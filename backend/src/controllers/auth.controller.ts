@@ -5,11 +5,11 @@ import { getSafeUser, loginUser, registerUser, signToken } from "../services/aut
 import { env } from "../config/env.js";
 
 function setAuthCookie(res: Response, token: string) {
-  const isProduction = env.jwtSecret !== "change-this-in-development" && process.env.NODE_ENV === "production";
+  const isProduction = process.env.NODE_ENV === "production";
 
   res.cookie("subnetops_token", token, {
     httpOnly: true,
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
     secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
