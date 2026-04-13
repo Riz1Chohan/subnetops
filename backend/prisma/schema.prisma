@@ -9,21 +9,21 @@ datasource db {
 }
 
 model User {
-  id            String          @id @default(uuid())
-  email         String          @unique
-  passwordHash  String
-  fullName      String?
-  planTier      PlanTier        @default(FREE)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  projects      Project[]
-  memberships   Membership[]
-  comments      ProjectComment[]
-  commentReplies ProjectComment[] @relation("CommentReplies")
-  assignedComments ProjectComment[] @relation("AssignedCommentUser")
-  notifications Notification[]
+  id                     String                   @id @default(uuid())
+  email                  String                   @unique
+  passwordHash           String
+  fullName               String?
+  planTier               PlanTier                 @default(FREE)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  projects               Project[]
+  memberships            Membership[]
+  comments               ProjectComment[]
+  assignedComments       ProjectComment[]         @relation("AssignedCommentUser")
+  notifications          Notification[]
   notificationPreference NotificationPreference?
-  watches       ProjectWatch[]
+  watches                ProjectWatch[]
+}
 }
 
 enum NotificationType {
