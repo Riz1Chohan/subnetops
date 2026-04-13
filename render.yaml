@@ -18,6 +18,8 @@ services:
         value: 4000
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20.12.2
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
