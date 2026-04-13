@@ -5,8 +5,7 @@ services:
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: npm install --ignore-scripts && npx prisma generate && npm run build
-    startCommand: node dist/server.js
+    buildCommand: npm install --ignore-scripts --include=dev && npx prisma generate && npm run build    startCommand: node dist/server.js
     healthCheckPath: /api/health/ready
     autoDeployTrigger: commit
     envVars:
