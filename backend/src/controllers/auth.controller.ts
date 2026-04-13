@@ -2,7 +2,6 @@ import type { Request, Response } from "express";
 import { ApiError } from "../utils/apiError.js";
 import { loginSchema, registerSchema } from "../validators/auth.schemas.js";
 import { getSafeUser, loginUser, registerUser, signToken } from "../services/auth.service.js";
-import { env } from "../config/env.js";
 
 function setAuthCookie(res: Response, token: string) {
   const isProduction = process.env.NODE_ENV === "production";

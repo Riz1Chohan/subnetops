@@ -196,3 +196,44 @@ export interface ProjectCommentReply {
 export type CommentTaskStatus = "OPEN" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 export type CommentTaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type CommentTargetType = "PROJECT" | "SITE" | "VLAN";
+
+
+export interface AIPlanDraft {
+  project: {
+    name: string;
+    description: string;
+    organizationName?: string;
+    environmentType?: string;
+    basePrivateRange?: string;
+  };
+  sites: Array<{
+    name: string;
+    location?: string;
+    siteCode?: string;
+    defaultAddressBlock?: string;
+    notes?: string;
+  }>;
+  vlans: Array<{
+    siteName: string;
+    vlanId: number;
+    vlanName: string;
+    purpose?: string;
+    subnetCidr: string;
+    gatewayIp: string;
+    dhcpEnabled: boolean;
+    estimatedHosts?: number;
+    department?: string;
+    notes?: string;
+  }>;
+  rationale: string[];
+  assumptions: string[];
+  reviewChecklist: string[];
+  provider: "local" | "openai";
+}
+
+export interface AIValidationExplanation {
+  explanation: string;
+  whyItMatters: string;
+  suggestedFixes: string[];
+  provider: "local" | "openai";
+}

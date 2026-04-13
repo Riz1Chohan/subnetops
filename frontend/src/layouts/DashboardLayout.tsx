@@ -19,6 +19,7 @@ export function DashboardLayout() {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/projects/new">New Project</Link>
           <Link to="/my-tasks">My Tasks{overdueTasks > 0 ? ` (${overdueTasks})` : ""}</Link>
+          <Link to="/about">About</Link>
           <span className="muted">Notifications: {notificationSummaryQuery.data?.unread ?? 0}</span>
           <span className="muted">{data?.user?.email || "Guest"}</span>
           <button

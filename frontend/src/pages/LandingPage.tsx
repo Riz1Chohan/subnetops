@@ -12,6 +12,7 @@ export function LandingPage() {
         <div className="actions">
           <Link to="/register"><button type="button">Get started</button></Link>
           <Link to="/login" className="link-button">Login</Link>
+          <Link to="/about" className="link-button">About</Link>
         </div>
       </div>
     </main>

@@ -34,4 +34,7 @@ export const env = {
   automationSweepIntervalMs: toNumber(process.env.AUTOMATION_SWEEP_INTERVAL_MS, 300000),
   dbPushOnBoot: toBool(process.env.DB_PUSH_ON_BOOT, false),
   seedDemoOnBoot: toBool(process.env.SEED_DEMO_ON_BOOT, false),
+  aiProvider: process.env.AI_PROVIDER || "local",
+  openAiApiKey: process.env.OPENAI_API_KEY || "",
+  openAiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 };

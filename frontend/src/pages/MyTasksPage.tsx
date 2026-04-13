@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import { useAssignedTasks, useQueueMyDigest, useUpdateCommentTask } from "../features/comments/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
 import type { CommentTaskPriority } from "../lib/types";
+import { SectionHeader } from "../components/app/SectionHeader";
+import { LoadingState } from "../components/app/LoadingState";
+import { EmptyState } from "../components/app/EmptyState";
+import { ErrorState } from "../components/app/ErrorState";
 
 function isOverdue(dueDate?: string, taskStatus?: string) {
   if (!dueDate || taskStatus === "DONE") return false;
@@ -67,18 +71,41 @@ export function MyTasksPage() {
     return acc;
   }, {} as Record<string, { name: string; open: number; overdue: number; total: number; critical: number }>));
 
+  if (tasksQuery.isLoading) {
+    return <LoadingState title="Loading my tasks" message="Gathering your assigned work, due dates, and project summaries." />;
+  }
+
+  if (tasksQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load your tasks"
+        message={tasksQuery.error instanceof Error ? tasksQuery.error.message : "SubnetOps could not load your assigned tasks right now."}
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
-      <div className="panel" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ marginBottom: 8 }}>My Tasks</h1>
-          <p className="muted" style={{ margin: 0 }}>Assigned review items for {authQuery.data?.user.email}.</p>
-        </div>
-        <div className="form-actions">
-          <button type="button" onClick={async () => { const result = await queueDigestMutation.mutateAsync(); window.alert(result.queued ? `Digest queued. Open: ${result.open ?? 0}, Overdue: ${result.overdue ?? 0}.` : result.reason || "Digest not queued."); }} disabled={queueDigestMutation.isPending}>{queueDigestMutation.isPending ? "Queueing..." : "Queue My Digest"}</button>
-          <Link to="/dashboard" className="link-button">Back to Dashboard</Link>
-        </div>
-      </div>
+      <SectionHeader
+        title="My Tasks"
+        description={`Assigned review items for ${authQuery.data?.user.email || "your account"}.`}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={async () => {
+                const result = await queueDigestMutation.mutateAsync();
+                window.alert(result.queued ? `Digest queued. Open: ${result.open ?? 0}, Overdue: ${result.overdue ?? 0}.` : result.reason || "Digest not queued.");
+              }}
+              disabled={queueDigestMutation.isPending}
+            >
+              {queueDigestMutation.isPending ? "Queueing..." : "Queue My Digest"}
+            </button>
+            <Link to="/dashboard" className="link-button">Back to Dashboard</Link>
+          </>
+        }
+      />
 
       <div className="summary-grid">
         <div className="summary-card"><div className="muted">Open</div><div className="value">{open}</div></div>
@@ -88,36 +115,54 @@ export function MyTasksPage() {
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>Tasks by Project</h2>
-        <div className="grid-cards">
-          {byProject.map((project) => (
-            <div key={project.name} className="validation-card">
-              <strong>{project.name}</strong>
-              <p className="muted" style={{ margin: "6px 0" }}>Open: {project.open} • Total: {project.total}</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span className={project.overdue > 0 ? "badge badge-error" : "badge badge-info"}>Overdue: {project.overdue}</span>
-                <span className={project.critical > 0 ? "badge badge-error" : "badge badge-info"}>Critical: {project.critical}</span>
+        {byProject.length === 0 ? (
+          <EmptyState
+            title="No assigned tasks yet"
+            message="When tasks are assigned to you, this page will group them by project and show what needs attention first."
+          />
+        ) : (
+          <div className="grid-cards">
+            {byProject.map((project) => (
+              <div key={project.name} className="validation-card">
+                <strong>{project.name}</strong>
+                <p className="muted" style={{ margin: "6px 0" }}>Open: {project.open} • Total: {project.total}</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className={project.overdue > 0 ? "badge badge-error" : "badge badge-info"}>Overdue: {project.overdue}</span>
+                  <span className={project.critical > 0 ? "badge badge-error" : "badge badge-info"}>Critical: {project.critical}</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="panel">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <h2 style={{ marginTop: 0 }}>Assigned Items</h2>
           <div className="form-actions">
-            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as any)}>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as "all" | CommentTaskPriority)}>
               <option value="all">All priorities</option>
               <option value="LOW">Low</option>
               <option value="MEDIUM">Medium</option>
               <option value="HIGH">High</option>
               <option value="CRITICAL">Critical</option>
             </select>
-            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as "priority" | "due")}>
               <option value="priority">Sort by priority</option>
               <option value="due">Sort by due date</option>
             </select>
-            <button type="button" disabled={selectedTaskIds.length === 0} onClick={async () => { for (const taskId of selectedTaskIds) { await updateTaskMutation.mutateAsync({ commentId: taskId, values: { taskStatus: "DONE" } }); } setSelectedTaskIds([]); }}>Mark Selected Done</button>
+            <button
+              type="button"
+              disabled={selectedTaskIds.length === 0}
+              onClick={async () => {
+                for (const taskId of selectedTaskIds) {
+                  await updateTaskMutation.mutateAsync({ commentId: taskId, values: { taskStatus: "DONE" } });
+                }
+                setSelectedTaskIds([]);
+              }}
+            >
+              Mark Selected Done
+            </button>
           </div>
         </div>
         <div style={{ display: "grid", gap: 10 }}>
@@ -146,7 +191,7 @@ export function MyTasksPage() {
                     <option value="HIGH">High</option>
                     <option value="CRITICAL">Critical</option>
                   </select>
-                  <select value={task.taskStatus} onChange={(e) => void updateTaskMutation.mutateAsync({ commentId: task.id, values: { taskStatus: e.target.value as any } })}>
+                  <select value={task.taskStatus} onChange={(e) => void updateTaskMutation.mutateAsync({ commentId: task.id, values: { taskStatus: e.target.value as "OPEN" | "IN_PROGRESS" | "BLOCKED" | "DONE" } })}>
                     <option value="OPEN">Open</option>
                     <option value="IN_PROGRESS">In Progress</option>
                     <option value="BLOCKED">Blocked</option>
@@ -156,7 +201,12 @@ export function MyTasksPage() {
               </div>
             );
           })}
-          {!tasksQuery.isLoading && filteredTasks.length === 0 ? <p className="muted">No assigned tasks yet.</p> : null}
+          {filteredTasks.length === 0 ? (
+            <EmptyState
+              title={tasks.length === 0 ? "No assigned tasks yet" : "No tasks match this filter"}
+              message={tasks.length === 0 ? "Assigned review work will appear here when someone adds you to a task." : "Try a different priority filter or sort view to bring matching tasks back into view."}
+            />
+          ) : null}
         </div>
       </div>
     </section>

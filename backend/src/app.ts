@@ -15,6 +15,7 @@ import commentRoutes from "./routes/comment.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import notificationPreferenceRoutes from "./routes/notificationPreference.routes.js";
 import projectWatchRoutes from "./routes/projectWatch.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -58,6 +59,7 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/notification-preferences", notificationPreferenceRoutes);
 app.use("/api/project-watchers", projectWatchRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

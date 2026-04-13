@@ -9,6 +9,9 @@ import { ValidationList } from "../features/validation/components/ValidationList
 import { ValidationSummaryChart } from "../features/report/components/ValidationSummaryChart";
 import { ActivityFeed } from "../features/report/components/ActivityFeed";
 import { apiUrl } from "../lib/api";
+import { LoadingState } from "../components/app/LoadingState";
+import { EmptyState } from "../components/app/EmptyState";
+import { ErrorState } from "../components/app/ErrorState";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -42,8 +45,25 @@ export function ProjectReportPage() {
     };
   }, [project, vlans]);
 
-  if (projectQuery.isLoading) return <p className="muted">Loading report...</p>;
-  if (!project || !enrichedProject) return <p className="error-text">Project not found.</p>;
+  if (projectQuery.isLoading) return <LoadingState title="Loading report" message="Preparing the printable project summary and exports." />;
+  if (projectQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load report"
+        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this report right now."}
+        action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
+      />
+    );
+  }
+  if (!project || !enrichedProject) {
+    return (
+      <EmptyState
+        title="Project not found"
+        message="The requested report view could not be loaded."
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
@@ -65,7 +85,7 @@ export function ProjectReportPage() {
             <button type="button" onClick={() => window.print()}>Print Report</button>
             <a href={apiUrl(`/export/projects/${projectId}/csv`)} target="_blank" rel="noreferrer" className="link-button">Export CSV</a>
             <a href={apiUrl(`/export/projects/${projectId}/pdf`)} target="_blank" rel="noreferrer" className="link-button">Export PDF</a>
-            <Link to={`/projects/${projectId}`} className="link-button">Back to Project</Link>
+            <Link to={`/projects/${projectId}/overview`} className="link-button">Back to Project</Link>
           </div>
         </div>
       </div>
@@ -75,6 +95,13 @@ export function ProjectReportPage() {
         siteCount={sites.length}
         vlanCount={vlans.length}
       />
+
+      <div className="trust-note">
+        <strong>Report purpose</strong>
+        <p className="muted" style={{ margin: "6px 0 0 0" }}>
+          Use this view for design review, exports, and client-facing handoff. Use the workspace pages for editing.
+        </p>
+      </div>
 
       <div className="summary-grid">
         <div className="summary-card">
@@ -113,7 +140,7 @@ export function ProjectReportPage() {
       <div className="panel report-section">
         <h2>Site Summary</h2>
         {sites.length === 0 ? (
-          <p className="muted">No sites added yet.</p>
+<EmptyState title="No sites added yet" message="Add sites in the workspace to populate the report-ready site summary." />
         ) : (
           <table>
             <thead>
@@ -141,7 +168,7 @@ export function ProjectReportPage() {
       <div className="panel report-section">
         <h2>VLAN Summary</h2>
         {vlans.length === 0 ? (
-          <p className="muted">No VLANs added yet.</p>
+<EmptyState title="No VLANs added yet" message="Add VLANs in the workspace to populate the report-ready segmentation summary." />
         ) : (
           <table>
             <thead>

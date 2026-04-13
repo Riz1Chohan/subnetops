@@ -42,13 +42,19 @@ services:
         value: "false"
       - key: SEED_DEMO_ON_BOOT
         value: "false"
+      - key: AI_PROVIDER
+        value: "local"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
 
   - type: web
     name: subnetops-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist    
+    staticPublishPath: ./dist
     envVars:
       - key: NODE_VERSION
         value: 20.12.2
