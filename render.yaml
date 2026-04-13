@@ -6,7 +6,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install --ignore-scripts --include=dev && npx prisma generate && npm run build    
-    startCommand: node dist/server.js
+    startCommand: npx prisma db push && node dist/server.js    
     healthCheckPath: /api/health/ready
     autoDeployTrigger: commit
     envVars:
@@ -14,8 +14,6 @@ services:
         fromDatabase:
           name: subnetops-db
           property: connectionString
-      - key: PORT
-        value: 4000
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
