@@ -1,0 +1,19 @@
+import { Router } from "express";
+import * as projectController from "../controllers/project.controller.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { requireAuth } from "../middleware/auth.js";
+
+const router = Router();
+
+router.use(requireAuth);
+router.get("/", asyncHandler(projectController.listProjects));
+router.post("/", asyncHandler(projectController.createProject));
+router.post("/templates/:templateKey", asyncHandler(projectController.createProjectFromTemplate));
+router.get("/:projectId", asyncHandler(projectController.getProject));
+router.post("/:projectId/duplicate", asyncHandler(projectController.duplicateProject));
+router.get("/:projectId/sites", asyncHandler(projectController.getProjectSites));
+router.get("/:projectId/vlans", asyncHandler(projectController.getProjectVlans));
+router.patch("/:projectId", asyncHandler(projectController.updateProject));
+router.delete("/:projectId", asyncHandler(projectController.deleteProject));
+
+export default router;
