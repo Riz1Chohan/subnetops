@@ -65,9 +65,6 @@ export function ProjectOverviewPage() {
   const [sortMode, setSortMode] = useState("vlan-asc");
   const [selectedAnnotationTarget, setSelectedAnnotationTarget] = useState<{ targetType: "SITE" | "VLAN"; targetId: string } | null>(null);
 
-  if (isLoading) return <p className="muted">Loading project...</p>;
-  if (!project) return <p className="error-text">Project not found.</p>;
-
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const safeSites = useMemo(() => sites, [sites]);
@@ -105,6 +102,9 @@ export function ProjectOverviewPage() {
     return filtered;
   }, [vlans, vlanQuery, siteFilter, categoryFilter, sortMode]);
 
+   if (isLoading) return <p className="muted">Loading project...</p>;
+  if (!project) return <p className="error-text">Project not found.</p>;
+  
   const enrichedProject = {
     ...project,
     sites: project.sites.map((site) => ({
