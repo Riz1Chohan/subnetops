@@ -6,7 +6,6 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install --ignore-scripts && npx prisma generate && npm run build
-    preDeployCommand: npx prisma db push
     startCommand: node dist/server.js
     healthCheckPath: /api/health/ready
     autoDeployTrigger: commit
