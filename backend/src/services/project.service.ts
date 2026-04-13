@@ -52,6 +52,7 @@ export async function createProject(
     reportFooter?: string;
     approvalStatus?: "DRAFT" | "IN_REVIEW" | "APPROVED";
     reviewerNotes?: string;
+    requirementsJson?: string;
   },
   actorLabel?: string,
 ) {
@@ -149,6 +150,7 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
       reportFooter: source.reportFooter,
       approvalStatus: source.approvalStatus,
       reviewerNotes: source.reviewerNotes,
+      requirementsJson: source.requirementsJson,
     },
   });
 

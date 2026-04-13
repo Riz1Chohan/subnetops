@@ -72,7 +72,7 @@ export function ProjectVlansPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="VLANs"
-        description="Manage VLANs, gateways, subnet sizes, and filters in a more mature workspace."
+        description="Manage VLANs, subnet roles, address boundaries, and capacity planning in a more realistic IP workspace."
         actions={
           !showCreate && !editingVlan ? (
             <button type="button" onClick={() => setShowCreate(true)}>Add VLAN</button>

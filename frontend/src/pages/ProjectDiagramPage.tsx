@@ -6,6 +6,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
+import { parseRequirementsProfile } from "../lib/requirementsProfile";
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
@@ -16,6 +17,7 @@ export function ProjectDiagramPage() {
   const project = projectQuery.data;
   const vlans = vlansQuery.data ?? [];
   const comments = commentsQuery.data ?? [];
+  const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
 
   if (projectQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the logical and physical diagram workspace." />;
   if (projectQuery.isError) {
@@ -52,7 +54,7 @@ export function ProjectDiagramPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Diagram"
-        description="A larger, calmer workspace for reviewing topology, segmentation, and communication-ready diagram views."
+        description="Network-style logical and topology views that are closer to real infrastructure storytelling than an abstract decision tree."
       />
 
       <div className="summary-grid">
@@ -70,29 +72,38 @@ export function ProjectDiagramPage() {
         <aside className="panel" style={{ display: "grid", gap: 12, alignSelf: "start" }}>
           <h2 style={{ margin: 0 }}>Diagram guide</h2>
           <div className="trust-note">
-            <strong>How to use this page</strong>
+            <strong>How this is different now</strong>
             <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              Use the diagram page to review structure and explain the design to others. Keep deep addressing and remediation work in the VLAN and validation pages.
+              The diagram page now aims to look and read more like a network plan, with a visible internet edge, firewall/core structure, site containers, and recognizable topology flow.
             </p>
           </div>
 
           <details open>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Reading the logical and physical views</summary>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Reading the two views</summary>
             <ul style={{ margin: "10px 0 0 0", paddingLeft: 18 }}>
-              <li>Logical view is best for segmentation, VLAN boundaries, and subnet discussion.</li>
-              <li>Physical view is best for quick infrastructure storytelling and handoff conversations.</li>
-              <li>Open task markers help you see where review work is concentrated.</li>
+              <li><strong>Logical Design</strong> is best for segmentation, site blocks, VLAN structure, and design review.</li>
+              <li><strong>Physical / Topology</strong> is best for presenting perimeter, core, branch attachment, and local edge components.</li>
+              <li>Task markers still show where review work is concentrated.</li>
             </ul>
           </details>
 
           <details>
             <summary style={{ cursor: "pointer", fontWeight: 700 }}>Recommended workflow</summary>
             <ol style={{ margin: "10px 0 0 0", paddingLeft: 18 }}>
-              <li>Validate the project first.</li>
-              <li>Use the diagram to present the intended structure.</li>
-              <li>Use the report page for cleaner stakeholder-facing output.</li>
+              <li>Run validation first so the diagram reflects a cleaner design state.</li>
+              <li>Use the logical view for engineering review.</li>
+              <li>Use the physical/topology view for handoff and explanation.</li>
             </ol>
           </details>
+
+          {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? (
+            <div className="trust-note">
+              <strong>Cloud / hybrid planning context</strong>
+              <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                This project assumes {requirementsProfile.cloudProvider} over {requirementsProfile.cloudConnectivity}, with {requirementsProfile.cloudHostingModel}. The diagram should be read with a cloud boundary of {requirementsProfile.cloudIdentityBoundary} and a traffic model of {requirementsProfile.cloudTrafficBoundary}.
+              </p>
+            </div>
+          ) : null}
 
           <div className="toolbar-row">
             <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>

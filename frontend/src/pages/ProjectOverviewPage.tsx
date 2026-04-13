@@ -9,6 +9,7 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import type { Vlan } from "../lib/types";
 import { utilizationForCidr } from "../lib/networkValidators";
+import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -58,6 +59,8 @@ export function ProjectOverviewPage() {
     return acc;
   }, {});
   const categoryEntries = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
+  const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
+  const requirementsReadiness = planningReadinessSummary(requirementsProfile);
   const mostLoadedSegment = [...vlans]
     .map((vlan) => ({ vlan, utilization: utilizationForCidr(vlan.subnetCidr, vlan.estimatedHosts) }))
     .filter((entry) => Boolean(entry.utilization))
@@ -89,8 +92,8 @@ export function ProjectOverviewPage() {
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
-        title="Overview"
-        description="A source-of-truth summary for the network plan, validation health, and next engineering actions."
+        title="Logical Design"
+        description="Use this workspace to move from requirements into sites, VLANs, subnetting, and design structure."
         actions={
           <>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
@@ -127,6 +130,13 @@ export function ProjectOverviewPage() {
         {summaryCard("Validation health", validationHealthLabel(errorCount, warningCount))}
       </div>
 
+      <div className="summary-grid">
+        <div className="summary-card"><div className="muted">Requirements readiness</div><div className="value">{requirementsReadiness.completionLabel}</div></div>
+        <div className="summary-card"><div className="muted">Tracks ready</div><div className="value">{requirementsReadiness.readyCount}</div></div>
+        <div className="summary-card"><div className="muted">Need review</div><div className="value">{requirementsReadiness.reviewCount}</div></div>
+        <div className="summary-card"><div className="muted">Inactive</div><div className="value">{requirementsReadiness.inactiveCount}</div></div>
+      </div>
+
       <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1.2fr 1fr" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
@@ -150,10 +160,65 @@ export function ProjectOverviewPage() {
                 : "Add estimated host counts to surface utilization pressure and capacity risk here."}
             </p>
           </div>
+
+          <div className="trust-note">
+            <strong>Addressing policy</strong>
+            <p className="muted" style={{ margin: "6px 0 0 0" }}>
+              This project is using {requirementsProfile.addressHierarchyModel}, with {requirementsProfile.siteBlockStrategy}, a gateway convention of {requirementsProfile.gatewayConvention}, and a growth model of {requirementsProfile.growthBufferModel}.
+            </p>
+          </div>
+
+          <div className="trust-note">
+            <strong>Operations model</strong>
+            <p className="muted" style={{ margin: "6px 0 0 0" }}>
+              The design assumes {requirementsProfile.managementIpPolicy}, {requirementsProfile.monitoringModel}, {requirementsProfile.loggingModel}, and {requirementsProfile.backupPolicy}. Ownership is planned as {requirementsProfile.operationsOwnerModel}.
+            </p>
+          </div>
+
+          <div className="trust-note">
+            <strong>Physical and endpoint profile</strong>
+            <p className="muted" style={{ margin: "6px 0 0 0" }}>
+              This plan assumes {requirementsProfile.siteLayoutModel}, serving a {requirementsProfile.siteRoleModel}, with {requirementsProfile.buildingCount} building(s), {requirementsProfile.floorCount} floor(s), a {requirementsProfile.closetModel}, and an edge footprint of {requirementsProfile.edgeFootprint}. It also assumes roughly {requirementsProfile.apCount} APs, {requirementsProfile.printerCount} printers, {requirementsProfile.phoneCount} phones, {requirementsProfile.cameraCount} cameras, {requirementsProfile.serverCount} servers, and {requirementsProfile.iotDeviceCount} IoT or specialty devices.
+            </p>
+          </div>
+
+          <div className="trust-note">
+            <strong>Application and WAN profile</strong>
+            <p className="muted" style={{ margin: "6px 0 0 0" }}>
+              The design assumes {requirementsProfile.applicationProfile}, with {requirementsProfile.criticalServicesModel}, {requirementsProfile.interSiteTrafficModel}, {requirementsProfile.bandwidthProfile}, and {requirementsProfile.qosModel}. Outage tolerance is {requirementsProfile.outageTolerance} and the growth horizon is {requirementsProfile.growthHorizon}.
+            </p>
+          </div>
+
+          <div className="trust-note">
+            <strong>Implementation and handoff model</strong>
+            <p className="muted" style={{ margin: "6px 0 0 0" }}>
+              This plan assumes {requirementsProfile.budgetModel}, {requirementsProfile.vendorPreference}, {requirementsProfile.implementationTimeline}, and {requirementsProfile.rolloutModel}. The final package is aimed at {requirementsProfile.primaryAudience} with an output style of {requirementsProfile.outputPackage}.
+            </p>
+          </div>
         </div>
 
         <div className="panel" style={{ display: "grid", gap: 12 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 0 }}>What to review next</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Requirements snapshot</h2>
+          <p className="muted" style={{ margin: 0 }}>Use case: {requirementsProfile.planningFor} • Phase: {requirementsProfile.projectPhase} • Goal: {requirementsProfile.primaryGoal}</p>
+          <p className="muted" style={{ margin: 0 }}>WAN: {requirementsProfile.internetModel} • Compliance: {requirementsProfile.complianceProfile}</p>
+          <p className="muted" style={{ margin: 0 }}>Security posture: {requirementsProfile.securityPosture}</p>
+          <p className="muted" style={{ margin: 0 }}>Trust boundary: {requirementsProfile.trustBoundaryModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Identity model: {requirementsProfile.identityModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Cloud posture: {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? `${requirementsProfile.cloudProvider} over ${requirementsProfile.cloudConnectivity}` : "On-prem focused"}</p>
+          <p className="muted" style={{ margin: 0 }}>Cloud hosting: {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? requirementsProfile.cloudHostingModel : "No hybrid hosting model selected"}</p>
+          <p className="muted" style={{ margin: 0 }}>Address hierarchy: {requirementsProfile.addressHierarchyModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Site block strategy: {requirementsProfile.siteBlockStrategy}</p>
+          <p className="muted" style={{ margin: 0 }}>Monitoring model: {requirementsProfile.monitoringModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Naming standard: {requirementsProfile.namingStandard}</p>
+          <p className="muted" style={{ margin: 0 }}>Site layout: {requirementsProfile.siteLayoutModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Site role: {requirementsProfile.siteRoleModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Buildings / floors: {requirementsProfile.buildingCount} / {requirementsProfile.floorCount}</p>
+          <p className="muted" style={{ margin: 0 }}>Endpoint mix: {requirementsProfile.wiredWirelessMix}</p>
+          <p className="muted" style={{ margin: 0 }}>Application profile: {requirementsProfile.applicationProfile}</p>
+          <p className="muted" style={{ margin: 0 }}>WAN / performance: {requirementsProfile.interSiteTrafficModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Implementation: {requirementsProfile.rolloutModel}</p>
+          <p className="muted" style={{ margin: 0 }}>Output package: {requirementsProfile.outputPackage}</p>
+          <h2 style={{ marginTop: 8, marginBottom: 0 }}>What to review next</h2>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             <li>Check validation before treating the design as final.</li>
             <li>Use the diagram page to explain logical vs physical structure.</li>
@@ -163,7 +228,7 @@ export function ProjectOverviewPage() {
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>Network workspaces</h2>
+        <h2 style={{ marginTop: 0 }}>Logical design workspaces</h2>
         <div className="grid-2">
           <Link to={`/projects/${projectId}/sites`} className="panel" style={{ textDecoration: "none" }}>
             <h3 style={{ marginTop: 0 }}>Sites</h3>
@@ -192,7 +257,7 @@ export function ProjectOverviewPage() {
 
           <Link to={`/projects/${projectId}/report`} className="panel" style={{ textDecoration: "none" }}>
             <h3 style={{ marginTop: 0 }}>Report</h3>
-            <p className="muted">Open the handoff surface for cleaner stakeholder review.</p>
+            <p className="muted">Open the handoff surface for cleaner stakeholder review and export.</p>
           </Link>
         </div>
       </div>

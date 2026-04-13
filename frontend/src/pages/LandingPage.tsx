@@ -2,12 +2,14 @@ import { Link } from "react-router-dom";
 
 export function LandingPage() {
   return (
-    <main className="hero">
+    <section className="hero">
       <div className="panel">
-        <h1>Plan VLANs and IP ranges without spreadsheet chaos.</h1>
+        <h1>Start with requirements. End with a validated network plan.</h1>
         <p>
-          SubnetOps helps small IT teams design networks faster, catch subnet mistakes early,
-          and export clean documentation that is actually usable.
+          SubnetOps is a guided network planning workspace from NetWorks. Capture real requirements,
+          shape the logical design, validate key decisions early, and produce cleaner handoff outputs.
+          The workflow is built around structured planning ideas such as segmentation, modular design,
+          addressing hierarchy, and review-ready documentation.
         </p>
         <div className="actions">
           <Link to="/register"><button type="button">Get started</button></Link>
@@ -15,6 +17,6 @@ export function LandingPage() {
           <Link to="/about" className="link-button">About</Link>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

@@ -12,6 +12,7 @@ export interface AIUseDraftOptions {
 
 interface AIPlanningPanelProps {
   onUseDraft: (draft: AIPlanDraft, options: AIUseDraftOptions) => void;
+  seedPrompt?: string;
 }
 
 const starterPrompts = [
@@ -37,7 +38,7 @@ function providerLabel(provider: AIPlanDraft["provider"]) {
   return provider === "openai" ? "Enhanced AI mode" : "Local draft mode";
 }
 
-export function AIPlanningPanel({ onUseDraft }: AIPlanningPanelProps) {
+export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps) {
   const [prompt, setPrompt] = useState("1 HQ, 2 branches, guest Wi-Fi isolated, servers at HQ, voice VLAN, 80 users at HQ and 25 per branch.");
   const [applyProjectFields, setApplyProjectFields] = useState(true);
   const [applySites, setApplySites] = useState(true);
@@ -50,6 +51,12 @@ export function AIPlanningPanel({ onUseDraft }: AIPlanningPanelProps) {
       setApplySites(true);
     }
   }, [applyVlans, applySites]);
+
+  useEffect(() => {
+    if (seedPrompt && seedPrompt.trim().length > 0) {
+      setPrompt(seedPrompt);
+    }
+  }, [seedPrompt]);
 
   const selectedSummary = useMemo(() => {
     const parts = [] as string[];

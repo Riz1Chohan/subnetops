@@ -546,3 +546,161 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #122033;
+  text-decoration: none;
+}
+
+.brand-link:hover {
+  text-decoration: none;
+}
+
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(18, 32, 51, 0.08);
+}
+
+.brand-copy {
+  display: grid;
+  line-height: 1.05;
+}
+
+.brand-copy small {
+  color: #61738c;
+  font-size: 0.76rem;
+}
+
+.brand-copy strong {
+  color: #122033;
+  font-size: 1rem;
+}
+
+.guided-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.guided-grid label,
+.guided-checks label {
+  display: grid;
+  gap: 6px;
+}
+
+.guided-grid label span {
+  color: #42566f;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.guided-checks {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.guided-checks label {
+  align-items: center;
+  grid-template-columns: auto 1fr;
+  background: #fbfcff;
+  border: 1px solid #e6ecf7;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.guided-checks input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+
+.workflow-panel {
+  border-color: #dfe8f7;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+}
+
+.workflow-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.workflow-stage-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.workflow-stage-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #dfe6f3;
+  background: #fff;
+  color: #163257;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(18, 32, 51, 0.04);
+}
+
+.workflow-stage-card:hover {
+  text-decoration: none;
+  border-color: #bfd0ec;
+  background: #f8fbff;
+}
+
+.workflow-stage-card.complete {
+  border-color: #c9e6d0;
+  background: #f7fcf8;
+}
+
+.workflow-stage-card.current {
+  border-color: #b7caef;
+  background: #eef4ff;
+  box-shadow: 0 10px 24px rgba(35, 87, 216, 0.08);
+}
+
+.workflow-stage-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.workflow-stage-step {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4d6380;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.workflow-stage-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #f3f6fb;
+  color: #415776;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.workflow-stage-card.current .workflow-stage-status {
+  background: #dbe8ff;
+  color: #1f4b9b;
+}
+
+.workflow-stage-card.complete .workflow-stage-status {
+  background: #def3e2;
+  color: #2f6b3f;
+}

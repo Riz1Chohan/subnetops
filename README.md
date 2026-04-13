@@ -22,6 +22,20 @@ SubnetOps is a VLAN/IP planning workspace for small IT teams.
 - a public About page was added for product/company context, including NetWorks as the planned company name
 - the About page also credits Rizwan Chohan as the creator of the product
 
+## v44 release notes
+- the product shell now uses shared branding and navigation instead of leaving About disconnected from the rest of the experience
+- NetWorks branding and the uploaded logo are now integrated into public, auth, and app layouts
+- About copy now presents NetWorks and SubnetOps in a more professional company/product structure
+- project creation now begins with a guided planning step before the AI workflow, including use-case and environment selection
+- guided answers can now seed the AI planner so the first draft starts from more realistic planning context
+
+## v45 release notes
+- guided project creation now captures a broader requirements brief instead of only a lightweight starter context
+- the planning flow now includes project phase, compliance context, WAN model, server placement, and primary design goal
+- security, resilience, wireless, remote access, and cloud-connected needs now appear as planning signals before draft generation
+- the project form can now start from a generated requirements summary, not only from raw AI output
+- the AI seed prompt is now driven by a richer requirements brief so the first draft is grounded in more realistic design intent
+
 ## What is real in this codebase
 - React + Vite frontend
 - Express + Prisma backend
@@ -158,3 +172,140 @@ Before a real production deployment:
 - frontend builds to static assets and serves through nginx
 - backend install uses `npm install --ignore-scripts` so Prisma generation is deferred to startup
 - the provided smoke-test script checks frontend + live + ready endpoints
+
+
+## v46 release notes
+- upgraded subnetting logic from basic CIDR checks toward a more realistic IP planning model
+- added subnet facts such as canonical CIDR, mask, wildcard, network, broadcast, first/last usable, and role-aware usable counts
+- added role-aware planning for user, guest, server, management, voice, printer, IoT, camera, WAN transit, and loopback-style segments
+- improved validation with canonical CIDR warnings, parent site block checks, /31 and /32 review logic, and richer capacity guidance
+- upgraded VLAN workspace to show subnetting insight and stronger addressing details
+
+
+## v47 release notes
+- redesigned the validation workspace into a more realistic engineering review flow
+- added category grouping for addressing, gateway, capacity, segment-role, input-quality, and general findings
+- added search and filters for severity, entity type, and category
+- improved validation cards with rule codes, entity tags, and duplicate-task awareness
+- strengthened the side guidance so validation feels closer to a real review surface instead of a simple issue list
+
+
+## v48 release notes
+- rebuilt the diagram workspace so it looks more like a real network plan and less like an abstract tree
+- added a clearer internet edge, firewall, core, site edge, access, and server/wireless storytelling model
+- improved logical and physical/topology view separation
+- updated the diagram page guidance so users understand when to use each view
+
+
+## v49 release notes
+- redesigned the report page into a stronger handoff and review surface
+- added an executive summary, planning profile, validation posture, and top findings section
+- expanded the segmentation table with subnetting-aware fields like usable space and headroom
+- kept the diagram and detailed findings in the report so the page is more useful for stakeholder review and export
+
+
+## v50 release notes
+- added a dedicated Requirements workspace inside the project shell
+- started the workflow reset toward Requirements -> Logical Design -> Validation -> Diagram -> Report/Export
+- now persists guided planning inputs on the project as structured requirements JSON
+- updated the start flow so conditional scenario panels appear when security, wireless, cloud, or resilience choices matter
+- aligned the logical design and report surfaces more closely to the saved requirements context
+
+
+## v51 release notes
+
+- Extended the requirements model toward a more dynamic branching planner.
+- Added scenario-based planning fields to the in-project Requirements workspace, not only the new-project flow.
+- Added richer scenario context to the logical design and report surfaces so security, wireless, resilience, and cloud choices remain visible after intake.
+
+
+## v52 release notes
+
+- Expanded the requirements model to capture stronger security and trust-boundary decisions.
+- Added deeper cloud and hybrid planning fields for identity boundaries and traffic boundaries.
+- Updated the guided planner and requirements workspace so these choices stay visible in logical design and report views.
+
+
+## v53 release notes
+
+- Deepened the cloud and hybrid planning model with hosting, network, and routing choices.
+- Added hybrid-aware context to the diagram workspace so cloud boundary decisions are visible during review.
+- Added a cloud / hybrid planning summary to the report so hybrid assumptions carry into handoff outputs.
+
+
+## v54 release notes
+
+- Added an addressing and subnetting strategy layer to the guided planner and requirements workspace.
+- Expanded the requirements model with address hierarchy, site block, gateway, growth, and reserved-range policy choices.
+- Carried the addressing strategy into logical design and report surfaces so subnetting reads more like a planned hierarchy.
+
+
+## v55 release notes
+
+- Added an operations and manageability planning layer to the guided planner and requirements workspace.
+- Expanded the requirements model with management IP, naming, monitoring, logging, backup, and ownership decisions.
+- Carried operational planning assumptions into logical design and report views so the plan reads more like a maintainable network design.
+
+
+## v56 release notes
+
+- Added a physical layout and endpoint profile layer to the guided planner and requirements workspace.
+- Expanded the requirements model with site layout, physical scope, and device-count assumptions across printers, phones, APs, cameras, servers, and IoT devices.
+- Carried that physical and endpoint context into logical design and report views so the plan feels more tied to real sites and real infrastructure demand.
+
+
+## v57 release notes
+
+- Added an applications, WAN, and performance planning layer to the guided planner and requirements workspace.
+- Expanded the requirements model with application profile, critical services, inter-site traffic, bandwidth, latency, QoS, outage tolerance, and growth-horizon choices.
+- Carried the traffic and performance context into logical design and report surfaces so the plan reflects real service behavior and WAN expectations.
+
+
+## v58 release notes
+
+- Added an implementation constraints and outputs planning layer to the guided planner and requirements workspace.
+- Expanded the requirements model with budget, vendor preference, timeline, rollout, downtime, team capability, and handoff-target choices.
+- Carried that delivery and output context into logical design and report surfaces so the plan reflects how it will actually be implemented and consumed.
+
+
+## v60 release notes
+
+- Strengthened the About and product messaging with a more standards-informed planning and methodology layer.
+- Added methodology-oriented guidance to the requirements and report surfaces so the app reads more like a serious planning workflow.
+- Refined landing/about copy so NetWorks and SubnetOps present more clearly as a professional product and company direction.
+
+
+## v61 release notes
+
+- Added track-level status and review guidance to the guided planner and requirements workspace.
+- Introduced planning-track readiness summaries so the active scenario areas read more like a guided workflow.
+- Moved the planner another step toward a fuller dynamic branching model by combining active-track visibility with review status.
+
+
+## v63 release notes
+
+- Added requirements-readiness summaries to the planner, requirements workspace, logical design view, and report.
+- Introduced readiness labels and next-review guidance so the active planning tracks feel more actionable.
+- Continued the guided-workflow direction by turning track status into more visible planning progress.
+
+
+## v64 release notes
+
+- Deepened the physical planning layer with site role, buildings, floors, closet model, and edge-footprint fields.
+- Extended the physical and endpoint profile so it reads more like real site-structure planning instead of only device counts.
+- Carried the richer site-structure context into logical design and report views.
+
+
+## v65 release notes
+
+- Added a clearer workflow-progress layer to the project shell so the path from Requirements to Report reads more like one guided process.
+- Introduced stage cards for Requirements, Logical Design, Validation, Diagram, and Report / Export, with current-stage and next-stage guidance.
+- Added current-workflow guidance in the sidebar so users can see what stage they are in and where the review should move next.
+
+
+## v66 release notes
+
+- Added a dependency and environment stabilization pass focused on reproducibility and verification readiness.
+- Pinned frontend and backend package versions instead of leaving them floating under caret ranges.
+- Aligned Prisma package versions and added runtime guidance files for Node 20.12.2.
+- Added a verification script so installs and builds can be checked more consistently outside this container.
