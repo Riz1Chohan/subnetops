@@ -19,7 +19,6 @@ model User {
   projects      Project[]
   memberships   Membership[]
   comments      ProjectComment[]
-  commentReplies ProjectComment[] @relation("CommentReplies")
   assignedComments ProjectComment[] @relation("AssignedCommentUser")
   notifications Notification[]
   notificationPreference NotificationPreference?
