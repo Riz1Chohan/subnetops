@@ -1,8 +1,9 @@
 import prismaClientPkg from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pgPkg from "pg";
-const { Pool } = pgPkg;
 import { env } from "../config/env.js";
+
+const { Pool } = pgPkg;
 
 const { PrismaClient } = prismaClientPkg as { PrismaClient: new (options?: any) => any };
 

@@ -1,16 +1,41 @@
 import type { Request, Response } from "express";
 import { ApiError } from "../utils/apiError.js";
-import { loginSchema, registerSchema } from "../validators/auth.schemas.js";
-import { getSafeUser, loginUser, registerUser, signToken } from "../services/auth.service.js";
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  requestPasswordResetSchema,
+  resetPasswordSchema,
+} from "../validators/auth.schemas.js";
+import {
+  changePassword,
+  createPasswordResetRequest,
+  getSafeUser,
+  loginUser,
+  registerUser,
+  resetPassword,
+  signToken,
+} from "../services/auth.service.js";
+
+function authCookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    sameSite: (isProduction ? "none" : "lax") as const,
+    secure: isProduction,
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+}
 
 function setAuthCookie(res: Response, token: string) {
-  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("subnetops_token", token, authCookieOptions());
+}
 
-  res.cookie("subnetops_token", token, {
-    httpOnly: true,
-    sameSite: isProduction ? "none" : "lax",
-    secure: isProduction,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+function clearAuthCookie(res: Response) {
+  res.clearCookie("subnetops_token", {
+    ...authCookieOptions(),
+    maxAge: 0,
   });
 }
 
@@ -39,8 +64,8 @@ export async function login(req: Request, res: Response) {
 }
 
 export async function logout(_req: Request, res: Response) {
-  res.clearCookie("subnetops_token");
-  res.json({ message: "Logged out" });
+  clearAuthCookie(res);
+  res.status(204).send();
 }
 
 export async function me(req: Request, res: Response) {
@@ -50,4 +75,35 @@ export async function me(req: Request, res: Response) {
 
   const safeUser = await getSafeUser(req.user.id);
   res.json({ user: safeUser });
+}
+
+export async function changePasswordHandler(req: Request, res: Response) {
+  if (!req.user?.id) {
+    throw new ApiError(401, "Unauthorized");
+  }
+  const data = changePasswordSchema.parse(req.body);
+  await changePassword({ userId: req.user.id, ...data });
+  clearAuthCookie(res);
+  res.json({ message: "Password changed successfully. Please sign in again." });
+}
+
+export async function requestPasswordReset(req: Request, res: Response) {
+  const data = requestPasswordResetSchema.parse(req.body);
+  const result = await createPasswordResetRequest(data);
+  const response: { message: string; resetToken?: string } = {
+    message: "If an account exists for that email, reset instructions are ready.",
+  };
+
+  if (process.env.NODE_ENV !== "production" && result.resetToken) {
+    response.resetToken = result.resetToken;
+  }
+
+  res.json(response);
+}
+
+export async function resetPasswordHandler(req: Request, res: Response) {
+  const data = resetPasswordSchema.parse(req.body);
+  await resetPassword(data);
+  clearAuthCookie(res);
+  res.json({ message: "Password reset successfully. Please sign in with your new password." });
 }

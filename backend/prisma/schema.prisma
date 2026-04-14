@@ -78,6 +78,8 @@ model Project {
   approvalStatus   ApprovalStatus     @default(DRAFT)
   reviewerNotes    String?
   requirementsJson String?
+  discoveryJson    String?
+  platformProfileJson String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)

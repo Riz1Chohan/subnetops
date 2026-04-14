@@ -11,7 +11,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "setup": "npm install --ignore-scripts && npm run prisma:generate"
+    "setup": "npm install --ignore-scripts && npm run prisma:update",
+    "prisma:push": "prisma db push",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:update": "npm run prisma:generate && npm run prisma:push",
+    "prisma:update:dev": "npm run prisma:update && npm run prisma:seed"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
