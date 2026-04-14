@@ -50,7 +50,7 @@ export function VlanTable({
                 <td>{vlan.site?.name || "—"}</td>
                 <td>{vlan.vlanId}</td>
                 <td>{vlan.vlanName}</td>
-                <td>{vlan.purpose || role.replaceAll("_", " ")}</td>
+                <td>{vlan.purpose || role.replace(/_/g, " ")}</td>
                 <td>{facts?.canonicalCidr || vlan.subnetCidr}</td>
                 <td>{vlan.gatewayIp}</td>
                 <td>{facts?.dottedMask || "—"}</td>
