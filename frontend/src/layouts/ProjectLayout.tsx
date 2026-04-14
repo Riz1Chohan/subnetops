@@ -166,7 +166,7 @@ export function ProjectLayout() {
           </div>
           <div className="workflow-meta">
             <span className="badge-soft">Current stage: {currentStage.label}</span>
-            <span className="badge-soft">Requirements: {readiness.label}</span>
+            <span className="badge-soft">Requirements: {readiness.completionLabel}</span>
             {nextStage ? <span className="badge-soft">Next: {nextStage.label}</span> : <span className="badge-soft">Next: Final review</span>}
           </div>
         </div>
@@ -174,7 +174,7 @@ export function ProjectLayout() {
         <div className="workflow-stage-grid">
           {workflowStages.map((stage, index) => {
             const state = workflowStateForIndex(index, activeStageIndex);
-            const statusLabel = workflowStatusLabel(stage.key, readiness.label, errorCount, sites.length, vlans.length);
+            const statusLabel = workflowStatusLabel(stage.key, readiness.completionLabel, errorCount, sites.length, vlans.length);
             return (
               <Link
                 key={stage.key}
