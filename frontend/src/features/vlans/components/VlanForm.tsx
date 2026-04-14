@@ -157,7 +157,7 @@ export function VlanForm({
         <div className="validation-card">
           <strong>Subnetting insight</strong>
           <p className="muted" style={{ margin: "6px 0" }}>
-            Segment role: <strong>{role.replaceAll("_", " ")}</strong>
+            Segment role: <strong>{role.replace(/_/g, " ")}</strong>
             {planningHint ? <>
               {" "}• recommended minimum size: <strong>/{planningHint.recommendedPrefix}</strong> with about <strong>{planningHint.usableHosts}</strong> usable addresses.
             </> : null}
