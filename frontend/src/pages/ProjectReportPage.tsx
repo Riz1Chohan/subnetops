@@ -422,7 +422,7 @@ export function ProjectReportPage() {
                   <tr key={vlan.id}>
                     <td>{vlan.site?.name || "—"}</td>
                     <td>{vlan.vlanId} • {vlan.vlanName}</td>
-                    <td>{vlan.purpose || role.replaceAll("_", " ")}</td>
+                    <td>{vlan.purpose || role.replace(/_/g, " ")}</td>
                     <td>{facts?.canonicalCidr || vlan.subnetCidr}</td>
                     <td>{vlan.gatewayIp}</td>
                     <td>{facts?.usableAddresses ?? "—"}</td>
