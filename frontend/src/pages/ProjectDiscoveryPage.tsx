@@ -1,0 +1,349 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { SectionHeader } from "../components/app/SectionHeader";
+import { LoadingState } from "../components/app/LoadingState";
+import { EmptyState } from "../components/app/EmptyState";
+import { ErrorState } from "../components/app/ErrorState";
+import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
+import {
+  analyzeDiscoveryWorkspaceState,
+  clearDiscoveryWorkspaceState,
+  emptyDiscoveryWorkspaceState,
+  resolveDiscoveryWorkspaceState,
+  saveDiscoveryWorkspaceState,
+  type DiscoveryWorkspaceState,
+} from "../lib/discoveryFoundation";
+
+function summaryCard(label: string, value: number | string) {
+  return (
+    <div className="panel" style={{ minWidth: 0 }}>
+      <p className="muted" style={{ marginBottom: 8 }}>{label}</p>
+      <h2 style={{ margin: 0 }}>{value}</h2>
+    </div>
+  );
+}
+
+function textareaField(label: string, description: string, value: string, onChange: (next: string) => void, placeholder: string) {
+  return (
+    <label className="field" style={{ display: "grid", gap: 8 }}>
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      <span className="muted">{description}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={7}
+        style={{ resize: "vertical" }}
+      />
+    </label>
+  );
+}
+
+export function ProjectDiscoveryPage() {
+  const { projectId = "" } = useParams();
+  const projectQuery = useProject(projectId);
+  const sitesQuery = useProjectSites(projectId);
+  const vlansQuery = useProjectVlans(projectId);
+
+  const project = projectQuery.data;
+  const sites = sitesQuery.data ?? [];
+  const vlans = vlansQuery.data ?? [];
+
+  const updateProjectMutation = useUpdateProject(projectId);
+  const [state, setState] = useState<DiscoveryWorkspaceState>(emptyDiscoveryWorkspaceState());
+  const [loaded, setLoaded] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string>("");
+
+  useEffect(() => {
+    if (!projectId) return;
+    const resolved = resolveDiscoveryWorkspaceState(projectId, project);
+    setState(resolved);
+    setLoaded(true);
+  }, [projectId, project?.discoveryJson]);
+
+  const summary = useMemo(
+    () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state }),
+    [project, sites, vlans, state],
+  );
+
+  const updateState = (patch: Partial<DiscoveryWorkspaceState>) => {
+    setState((current) => ({ ...current, ...patch }));
+    setSaveNotice("");
+  };
+
+  const saveNow = async () => {
+    const payload: DiscoveryWorkspaceState = {
+      ...state,
+      lastSavedAt: new Date().toISOString(),
+    };
+    await updateProjectMutation.mutateAsync({ discoveryJson: JSON.stringify(payload) });
+    saveDiscoveryWorkspaceState(projectId, payload);
+    setState(payload);
+    setSaveNotice(`Saved to shared project data • ${new Date(payload.lastSavedAt || new Date().toISOString()).toLocaleString()}`);
+  };
+
+  const clearAll = async () => {
+    clearDiscoveryWorkspaceState(projectId);
+    await updateProjectMutation.mutateAsync({ discoveryJson: JSON.stringify(emptyDiscoveryWorkspaceState()) });
+    setState(emptyDiscoveryWorkspaceState());
+    setSaveNotice("Discovery notes cleared from shared project data for this project.");
+  };
+
+  if (projectQuery.isLoading || !loaded) {
+    return <LoadingState title="Loading discovery workspace" message="Preparing the current-state ingestion foundation for this project." />;
+  }
+
+  if (projectQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load discovery workspace"
+        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this project right now."}
+      />
+    );
+  }
+
+  if (!project) {
+    return (
+      <EmptyState
+        title="Project not found"
+        message="The requested project could not be found or may no longer be available."
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
+
+  return (
+    <section style={{ display: "grid", gap: 18 }}>
+      <SectionHeader
+        title="Discovery & Current State"
+        description="This workspace is the v80 foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
+        actions={
+          <>
+            <Link to={`/projects/${projectId}/requirements`} className="link-button">Requirements</Link>
+            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
+            <Link to={`/projects/${projectId}/implementation`} className="link-button">Implementation</Link>
+            <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
+          </>
+        }
+      />
+
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
+          <span className="badge-soft">Filled sections {summary.filledSections}/9</span>
+          <span className="badge-soft">Migration complexity {summary.migrationComplexity}</span>
+          <span className="badge-soft">Shared project persistence</span>
+        </div>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>{project.name}</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Use this page for pasted audits, inventory notes, current VLAN/subnet baselines, routing notes, security posture, and pain points. This is the discovery layer that will later feed deeper design and migration intelligence.
+          </p>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="button" onClick={() => void saveNow()} disabled={updateProjectMutation.isPending}>
+            {updateProjectMutation.isPending ? "Saving..." : "Save discovery notes"}
+          </button>
+          <button type="button" className="button button-secondary" onClick={() => void clearAll()} disabled={updateProjectMutation.isPending}>Clear discovery notes</button>
+        </div>
+        <p className="muted" style={{ margin: 0 }}>
+          {saveNotice || (state.lastSavedAt ? `Last saved to project data: ${new Date(state.lastSavedAt).toLocaleString()}` : "No shared discovery save yet for this project.")}
+        </p>
+      </div>
+
+      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+        {summaryCard("Filled sections", `${summary.filledSections}/9`)}
+        {summaryCard("Device references", summary.deviceMentions)}
+        {summaryCard("Routing protocols", summary.routingProtocols.length)}
+        {summaryCard("Gap items", summary.gaps.length)}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <h2 style={{ margin: 0 }}>Paste current-state inputs</h2>
+        <p className="muted" style={{ margin: 0 }}>
+          Keep entries short and operational. One line per device, issue, site, subnet, or dependency works well. This page is intentionally flexible so you can paste from audits, spreadsheets, ticket notes, or rough engineering writeups.
+        </p>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          {textareaField(
+            "Topology baseline",
+            "Existing sites, WAN model, internet edges, cloud edges, hub/spoke notes, data center or service locations.",
+            state.topologyText,
+            (next) => updateState({ topologyText: next }),
+            "HQ ↔ MPLS ↔ Branch 1\nHQ ↔ VPN ↔ Branch 2\nAzure reachable from HQ firewall pair\nInternet breakout only at HQ today",
+          )}
+          {textareaField(
+            "Inventory and lifecycle",
+            "Existing devices, roles, software versions, support status, refresh flags, or platform limits.",
+            state.inventoryText,
+            (next) => updateState({ inventoryText: next }),
+            "2x core switches - aging - EOS next year\nBranch firewall pair - current\nWireless controller - legacy\nWAN edge routers - OSPF capable",
+          )}
+          {textareaField(
+            "Addressing and VLAN baseline",
+            "Current VLAN IDs, subnets, gateways, DHCP ranges, summarization issues, or overlap concerns.",
+            state.addressingText,
+            (next) => updateState({ addressingText: next }),
+            "VLAN 10 192.168.10.0/24 gateway .1\nVLAN 20 192.168.20.0/24 gateway .1\nGuest subnet duplicated at two sites\nDHCP on Windows server at HQ",
+          )}
+          {textareaField(
+            "Routing and transport baseline",
+            "Current routing protocols, default-route behavior, redistribution, MPLS, SD-WAN, provider edge, VPN, or cloud edge notes.",
+            state.routingText,
+            (next) => updateState({ routingText: next }),
+            "OSPF internally\nStatic default toward ISP\nVPN to Azure\nNo branch summarization today\nMPLS handoff at HQ and Branch 1",
+          )}
+          {textareaField(
+            "Security posture",
+            "Firewall zones, NAC, 802.1X, VPN, IDS/IPS, SIEM, logging, remote access, guest isolation, or management controls.",
+            state.securityText,
+            (next) => updateState({ securityText: next }),
+            "Firewall pair at HQ\nGuest isolated only at HQ\nNo NAC today\nVPN for admins\nSIEM collecting syslog\nManagement flat with user access",
+          )}
+          {textareaField(
+            "Wireless baseline",
+            "SSID design, WPA2/WPA3, controller model, guest wireless, RF pain points, controller/cloud management.",
+            state.wirelessText,
+            (next) => updateState({ wirelessText: next }),
+            "Corporate SSID + Guest SSID\nWPA2-Enterprise today\nController-based APs\nCoverage gaps in warehouse area",
+          )}
+          {textareaField(
+            "Gaps and pain points",
+            "What the current network lacks or where the redesign is expected to improve it.",
+            state.gapText,
+            (next) => updateState({ gapText: next }),
+            "Flat user and printer access\nGuest not isolated consistently\nNo site summarization\nAging core platform\nManual VPN changes",
+          )}
+          {textareaField(
+            "Constraints and dependencies",
+            "Maintenance windows, contracts, compliance, provider handoffs, cloud dependencies, staffing, or rollout constraints.",
+            state.constraintsText,
+            (next) => updateState({ constraintsText: next }),
+            "Weekend cutovers only\nSingle engineer available\nProvider lead time 45 days\nMust preserve existing guest internet access during migration",
+          )}
+        </div>
+        {textareaField(
+          "Extra notes",
+          "Anything that does not fit the other fields but affects discovery, design, migration, or stakeholder review.",
+          state.notesText,
+          (next) => updateState({ notesText: next }),
+          "Customer wants future SD-WAN option\nPossible office expansion next year\nCloud identity already in use",
+        )}
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Discovery coverage</h2>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Area</th>
+                  <th align="left">Status</th>
+                  <th align="left">Why it matters</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.ingestionCoverage.map((item) => (
+                  <tr key={item.label}>
+                    <td>{item.label}</td>
+                    <td>{item.complete ? "Captured" : "Missing"}</td>
+                    <td>{item.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Current-state highlights</h2>
+          {summary.currentStateHighlights.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>No meaningful current-state baseline has been captured yet.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {summary.currentStateHighlights.map((item) => (
+                <div key={item} className="trust-note">
+                  <p className="muted" style={{ margin: 0 }}>{item}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Parsed signals</h2>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <strong>Routing and transport</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{summary.routingProtocols.join(", ") || "No named routing or transport protocols detected yet."}</p>
+            </div>
+            <div>
+              <strong>Security controls</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{summary.securityControls.join(", ") || "No named security controls detected yet."}</p>
+            </div>
+            <div>
+              <strong>Wireless signals</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{summary.wirelessSignals.join(", ") || "No named wireless signals detected yet."}</p>
+            </div>
+            <div>
+              <strong>Lifecycle flags</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{summary.lifecycleFlags.join(" • ") || "No lifecycle warnings detected yet."}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Gaps and constraints</h2>
+          <div className="grid-2" style={{ alignItems: "start" }}>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Gap analysis inputs</h3>
+              {summary.gaps.length === 0 ? <p className="muted" style={{ margin: 0 }}>No explicit gaps captured yet.</p> : (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {summary.gaps.map((item) => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Constraints and dependencies</h3>
+              {summary.constraints.length === 0 ? <p className="muted" style={{ margin: 0 }}>No constraints captured yet.</p> : (
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {summary.constraints.map((item) => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Discovery risks</h2>
+          {summary.inferredRisks.length === 0 ? <p className="muted" style={{ margin: 0 }}>No discovery risks are visible yet.</p> : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {summary.inferredRisks.map((item) => (
+                <div key={item} className="validation-card">
+                  <p className="muted" style={{ margin: 0 }}>{item}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Best next inputs</h2>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {summary.suggestedNextInputs.length === 0 ? <li>Discovery coverage is broad enough to continue deeper design and migration planning.</li> : summary.suggestedNextInputs.map((item) => (
+              <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+            ))}
+          </ul>
+          <div className="form-actions">
+            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
+            <Link to={`/projects/${projectId}/implementation`} className="link-button">Open Implementation Plan</Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
