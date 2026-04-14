@@ -9,7 +9,7 @@ const { PrismaClient } = prismaClientPkg as { PrismaClient: new (options?: any) 
 type PrismaClientInstance = InstanceType<typeof PrismaClient>;
 
 const globalForPrisma = globalThis as typeof globalThis & {
-  __subnetopsPgPool?: Pool;
+  __subnetopsPgPool?: InstanceType<typeof Pool>;
   __subnetopsPrisma?: PrismaClientInstance;
 };
 
