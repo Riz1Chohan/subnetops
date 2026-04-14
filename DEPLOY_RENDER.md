@@ -64,3 +64,17 @@ Once the first Render deployment works:
 - move SMTP values to real secrets
 - disable demo accounts/seeding in production
 - attach a custom domain
+
+
+## Prisma update behavior
+The backend now starts through `./entrypoint.sh` on Render. That startup path will:
+- run `prisma generate`
+- sync the schema on boot when `PRISMA_SYNC_ON_BOOT=true`
+- use `PRISMA_SYNC_STRATEGY=push` by default in this starter
+
+For this codebase, that means schema changes like new JSON columns are applied as part of the normal startup/deploy flow instead of being left as a manual reminder.
+
+If you later move to reviewed Prisma migration files, change:
+- `PRISMA_SYNC_STRATEGY=migrate`
+
+and keep `PRISMA_SYNC_ON_BOOT=true`.

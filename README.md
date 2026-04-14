@@ -83,11 +83,14 @@ AUTOMATION_SWEEP_ENABLED=false
 
 Then run:
 ```bash
-npx prisma generate
-npx prisma db push
+npm run prisma:update
 npm run prisma:seed
 npm run dev
 ```
+
+This now handles the normal Prisma update flow in one step:
+- regenerate the Prisma client
+- apply the current schema to the database with `prisma db push`
 
 ### 3. Frontend
 ```bash
@@ -153,13 +156,28 @@ AUTOMATION_SWEEP_ENABLED=true
 AUTOMATION_SWEEP_INTERVAL_MS=300000
 ```
 
+## Prisma schema update flow
+When a version adds or changes Prisma fields, use the built-in update flow before backend testing or deployment:
+
+```bash
+cd backend
+npm run prisma:update
+```
+
+This project now also supports boot-time Prisma sync through backend startup controls:
+- `PRISMA_SYNC_ON_BOOT=true` will run a schema sync when the backend starts
+- `PRISMA_SYNC_STRATEGY=push` uses `prisma db push` and matches the current repo workflow
+- `PRISMA_SYNC_STRATEGY=migrate` is reserved for reviewed migration files when you adopt migration-based releases later
+
+Render and the provided docker-compose backend startup now call the backend entrypoint so this sync flow is built into normal deployment startup.
+
 ## Production notes
 Before a real production deployment:
 - set a strong `JWT_SECRET`
 - use a real PostgreSQL instance
 - use HTTPS
 - use a real SMTP provider
-- replace `prisma db push` with reviewed Prisma migrations
+- this starter currently defaults to startup schema sync with `prisma db push`; when you later move to reviewed migrations, switch `PRISMA_SYNC_STRATEGY` to `migrate` and add migration files
 - disable demo seeding in production
 - point `CORS_ORIGIN` at your public frontend origin if you are not using same-origin nginx proxying
 
@@ -309,3 +327,36 @@ Before a real production deployment:
 - Pinned frontend and backend package versions instead of leaving them floating under caret ranges.
 - Aligned Prisma package versions and added runtime guidance files for Node 20.12.2.
 - Added a verification script so installs and builds can be checked more consistently outside this container.
+
+## v67 release notes
+
+- Rebuilt Start Plan into a multi-step planning wizard with Back / Next flow and a left-side section rail.
+- Replaced the long one-page intake with calmer stage-by-stage planning sections and a structured Plan Snapshot.
+- Added an AI workspace route so AI planning can stay separate from the guided planning wizard.
+- Refined planner terminology and topbar branding, including the slogan “Plan networks with clarity.”
+
+
+## v68 release notes
+
+- Added dedicated Help and FAQ pages and wired them into the public and signed-in navigation.
+- Kept the AI workspace separate from Start Plan and added quick links between AI, Help, FAQ, and the planner.
+- Introduced lightweight help-tip popovers inside the planner so guidance is available without turning the product into a chat-style experience.
+
+
+## v69 release notes
+
+- improved auth reliability for register, login, and logout flows
+- added friendlier duplicate-email handling during account creation
+- added account password change support
+- added forgot/reset password pages for development and testing
+- improved session clearing on logout and password changes
+
+
+## v70 Release Notes
+
+- carried forward the live Render deployment fixes discovered after v66
+- frontend build now uses an explicit TypeScript project path instead of build mode
+- fixed ES2020-safe segment-role label formatting in the VLAN and report views
+- fixed requirements readiness labels in the project shell to use the correct readiness property
+- fixed backend PostgreSQL pool import handling for Node ESM/CommonJS interop on Render
+- fixed the PostgreSQL pool global type annotation to keep the backend TypeScript build clean
