@@ -872,7 +872,7 @@ function buildWanLinks(input: {
     targets.push({
       id: "cloud-edge",
       name: `${profile.cloudProvider || "Cloud"} Edge`,
-      code: undefined,
+      code: "CLD",
       transport: profile.cloudConnectivity || "Site-to-cloud connectivity",
     });
   }
