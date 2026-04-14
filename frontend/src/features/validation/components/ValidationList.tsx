@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { EmptyState } from "../../../components/app/EmptyState";
 import type { ValidationResult } from "../../../lib/types";
 
@@ -17,6 +18,8 @@ export function ValidationList({
   onConvertToTask,
   onExplain,
   openTaskBodies,
+  getFixPath,
+  getFixLabel,
   emptyTitle = "No validation findings",
   emptyMessage = "Run validation after adding sites or VLANs to surface overlaps, gateway issues, and sizing risks.",
 }: {
@@ -24,6 +27,8 @@ export function ValidationList({
   onConvertToTask?: (item: ValidationResult) => void;
   onExplain?: (item: ValidationResult) => void;
   openTaskBodies?: Set<string>;
+  getFixPath?: (item: ValidationResult) => string | undefined;
+  getFixLabel?: (item: ValidationResult) => string | undefined;
   emptyTitle?: string;
   emptyMessage?: string;
 }) {
@@ -36,6 +41,8 @@ export function ValidationList({
       {items.map((item) => {
         const taskBody = `[Validation] ${item.title} — ${item.message}`;
         const alreadyTracked = openTaskBodies?.has(taskBody);
+        const fixPath = getFixPath?.(item);
+        const fixLabel = getFixLabel?.(item) || "Open fix area";
 
         return (
           <div key={item.id} className="validation-card">
@@ -47,8 +54,15 @@ export function ValidationList({
             </div>
             <h4 style={{ marginBottom: 8 }}>{item.title}</h4>
             <p style={{ margin: 0 }}>{item.message}</p>
-            {onConvertToTask || onExplain ? (
+            {fixPath ? (
+              <div className="validation-meta-row">
+                <span className="muted">Need to fix this?</span>
+                <Link to={fixPath} className="inline-link">{fixLabel}</Link>
+              </div>
+            ) : null}
+            {onConvertToTask || onExplain || fixPath ? (
               <div className="form-actions">
+                {fixPath ? <Link to={fixPath} className="link-button">{fixLabel}</Link> : null}
                 {onConvertToTask ? <button type="button" onClick={() => onConvertToTask(item)} disabled={alreadyTracked}>Convert to Task</button> : null}
                 {onExplain ? <button type="button" onClick={() => onExplain(item)}>Explain with AI</button> : null}
               </div>

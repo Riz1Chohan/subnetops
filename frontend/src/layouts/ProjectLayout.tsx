@@ -8,8 +8,15 @@ import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
 
 const projectNavItems = [
+  { key: "discovery", label: "Discovery & Current State" },
   { key: "requirements", label: "Requirements" },
   { key: "logical-design", label: "Logical Design" },
+  { key: "addressing", label: "Addressing Plan" },
+  { key: "security", label: "Security Architecture" },
+  { key: "routing", label: "Routing & Switching" },
+  { key: "implementation", label: "Implementation & Migration" },
+  { key: "standards", label: "Config Standards" },
+  { key: "platform", label: "Platform & BOM" },
   { key: "validation", label: "Validation" },
   { key: "diagram", label: "Diagram" },
   { key: "report", label: "Report / Export" },
@@ -18,6 +25,7 @@ const projectNavItems = [
 ];
 
 const workflowStages = [
+  { key: "discovery", label: "Discovery", route: "discovery", description: "Capture the current environment, topology, risks, and migration constraints before shaping the target design." },
   { key: "requirements", label: "Requirements", route: "requirements", description: "Capture the planning brief, environment, security posture, and delivery assumptions." },
   { key: "logical-design", label: "Logical Design", route: "logical-design", description: "Shape sites, addressing, segmentation, and the core network structure from the saved requirements." },
   { key: "validation", label: "Validation", route: "validation", description: "Review conflicts, capacity, gateway logic, and overall design health before diagramming or handoff." },
@@ -53,6 +61,11 @@ function workflowStateForIndex(index: number, activeIndex: number) {
 }
 
 function workflowStatusLabel(stageKey: string, readinessLabel: string, errorCount: number, sitesCount: number, vlanCount: number) {
+  if (stageKey === "discovery") {
+    if (sitesCount > 0 || vlanCount > 0) return "In progress";
+    return "Start here";
+  }
+
   if (stageKey === "requirements") {
     if (readinessLabel === "Review-ready" || readinessLabel === "Mostly shaped") return "Ready";
     return "Needs review";
@@ -100,7 +113,8 @@ export function ProjectLayout() {
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const readiness = planningReadinessSummary(requirementsProfile);
-  const activeStageIndex = Math.max(0, workflowStages.findIndex((stage) => location.pathname.includes(`/${stage.route}`)));
+  const workflowRoute = location.pathname.includes("/addressing") || location.pathname.includes("/security") || location.pathname.includes("/routing") ? "logical-design" : (location.pathname.includes("/implementation") || location.pathname.includes("/standards") || location.pathname.includes("/platform")) ? "report" : undefined;
+  const activeStageIndex = Math.max(0, workflowStages.findIndex((stage) => workflowRoute ? stage.route === workflowRoute : location.pathname.includes(`/${stage.route}`)));
   const currentStage = workflowStages[activeStageIndex] ?? workflowStages[0];
   const nextStage = workflowStages[activeStageIndex + 1] ?? null;
 
@@ -143,8 +157,15 @@ export function ProjectLayout() {
             <p className="muted" style={{ marginTop: 8 }}>{project.description || "No description yet."}</p>
           </div>
           <div className="form-actions">
+            <Link to={`/projects/${projectId}/discovery`} className="link-button">Discovery</Link>
             <Link to={`/projects/${projectId}/requirements`} className="link-button">Requirements</Link>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
+            <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Plan</Link>
+            <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
+            <Link to={`/projects/${projectId}/routing`} className="link-button">Routing & Switching</Link>
+            <Link to={`/projects/${projectId}/implementation`} className="link-button">Implementation</Link>
+            <Link to={`/projects/${projectId}/standards`} className="link-button">Config Standards</Link>
+            <Link to={`/projects/${projectId}/platform`} className="link-button">Platform & BOM</Link>
             <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
           </div>
         </div>

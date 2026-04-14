@@ -27,6 +27,8 @@ export function createProject(input: {
   reportHeader?: string;
   reportFooter?: string;
   requirementsJson?: string;
+  discoveryJson?: string;
+  platformProfileJson?: string;
 }) {
   return api<Project>("/projects", {
     method: "POST",
@@ -44,6 +46,8 @@ export function updateProject(projectId: string, input: {
   reportHeader?: string;
   reportFooter?: string;
   requirementsJson?: string;
+  discoveryJson?: string;
+  platformProfileJson?: string;
 }) {
   return api<{ message: string }>(`/projects/${projectId}`, {
     method: "PATCH",

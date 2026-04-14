@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { useMemo } from "react";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
@@ -7,9 +8,10 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
-import type { Vlan } from "../lib/types";
-import { utilizationForCidr } from "../lib/networkValidators";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
+import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "../lib/discoveryFoundation";
+import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -20,15 +22,13 @@ function summaryCard(label: string, value: number | string) {
   );
 }
 
-function vlanCategory(vlan: Vlan) {
-  const text = `${vlan.vlanName} ${vlan.purpose || ""} ${vlan.department || ""}`.toLowerCase();
-  if (text.includes("guest")) return "Guest";
-  if (text.includes("server")) return "Servers";
-  if (text.includes("management") || text.includes("mgmt")) return "Management";
-  if (text.includes("voice")) return "Voice";
-  if (text.includes("clinical") || text.includes("medical")) return "Clinical";
-  if (text.includes("admin")) return "Admin";
-  return "Other";
+function designFactCard(title: string, detail: string) {
+  return (
+    <div className="panel" style={{ minWidth: 0 }}>
+      <p className="muted" style={{ marginBottom: 8 }}>{title}</p>
+      <p style={{ margin: 0 }}>{detail}</p>
+    </div>
+  );
 }
 
 function validationHealthLabel(errorCount: number, warningCount: number) {
@@ -52,28 +52,31 @@ export function ProjectOverviewPage() {
 
   const errorCount = validationItems.filter((item) => item.severity === "ERROR").length;
   const warningCount = validationItems.filter((item) => item.severity === "WARNING").length;
-  const dhcpCount = vlans.filter((item) => item.dhcpEnabled).length;
-  const categoryCounts = vlans.reduce<Record<string, number>>((acc, vlan) => {
-    const category = vlanCategory(vlan);
-    acc[category] = (acc[category] || 0) + 1;
-    return acc;
-  }, {});
-  const categoryEntries = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const requirementsReadiness = planningReadinessSummary(requirementsProfile);
-  const mostLoadedSegment = [...vlans]
-    .map((vlan) => ({ vlan, utilization: utilizationForCidr(vlan.subnetCidr, vlan.estimatedHosts) }))
-    .filter((entry) => Boolean(entry.utilization))
-    .sort((a, b) => (b.utilization?.utilization || 0) - (a.utilization?.utilization || 0))[0];
+  const synthesized = useMemo(
+    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
+    [project, sites, vlans, requirementsProfile],
+  );
+
+  const discoverySummary = useMemo(
+    () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
+    [projectId, project, sites, vlans],
+  );
+
+  const platformFoundation = useMemo(
+    () => synthesizePlatformBomFoundation({ project, sites, vlans, profile: requirementsProfile, synthesized, state: resolvePlatformProfileState(projectId, project) }),
+    [projectId, project, sites, vlans, requirementsProfile, synthesized],
+  );
 
   if (projectQuery.isLoading) {
-    return <LoadingState title="Loading overview" message="Preparing the project summary, actions, and key metrics." />;
+    return <LoadingState title="Loading logical design" message="Preparing the synthesized HLD, LLD, and addressing outputs." />;
   }
 
   if (projectQuery.isError) {
     return (
       <ErrorState
-        title="Unable to load project overview"
+        title="Unable to load logical design"
         message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this project right now."}
       />
     );
@@ -89,17 +92,27 @@ export function ProjectOverviewPage() {
     );
   }
 
+  const decisions = synthesized.designReview.filter((item) => item.kind === "decision");
+  const assumptions = synthesized.designReview.filter((item) => item.kind === "assumption");
+  const risks = synthesized.designReview.filter((item) => item.kind === "risk");
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Logical Design"
-        description="Use this workspace to move from requirements into sites, VLANs, subnetting, and design structure."
+        description="This workspace should read like an engineer's HLD/LLD package: architecture intent, logical domains, per-site low-level design, and the addressing model that supports implementation later."
         actions={
           <>
+            <Link to={`/projects/${projectId}/addressing`} className="link-button">Open Addressing Plan</Link>
+            <Link to={`/projects/${projectId}/security`} className="link-button">Open Security</Link>
+            <Link to={`/projects/${projectId}/routing`} className="link-button">Open Routing & Switching</Link>
+            <Link to={`/projects/${projectId}/implementation`} className="link-button">Open Implementation</Link>
+            <Link to={`/projects/${projectId}/standards`} className="link-button">Open Config Standards</Link>
+            <Link to={`/projects/${projectId}/platform`} className="link-button">Open Platform & BOM</Link>
+            <Link to={`/projects/${projectId}/discovery`} className="link-button">Open Discovery</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
             <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
             <Link to={`/projects/${projectId}/report`} className="link-button">Open Report</Link>
-            {project.canEdit ? <Link to={`/projects/${projectId}/settings`} className="link-button">Settings</Link> : null}
           </>
         }
       />
@@ -107,8 +120,10 @@ export function ProjectOverviewPage() {
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
-          {project.basePrivateRange ? <span className="badge-soft">Base range {project.basePrivateRange}</span> : null}
+          <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
           <span className="badge-soft">Validation {validationHealthLabel(errorCount, warningCount)}</span>
+          <span className="badge-soft">Requirements {requirementsReadiness.completionLabel}</span>
+          {synthesized.organizationBlockAssumed ? <span className="badge-soft">Working range assumed</span> : null}
         </div>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{project.name}</h2>
@@ -123,142 +138,472 @@ export function ProjectOverviewPage() {
         vlanCount={vlans.length}
       />
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-        {summaryCard("Sites", sites.length)}
-        {summaryCard("Segments", vlans.length)}
-        {summaryCard("DHCP-enabled segments", dhcpCount)}
-        {summaryCard("Validation health", validationHealthLabel(errorCount, warningCount))}
-      </div>
-
-      <div className="summary-grid">
-        <div className="summary-card"><div className="muted">Requirements readiness</div><div className="value">{requirementsReadiness.completionLabel}</div></div>
-        <div className="summary-card"><div className="muted">Tracks ready</div><div className="value">{requirementsReadiness.readyCount}</div></div>
-        <div className="summary-card"><div className="muted">Need review</div><div className="value">{requirementsReadiness.reviewCount}</div></div>
-        <div className="summary-card"><div className="muted">Inactive</div><div className="value">{requirementsReadiness.inactiveCount}</div></div>
-      </div>
-
-      <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1.2fr 1fr" }}>
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Current-state discovery foundation</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            The design package is stronger when it starts from what exists today. This snapshot shows whether discovery has enough current-state context to support migration-ready decisions.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Discovery sections", `${discoverySummary.filledSections}/9`)}
+          {summaryCard("Current device refs", discoverySummary.deviceMentions)}
+          {summaryCard("Routing signals", discoverySummary.routingProtocols.length)}
+          {summaryCard("Migration complexity", discoverySummary.migrationComplexity)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
           <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Network profile</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              Use this summary to understand how the design is segmented before reviewing the detailed VLAN workspace.
-            </p>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Current-state highlights</h3>
+            {discoverySummary.currentStateHighlights.length === 0 ? <p className="muted" style={{ margin: 0 }}>No discovery baseline has been saved yet.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {discoverySummary.currentStateHighlights.slice(0, 4).map((item) => (
+                  <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Discovery risks</h3>
+            {discoverySummary.inferredRisks.length === 0 ? <p className="muted" style={{ margin: 0 }}>No discovery risks surfaced yet.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {discoverySummary.inferredRisks.slice(0, 4).map((item) => (
+                  <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div>
+          <Link to={`/projects/${projectId}/discovery`} className="link-button">Open Discovery & Current State</Link>
+        </div>
+      </div>
 
-          <div className="network-chip-list">
-            {categoryEntries.length === 0 ? <span className="muted">No segment categories identified yet.</span> : categoryEntries.map(([label, count]) => (
-              <span key={label} className="badge-soft">{label}: {count}</span>
+      <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+        {summaryCard("Sites in design", synthesized.siteSummaries.length)}
+        {summaryCard("Logical domains", synthesized.logicalDomains.length)}
+        {summaryCard("Address plan rows", synthesized.addressingPlan.length)}
+        {summaryCard("Configured segments", synthesized.stats.configuredSegments)}
+        {summaryCard("Transit links", synthesized.wanLinks.length)}
+        {summaryCard("Security zones", synthesized.securityZones.length)}
+        {summaryCard("Routing policies", synthesized.routePolicies.length)}
+        {summaryCard("Routing identities", synthesized.routingPlan.filter((item) => item.loopbackCidr).length)}
+        {summaryCard("Config templates", synthesized.configurationTemplates.length)}
+        {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Platform profile and BOM foundation</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            The design package becomes more deliverable when it also states the target platform posture and the first role-based material estimate behind it. This is not final procurement output yet, but it is the foundation a senior engineer would use before model selection and quoting.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Deployment class", platformFoundation.platformSummary.deploymentClass)}
+          {summaryCard("Hardware categories", platformFoundation.totals.hardwareCategories)}
+          {summaryCard("Review items", platformFoundation.totals.reviewItems)}
+          {summaryCard("Operations fit", platformFoundation.platformSummary.operationsFit)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Platform fit</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {platformFoundation.platformSummary.compatibilityNotes.slice(0, 4).map((item) => (
+                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>BOM assumptions</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {platformFoundation.bomAssumptions.slice(0, 3).map((item) => (
+                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div>
+          <Link to={`/projects/${projectId}/platform`} className="link-button">Open Platform & BOM</Link>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>High-Level Design blueprint</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This is the architecture layer of SubnetOps: it should answer what kind of network is being built, how sites relate to each other,
+            how trust boundaries are separated, and what the routing and operations posture should be before anyone starts writing configs.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+          {designFactCard("Architecture pattern", synthesized.highLevelDesign.architecturePattern)}
+          {designFactCard("Layer model", synthesized.highLevelDesign.layerModel)}
+          {designFactCard("WAN architecture", synthesized.highLevelDesign.wanArchitecture)}
+          {designFactCard("Cloud / hybrid", synthesized.highLevelDesign.cloudArchitecture)}
+          {designFactCard("Data center / services", synthesized.highLevelDesign.dataCenterArchitecture)}
+          {designFactCard("Redundancy model", synthesized.highLevelDesign.redundancyModel)}
+          {designFactCard("Routing strategy", synthesized.highLevelDesign.routingStrategy)}
+          {designFactCard("Switching strategy", synthesized.highLevelDesign.switchingStrategy)}
+          {designFactCard("Segmentation strategy", synthesized.highLevelDesign.segmentationStrategy)}
+          {designFactCard("Security architecture", synthesized.highLevelDesign.securityArchitecture)}
+          {designFactCard("Wireless architecture", synthesized.highLevelDesign.wirelessArchitecture)}
+          {designFactCard("Operations posture", synthesized.highLevelDesign.operationsArchitecture)}
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {synthesized.highLevelDesign.rationale.map((item) => (
+            <div key={item} className="trust-note">
+              <p className="muted" style={{ margin: 0 }}>{item}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing and switching design intent</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This is the control-plane and access-layer part of the design package: the internal routing model, the provider or cloud edge posture,
+            the route-policy boundaries, the switching/L2 fault-domain strategy, and the QoS assumptions that should exist before configuration work begins.
+          </p>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Protocol / transport</th>
+                  <th align="left">Scope</th>
+                  <th align="left">Purpose</th>
+                  <th align="left">Recommendation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synthesized.routingProtocols.map((item) => (
+                  <tr key={item.protocol + item.scope}>
+                    <td>{item.protocol}</td>
+                    <td>{item.scope}</td>
+                    <td>{item.purpose}</td>
+                    <td>{item.recommendation}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "grid", gap: 12 }}>
+            {synthesized.switchingDesign.map((item) => (
+              <div key={item.topic} className="trust-note">
+                <strong>{item.topic}</strong>
+                <p className="muted" style={{ margin: "8px 0" }}>{item.recommendation}</p>
+                <p className="muted" style={{ margin: "0 0 8px" }}><strong>Implementation hint:</strong> {item.implementationHint}</p>
+                <p className="muted" style={{ margin: 0 }}><strong>Why:</strong> {item.rationale}</p>
+              </div>
             ))}
           </div>
-
-          <div className="trust-note">
-            <strong>Most loaded segment</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              {mostLoadedSegment?.utilization
-                ? `${mostLoadedSegment.vlan.vlanName} at ${mostLoadedSegment.vlan.site?.name || "its site"} is using about ${Math.round(mostLoadedSegment.utilization.utilization * 100)}% of its usable host space.`
-                : "Add estimated host counts to surface utilization pressure and capacity risk here."}
-            </p>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Route-policy topic</th>
+                  <th align="left">Scope</th>
+                  <th align="left">Intent</th>
+                  <th align="left">Recommendation</th>
+                  <th align="left">Risk if skipped</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synthesized.routePolicies.map((item) => (
+                  <tr key={item.policyName}>
+                    <td>{item.policyName}</td>
+                    <td>{item.scope}</td>
+                    <td>{item.intent}</td>
+                    <td>{item.recommendation}</td>
+                    <td>{item.riskIfSkipped}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div className="trust-note">
-            <strong>Addressing policy</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              This project is using {requirementsProfile.addressHierarchyModel}, with {requirementsProfile.siteBlockStrategy}, a gateway convention of {requirementsProfile.gatewayConvention}, and a growth model of {requirementsProfile.growthBufferModel}.
-            </p>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <h3 style={{ marginTop: 0 }}>QoS and traffic treatment</h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                {synthesized.qosPlan.map((item) => (
+                  <div key={item.trafficClass} className="trust-note">
+                    <strong>{item.trafficClass}</strong>
+                    <p className="muted" style={{ margin: "8px 0" }}>{item.treatment}</p>
+                    <p className="muted" style={{ margin: "0 0 8px" }}><strong>Marking:</strong> {item.marking}</p>
+                    <p className="muted" style={{ margin: 0 }}><strong>Scope:</strong> {item.scope}. {item.rationale}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <h3 style={{ marginTop: 0 }}>Routing and switching review</h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                {synthesized.routingSwitchingReview.map((item) => (
+                  <div key={item.title} className="trust-note">
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+                      <strong>{item.title}</strong>
+                      <span className={item.severity === "critical" ? "badge badge-error" : item.severity === "warning" ? "badge badge-warning" : "badge badge-info"}>{item.severity}</span>
+                    </div>
+                    <p className="muted" style={{ margin: "0 0 8px" }}>{item.detail}</p>
+                    {item.affected.length > 0 ? <p className="muted" style={{ margin: 0 }}><strong>Affected:</strong> {item.affected.join(", ")}</p> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+        </div>
+      </div>
 
-          <div className="trust-note">
-            <strong>Operations model</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              The design assumes {requirementsProfile.managementIpPolicy}, {requirementsProfile.monitoringModel}, {requirementsProfile.loggingModel}, and {requirementsProfile.backupPolicy}. Ownership is planned as {requirementsProfile.operationsOwnerModel}.
-            </p>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Logical domains and trust boundaries</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            A senior-level design package should show more than VLANs. It should show which logical domains exist, why they exist, and where each belongs in the architecture.
+          </p>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Logical domain</th>
+                <th align="left">Segments</th>
+                <th align="left">Purpose</th>
+                <th align="left">Placement</th>
+                <th align="left">Policy intent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {synthesized.logicalDomains.map((domain) => (
+                <tr key={domain.name}>
+                  <td>{domain.name}</td>
+                  <td>{domain.segments.length > 0 ? domain.segments.join(", ") : "—"}</td>
+                  <td>{domain.purpose}</td>
+                  <td>{domain.placement}</td>
+                  <td>{domain.policy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security architecture and segmentation intent</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This section makes the trust model explicit: the zones the design expects, the controls that should exist, and the findings that still need security review before implementation.
+          </p>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Security zone</th>
+                  <th align="left">Type</th>
+                  <th align="left">Segments</th>
+                  <th align="left">Enforcement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synthesized.securityZones.map((zone) => (
+                  <tr key={zone.zoneName}>
+                    <td>{zone.zoneName}</td>
+                    <td>{zone.zoneType}</td>
+                    <td>{zone.segments.join(", ") || "—"}</td>
+                    <td>{zone.enforcement}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div className="trust-note">
-            <strong>Physical and endpoint profile</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              This plan assumes {requirementsProfile.siteLayoutModel}, serving a {requirementsProfile.siteRoleModel}, with {requirementsProfile.buildingCount} building(s), {requirementsProfile.floorCount} floor(s), a {requirementsProfile.closetModel}, and an edge footprint of {requirementsProfile.edgeFootprint}. It also assumes roughly {requirementsProfile.apCount} APs, {requirementsProfile.printerCount} printers, {requirementsProfile.phoneCount} phones, {requirementsProfile.cameraCount} cameras, {requirementsProfile.serverCount} servers, and {requirementsProfile.iotDeviceCount} IoT or specialty devices.
-            </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            {synthesized.segmentationReview.map((item) => (
+              <div key={`${item.severity}-${item.title}`} className="trust-note">
+                <p style={{ margin: "0 0 6px" }}><strong>{item.title}</strong> • {item.severity}</p>
+                <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </div>
 
-          <div className="trust-note">
-            <strong>Application and WAN profile</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              The design assumes {requirementsProfile.applicationProfile}, with {requirementsProfile.criticalServicesModel}, {requirementsProfile.interSiteTrafficModel}, {requirementsProfile.bandwidthProfile}, and {requirementsProfile.qosModel}. Outage tolerance is {requirementsProfile.outageTolerance} and the growth horizon is {requirementsProfile.growthHorizon}.
-            </p>
-          </div>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Low-Level Design by site</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This is the per-site engineering starter: each site should show its role, layer model, routing intent, segment footprint, and what still needs to be resolved before implementation.
+          </p>
+        </div>
+        <div style={{ display: "grid", gap: 14 }}>
+          {synthesized.lowLevelDesign.map((site) => (
+            <div key={site.siteId} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <h3 style={{ marginTop: 0, marginBottom: 6 }}>{site.siteName}{site.siteCode ? ` • ${site.siteCode}` : ""}</h3>
+                  <p className="muted" style={{ margin: 0 }}>{site.siteRole}</p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className="badge-soft">Segments {site.localSegmentCount}</span>
+                  <span className="badge-soft">Transit links {site.transitAdjacencyCount}</span>
+                  <span className="badge-soft">Summary {site.summaryRoute || "Pending"}</span>
+                  <span className="badge-soft">Loopback {site.loopbackCidr || "Pending"}</span>
+                </div>
+              </div>
 
-          <div className="trust-note">
-            <strong>Implementation and handoff model</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              This plan assumes {requirementsProfile.budgetModel}, {requirementsProfile.vendorPreference}, {requirementsProfile.implementationTimeline}, and {requirementsProfile.rolloutModel}. The final package is aimed at {requirementsProfile.primaryAudience} with an output style of {requirementsProfile.outputPackage}.
-            </p>
+              <div className="grid-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", marginTop: 14 }}>
+                {designFactCard("Layer model", site.layerModel)}
+                {designFactCard("Routing role", site.routingRole)}
+                {designFactCard("Switching profile", site.switchingProfile)}
+                {designFactCard("Security boundary", site.securityBoundary)}
+                {designFactCard("Local service model", site.localServiceModel)}
+                {designFactCard("Wireless model", site.wirelessModel)}
+                {designFactCard("Physical assumption", site.physicalAssumption)}
+                {designFactCard("Segment footprint", site.localSegments.length > 0 ? site.localSegments.join(", ") : "No routed local segments yet")}
+              </div>
+
+              <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+                <div>
+                  <h4 style={{ marginTop: 0, marginBottom: 8 }}>Implementation focus</h4>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {site.implementationFocus.map((item) => (
+                      <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 style={{ marginTop: 0, marginBottom: 8 }}>Site notes</h4>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {site.notes.map((item) => (
+                      <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement-to-design traceability</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This section is important because the tool should explain why it proposed a design, not just what it proposed.
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Design topic</th>
+                  <th align="left">Requirement trigger</th>
+                  <th align="left">Design outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synthesized.traceability.map((item) => (
+                  <tr key={item.title}>
+                    <td>{item.title}</td>
+                    <td>{item.requirement}</td>
+                    <td>{item.designOutcome}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
         <div className="panel" style={{ display: "grid", gap: 12 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Requirements snapshot</h2>
-          <p className="muted" style={{ margin: 0 }}>Use case: {requirementsProfile.planningFor} • Phase: {requirementsProfile.projectPhase} • Goal: {requirementsProfile.primaryGoal}</p>
-          <p className="muted" style={{ margin: 0 }}>WAN: {requirementsProfile.internetModel} • Compliance: {requirementsProfile.complianceProfile}</p>
-          <p className="muted" style={{ margin: 0 }}>Security posture: {requirementsProfile.securityPosture}</p>
-          <p className="muted" style={{ margin: 0 }}>Trust boundary: {requirementsProfile.trustBoundaryModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Identity model: {requirementsProfile.identityModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Cloud posture: {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? `${requirementsProfile.cloudProvider} over ${requirementsProfile.cloudConnectivity}` : "On-prem focused"}</p>
-          <p className="muted" style={{ margin: 0 }}>Cloud hosting: {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? requirementsProfile.cloudHostingModel : "No hybrid hosting model selected"}</p>
-          <p className="muted" style={{ margin: 0 }}>Address hierarchy: {requirementsProfile.addressHierarchyModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Site block strategy: {requirementsProfile.siteBlockStrategy}</p>
-          <p className="muted" style={{ margin: 0 }}>Monitoring model: {requirementsProfile.monitoringModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Naming standard: {requirementsProfile.namingStandard}</p>
-          <p className="muted" style={{ margin: 0 }}>Site layout: {requirementsProfile.siteLayoutModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Site role: {requirementsProfile.siteRoleModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Buildings / floors: {requirementsProfile.buildingCount} / {requirementsProfile.floorCount}</p>
-          <p className="muted" style={{ margin: 0 }}>Endpoint mix: {requirementsProfile.wiredWirelessMix}</p>
-          <p className="muted" style={{ margin: 0 }}>Application profile: {requirementsProfile.applicationProfile}</p>
-          <p className="muted" style={{ margin: 0 }}>WAN / performance: {requirementsProfile.interSiteTrafficModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Implementation: {requirementsProfile.rolloutModel}</p>
-          <p className="muted" style={{ margin: 0 }}>Output package: {requirementsProfile.outputPackage}</p>
-          <h2 style={{ marginTop: 8, marginBottom: 0 }}>What to review next</h2>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            <li>Check validation before treating the design as final.</li>
-            <li>Use the diagram page to explain logical vs physical structure.</li>
-            <li>Use the report page when the plan needs a cleaner stakeholder handoff.</li>
-          </ul>
+          <h2 style={{ margin: 0 }}>Design decisions, assumptions, and risks</h2>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Decisions</h3>
+              <div style={{ display: "grid", gap: 8 }}>
+                {decisions.map((item) => (
+                  <div key={item.title} className="validation-card">
+                    <strong>{item.title}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Assumptions</h3>
+              <div style={{ display: "grid", gap: 8 }}>
+                {assumptions.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major assumptions surfaced right now.</p> : assumptions.map((item) => (
+                  <div key={item.title} className="validation-card">
+                    <strong>{item.title}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Risks</h3>
+              <div style={{ display: "grid", gap: 8 }}>
+                {risks.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major risks surfaced right now.</p> : risks.map((item) => (
+                  <div key={item.title} className="validation-card">
+                    <strong>{item.title}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="panel">
-        <h2 style={{ marginTop: 0 }}>Logical design workspaces</h2>
-        <div className="grid-2">
-          <Link to={`/projects/${projectId}/sites`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>Sites</h3>
-            <p className="muted">Manage site boundaries, labels, and address blocks.</p>
-          </Link>
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Address hierarchy snapshot</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            The HLD/LLD output still depends on a clean address hierarchy. Review this quickly here, then use the Addressing Plan workspace for full detail.
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Site</th>
+                  <th align="left">Site block</th>
+                  <th align="left">Allocated</th>
+                  <th align="left">Headroom</th>
+                  <th align="left">Summary target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {synthesized.siteHierarchy.map((site) => (
+                  <tr key={site.id}>
+                    <td>{site.name}{site.siteCode ? ` • ${site.siteCode}` : ""}</td>
+                    <td>{site.siteBlockCidr || "—"}</td>
+                    <td>{site.allocatedSegmentAddresses}</td>
+                    <td>{site.blockHeadroomAddresses}</td>
+                    <td>{site.summarizationTarget || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <Link to={`/projects/${projectId}/addressing`} className="link-button">Open full Addressing Plan</Link>
+          </div>
+        </div>
 
-          <Link to={`/projects/${projectId}/vlans`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>VLANs</h3>
-            <p className="muted">Plan segments, gateways, subnet sizing, and DHCP behavior.</p>
-          </Link>
-
-          <Link to={`/projects/${projectId}/validation`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>Validation</h3>
-            <p className="muted">Surface overlap, gateway, and capacity issues before handoff.</p>
-          </Link>
-
-          <Link to={`/projects/${projectId}/diagram`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>Diagram</h3>
-            <p className="muted">Review the network visually in logical and physical-style views.</p>
-          </Link>
-
-          <Link to={`/projects/${projectId}/tasks`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>Tasks</h3>
-            <p className="muted">Track technical review work, ownership, and overdue items.</p>
-          </Link>
-
-          <Link to={`/projects/${projectId}/report`} className="panel" style={{ textDecoration: "none" }}>
-            <h3 style={{ marginTop: 0 }}>Report</h3>
-            <p className="muted">Open the handoff surface for cleaner stakeholder review and export.</p>
-          </Link>
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Implementation next steps</h2>
+          <p className="muted" style={{ margin: 0 }}>Rollout: {synthesized.implementationPlan.rolloutStrategy}</p>
+          <p className="muted" style={{ margin: 0 }}>Validation: {synthesized.implementationPlan.validationApproach}</p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {synthesized.implementationNextSteps.map((step) => (
+              <li key={step} style={{ marginBottom: 8 }}>{step}</li>
+            ))}
+          </ul>
+          <div>
+            <Link to={`/projects/${projectId}/implementation`} className="link-button">Open full Implementation Plan</Link>
+          </div>
         </div>
       </div>
     </section>

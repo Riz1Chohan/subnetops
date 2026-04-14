@@ -15,6 +15,8 @@ export function LandingPage() {
           <Link to="/register"><button type="button">Get started</button></Link>
           <Link to="/login" className="link-button">Login</Link>
           <Link to="/about" className="link-button">About</Link>
+          <Link to="/help" className="link-button">Help</Link>
+          <Link to="/faq" className="link-button">FAQ</Link>
         </div>
       </div>
     </section>

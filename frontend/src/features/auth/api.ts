@@ -23,9 +23,30 @@ export function login(input: { email: string; password: string }) {
 }
 
 export function logout() {
-  return api<{ message: string }>("/auth/logout", { method: "POST" });
+  return api<void>("/auth/logout", { method: "POST" });
 }
 
 export function getMe() {
   return api<{ user: SafeUser }>("/auth/me");
+}
+
+export function changePassword(input: { currentPassword: string; newPassword: string }) {
+  return api<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function requestPasswordReset(input: { email: string }) {
+  return api<{ message: string; resetToken?: string }>("/auth/request-password-reset", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resetPassword(input: { token: string; newPassword: string }) {
+  return api<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

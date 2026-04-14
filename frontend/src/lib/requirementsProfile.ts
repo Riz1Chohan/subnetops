@@ -80,7 +80,7 @@ export type RequirementsProfile = {
 
 export const defaultRequirementsProfile: RequirementsProfile = {
   planningFor: "Office",
-  projectPhase: "Greenfield",
+  projectPhase: "New network build",
   environmentType: "On-prem",
   complianceProfile: "General business",
   siteCount: "1",

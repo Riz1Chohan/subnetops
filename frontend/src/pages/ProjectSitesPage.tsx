@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { Site } from "../lib/types";
 import { SiteForm } from "../features/sites/components/SiteForm";
 import { SiteTable } from "../features/sites/components/SiteTable";
@@ -11,6 +11,7 @@ import { ErrorState } from "../components/app/ErrorState";
 
 export function ProjectSitesPage() {
   const { projectId = "" } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sitesQuery = useProjectSites(projectId);
   const createSiteMutation = useCreateSite(projectId);
   const updateSiteMutation = useUpdateSite(projectId);
@@ -21,6 +22,22 @@ export function ProjectSitesPage() {
   const [siteQuery, setSiteQuery] = useState("");
 
   const sites = sitesQuery.data ?? [];
+  const editId = searchParams.get("edit");
+
+  useEffect(() => {
+    if (!editId || sites.length === 0) return;
+    const match = sites.find((site) => site.id === editId);
+    if (!match) return;
+    setEditingSite((current) => current?.id === match.id ? current : match);
+    setShowCreate(false);
+  }, [editId, sites]);
+
+  function clearEditQuery() {
+    if (!searchParams.has("edit")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }
   const filteredSites = useMemo(() => {
     const needle = siteQuery.trim().toLowerCase();
     if (!needle) return sites;
@@ -42,6 +59,7 @@ export function ProjectSitesPage() {
               onClick={() => {
                 setShowCreate(false);
                 setEditingSite(null);
+                clearEditQuery();
               }}
             >
               Close Form
@@ -59,6 +77,7 @@ export function ProjectSitesPage() {
             onCancel={() => {
               setShowCreate(false);
               setEditingSite(null);
+              clearEditQuery();
             }}
             isSubmitting={isSubmitting}
             onSubmit={async (values) => {
@@ -66,11 +85,13 @@ export function ProjectSitesPage() {
                 await updateSiteMutation.mutateAsync({ siteId: editingSite.id, values });
                 setEditingSite(null);
                 setShowCreate(false);
+                clearEditQuery();
                 return;
               }
 
               await createSiteMutation.mutateAsync(values);
               setShowCreate(false);
+              clearEditQuery();
             }}
           />
         </div>

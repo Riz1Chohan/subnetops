@@ -6,6 +6,7 @@ import { useCreateProjectComment, useProjectComments } from "../features/comment
 import { useExplainValidationFinding } from "../features/ai/hooks";
 import type { ValidationResult } from "../lib/types";
 import { AIValidationInsight } from "../features/ai/components/AIValidationInsight";
+import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
@@ -73,7 +74,7 @@ export function ProjectValidationPage() {
     return Array.from(map.entries());
   }, [filteredItems]);
 
-  const openTaskBodies = new Set((commentsQuery.data ?? []).map((comment) => comment.body));
+  const openTaskBodies = new Set<string>((commentsQuery.data ?? []).map((comment) => comment.body));
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -173,6 +174,8 @@ export function ProjectValidationPage() {
                         entityType: item.entityType,
                       });
                     }}
+                    getFixPath={(item) => buildValidationFixPath(projectId, item)}
+                    getFixLabel={(item) => validationFixLabel(item)}
                   />
                 </div>
               ))}
@@ -186,6 +189,7 @@ export function ProjectValidationPage() {
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li>Fix errors before treating the logical design as handoff-ready.</li>
               <li>Warnings usually indicate design debt, growth pressure, or convention drift.</li>
+              <li>Each finding can now jump directly into the related site, VLAN, or requirements area.</li>
               <li>Convert recurring issues into tasks so they stay visible in the project workflow.</li>
             </ul>
           </div>

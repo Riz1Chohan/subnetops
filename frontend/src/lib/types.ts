@@ -54,6 +54,8 @@ export interface Project {
   approvalStatus?: "DRAFT" | "IN_REVIEW" | "APPROVED";
   reviewerNotes?: string;
   requirementsJson?: string;
+  discoveryJson?: string;
+  platformProfileJson?: string;
   organizationId?: string;
   canEdit?: boolean;
   taskSummary?: {

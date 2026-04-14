@@ -15,19 +15,26 @@ export function DashboardLayout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Brand to="/dashboard" showCompany />
+        <div className="topbar-brand-row">
+          <Brand to="/dashboard" showCompany />
+          <span className="brand-slogan">Plan networks with clarity.</span>
+        </div>
         <nav>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/projects/new">Start Plan</Link>
+          <Link to="/ai">AI</Link>
           <Link to="/my-tasks">My Tasks{overdueTasks > 0 ? ` (${overdueTasks})` : ""}</Link>
           <Link to="/dashboard/about">About</Link>
+          <Link to="/dashboard/help">Help</Link>
+          <Link to="/dashboard/faq">FAQ</Link>
+          <Link to="/account/security">Account</Link>
           <span className="muted">Notifications: {notificationSummaryQuery.data?.unread ?? 0}</span>
           <span className="muted">{data?.user?.email || "Guest"}</span>
           <button
             type="button"
             onClick={async () => {
               await logoutMutation.mutateAsync();
-              navigate("/login");
+              navigate("/login", { replace: true });
             }}
           >
             Logout

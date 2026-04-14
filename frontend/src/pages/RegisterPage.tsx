@@ -18,12 +18,12 @@ export function RegisterPage() {
         onSubmit={async (e) => {
           e.preventDefault();
           await registerMutation.mutateAsync({ fullName, email, password });
-          navigate("/dashboard");
+          navigate("/dashboard", { replace: true });
         }}
       >
-        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required />
-        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required minLength={8} />
+        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name" autoComplete="name" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" required />
+        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" autoComplete="new-password" required minLength={8} />
         {registerMutation.error ? <p className="error-text">{registerMutation.error.message}</p> : null}
         <button type="submit" disabled={registerMutation.isPending}>{registerMutation.isPending ? "Creating..." : "Create account"}</button>
       </form>

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { Vlan } from "../lib/types";
 import { VlanForm } from "../features/vlans/components/VlanForm";
 import { VlanTable } from "../features/vlans/components/VlanTable";
@@ -22,6 +22,7 @@ function vlanCategory(vlan: Vlan) {
 
 export function ProjectVlansPage() {
   const { projectId = "" } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
 
@@ -38,6 +39,22 @@ export function ProjectVlansPage() {
 
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
+  const editId = searchParams.get("edit");
+
+  useEffect(() => {
+    if (!editId || vlans.length === 0) return;
+    const match = vlans.find((vlan) => vlan.id === editId);
+    if (!match) return;
+    setEditingVlan((current) => current?.id === match.id ? current : match);
+    setShowCreate(false);
+  }, [editId, vlans]);
+
+  function clearEditQuery() {
+    if (!searchParams.has("edit")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }
 
   const filteredVlans = useMemo(() => {
     const filtered = vlans.filter((vlan) => {
@@ -82,6 +99,7 @@ export function ProjectVlansPage() {
               onClick={() => {
                 setShowCreate(false);
                 setEditingVlan(null);
+                clearEditQuery();
               }}
             >
               Close Form
@@ -100,6 +118,7 @@ export function ProjectVlansPage() {
             onCancel={() => {
               setShowCreate(false);
               setEditingVlan(null);
+              clearEditQuery();
             }}
             isSubmitting={isSubmitting}
             onSubmit={async (values) => {
@@ -107,11 +126,13 @@ export function ProjectVlansPage() {
                 await updateVlanMutation.mutateAsync({ vlanId: editingVlan.id, values });
                 setEditingVlan(null);
                 setShowCreate(false);
+                clearEditQuery();
                 return;
               }
 
               await createVlanMutation.mutateAsync(values);
               setShowCreate(false);
+              clearEditQuery();
             }}
           />
         </div>
