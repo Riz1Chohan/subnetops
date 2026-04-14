@@ -19,7 +19,7 @@ echo
 echo "==> Backend install + Prisma generate + build"
 cd "${ROOT_DIR}/backend"
 npm install --include=dev
-npx prisma generate
+npm run prisma:update
 npm run build
 
 echo
