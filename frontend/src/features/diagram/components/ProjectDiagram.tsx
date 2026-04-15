@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { synthesizeLogicalDesign, type SitePlacementDevice, type SynthesizedLogicalDesign, type TrafficFlowPath } from "../../../lib/designSynthesis";
 import { parseRequirementsProfile } from "../../../lib/requirementsProfile";
 import type { ProjectComment, ProjectDetail, Site, Vlan } from "../../../lib/types";
 
@@ -13,7 +14,10 @@ interface ProjectDiagramProps {
 }
 
 type DiagramMode = "logical" | "physical";
-type VlanCategory = "admin" | "guest" | "servers" | "management" | "voice" | "clinical" | "default";
+type OverlayMode = "none" | "addressing" | "security" | "flows";
+type SitePoint = { x: number; y: number };
+
+type DeviceKind = SitePlacementDevice["deviceType"] | "internet" | "cloud";
 
 function getSvgElement(svgId: string) {
   return document.getElementById(svgId) as SVGSVGElement | null;
@@ -50,7 +54,7 @@ async function exportPng(svgId: string, filename: string) {
 
   const canvas = document.createElement("canvas");
   canvas.width = image.width || 1800;
-  canvas.height = image.height || 1100;
+  canvas.height = image.height || 1200;
   const context = canvas.getContext("2d");
   if (!context) {
     URL.revokeObjectURL(url);
@@ -68,69 +72,134 @@ async function exportPng(svgId: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function vlanCategory(vlan: Vlan): VlanCategory {
-  const text = `${vlan.vlanName} ${vlan.purpose || ""} ${vlan.department || ""}`.toLowerCase();
-  if (text.includes("guest")) return "guest";
-  if (text.includes("server")) return "servers";
-  if (text.includes("management") || text.includes("mgmt")) return "management";
-  if (text.includes("voice")) return "voice";
-  if (text.includes("clinical") || text.includes("medical") || text.includes("iot") || text.includes("camera")) return "clinical";
-  if (text.includes("admin")) return "admin";
-  return "default";
-}
-
-function categoryColor(category: VlanCategory) {
-  switch (category) {
-    case "admin": return { fill: "#e6f0ff", stroke: "#87aef7", text: "#1f4eaa", label: "Admin" };
-    case "guest": return { fill: "#fff0e3", stroke: "#ffc98e", text: "#9a4f00", label: "Guest" };
-    case "servers": return { fill: "#efe8ff", stroke: "#c7a7ff", text: "#5d30a6", label: "Servers" };
-    case "management": return { fill: "#e7fff3", stroke: "#8ddab0", text: "#1f7d4b", label: "Management" };
-    case "voice": return { fill: "#ffe8f0", stroke: "#ffadc8", text: "#a52f63", label: "Voice" };
-    case "clinical": return { fill: "#e7fbff", stroke: "#92deee", text: "#0f7286", label: "Specialized" };
-    default: return { fill: "#edf3ff", stroke: "#c7d9fb", text: "#20427f", label: "Other" };
-  }
-}
-
 function openTaskCount(comments: ProjectComment[], targetType: "SITE" | "VLAN", targetId: string) {
   return comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === targetType && comment.targetId === targetId).length;
 }
 
-function siteRole(site: SiteWithVlans, index: number) {
-  const text = `${site.name} ${site.siteCode || ""}`.toLowerCase();
-  if (text.includes("hq") || text.includes("head") || text.includes("core")) return "HQ";
-  return index === 0 ? "Primary Site" : "Branch Site";
+function roleTone(kind: DeviceKind) {
+  switch (kind) {
+    case "firewall": return { fill: "#ebf3ff", stroke: "#73a1ef", text: "#144aab" };
+    case "router": return { fill: "#ffffff", stroke: "#8cb0ef", text: "#183866" };
+    case "core-switch":
+    case "distribution-switch":
+    case "access-switch": return { fill: "#ffffff", stroke: "#8eb7f7", text: "#183866" };
+    case "wireless-controller":
+    case "access-point": return { fill: "#f3fff8", stroke: "#8fdab3", text: "#1d7f4c" };
+    case "server": return { fill: "#f6f0ff", stroke: "#c9abff", text: "#5a34a3" };
+    case "cloud-edge":
+    case "cloud": return { fill: "#f4efff", stroke: "#c7b0ff", text: "#5a34a3" };
+    case "internet": return { fill: "#eef5ff", stroke: "#bad1f5", text: "#234878" };
+    default: return { fill: "#ffffff", stroke: "#ccd7eb", text: "#183866" };
+  }
 }
 
-function cloudGlyph(cx: number, cy: number, label: string, tone: "internet" | "cloud" = "internet") {
-  const palette = tone === "internet"
-    ? { fill: "#eef5ff", stroke: "#b9d1f5", text: "#244579" }
-    : { fill: "#f2ecff", stroke: "#cdb8ff", text: "#5d30a6" };
+function deviceLabel(kind: DeviceKind) {
+  switch (kind) {
+    case "firewall": return "Firewall";
+    case "router": return "Router";
+    case "core-switch": return "Core Switch";
+    case "distribution-switch": return "Distribution";
+    case "access-switch": return "Access Switch";
+    case "wireless-controller": return "WLC";
+    case "access-point": return "AP";
+    case "server": return "Server";
+    case "cloud-edge": return "Cloud Edge";
+    case "cloud": return "Cloud";
+    case "internet": return "Internet";
+    default: return kind;
+  }
+}
+
+function linkStyle(type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow") {
+  switch (type) {
+    case "internet": return { stroke: "#7ca5eb", dash: "8 6", width: 2.5 };
+    case "trunk": return { stroke: "#9a7cff", dash: "2 0", width: 3.5 };
+    case "vpn": return { stroke: "#1d7f4c", dash: "10 5", width: 3 };
+    case "ha": return { stroke: "#ff9b5d", dash: "6 5", width: 2.5 };
+    case "flow": return { stroke: "#ff7a59", dash: "0", width: 3.5 };
+    default: return { stroke: "#85a7e6", dash: "0", width: 2.6 };
+  }
+}
+
+function DeviceIcon({ x, y, kind, label, sublabel }: { x: number; y: number; kind: DeviceKind; label: string; sublabel?: string }) {
+  const tone = roleTone(kind);
+  const bodyX = x;
+  const bodyY = y;
+
+  if (kind === "internet" || kind === "cloud" || kind === "cloud-edge") {
+    return (
+      <g>
+        <ellipse cx={bodyX + 34} cy={bodyY + 28} rx={28} ry={18} fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+        <ellipse cx={bodyX + 62} cy={bodyY + 18} rx={30} ry={20} fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+        <ellipse cx={bodyX + 88} cy={bodyY + 30} rx={22} ry={15} fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+        <rect x={bodyX + 20} y={bodyY + 24} width={78} height={22} rx={11} fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+        <text x={bodyX + 60} y={bodyY + 74} textAnchor="middle" fontSize="12" fontWeight="700" fill={tone.text}>{label}</text>
+        {sublabel ? <text x={bodyX + 60} y={bodyY + 89} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
+      </g>
+    );
+  }
+
+  if (kind === "router") {
+    return (
+      <g>
+        <circle cx={bodyX + 44} cy={bodyY + 32} r={30} fill={tone.fill} stroke={tone.stroke} strokeWidth="2.5" />
+        <path d={`M ${bodyX + 23} ${bodyY + 32} L ${bodyX + 43} ${bodyY + 18} L ${bodyX + 43} ${bodyY + 27} L ${bodyX + 62} ${bodyY + 18} L ${bodyX + 46} ${bodyY + 32} L ${bodyX + 62} ${bodyY + 46} L ${bodyX + 43} ${bodyY + 37} L ${bodyX + 43} ${bodyY + 46} L ${bodyX + 23} ${bodyY + 32} Z`} fill={tone.stroke} opacity="0.8" />
+        <text x={bodyX + 44} y={bodyY + 74} textAnchor="middle" fontSize="12" fontWeight="700" fill="#183866">{label}</text>
+        {sublabel ? <text x={bodyX + 44} y={bodyY + 89} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
+      </g>
+    );
+  }
+
+  if (kind === "firewall") {
+    return (
+      <g>
+        <path d={`M ${bodyX + 16} ${bodyY} L ${bodyX + 104} ${bodyY} L ${bodyX + 118} ${bodyY + 14} L ${bodyX + 118} ${bodyY + 52} L ${bodyX} ${bodyY + 52} L ${bodyX} ${bodyY + 14} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth="2.2" />
+        <rect x={bodyX + 18} y={bodyY + 12} width="80" height="6" rx="3" fill={tone.stroke} opacity="0.26" />
+        <rect x={bodyX + 18} y={bodyY + 23} width="80" height="6" rx="3" fill={tone.stroke} opacity="0.22" />
+        <rect x={bodyX + 18} y={bodyY + 34} width="80" height="6" rx="3" fill={tone.stroke} opacity="0.18" />
+        <text x={bodyX + 59} y={bodyY + 71} textAnchor="middle" fontSize="12" fontWeight="700" fill="#183866">{label}</text>
+        {sublabel ? <text x={bodyX + 59} y={bodyY + 86} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
+      </g>
+    );
+  }
+
+  if (kind === "access-point" || kind === "wireless-controller") {
+    return (
+      <g>
+        <circle cx={bodyX + 26} cy={bodyY + 26} r={17} fill={tone.fill} stroke={tone.stroke} strokeWidth="2.2" />
+        <circle cx={bodyX + 26} cy={bodyY + 26} r={4} fill={tone.text} />
+        <path d={`M ${bodyX + 12} ${bodyY + 14} Q ${bodyX + 26} ${bodyY + 4} ${bodyX + 40} ${bodyY + 14}`} fill="none" stroke={tone.stroke} strokeWidth="2" />
+        <path d={`M ${bodyX + 16} ${bodyY + 19} Q ${bodyX + 26} ${bodyY + 12} ${bodyX + 36} ${bodyY + 19}`} fill="none" stroke={tone.stroke} strokeWidth="2" />
+        <text x={bodyX + 26} y={bodyY + 58} textAnchor="middle" fontSize="12" fontWeight="700" fill="#183866">{label}</text>
+        {sublabel ? <text x={bodyX + 26} y={bodyY + 73} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
+      </g>
+    );
+  }
+
+  if (kind === "server") {
+    return (
+      <g>
+        <rect x={bodyX} y={bodyY} width="74" height="50" rx="10" fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+        <rect x={bodyX + 10} y={bodyY + 10} width="54" height="7" rx="3.5" fill={tone.stroke} opacity="0.28" />
+        <rect x={bodyX + 10} y={bodyY + 22} width="54" height="7" rx="3.5" fill={tone.stroke} opacity="0.22" />
+        <rect x={bodyX + 10} y={bodyY + 34} width="22" height="6" rx="3" fill={tone.stroke} opacity="0.18" />
+        <text x={bodyX + 37} y={bodyY + 70} textAnchor="middle" fontSize="12" fontWeight="700" fill="#183866">{label}</text>
+        {sublabel ? <text x={bodyX + 37} y={bodyY + 85} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
+      </g>
+    );
+  }
 
   return (
     <g>
-      <ellipse cx={cx - 34} cy={cy + 8} rx={34} ry={20} fill={palette.fill} stroke={palette.stroke} strokeWidth="2" />
-      <ellipse cx={cx + 4} cy={cy - 8} rx={44} ry={26} fill={palette.fill} stroke={palette.stroke} strokeWidth="2" />
-      <ellipse cx={cx + 46} cy={cy + 6} rx={30} ry={18} fill={palette.fill} stroke={palette.stroke} strokeWidth="2" />
-      <rect x={cx - 58} y={cy + 2} width={118} height={30} rx={15} fill={palette.fill} stroke={palette.stroke} strokeWidth="2" />
-      <text x={cx} y={cy + 18} textAnchor="middle" fontSize="14" fontWeight="700" fill={palette.text}>{label}</text>
-    </g>
-  );
-}
-
-function zoneBand(x: number, y: number, width: number, height: number, title: string, subtitle: string, tone: "blue" | "purple" | "green" | "orange" = "blue") {
-  const palette = tone === "purple"
-    ? { fill: "#faf7ff", stroke: "#d9c7ff", title: "#5d30a6", subtitle: "#6f6690" }
-    : tone === "green"
-      ? { fill: "#f4fff9", stroke: "#b9efcf", title: "#207447", subtitle: "#5f7a6a" }
-      : tone === "orange"
-        ? { fill: "#fff8ef", stroke: "#ffd29b", title: "#9a4f00", subtitle: "#7e6d58" }
-        : { fill: "#f7fbff", stroke: "#d7e6ff", title: "#1f4eaa", subtitle: "#5f7390" };
-
-  return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} rx={20} fill={palette.fill} stroke={palette.stroke} strokeWidth="2" strokeDasharray="8 6" />
-      <text x={x + 18} y={y + 24} fontSize="14" fontWeight="700" fill={palette.title}>{title}</text>
-      <text x={x + 18} y={y + 42} fontSize="11" fill={palette.subtitle}>{subtitle}</text>
+      <rect x={bodyX} y={bodyY} width="112" height="42" rx="10" fill={tone.fill} stroke={tone.stroke} strokeWidth="2" />
+      {Array.from({ length: 8 }).map((_, index) => (
+        <rect key={index} x={bodyX + 11 + index * 11.2} y={bodyY + 13} width="6" height="5" rx="2" fill={tone.stroke} opacity={0.9 - index * 0.05} />
+      ))}
+      {Array.from({ length: 8 }).map((_, index) => (
+        <rect key={`lower-${index}`} x={bodyX + 11 + index * 11.2} y={bodyY + 23} width="6" height="5" rx="2" fill={tone.stroke} opacity={0.6 - index * 0.03} />
+      ))}
+      <text x={bodyX + 56} y={bodyY + 60} textAnchor="middle" fontSize="12" fontWeight="700" fill="#183866">{label}</text>
+      {sublabel ? <text x={bodyX + 56} y={bodyY + 75} textAnchor="middle" fontSize="10.5" fill="#657892">{sublabel}</text> : null}
     </g>
   );
 }
@@ -145,350 +214,479 @@ function taskBadge(x: number, y: number, count: number) {
   );
 }
 
-function lineLink(x1: number, y1: number, x2: number, y2: number, dashed = false, label?: string) {
-  const labelX = (x1 + x2) / 2;
-  const labelY = (y1 + y2) / 2 - 6;
+function chip(x: number, y: number, width: number, text: string, tone: "blue" | "purple" | "green" | "orange") {
+  const palette = tone === "purple"
+    ? { fill: "#f7f1ff", stroke: "#c9abff", text: "#5a34a3" }
+    : tone === "green"
+      ? { fill: "#f2fff8", stroke: "#96dfb7", text: "#1d7f4c" }
+      : tone === "orange"
+        ? { fill: "#fff7ef", stroke: "#ffc98e", text: "#8f4b00" }
+        : { fill: "#eef5ff", stroke: "#b8cff5", text: "#20427f" };
+
   return (
     <g>
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#a8bfe8" strokeWidth="2.5" strokeDasharray={dashed ? "8 6" : undefined} />
-      {label ? <text x={labelX} y={labelY} textAnchor="middle" fontSize="11" fill="#5f7390">{label}</text> : null}
+      <rect x={x} y={y} width={width} height="22" rx="11" fill={palette.fill} stroke={palette.stroke} />
+      <text x={x + 10} y={y + 15} fontSize="10.5" fill={palette.text}>{text}</text>
     </g>
   );
 }
 
-function firewallNode(x: number, y: number, label: string, sublabel?: string) {
+function pathLine(points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) {
+  const style = linkStyle(type);
+  const path = points.map(([x, y], index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+  const labelPoint = points[Math.floor(points.length / 2)];
+  const labelWidth = Math.max(116, ((label?.length ?? 0) * 6.3) + 24);
+  const secondaryWidth = Math.max(104, ((secondaryLabel?.length ?? 0) * 6.1) + 24);
   return (
     <g>
-      <path d={`M ${x + 18} ${y} L ${x + 112} ${y} L ${x + 130} ${y + 18} L ${x + 130} ${y + 62} L ${x} ${y + 62} L ${x} ${y + 18} Z`} fill="#eaf3ff" stroke="#7fa9f7" strokeWidth="2" />
-      <rect x={x + 18} y={y + 12} width="94" height="8" rx="4" fill="#7fa9f7" opacity="0.28" />
-      <rect x={x + 18} y={y + 26} width="94" height="8" rx="4" fill="#7fa9f7" opacity="0.2" />
-      <rect x={x + 18} y={y + 40} width="94" height="8" rx="4" fill="#7fa9f7" opacity="0.14" />
-      <text x={x + 65} y={y + 80} textAnchor="middle" fontSize="12" fontWeight="700" fill="#1f4eaa">{label}</text>
-      {sublabel ? <text x={x + 65} y={y + 95} textAnchor="middle" fontSize="10.5" fill="#60769a">{sublabel}</text> : null}
+      <path d={path} fill="none" stroke={style.stroke} strokeWidth={style.width} strokeDasharray={style.dash} strokeLinecap="round" strokeLinejoin="round" />
+      {label && labelPoint ? (
+        <g>
+          <rect x={labelPoint[0] - labelWidth / 2} y={labelPoint[1] - (secondaryLabel ? 28 : 18)} width={labelWidth} height={18} rx="9" fill="#ffffff" stroke="#dbe6f7" />
+          <text x={labelPoint[0]} y={labelPoint[1] - (secondaryLabel ? 15 : 5)} textAnchor="middle" fontSize="10.5" fill="#526984">{label}</text>
+          {secondaryLabel ? (
+            <g>
+              <rect x={labelPoint[0] - secondaryWidth / 2} y={labelPoint[1] - 6} width={secondaryWidth} height={16} rx="8" fill="#f8fbff" stroke="#dbe6f7" />
+              <text x={labelPoint[0]} y={labelPoint[1] + 5} textAnchor="middle" fontSize="9.6" fill="#6a7d97">{secondaryLabel}</text>
+            </g>
+          ) : null}
+        </g>
+      ) : null}
     </g>
   );
 }
 
-function routerNode(x: number, y: number, label: string, sublabel?: string, tone: "core" | "site" = "site") {
-  const palette = tone === "core"
-    ? { fill: "#2357d8", stroke: "#2357d8", text: "#ffffff", soft: "#dfe9ff" }
-    : { fill: "#ffffff", stroke: "#9cb9ef", text: "#123566", soft: "#9cb9ef" };
 
-  return (
-    <g>
-      <circle cx={x + 44} cy={y + 34} r="34" fill={palette.fill} stroke={palette.stroke} strokeWidth="2.5" />
-      <path d={`M ${x + 24} ${y + 30} L ${x + 44} ${y + 18} L ${x + 44} ${y + 28} L ${x + 62} ${y + 18} L ${x + 46} ${y + 34} L ${x + 62} ${y + 50} L ${x + 44} ${y + 40} L ${x + 44} ${y + 50} L ${x + 24} ${y + 38} L ${x + 42} ${y + 34} Z`} fill={palette.text === "#ffffff" ? "#dfe9ff" : palette.soft} opacity="0.95" />
-      <text x={x + 44} y={y + 83} textAnchor="middle" fontSize="12" fontWeight="700" fill="#17345e">{label}</text>
-      {sublabel ? <text x={x + 44} y={y + 98} textAnchor="middle" fontSize="10.5" fill="#60769a">{sublabel}</text> : null}
-    </g>
-  );
+function primaryDmzService(synthesized: SynthesizedLogicalDesign, siteName?: string) {
+  return synthesized.servicePlacements.find((service) => service.serviceType === "dmz-service" && (!siteName || service.siteName === siteName));
 }
 
-function switchNode(x: number, y: number, label: string, sublabel?: string) {
-  return (
-    <g>
-      <rect x={x} y={y} width="122" height="46" rx="12" fill="#ffffff" stroke="#9cb9ef" strokeWidth="2" />
-      {Array.from({ length: 8 }).map((_, index) => (
-        <rect key={index} x={x + 12 + index * 12.5} y={y + 14} width="7" height="6" rx="2" fill="#7fa9f7" opacity={0.9 - index * 0.05} />
-      ))}
-      {Array.from({ length: 8 }).map((_, index) => (
-        <rect key={`lower-${index}`} x={x + 12 + index * 12.5} y={y + 25} width="7" height="6" rx="2" fill="#7fa9f7" opacity={0.6 - index * 0.03} />
-      ))}
-      <text x={x + 61} y={y + 64} textAnchor="middle" fontSize="12" fontWeight="700" fill="#17345e">{label}</text>
-      {sublabel ? <text x={x + 61} y={y + 79} textAnchor="middle" fontSize="10.5" fill="#60769a">{sublabel}</text> : null}
-    </g>
-  );
+function sitePositionMap(sites: SiteWithVlans[], synthesized: SynthesizedLogicalDesign, cardWidth: number, startX: number, gap: number): Record<string, SitePoint> {
+  const positions: Record<string, SitePoint> = {};
+  if (sites.length === 1) {
+    positions[sites[0].id] = { x: 560, y: 210 };
+    return positions;
+  }
+
+  if (synthesized.topology.topologyType === "hub-spoke" && synthesized.topology.primarySiteId) {
+    const primary = sites.find((site) => site.id === synthesized.topology.primarySiteId) || sites[0];
+    const branches = sites.filter((site) => site.id !== primary.id);
+    positions[primary.id] = { x: 560, y: 170 };
+    const columns = Math.min(3, Math.max(2, branches.length));
+    branches.forEach((site, index) => {
+      const row = Math.floor(index / columns);
+      const col = index % columns;
+      positions[site.id] = { x: 120 + col * (cardWidth + 90), y: 580 + row * 400 };
+    });
+    return positions;
+  }
+
+  sites.forEach((site, index) => {
+    positions[site.id] = { x: startX + index * (cardWidth + gap), y: 178 };
+  });
+  return positions;
 }
 
-function accessPointNode(x: number, y: number, label: string, sublabel?: string) {
-  return (
-    <g>
-      <circle cx={x + 26} cy={y + 26} r="18" fill="#ffffff" stroke="#8ddab0" strokeWidth="2" />
-      <circle cx={x + 26} cy={y + 26} r="4" fill="#1f7d4b" />
-      <path d={`M ${x + 11} ${y + 14} Q ${x + 26} ${y + 2} ${x + 41} ${y + 14}`} fill="none" stroke="#8ddab0" strokeWidth="2" />
-      <path d={`M ${x + 15} ${y + 19} Q ${x + 26} ${y + 11} ${x + 37} ${y + 19}`} fill="none" stroke="#8ddab0" strokeWidth="2" />
-      <text x={x + 26} y={y + 58} textAnchor="middle" fontSize="12" fontWeight="700" fill="#1d5d3e">{label}</text>
-      {sublabel ? <text x={x + 26} y={y + 73} textAnchor="middle" fontSize="10.5" fill="#60796a">{sublabel}</text> : null}
-    </g>
-  );
+function overlayTone(mode: OverlayMode) {
+  switch (mode) {
+    case "addressing": return "blue" as const;
+    case "security": return "purple" as const;
+    case "flows": return "orange" as const;
+    default: return "green" as const;
+  }
 }
 
-function serverNode(x: number, y: number, label: string, sublabel?: string) {
-  return (
-    <g>
-      <rect x={x} y={y} width="84" height="56" rx="12" fill="#ffffff" stroke="#c7a7ff" strokeWidth="2" />
-      <rect x={x + 12} y={y + 10} width="60" height="10" rx="5" fill="#c7a7ff" opacity="0.35" />
-      <rect x={x + 12} y={y + 25} width="60" height="10" rx="5" fill="#c7a7ff" opacity="0.23" />
-      <rect x={x + 12} y={y + 40} width="60" height="6" rx="3" fill="#c7a7ff" opacity="0.17" />
-      <text x={x + 42} y={y + 75} textAnchor="middle" fontSize="12" fontWeight="700" fill="#53308f">{label}</text>
-      {sublabel ? <text x={x + 42} y={y + 90} textAnchor="middle" fontSize="10.5" fill="#6f6690">{sublabel}</text> : null}
-    </g>
-  );
+function overlayItems(site: SiteWithVlans, synthesized: SynthesizedLogicalDesign, mode: OverlayMode) {
+  if (mode === "addressing") {
+    return synthesized.addressingPlan
+      .filter((row) => row.siteId === site.id)
+      .slice(0, 5)
+      .map((row) => `${row.segmentName} • ${row.subnetCidr}`);
+  }
+
+  if (mode === "security") {
+    return synthesized.securityBoundaries
+      .filter((boundary) => boundary.siteName === site.name)
+      .slice(0, 5)
+      .map((boundary) => `${boundary.zoneName} • via ${boundary.attachedDevice}`);
+  }
+
+  if (mode === "flows") {
+    return synthesized.trafficFlows
+      .filter((flow) => flow.sourceSite === site.name || flow.destinationSite === site.name)
+      .slice(0, 4)
+      .map((flow) => `${flow.flowName} • ${flow.sourceZone} → ${flow.destinationZone}`);
+  }
+
+  return synthesized.sitePlacements
+    .filter((placement) => placement.siteId === site.id)
+    .slice(0, 4)
+    .map((placement) => `${deviceLabel(placement.deviceType)} • ${placement.role}`);
 }
 
-function chip(x: number, y: number, width: number, text: string, category: VlanCategory) {
-  const style = categoryColor(category);
-  return (
-    <g>
-      <rect x={x} y={y} width={width} height="22" rx="11" fill={style.fill} stroke={style.stroke} />
-      <text x={x + 10} y={y + 15} fontSize="10.5" fill={style.text}>{text}</text>
-    </g>
-  );
+function diagramLegend(mode: OverlayMode) {
+  const title = mode === "addressing" ? "Addressing overlay"
+    : mode === "security" ? "Security overlay"
+      : mode === "flows" ? "Traffic-flow overlay"
+        : "Placement overlay";
+  const details = mode === "addressing"
+    ? ["Shows site VLAN / subnet labels.", "Use this to confirm where blocks land."]
+    : mode === "security"
+      ? ["Shows zones and attached enforcement devices.", "Use this to verify DMZ, guest, and management boundaries."]
+      : mode === "flows"
+        ? ["Highlights critical traffic paths and control points.", "Use this to review north-south and shared-service movement."]
+        : ["Shows actual device roles that the engine placed at each site.", "Use this to verify edge, switching, and service placement."];
+  return { title, details };
 }
 
-function Legend() {
-  const items = ["admin", "guest", "servers", "management", "voice", "clinical", "default"] as const;
+function LogicalTopologyDiagram({
+  project,
+  synthesized,
+  svgId,
+  comments,
+  overlay,
+  onSelectTarget,
+}: {
+  project: ProjectDetail;
+  synthesized: SynthesizedLogicalDesign;
+  svgId: string;
+  comments: ProjectComment[];
+  overlay: OverlayMode;
+  onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
+}) {
+  const sites = (project.sites ?? []) as SiteWithVlans[];
+  const cardWidth = 290;
+  const cardHeight = 350;
+  const startX = 50;
+  const gap = 24;
+  const sitePositions = sitePositionMap(sites, synthesized, cardWidth, startX, gap);
+  const occupiedXs = Object.values(sitePositions).map((point) => point.x);
+  const occupiedYs = Object.values(sitePositions).map((point) => point.y);
+  const width = Math.max(1600, (Math.max(...occupiedXs, 0)) + cardWidth + 120);
+  const height = Math.max(980, (Math.max(...occupiedYs, 0)) + cardHeight + 120);
+
   return (
-    <div className="legend">
-      {items.map((item) => {
-        const style = categoryColor(item);
-        return (
-          <div className="legend-item" key={item}>
-            <span className="legend-swatch" style={{ background: style.stroke }} />
-            {style.label}
-          </div>
-        );
-      })}
+    <div style={{ overflowX: "auto" }}>
+      <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Logical topology diagram with explicit device placement, addressing, and overlay modes">
+        <rect x={0} y={0} width={width} height={height} rx={30} fill="#fbfdff" />
+        <rect x={40} y={36} width={width - 80} height={110} rx={24} fill="#f6f9ff" stroke="#d9e6fb" />
+        <text x={64} y={72} fontSize="20" fontWeight="700" fill="#142742">Logical topology</text>
+        <text x={64} y={96} fontSize="12" fill="#637998">v97 focuses on a real topology-style view: edge devices, switching roles, service placement, and overlays that reflect explicit design objects.</text>
+        <text x={64} y={118} fontSize="12" fill="#637998">Topology: {synthesized.topology.topologyLabel} • Breakout: {synthesized.topology.internetBreakout} • Redundancy: {synthesized.topology.redundancyModel}</text>
+        {chip(width - 286, 58, 210, diagramLegend(overlay).title, overlayTone(overlay))}
+
+        {sites.map((site, index) => {
+          const sitePoint = sitePositions[site.id] || { x: startX + index * (cardWidth + gap), y: 178 };
+          const x = sitePoint.x;
+          const y = sitePoint.y;
+          const siteDevices = synthesized.sitePlacements.filter((placement) => placement.siteId === site.id);
+          const siteOverlays = overlayItems(site, synthesized, overlay);
+          const taskCount = openTaskCount(comments, "SITE", site.id);
+          const edgeDevice = siteDevices.find((device) => device.role.toLowerCase().includes("edge") || device.deviceType === "firewall" || device.deviceType === "router") || siteDevices[0];
+          const switchDevice = siteDevices.find((device) => device.deviceType === "core-switch" || device.deviceType === "distribution-switch" || device.deviceType === "access-switch");
+          const serviceDevice = siteDevices.find((device) => device.deviceType === "server");
+          const wirelessDevice = siteDevices.find((device) => device.deviceType === "wireless-controller" || device.deviceType === "access-point");
+          const securitySummary = synthesized.securityBoundaries.filter((boundary) => boundary.siteName === site.name).slice(0, 2);
+
+          return (
+            <g key={site.id}>
+              <rect x={x} y={y} width={cardWidth} height={cardHeight} rx={24} fill="#ffffff" stroke="#dce7f8" strokeWidth="2.3" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
+              <text x={x + 20} y={y + 30} fontSize="18" fontWeight="700" fill="#142742">{site.name}</text>
+              <text x={x + 20} y={y + 50} fontSize="11" fill="#697f98">{site.defaultAddressBlock || "No site summary block assigned"}</text>
+              <text x={x + 20} y={y + 68} fontSize="11" fill="#697f98">Site role: {site.name === synthesized.topology.primarySiteName ? "Primary / policy hub" : synthesized.topology.topologyType === "collapsed-core" ? "Collapsed-core site" : "Attached / branch site"}</text>
+              {taskBadge(x + cardWidth - 24, y + 24, taskCount)}
+
+              {edgeDevice ? <DeviceIcon x={x + 18} y={y + 92} kind={edgeDevice.deviceType} label={deviceLabel(edgeDevice.deviceType)} sublabel={edgeDevice.role} /> : null}
+              {switchDevice ? <DeviceIcon x={x + 126} y={y + 92} kind={switchDevice.deviceType} label={deviceLabel(switchDevice.deviceType)} sublabel={switchDevice.role} /> : null}
+              {serviceDevice ? <DeviceIcon x={x + 212} y={y + 92} kind={serviceDevice.deviceType} label="Services" sublabel={serviceDevice.role} /> : null}
+              {wirelessDevice ? <DeviceIcon x={x + 114} y={y + 188} kind={wirelessDevice.deviceType} label={deviceLabel(wirelessDevice.deviceType)} sublabel={wirelessDevice.role} /> : null}
+              {primaryDmzService(synthesized, site.name) ? <DeviceIcon x={x + 214} y={y + 186} kind="server" label="DMZ Host" sublabel={primaryDmzService(synthesized, site.name)?.subnetCidr || "Published"} /> : null}
+
+              {edgeDevice && switchDevice ? pathLine([[x + 120, y + 122], [x + 126, y + 122]], "routed", edgeDevice.deviceType === "firewall" ? "inside / transit" : "LAN handoff", edgeDevice.connectedSubnets[0] || undefined) : null}
+              {switchDevice && serviceDevice ? pathLine([[x + 238, y + 122], [x + 212, y + 122]], "trunk", "server trunk", serviceDevice.connectedSubnets[0] || undefined) : null}
+              {switchDevice && wirelessDevice ? pathLine([[x + 182, y + 155], [x + 140, y + 188]], "trunk", "AP uplink", wirelessDevice.connectedZones[0] || undefined) : null}
+              {edgeDevice && primaryDmzService(synthesized, site.name) ? pathLine([[x + 78, y + 144], [x + 214, y + 212]], "internet", "DMZ leg", primaryDmzService(synthesized, site.name)?.subnetCidr || undefined) : null}
+
+              <text x={x + 18} y={y + 270} fontSize="12" fontWeight="700" fill="#324866">{diagramLegend(overlay).title}</text>
+              {siteOverlays.slice(0, 5).map((item, overlayIndex) => chip(x + 18, y + 282 + overlayIndex * 28, cardWidth - 36, item, overlayTone(overlay)))}
+              {siteOverlays.length === 0 ? <text x={x + 18} y={y + 300} fontSize="10.5" fill="#6a7d97">No overlay items yet for this site.</text> : null}
+              {securitySummary.map((boundary, boundaryIndex) => (
+                <text key={`${site.id}-${boundary.zoneName}-${boundaryIndex}`} x={x + 18} y={y + cardHeight - 30 + boundaryIndex * 14} fontSize="10.5" fill="#61758f">{boundary.zoneName}: {boundary.controlPoint}</text>
+              ))}
+            </g>
+          );
+        })}
+
+        {sites.length > 1 ? (
+          synthesized.topology.topologyType === "hub-spoke" && synthesized.topology.primarySiteId
+            ? sites.filter((site) => site.id !== synthesized.topology.primarySiteId).map((site) => {
+                const primaryPoint = sitePositions[synthesized.topology.primarySiteId!];
+                const branchPoint = sitePositions[site.id];
+                const wanLink = synthesized.wanLinks.find((link) => link.endpointASiteId === site.id || link.endpointBSiteId === site.id);
+                return (
+                  <g key={`inter-${site.id}`}>
+                    {pathLine(
+                      [[primaryPoint.x + cardWidth / 2, primaryPoint.y + cardHeight], [branchPoint.x + cardWidth / 2, branchPoint.y]],
+                      "vpn",
+                      "WAN / hub-spoke",
+                      wanLink?.subnetCidr || "Point-to-point transit",
+                    )}
+                  </g>
+                );
+              })
+            : sites.slice(0, -1).map((site, index) => {
+                const currentPoint = sitePositions[site.id];
+                const nextSite = sites[index + 1];
+                const nextPoint = sitePositions[nextSite.id];
+                const label = synthesized.topology.topologyType === "collapsed-core" ? "Campus / local core" : "Inter-site routed path";
+                return (
+                  <g key={`inter-${site.id}`}>
+                    {pathLine(
+                      [[currentPoint.x + cardWidth, currentPoint.y + 176], [nextPoint.x, nextPoint.y + 176]],
+                      synthesized.topology.topologyType === "collapsed-core" ? "trunk" : "routed",
+                      label,
+                      synthesized.wanLinks[index]?.subnetCidr || undefined,
+                    )}
+                  </g>
+                );
+              })
+        ) : null}
+      </svg>
     </div>
   );
 }
 
-function ArchitectureSignals({ project }: { project: ProjectDetail }) {
+function PhysicalTopologyDiagram({
+  project,
+  synthesized,
+  svgId,
+  comments,
+  overlay,
+  onSelectTarget,
+}: {
+  project: ProjectDetail;
+  synthesized: SynthesizedLogicalDesign;
+  svgId: string;
+  comments: ProjectComment[];
+  overlay: OverlayMode;
+  onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
+}) {
+  const sites = (project.sites ?? []) as SiteWithVlans[];
   const requirements = parseRequirementsProfile(project.requirementsJson);
-  const signalItems = [
-    requirements.environmentType,
-    requirements.internetModel,
-    requirements.securityPosture,
-    requirements.gatewayConvention,
-    requirements.trustBoundaryModel,
+  const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
+  const branchSites = sites.filter((site) => site.id !== primarySite?.id);
+  const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
+  const width = Math.max(1680, 1280 + branchSites.length * 140 + (cloudNeeded ? 180 : 0));
+  const height = 1160;
+  const centerX = width / 2;
+  const hqTaskCount = primarySite ? openTaskCount(comments, "SITE", primarySite.id) : 0;
+
+  const flowOverlays = overlay === "flows" ? synthesized.trafficFlows.slice(0, 4) : [];
+  const legend = diagramLegend(overlay);
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Physical style topology diagram with real network symbols and overlay modes">
+        <rect x={0} y={0} width={width} height={height} rx={30} fill="#fbfdff" />
+
+        <rect x={48} y={42} width={width - 96} height={180} rx={28} fill="#f8fbff" stroke="#dbe6f7" strokeWidth="2" />
+        <text x={72} y={76} fontSize="21" fontWeight="700" fill="#152742">Physical / topology diagram</text>
+        <text x={72} y={101} fontSize="12" fill="#607791">v98 tightens the topology rebuild with labeled links, clearer DMZ host placement, and topology-aware positioning that changes with the selected design model.</text>
+        <text x={72} y={122} fontSize="12" fill="#607791">Connection semantics: routed = blue, trunk = purple, VPN/WAN = green dashed, internet = blue dashed, flow overlay = orange.</text>
+        {chip(width - 310, 68, 230, legend.title, overlayTone(overlay))}
+        {legend.details.map((detail, index) => <text key={detail} x={width - 300} y={104 + index * 18} fontSize="11" fill="#607791">• {detail}</text>)}
+
+        <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} />
+        {pathLine([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
+        <DeviceIcon x={centerX - 60} y={226} kind="firewall" label="Perimeter Firewall" sublabel={synthesized.topology.redundancyModel} />
+        {primaryDmzService(synthesized, primarySite?.name) ? <DeviceIcon x={centerX + 168} y={232} kind="server" label="DMZ Host" sublabel={primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || "Published service"} /> : null}
+        {primaryDmzService(synthesized, primarySite?.name) ? pathLine([[centerX + 58, 262], [centerX + 168, 262]], "internet", "dmz", primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || undefined) : null}
+        {pathLine([[centerX, 278], [centerX, 340]], "routed", "inside / routed core", synthesized.routingPlan.find((item) => item.siteId === primarySite?.id)?.summaryAdvertisement || undefined)}
+
+        <rect x={centerX - 270} y={344} width={540} height={360} rx={28} fill="#ffffff" stroke="#dce7f8" strokeWidth="2.5" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
+        <text x={centerX - 236} y={380} fontSize="19" fontWeight="700" fill="#16263d">{primarySite?.name || project.name}</text>
+        <text x={centerX - 236} y={400} fontSize="11" fill="#6a7d97">Primary site / policy hub</text>
+        <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97">{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text>
+        {taskBadge(centerX + 236, 372, hqTaskCount)}
+
+        <DeviceIcon x={centerX - 216} y={448} kind="router" label="Core Routing" sublabel="Summaries / north-south" />
+        <DeviceIcon x={centerX - 66} y={452} kind="core-switch" label="Core Switch" sublabel="Inter-VLAN / trunks" />
+        <DeviceIcon x={centerX + 96} y={448} kind="server" label="Shared Services" sublabel="Server / management" />
+        <DeviceIcon x={centerX - 20} y={564} kind="access-switch" label="Access Layer" sublabel="Users / closets / PoE" />
+        <DeviceIcon x={centerX + 178} y={564} kind="access-point" label="Wireless" sublabel="Staff / guest" />
+
+        {pathLine([[centerX - 128, 480], [centerX - 66, 480]], "routed", "svi / routed handoff", synthesized.routingPlan.find((item) => item.siteId === primarySite?.id)?.loopbackCidr || undefined)}
+        {pathLine([[centerX + 46, 480], [centerX + 96, 480]], "trunk", "server / service trunk", synthesized.servicePlacements.find((item) => item.siteName === primarySite?.name)?.subnetCidr || undefined)}
+        {pathLine([[centerX - 8, 594], [centerX + 178, 594]], "trunk", "edge access / AP uplink", requirements.wirelessRequired ? "staff + guest SSIDs" : undefined)}
+
+        {overlay === "addressing" ? synthesized.addressingPlan.filter((row) => row.siteId === primarySite?.id).slice(0, 6).map((row, index) => chip(centerX - 238, 630 + index * 28, 476, `${row.segmentName} • VLAN ${row.vlanId ?? "—"} • ${row.subnetCidr}`, "blue")) : null}
+        {overlay === "security" ? synthesized.securityBoundaries.filter((boundary) => boundary.siteName === primarySite?.name).slice(0, 5).map((boundary, index) => chip(centerX - 238, 630 + index * 28, 476, `${boundary.zoneName} • ${boundary.attachedDevice} • ${boundary.controlPoint}`, "purple")) : null}
+        {overlay === "flows" ? flowOverlays.slice(0, 3).map((flow, index) => chip(centerX - 238, 630 + index * 28, 476, `${flow.flowName} • ${flow.sourceZone} → ${flow.destinationZone}`, "orange")) : null}
+        {overlay === "none" ? synthesized.sitePlacements.filter((placement) => placement.siteId === primarySite?.id).slice(0, 5).map((placement, index) => chip(centerX - 238, 630 + index * 28, 476, `${deviceLabel(placement.deviceType)} • ${placement.role} • ${placement.connectedZones.join(", ") || "No zone labels yet"}`, "green")) : null}
+
+        {cloudNeeded ? (
+          <g>
+            <DeviceIcon x={width - 250} y={132} kind="cloud" label="Cloud" sublabel={synthesized.topology.cloudConnected ? "Connected" : "Optional"} />
+            <DeviceIcon x={width - 256} y={270} kind="cloud-edge" label="Cloud Edge" sublabel="VNet / VPN / route filters" />
+            {pathLine([[centerX + 58, 262], [width - 220, 262]], "vpn", "Hybrid / cloud transport", requirements.cloudConnectivity || undefined)}
+          </g>
+        ) : null}
+
+        {branchSites.map((site, index) => {
+          const left = index % 2 === 0;
+          const row = Math.floor(index / 2);
+          const x = left ? 72 : width - 392;
+          const y = 392 + row * 246;
+          const boxWidth = 320;
+          const anchorX = left ? x + boxWidth : x;
+          const anchorY = y + 92;
+          const siteTaskCount = openTaskCount(comments, "SITE", site.id);
+          const edgeDevice = synthesized.sitePlacements.find((placement) => placement.siteId === site.id && (placement.deviceType === "firewall" || placement.deviceType === "router"))?.deviceType || "router";
+          const localOverlay = overlayItems(site, synthesized, overlay);
+
+          return (
+            <g key={site.id}>
+              {pathLine([[centerX, 490], [anchorX, anchorY]], synthesized.topology.topologyType === "hub-spoke" ? "vpn" : "routed", synthesized.topology.topologyType === "hub-spoke" ? "WAN / hub-spoke" : "Inter-site path", synthesized.wanLinks.find((link) => link.endpointASiteId === site.id || link.endpointBSiteId === site.id)?.subnetCidr || undefined)}
+              <rect x={x} y={y} width={boxWidth} height={188} rx={24} fill="#ffffff" stroke="#dce7f8" strokeWidth="2.3" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
+              <text x={x + 20} y={y + 30} fontSize="17" fontWeight="700" fill="#16263d">{site.name}</text>
+              <text x={x + 20} y={y + 49} fontSize="11" fill="#6a7d97">{site.defaultAddressBlock || "No site block assigned"}</text>
+              {taskBadge(x + boxWidth - 28, y + 24, siteTaskCount)}
+
+              <DeviceIcon x={x + 16} y={y + 84} kind={edgeDevice} label={deviceLabel(edgeDevice)} sublabel="Site edge / VPN" />
+              <DeviceIcon x={x + 124} y={y + 88} kind="access-switch" label="Access" sublabel="Users / trunks" />
+              <DeviceIcon x={x + 246} y={y + 90} kind="access-point" label="AP" sublabel="Wireless" />
+              {pathLine([[x + 118, y + 113], [x + 124, y + 113]], "routed", "inside", synthesized.addressingPlan.find((row) => row.siteId === site.id)?.gatewayIp || undefined)}
+              {pathLine([[x + 236, y + 113], [x + 246, y + 113]], "trunk", "wireless / access", localOverlay[0] || undefined)}
+
+              {localOverlay.slice(0, 2).map((item, itemIndex) => chip(x + 18, y + 154 + itemIndex * 26, boxWidth - 36, item, overlayTone(overlay)))}
+            </g>
+          );
+        })}
+
+        {flowOverlays.map((flow, index) => {
+          const baseY = 774 + index * 84;
+          return (
+            <g key={flow.id}>
+              {pathLine([[86, baseY], [width - 86, baseY]], "flow", `${flow.flowName} • ${flow.sourceZone} → ${flow.destinationZone}`)}
+              <text x={92} y={baseY + 22} fontSize="11" fill="#6a7d97">Path: {flow.path.join(" → ")}</text>
+              <text x={92} y={baseY + 40} fontSize="11" fill="#6a7d97">Control points: {flow.controlPoints.join(", ")}</text>
+              <text x={92} y={baseY + 58} fontSize="11" fill="#6a7d97">NAT / policy: {flow.natBehavior} • {flow.enforcementPolicy}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function ArchitectureSignals({ synthesized }: { synthesized: SynthesizedLogicalDesign }) {
+  const signals = [
+    `Topology: ${synthesized.topology.topologyLabel}`,
+    `Primary site: ${synthesized.topology.primarySiteName || "TBD"}`,
+    `Breakout: ${synthesized.topology.internetBreakout}`,
+    `Placements: ${synthesized.sitePlacements.length}`,
+    `Services: ${synthesized.servicePlacements.length}`,
+    `Flows: ${synthesized.trafficFlows.length}`,
   ];
 
   return (
     <div className="diagram-note-grid">
-      {signalItems.map((item) => (
+      {signals.map((item) => (
         <div key={item} className="diagram-note-card">
-          {item}
+          <p style={{ margin: 0 }}>{item}</p>
         </div>
       ))}
     </div>
   );
 }
 
-function LogicalDiagram({ project, svgId, comments = [], onSelectTarget }: { project: ProjectDetail; svgId: string; comments?: ProjectComment[]; onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void; }) {
-  const requirements = parseRequirementsProfile(project.requirementsJson);
-  const sites = (project.sites ?? []) as SiteWithVlans[];
-  const cloudActive = requirements.environmentType !== "On-prem" || requirements.cloudConnected;
-  const managementActive = requirements.management;
-  const wirelessActive = requirements.wireless || requirements.guestWifi;
-  const voiceActive = requirements.voice || Number(requirements.phoneCount || "0") > 0;
-  const dualIsp = requirements.dualIsp;
-
-  const siteWidth = 320;
-  const siteGap = 38;
-  const width = Math.max(1500, 120 + sites.length * siteWidth + Math.max(0, sites.length - 1) * siteGap + (cloudActive ? 240 : 0));
-  const height = 980;
-  const totalSiteSpan = sites.length * siteWidth + Math.max(0, sites.length - 1) * siteGap;
-  const startX = width / 2 - totalSiteSpan / 2;
-
+function Legend() {
+  const items = [
+    ["Firewall", "Perimeter, segmentation, DMZ, NAT, VPN"],
+    ["Router", "WAN, summaries, inter-site routing"],
+    ["Switch", "Core, distribution, access, trunks"],
+    ["Server", "Shared services, management, DMZ hosts"],
+    ["AP / WLC", "Wireless access and controller layers"],
+  ];
   return (
-    <div style={{ overflowX: "auto" }}>
-      <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Logical network design diagram">
-        <rect x={0} y={0} width={width} height={height} rx={28} fill="#fbfdff" />
-
-        {zoneBand(52, 36, width - 104, 188, "Perimeter and shared services", "WAN ingress, firewall enforcement, core routing, and shared service anchors", "blue")}
-        {zoneBand(52, 252, width - 104, 120, "Control and trust boundaries", "These overlays help show guest, management, cloud, and operations intent before implementation", "green")}
-        {zoneBand(52, 394, width - 104, height - 444, "Site and segment domains", "Each site groups WAN edge, switching, wireless, and segment containers inside its local addressing boundary", "purple")}
-
-        {cloudGlyph(width / 2 - (dualIsp ? 110 : 0), 88, dualIsp ? "ISP A / Internet" : "Internet / WAN")}
-        {dualIsp ? cloudGlyph(width / 2 + 110, 88, "ISP B / Internet") : null}
-        {dualIsp ? lineLink(width / 2 - 110, 122, width / 2 - 56, 170) : lineLink(width / 2, 122, width / 2, 170)}
-        {dualIsp ? lineLink(width / 2 + 110, 122, width / 2 + 56, 170) : null}
-
-        {firewallNode(width / 2 - 66, 150, dualIsp ? "Perimeter HA" : "Perimeter Firewall", dualIsp ? "Dual ISP / failover edge" : "Internet edge policy")}
-        {lineLink(width / 2, 246, width / 2, 314, false, requirements.internetModel)}
-        {routerNode(width / 2 - 44, 286, "Core WAN", "Summaries / transit / routing", "core")}
-
-        {managementActive ? lineLink(160, 316, width - 160, 316, true, "Management plane / monitoring") : null}
-        {wirelessActive ? lineLink(160, 338, width - 160, 338, true, requirements.guestWifi ? "Staff + guest wireless overlays" : "Wireless access planning") : null}
-        {voiceActive ? lineLink(160, 360, width - 160, 360, true, "Voice / QoS treatment") : null}
-
-        {cloudActive ? (
-          <g>
-            {zoneBand(width - 330, 70, 250, 132, "Cloud service boundary", `${requirements.cloudProvider} • ${requirements.cloudConnectivity}`, "purple")}
-            {cloudGlyph(width - 205, 118, requirements.cloudProvider || "Cloud", "cloud")}
-            {lineLink(width / 2 + 44, 320, width - 250, 170, false, requirements.cloudRoutingModel)}
-          </g>
-        ) : null}
-
-        {sites.map((site, index) => {
-          const x = startX + index * (siteWidth + siteGap);
-          const y = 448;
-          const role = siteRole(site, index);
-          const siteTaskCount = openTaskCount(comments, "SITE", site.id);
-          const vlans = site.vlans ?? [];
-          const displayedVlans = vlans.slice(0, 6);
-          const extraCount = Math.max(0, vlans.length - displayedVlans.length);
-          const siteHeight = 372 + Math.max(0, displayedVlans.length - 4) * 26;
-          const centerX = x + siteWidth / 2;
-          const apLabel = requirements.guestWifi ? "Staff / Guest SSIDs" : "Staff wireless";
-
-          return (
-            <g key={site.id}>
-              {lineLink(width / 2, 356, centerX, y, false, index === 0 ? "Primary path" : undefined)}
-              <rect x={x} y={y} width={siteWidth} height={siteHeight} rx={26} fill="#ffffff" stroke="#dbe6f7" strokeWidth="2.5" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
-              <text x={x + 20} y={y + 30} fontSize="18" fontWeight="700" fill="#16263d">{site.name}</text>
-              <text x={x + 20} y={y + 50} fontSize="11" fill="#6a7d97">{role} • {site.location || "Location not set"}</text>
-              <text x={x + 20} y={y + 68} fontSize="11" fill="#6a7d97">Parent site block: {site.defaultAddressBlock || "not assigned"}</text>
-              {taskBadge(x + siteWidth - 28, y + 26, siteTaskCount)}
-
-              {routerNode(x + 22, y + 90, "WAN Edge", role === "HQ" ? "Branch / core attachment" : "VPN / transit handoff")}
-              {switchNode(x + 100, y + 94, "L3 / Distribution", "SVIs / trunks / local routing")}
-              {wirelessActive ? accessPointNode(x + 236, y + 100, "Wireless", apLabel) : serverNode(x + 232, y + 92, "Services", requirements.serverPlacement)}
-
-              <line x1={x + 80} y1={y + 126} x2={x + 100} y2={y + 116} stroke="#a8bfe8" strokeWidth="2" />
-              <line x1={x + 222} y1={y + 116} x2={x + 236} y2={y + 126} stroke="#a8bfe8" strokeWidth="2" />
-
-              <text x={x + 20} y={y + 214} fontSize="12" fontWeight="700" fill="#324866">Segment containers</text>
-              {displayedVlans.map((vlan, vlanIndex) => {
-                const chipY = y + 228 + vlanIndex * 28;
-                const vlanTaskCount = openTaskCount(comments, "VLAN", vlan.id);
-                return (
-                  <g key={vlan.id} style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("VLAN", vlan.id)}>
-                    {chip(x + 18, chipY, siteWidth - 36, `VLAN ${vlan.vlanId} • ${vlan.vlanName} • ${vlan.subnetCidr}`, vlanCategory(vlan))}
-                    {taskBadge(x + siteWidth - 26, chipY + 11, vlanTaskCount)}
-                  </g>
-                );
-              })}
-              {extraCount > 0 ? <text x={x + 20} y={y + 228 + displayedVlans.length * 28 + 16} fontSize="10.5" fill="#6a7d97">+ {extraCount} more segment{extraCount === 1 ? "" : "s"}</text> : null}
-
-              <text x={x + 20} y={y + siteHeight - 42} fontSize="11" fill="#5f7390">Gateway policy: {requirements.gatewayConvention}</text>
-              <text x={x + 20} y={y + siteHeight - 24} fontSize="11" fill="#5f7390">Trust boundary: {requirements.trustBoundaryModel}</text>
-            </g>
-          );
-        })}
-      </svg>
+    <div className="diagram-note-grid" style={{ marginTop: 10 }}>
+      {items.map(([title, detail]) => (
+        <div key={title} className="diagram-note-card">
+          <strong style={{ display: "block", marginBottom: 6 }}>{title}</strong>
+          <p style={{ margin: 0 }}>{detail}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-function PhysicalDiagram({ project, svgId, comments = [], onSelectTarget }: { project: ProjectDetail; svgId: string; comments?: ProjectComment[]; onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void; }) {
-  const requirements = parseRequirementsProfile(project.requirementsJson);
-  const sites = (project.sites ?? []) as SiteWithVlans[];
-  const primaryIndex = sites.findIndex((site, index) => siteRole(site, index) === "HQ" || index === 0);
-  const primarySite = sites[primaryIndex >= 0 ? primaryIndex : 0];
-  const branches = sites.filter((site) => site.id !== primarySite?.id);
-  const cloudActive = requirements.environmentType !== "On-prem" || requirements.cloudConnected;
-  const wirelessActive = requirements.wireless || requirements.guestWifi;
-  const width = Math.max(1520, 1080 + branches.length * 130 + (cloudActive ? 150 : 0));
-  const height = 980;
-  const centerX = width / 2;
-  const hqTaskCount = primarySite ? openTaskCount(comments, "SITE", primarySite.id) : 0;
-
+function FlowSummaryPanel({ flows }: { flows: TrafficFlowPath[] }) {
+  const displayedFlows = flows.slice(0, 5);
   return (
-    <div style={{ overflowX: "auto" }}>
-      <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Physical style network topology diagram">
-        <rect x={0} y={0} width={width} height={height} rx={28} fill="#fbfdff" />
-
-        {zoneBand(54, 42, width - 108, 214, "Top-level topology", "Perimeter ingress, WAN edge, HQ core, branch attachment, and optional cloud connectivity", "blue")}
-        {zoneBand(54, 288, width - 108, height - 338, "Site attachment and local edge", "Branches attach into the WAN/core domain and then break out to access switching, wireless, and local services", "purple")}
-
-        {cloudGlyph(centerX, 94, requirements.dualIsp ? "Dual ISP edge" : "Internet / WAN")}
-        {lineLink(centerX, 128, centerX, 192)}
-        {firewallNode(centerX - 66, 176, "HQ Firewall", requirements.dualIsp ? "HA / NAT / VPN" : "Perimeter policy")}
-        {lineLink(centerX, 272, centerX, 334, false, requirements.internetModel)}
-
-        <rect x={centerX - 260} y={336} width={520} height={312} rx={28} fill="#ffffff" stroke="#dbe6f7" strokeWidth="2.5" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
-        <text x={centerX - 230} y={370} fontSize="19" fontWeight="700" fill="#16263d">{primarySite?.name || project.name}</text>
-        <text x={centerX - 230} y={392} fontSize="11" fill="#6a7d97">Primary site / HQ topology</text>
-        <text x={centerX - 230} y={410} fontSize="11" fill="#6a7d97">{primarySite?.defaultAddressBlock || "No HQ site block assigned"}</text>
-        {taskBadge(centerX + 226, 364, hqTaskCount)}
-
-        {routerNode(centerX - 204, 440, "Core Routing", "WAN / summaries / north-south", "core")}
-        {switchNode(centerX - 78, 450, "Core Switch Stack", "Inter-VLAN / distribution")}
-        {serverNode(centerX + 102, 438, "Server Zone", requirements.serverPlacement)}
-        {wirelessActive ? accessPointNode(centerX + 6, 538, "Wireless", requirements.guestWifi ? "Staff + guest SSIDs" : "Staff wireless") : null}
-        {switchNode(centerX - 168, 548, "Access Layer", "Closets / trunks / PoE")}
-        {requirements.management ? serverNode(centerX + 118, 544, "Mgmt / NMS", requirements.monitoringModel) : null}
-
-        <line x1={centerX - 160} y1={474} x2={centerX - 78} y2={474} stroke="#a8bfe8" strokeWidth="2" />
-        <line x1={centerX + 44} y1={474} x2={centerX + 102} y2={474} stroke="#a8bfe8" strokeWidth="2" />
-        <line x1={centerX - 108} y1={572} x2={centerX - 18} y2={572} stroke="#a8bfe8" strokeWidth="2" />
-        {requirements.management ? <line x1={centerX + 44} y1={572} x2={centerX + 118} y2={572} stroke="#a8bfe8" strokeWidth="2" /> : null}
-
-        {cloudActive ? (
-          <g>
-            {zoneBand(width - 324, 86, 244, 138, "Cloud attachment", `${requirements.cloudProvider} • ${requirements.cloudConnectivity}`, "purple")}
-            {cloudGlyph(width - 204, 134, requirements.cloudProvider || "Cloud", "cloud")}
-            {lineLink(centerX + 44, 366, width - 250, 170, false, requirements.cloudRoutingModel)}
-          </g>
-        ) : null}
-
-        {branches.map((site, index) => {
-          const leftSide = index % 2 === 0;
-          const row = Math.floor(index / 2);
-          const x = leftSide ? 80 : width - 400;
-          const y = 392 + row * 224;
-          const boxWidth = 320;
-          const anchorX = leftSide ? x + boxWidth : x;
-          const anchorY = y + 80;
-          const siteTaskCount = openTaskCount(comments, "SITE", site.id);
-          const categories = Array.from(new Set((site.vlans ?? []).map((vlan) => categoryColor(vlanCategory(vlan)).label))).slice(0, 3);
-
-          return (
-            <g key={site.id}>
-              {lineLink(centerX, 456, anchorX, anchorY, false, row === 0 ? "Branch attachment" : undefined)}
-              <rect x={x} y={y} width={boxWidth} height="168" rx="24" fill="#ffffff" stroke="#dbe6f7" strokeWidth="2.5" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
-              <text x={x + 20} y={y + 30} fontSize="17" fontWeight="700" fill="#16263d">{site.name}</text>
-              <text x={x + 20} y={y + 50} fontSize="11" fill="#6a7d97">{site.location || "Location not set"}</text>
-              <text x={x + 20} y={y + 68} fontSize="11" fill="#6a7d97">{site.defaultAddressBlock || "No site block assigned"}</text>
-              {taskBadge(x + boxWidth - 28, y + 24, siteTaskCount)}
-
-              {routerNode(x + 18, y + 86, "Router", "VPN / transit")}
-              {switchNode(x + 98, y + 94, "Access", "L2 / trunks / users")}
-              {wirelessActive ? accessPointNode(x + 248, y + 96, "AP", requirements.guestWifi ? "Guest aware" : "Staff") : serverNode(x + 228, y + 90, "Local svc", "Optional")}
-
-              <text x={x + 18} y={y + 150} fontSize="11" fill="#5f7390">Segment mix: {categories.join(", ") || "No segments yet"}</text>
-            </g>
-          );
-        })}
-
-        <text x={centerX} y={height - 34} textAnchor="middle" fontSize="13" fill="#5f7390">Physical / topology view • perimeter, HQ core, cloud boundary, branch attachment, and local site edge components</text>
-      </svg>
+    <div className="diagram-note-grid" style={{ marginTop: 10 }}>
+      {displayedFlows.map((flow) => (
+        <div key={flow.id} className="diagram-note-card">
+          <strong style={{ display: "block", marginBottom: 6 }}>{flow.flowName}</strong>
+          <p style={{ margin: "0 0 6px 0" }}>{flow.sourceZone} → {flow.destinationZone}</p>
+          <p style={{ margin: 0, color: "#61758f" }}>{flow.path.join(" → ")}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
 export function ProjectDiagram({ project, comments = [], onSelectTarget }: ProjectDiagramProps) {
-  const sites = project.sites ?? [];
+  const sites = (project.sites ?? []) as SiteWithVlans[];
   const svgId = `diagram-${project.id}`;
   const [mode, setMode] = useState<DiagramMode>("logical");
-  const baseFilename = useMemo(() => `${project.name.replace(/\s+/g, "-").toLowerCase()}-${mode}-diagram`, [mode, project.name]);
+  const [overlay, setOverlay] = useState<OverlayMode>("none");
+  const baseFilename = useMemo(() => `${project.name.replace(/\s+/g, "-").toLowerCase()}-${mode}-${overlay}-diagram`, [mode, overlay, project.name]);
+  const requirements = parseRequirementsProfile(project.requirementsJson);
+  const allVlans = sites.flatMap((site) => site.vlans ?? []);
+  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, allVlans, requirements), [project, sites, allVlans, requirements]);
 
   if (sites.length === 0) {
-    return <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a network diagram.</p></div></div></div>;
+    return <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
   }
 
   return (
     <div className="panel">
       <div className="diagram-toolbar" style={{ marginBottom: 12 }}>
         <div>
-          <h2 style={{ marginBottom: 6 }}>Generated Diagram</h2>
-          <p className="muted" style={{ margin: 0 }}>v71 moves the diagram closer to a real network planning surface with clearer device shapes, trust boundaries, WAN/core layers, and cloud placement cues.</p>
+          <h2 style={{ marginBottom: 6 }}>Generated Topology Diagram</h2>
+          <p className="muted" style={{ margin: 0 }}>v98 adds stronger topology-specific layout, labeled links, clearer DMZ host placement, and tighter cross-checking between flows, boundaries, and site roles.</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div className="diagram-toggle">
-            <button type="button" className={mode === "logical" ? "active" : ""} onClick={() => setMode("logical")}>Logical Design</button>
+            <button type="button" className={mode === "logical" ? "active" : ""} onClick={() => setMode("logical")}>Logical Topology</button>
             <button type="button" className={mode === "physical" ? "active" : ""} onClick={() => setMode("physical")}>Physical / Topology</button>
+          </div>
+          <div className="diagram-toggle">
+            <button type="button" className={overlay === "none" ? "active" : ""} onClick={() => setOverlay("none")}>Placement</button>
+            <button type="button" className={overlay === "addressing" ? "active" : ""} onClick={() => setOverlay("addressing")}>Addressing</button>
+            <button type="button" className={overlay === "security" ? "active" : ""} onClick={() => setOverlay("security")}>Security</button>
+            <button type="button" className={overlay === "flows" ? "active" : ""} onClick={() => setOverlay("flows")}>Flows</button>
           </div>
           <button type="button" onClick={() => exportSvg(svgId, `${baseFilename}.svg`)}>Export SVG</button>
           <button type="button" onClick={() => { void exportPng(svgId, `${baseFilename}.png`); }}>Export PNG</button>
         </div>
       </div>
-      <ArchitectureSignals project={project} />
+      <ArchitectureSignals synthesized={synthesized} />
       <Legend />
+      <div className="diagram-note-grid" style={{ marginTop: 10 }}>
+        <div className="diagram-note-card">
+          <strong style={{ display: "block", marginBottom: 6 }}>Report cross-check</strong>
+          <p style={{ margin: 0, color: "#61758f" }}>Use Placement with report section 2, Addressing with section 3, Security with section 4, and Flows with section 5 so the visual review matches the written package.</p>
+        </div>
+        <div className="diagram-note-card">
+          <strong style={{ display: "block", marginBottom: 6 }}>Validation cross-check</strong>
+          <p style={{ margin: 0, color: "#61758f" }}>If labels, paths, or DMZ placement look wrong here, the same mismatch should be reviewed in validation and then corrected in addressing, security, or routing workspaces.</p>
+        </div>
+      </div>
+      {overlay === "flows" ? <FlowSummaryPanel flows={synthesized.trafficFlows} /> : null}
       {mode === "logical"
-        ? <LogicalDiagram project={project} svgId={svgId} comments={comments} onSelectTarget={onSelectTarget} />
-        : <PhysicalDiagram project={project} svgId={svgId} comments={comments} onSelectTarget={onSelectTarget} />}
+        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} overlay={overlay} onSelectTarget={onSelectTarget} />
+        : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} overlay={overlay} onSelectTarget={onSelectTarget} />}
     </div>
   );
 }

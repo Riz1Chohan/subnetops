@@ -601,10 +601,33 @@ export function ProjectReportPage() {
 
       <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>10. Diagram preview</h2>
+          <h2 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h2>
           <p className="muted" style={{ margin: 0 }}>
-            The diagram engine still needs a future rebuild for real Packet Tracer or Visio-style topology output, but the current preview remains here so the report package still includes a visual reference.
+            The diagram preview is no longer only decorative. It should be used to cross-check section 2 placement, section 3 addressing, section 4 boundaries, and section 5 traffic paths against the generated topology views.
           </p>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>What to verify visually</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <li style={{ marginBottom: 8 }}><strong>Placement overlay:</strong> site roles, edge devices, switching roles, and local versus centralized services.</li>
+              <li style={{ marginBottom: 8 }}><strong>Addressing overlay:</strong> subnet labels, site blocks, transit links, and gateway relationships.</li>
+              <li style={{ marginBottom: 8 }}><strong>Security overlay:</strong> DMZ placement, attached control points, permitted peers, and management source.</li>
+              <li style={{ marginBottom: 0 }}><strong>Flow overlay:</strong> critical traffic paths, NAT posture, and enforcement points.</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Validation items to compare against the diagram</h3>
+            {topValidationItems.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No active validation blockers or warnings are open right now.</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {topValidationItems.slice(0, 5).map((item) => (
+                  <li key={item.id} style={{ marginBottom: 8 }}><strong>{item.severity}:</strong> {item.title}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
         <ProjectDiagram project={enrichedProject} />
       </div>

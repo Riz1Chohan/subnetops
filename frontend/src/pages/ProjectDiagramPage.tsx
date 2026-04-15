@@ -7,16 +7,20 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
+import { useValidationResults } from "../features/validation/hooks";
+import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
   const projectQuery = useProject(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const commentsQuery = useProjectComments(projectId);
+  const validationQuery = useValidationResults(projectId);
 
   const project = projectQuery.data;
   const vlans = vlansQuery.data ?? [];
   const comments = commentsQuery.data ?? [];
+  const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
 
   if (projectQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the logical and physical diagram workspace." />;
@@ -50,12 +54,13 @@ export function ProjectDiagramPage() {
   const openSiteTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "SITE").length;
   const openVlanTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "VLAN").length;
   const cloudContext = requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected;
+  const topValidationItems = validations.filter((item) => item.severity !== "INFO").slice(0, 5);
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Diagram workspace"
-        description="The diagram is now treated like a main artifact, not a squeezed side card. Use this stage for design review, explanation, and export."
+        description="The diagram is now treated like a main artifact, not a squeezed side card. Use this stage for design review, report cross-checking, validation comparison, and export."
         actions={(
           <div className="form-actions">
             <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
@@ -74,12 +79,47 @@ export function ProjectDiagramPage() {
             <span className="badge-soft">Mode-ready for export</span>
           </div>
           <p className="muted" style={{ margin: 0 }}>
-            The canvas below gets priority on widescreen layouts. Guide content is pushed down so the actual diagram can use the screen.
+            The canvas below gets priority on widescreen layouts. In v98 the diagram is also expected to be checked directly against the report sections and active validation findings.
           </p>
         </div>
 
         <div className="diagram-canvas-panel">
           <ProjectDiagram project={enrichedProject} comments={comments} />
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ padding: 16 }}>
+          <strong style={{ display: "block", marginBottom: 10 }}>Diagram ↔ report cross-check</strong>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <li style={{ marginBottom: 8 }}><strong>Placement</strong> should match report section 2 and the site-by-site design section.</li>
+            <li style={{ marginBottom: 8 }}><strong>Addressing</strong> should match report section 3 exactly, including block labels and gateways.</li>
+            <li style={{ marginBottom: 8 }}><strong>Security</strong> should match report section 4, especially DMZ placement, attached devices, and peers.</li>
+            <li style={{ marginBottom: 0 }}><strong>Flows</strong> should match report section 5 and the validation findings if a path or boundary looks wrong.</li>
+          </ul>
+        </div>
+
+        <div className="panel" style={{ padding: 16 }}>
+          <strong style={{ display: "block", marginBottom: 10 }}>Validation items to keep beside the diagram</strong>
+          {topValidationItems.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>No active validation blockers or warnings are open right now.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {topValidationItems.map((item) => (
+                <div key={item.id} className="panel" style={{ padding: 12, background: "rgba(17,24,39,0.02)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                    <span className="badge-soft">{item.severity}</span>
+                    <span className="badge-soft">{item.ruleCode}</span>
+                  </div>
+                  <p style={{ margin: "0 0 6px 0", fontWeight: 700 }}>{item.title}</p>
+                  <p className="muted" style={{ margin: 0 }}>{item.message}</p>
+                  <div style={{ marginTop: 8 }}>
+                    <Link to={buildValidationFixPath(projectId, item)} className="link-button">{validationFixLabel(item)}</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

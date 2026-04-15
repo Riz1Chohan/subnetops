@@ -102,18 +102,25 @@ export function ProjectOverviewPage() {
         title="Logical Design"
         description="This workspace should read like an engineer's HLD/LLD package: architecture intent, logical domains, per-site low-level design, and the addressing model that supports implementation later."
         actions={
-          <>
-            <Link to={`/projects/${projectId}/addressing`} className="link-button">Open Addressing Plan</Link>
-            <Link to={`/projects/${projectId}/security`} className="link-button">Open Security</Link>
-            <Link to={`/projects/${projectId}/routing`} className="link-button">Open Routing & Switching</Link>
-            <Link to={`/projects/${projectId}/implementation`} className="link-button">Open Implementation</Link>
-            <Link to={`/projects/${projectId}/standards`} className="link-button">Open Config Standards</Link>
-            <Link to={`/projects/${projectId}/platform`} className="link-button">Open Platform & BOM</Link>
-            <Link to={`/projects/${projectId}/discovery`} className="link-button">Open Discovery</Link>
-            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
-            <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Open Report</Link>
-          </>
+          <div className="overview-actions-shell">
+            <div className="overview-primary-actions">
+              <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing</Link>
+              <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
+              <Link to={`/projects/${projectId}/routing`} className="link-button">Routing</Link>
+              <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
+            </div>
+            <details className="overview-more-actions">
+              <summary>More workspace links</summary>
+              <div className="overview-more-actions-grid">
+                <Link to={`/projects/${projectId}/implementation`} className="link-button link-button-subtle">Implementation</Link>
+                <Link to={`/projects/${projectId}/standards`} className="link-button link-button-subtle">Config Standards</Link>
+                <Link to={`/projects/${projectId}/platform`} className="link-button link-button-subtle">Platform & BOM</Link>
+                <Link to={`/projects/${projectId}/discovery`} className="link-button link-button-subtle">Discovery</Link>
+                <Link to={`/projects/${projectId}/validation`} className="link-button link-button-subtle">Validation</Link>
+                <Link to={`/projects/${projectId}/diagram`} className="link-button link-button-subtle">Diagram</Link>
+              </div>
+            </details>
+          </div>
         }
       />
 
