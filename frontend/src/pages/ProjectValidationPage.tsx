@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ValidationList } from "../features/validation/components/ValidationList";
 import { useRunValidation, useValidationResults } from "../features/validation/hooks";
 import { useCreateProjectComment, useProjectComments } from "../features/comments/hooks";
@@ -30,6 +30,7 @@ const severityOrder = { ERROR: 0, WARNING: 1, INFO: 2 } as const;
 
 export function ProjectValidationPage() {
   const { projectId = "" } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const validationQuery = useValidationResults(projectId);
   const validationMutation = useRunValidation(projectId);
   const commentsQuery = useProjectComments(projectId);
@@ -40,6 +41,19 @@ export function ProjectValidationPage() {
   const [entityFilter, setEntityFilter] = useState<"all" | "PROJECT" | "SITE" | "VLAN">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchText, setSearchText] = useState("");
+  const insightRef = useRef<HTMLDivElement | null>(null);
+  const refreshedFromFix = searchParams.get("refreshed") === "1";
+
+  useEffect(() => {
+    if (!projectId || !refreshedFromFix) return;
+    validationMutation.mutate(undefined, {
+      onSettled: () => {
+        const next = new URLSearchParams(searchParams);
+        next.delete("refreshed");
+        setSearchParams(next, { replace: true });
+      },
+    });
+  }, [projectId, refreshedFromFix, searchParams, setSearchParams, validationMutation]);
 
   const items = validationQuery.data ?? [];
   const errorCount = items.filter((item) => item.severity === "ERROR").length;
@@ -87,6 +101,13 @@ export function ProjectValidationPage() {
           </button>
         }
       />
+
+      {refreshedFromFix ? (
+        <div className="panel" style={{ borderColor: "rgba(40,167,69,0.28)", background: "rgba(40,167,69,0.08)" }}>
+          <strong style={{ display: "block", marginBottom: 6 }}>Validation refresh in progress</strong>
+          <p className="muted" style={{ margin: 0 }}>SubnetOps is re-running validation after your latest fix so resolved findings can drop out of the review list.</p>
+        </div>
+      ) : null}
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Errors</p><h2 style={{ margin: 0 }}>{errorCount}</h2></div>
@@ -167,11 +188,16 @@ export function ProjectValidationPage() {
                     }}
                     onExplain={(item) => {
                       setSelectedItem(item);
+                      explainMutation.reset();
                       explainMutation.mutate({
                         title: item.title,
                         message: item.message,
                         severity: item.severity,
                         entityType: item.entityType,
+                      }, {
+                        onSettled: () => {
+                          setTimeout(() => insightRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                        },
                       });
                     }}
                     getFixPath={(item) => buildValidationFixPath(projectId, item)}
@@ -183,7 +209,7 @@ export function ProjectValidationPage() {
           )}
         </div>
 
-        <div style={{ display: "grid", gap: 12 }}>
+        <div ref={insightRef} style={{ display: "grid", gap: 12 }}>
           <div className="panel">
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Review guidance</h2>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -195,13 +221,20 @@ export function ProjectValidationPage() {
           </div>
 
           <div className="panel">
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI explain this issue</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI suggest a fix</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Pick any validation finding and SubnetOps will explain what it means, why it matters, and what to fix next.
+              Pick any validation finding and SubnetOps will explain the issue, why it matters, and the most likely fixes to try next.
             </p>
           </div>
 
-          {explainMutation.isPending ? <div className="panel"><p className="muted">Generating explanation...</p></div> : null}
+          {selectedItem ? (
+            <div className="panel">
+              <strong style={{ display: "block", marginBottom: 6 }}>Selected finding</strong>
+              <p className="muted" style={{ margin: 0 }}>{selectedItem.title}</p>
+            </div>
+          ) : null}
+          {explainMutation.isPending ? <div className="panel"><p className="muted">Generating suggested fixes...</p></div> : null}
+          {explainMutation.isError ? <div className="panel"><p className="error-text">{explainMutation.error instanceof Error ? explainMutation.error.message : "Could not generate a suggested fix right now."}</p></div> : null}
           {selectedItem && explainMutation.data ? <AIValidationInsight item={selectedItem} explanation={explainMutation.data} /> : null}
         </div>
       </div>

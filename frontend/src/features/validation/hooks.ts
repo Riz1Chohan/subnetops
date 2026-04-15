@@ -6,6 +6,9 @@ export function useValidationResults(projectId: string) {
     queryKey: ["validation", projectId],
     queryFn: () => getValidationResults(projectId),
     enabled: Boolean(projectId),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 

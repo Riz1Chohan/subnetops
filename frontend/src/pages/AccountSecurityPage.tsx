@@ -9,6 +9,7 @@ export function AccountSecurityPage() {
   const logoutMutation = useLogout();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -23,7 +24,9 @@ export function AccountSecurityPage() {
           style={{ display: "grid", gap: 12 }}
           onSubmit={async (e) => {
             e.preventDefault();
+            setSuccessMessage(null);
             await changePasswordMutation.mutateAsync({ currentPassword, newPassword });
+            setSuccessMessage("Password changed. You will be signed out so you can log in again with the new password.");
             await logoutMutation.mutateAsync();
             navigate("/login", { replace: true });
           }}
@@ -31,6 +34,7 @@ export function AccountSecurityPage() {
           <input value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" type="password" autoComplete="current-password" required />
           <input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" type="password" autoComplete="new-password" required minLength={8} />
           {changePasswordMutation.error ? <p className="error-text">{changePasswordMutation.error.message}</p> : null}
+          {successMessage ? <p className="muted" style={{ color: "#14532d" }}>{successMessage}</p> : null}
           <button type="submit" disabled={changePasswordMutation.isPending || logoutMutation.isPending}>
             {changePasswordMutation.isPending ? "Saving..." : "Change password"}
           </button>

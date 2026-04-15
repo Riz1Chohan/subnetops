@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Vlan } from "../lib/types";
 import { VlanForm } from "../features/vlans/components/VlanForm";
 import { VlanTable } from "../features/vlans/components/VlanTable";
@@ -21,6 +21,7 @@ function vlanCategory(vlan: Vlan) {
 }
 
 export function ProjectVlansPage() {
+  const navigate = useNavigate();
   const { projectId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const sitesQuery = useProjectSites(projectId);
@@ -138,12 +139,18 @@ export function ProjectVlansPage() {
                 setEditingVlan(null);
                 setShowCreate(false);
                 clearEditQuery();
+                if (returnToValidation) {
+                  navigate(`/projects/${projectId}/validation?refreshed=1`);
+                }
                 return;
               }
 
               await createVlanMutation.mutateAsync(values);
               setShowCreate(false);
               clearEditQuery();
+              if (returnToValidation) {
+                navigate(`/projects/${projectId}/validation?refreshed=1`);
+              }
             }}
           />
         </div>

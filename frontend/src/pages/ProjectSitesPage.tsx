@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Site } from "../lib/types";
 import { SiteForm } from "../features/sites/components/SiteForm";
 import { SiteTable } from "../features/sites/components/SiteTable";
@@ -10,6 +10,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
 
 export function ProjectSitesPage() {
+  const navigate = useNavigate();
   const { projectId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const sitesQuery = useProjectSites(projectId);
@@ -97,12 +98,18 @@ export function ProjectSitesPage() {
                 setEditingSite(null);
                 setShowCreate(false);
                 clearEditQuery();
+                if (returnToValidation) {
+                  navigate(`/projects/${projectId}/validation?refreshed=1`);
+                }
                 return;
               }
 
               await createSiteMutation.mutateAsync(values);
               setShowCreate(false);
               clearEditQuery();
+              if (returnToValidation) {
+                navigate(`/projects/${projectId}/validation?refreshed=1`);
+              }
             }}
           />
         </div>

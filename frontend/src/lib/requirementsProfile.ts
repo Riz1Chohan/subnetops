@@ -76,6 +76,7 @@ export type RequirementsProfile = {
   teamCapability: string;
   outputPackage: string;
   primaryAudience: string;
+  customRequirementsNotes: string;
 };
 
 export const defaultRequirementsProfile: RequirementsProfile = {
@@ -156,6 +157,7 @@ export const defaultRequirementsProfile: RequirementsProfile = {
   teamCapability: "small to mid-sized internal team with practical support needs",
   outputPackage: "technical handoff plus stakeholder summary",
   primaryAudience: "internal IT team and technical reviewers",
+  customRequirementsNotes: "",
 };
 
 export function parseRequirementsProfile(value?: string | null): RequirementsProfile {
@@ -190,8 +192,33 @@ export function buildGuidedPrompt(values: RequirementsProfile) {
   features.push(`site layout model of ${values.siteLayoutModel}`, `site role of ${values.siteRoleModel}`, `physical scope of ${values.physicalScope}`, `${values.buildingCount} building(s)`, `${values.floorCount} floor(s)`, `closet model of ${values.closetModel}`, `edge footprint of ${values.edgeFootprint}`, `about ${values.printerCount} printers`, `about ${values.phoneCount} phones`, `about ${values.apCount} access points`, `about ${values.cameraCount} cameras`, `about ${values.serverCount} servers`, `about ${values.iotDeviceCount} IoT or specialty devices`, `a user access mix of ${values.wiredWirelessMix}`);
   features.push(`application profile of ${values.applicationProfile}`, `critical services model of ${values.criticalServicesModel}`, `inter-site traffic model of ${values.interSiteTrafficModel}`, `bandwidth profile of ${values.bandwidthProfile}`, `latency sensitivity of ${values.latencySensitivity}`, `QoS model of ${values.qosModel}`, `outage tolerance of ${values.outageTolerance}`, `growth horizon of ${values.growthHorizon}`);
   features.push(`budget model of ${values.budgetModel}`, `vendor preference of ${values.vendorPreference}`, `implementation timeline of ${values.implementationTimeline}`, `rollout model of ${values.rolloutModel}`, `downtime constraint of ${values.downtimeConstraint}`, `team capability of ${values.teamCapability}`, `output package of ${values.outputPackage}`, `primary audience of ${values.primaryAudience}`);
+  if (values.customRequirementsNotes.trim()) features.push(`custom requirements notes: ${values.customRequirementsNotes.trim()}`);
 
   return `${values.planningFor} network, ${values.projectPhase.toLowerCase()}, ${values.environmentType} environment, ${values.complianceProfile} context, about ${values.siteCount} site(s), around ${values.usersPerSite} users per site, ${values.internetModel}, ${values.serverPlacement}, primary goal is ${values.primaryGoal}. Include ${features.length > 0 ? features.join(", ") : "realistic segmentation and subnet planning"}.`;
+}
+
+export function buildProjectSummaryDescription(values: RequirementsProfile, maxLength = 320) {
+  const parts = [
+    `${values.projectPhase} ${values.planningFor.toLowerCase()} network`,
+    `${values.environmentType.toLowerCase()} environment`,
+    `${values.siteCount} site(s)`,
+    `${values.usersPerSite} users/site`,
+    `primary goal: ${values.primaryGoal}`,
+  ];
+
+  if (values.guestWifi) parts.push(`guest access`);
+  if (values.management) parts.push(`management network`);
+  if (values.voice) parts.push(`voice`);
+  if (values.remoteAccess) parts.push(`remote access`);
+  if (values.cloudConnected || values.environmentType !== "On-prem") parts.push(`cloud-connected`);
+  if (values.dualIsp) parts.push(`redundancy`);
+
+  let summary = parts.join(", ");
+  if (values.customRequirementsNotes.trim()) {
+    summary += `. Notes: ${values.customRequirementsNotes.trim()}`;
+  }
+  if (summary.length <= maxLength) return summary;
+  return `${summary.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 export function buildGuidedDescription(values: RequirementsProfile) {
@@ -209,6 +236,7 @@ export function buildGuidedDescription(values: RequirementsProfile) {
   details.push(`site layout: ${values.siteLayoutModel}`, `site role: ${values.siteRoleModel}`, `physical scope: ${values.physicalScope}`, `buildings: ${values.buildingCount}`, `floors: ${values.floorCount}`, `closet model: ${values.closetModel}`, `edge footprint: ${values.edgeFootprint}`, `printers: ${values.printerCount}`, `phones: ${values.phoneCount}`, `access points: ${values.apCount}`, `cameras: ${values.cameraCount}`, `servers: ${values.serverCount}`, `IoT/specialty devices: ${values.iotDeviceCount}`, `wired/wireless mix: ${values.wiredWirelessMix}`);
   details.push(`application profile: ${values.applicationProfile}`, `critical services: ${values.criticalServicesModel}`, `inter-site traffic: ${values.interSiteTrafficModel}`, `bandwidth profile: ${values.bandwidthProfile}`, `latency sensitivity: ${values.latencySensitivity}`, `QoS model: ${values.qosModel}`, `outage tolerance: ${values.outageTolerance}`, `growth horizon: ${values.growthHorizon}`);
   details.push(`budget model: ${values.budgetModel}`, `vendor preference: ${values.vendorPreference}`, `implementation timeline: ${values.implementationTimeline}`, `rollout model: ${values.rolloutModel}`, `downtime constraint: ${values.downtimeConstraint}`, `team capability: ${values.teamCapability}`, `output package: ${values.outputPackage}`, `primary audience: ${values.primaryAudience}`);
+  if (values.customRequirementsNotes.trim()) details.push(`custom requirements notes: ${values.customRequirementsNotes.trim()}`);
 
   return [
     `${values.projectPhase} ${values.planningFor.toLowerCase()} network plan for a ${values.environmentType.toLowerCase()} environment.`,

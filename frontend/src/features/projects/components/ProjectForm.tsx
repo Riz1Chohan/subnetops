@@ -68,7 +68,8 @@ export function ProjectForm({ initialValues, organizations = [], submitLabel = "
         <option value="APPROVED">Approved</option>
       </select>
       <textarea placeholder="Reviewer notes (optional)" value={reviewerNotes} onChange={(e) => setReviewerNotes(e.target.value)} rows={4} />
-      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+      <textarea placeholder="Short project summary for dashboard and exports" value={description} onChange={(e) => setDescription(e.target.value.slice(0, 320))} rows={4} maxLength={320} />
+      <small className="muted">Keep this short. The detailed planning narrative is stored in the requirements package, not this summary field.</small>
       <div className="form-actions">
         <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : submitLabel}</button>
         {onCancel ? <button type="button" onClick={onCancel}>Cancel</button> : null}

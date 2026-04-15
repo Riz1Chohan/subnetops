@@ -6,6 +6,7 @@ import { ErrorState } from "../components/app/ErrorState";
 import { EmptyState } from "../components/app/EmptyState";
 import { useProject, useUpdateProject } from "../features/projects/hooks";
 import {
+  buildProjectSummaryDescription,
   buildGuidedDescription,
   conditionalSections,
   defaultRequirementsProfile,
@@ -33,6 +34,7 @@ export function ProjectRequirementsPage() {
   }, [initialProfile]);
 
   const description = useMemo(() => buildGuidedDescription(requirements), [requirements]);
+  const summaryDescription = useMemo(() => buildProjectSummaryDescription(requirements), [requirements]);
   const scenario = useMemo(() => conditionalSections(requirements), [requirements]);
   const activeTracks = useMemo(() => planningTracks(requirements), [requirements]);
   const trackStatuses = useMemo(() => planningTrackStatuses(requirements), [requirements]);
@@ -48,7 +50,7 @@ export function ProjectRequirementsPage() {
   const saveRequirements = () => updateMutation.mutate({
     requirementsJson: stringifyRequirementsProfile(requirements),
     environmentType: requirements.environmentType,
-    description,
+    description: summaryDescription,
   });
 
   const stepDefinitions = useMemo(() => {
@@ -94,7 +96,9 @@ export function ProjectRequirementsPage() {
                     <option>Warehouse</option>
                     <option>Multi-site business</option>
                     <option>Custom</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label>
@@ -103,7 +107,9 @@ export function ProjectRequirementsPage() {
                     <option>New network build</option>
                     <option>Redesign</option>
                     <option>Expansion</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label>
@@ -113,7 +119,9 @@ export function ProjectRequirementsPage() {
                     <option>Hybrid</option>
                     <option>Public cloud connected</option>
                     <option>Private cloud connected</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label>
@@ -124,7 +132,9 @@ export function ProjectRequirementsPage() {
                     <option>Education-oriented</option>
                     <option>Retail / transactional</option>
                     <option>Internal / low sensitivity</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label>
@@ -144,7 +154,9 @@ export function ProjectRequirementsPage() {
                     <option>centralized breakout</option>
                     <option>site-to-site VPN</option>
                     <option>SD-WAN or managed WAN</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label>
@@ -153,7 +165,9 @@ export function ProjectRequirementsPage() {
                     <option>centralized servers or services</option>
                     <option>mixed local and centralized services</option>
                     <option>mostly cloud-hosted services</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
 
                 <label style={{ gridColumn: "1 / -1" }}>
@@ -164,7 +178,9 @@ export function ProjectRequirementsPage() {
                     <option>performance and user experience</option>
                     <option>availability and redundancy</option>
                     <option>hybrid connectivity and flexibility</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               </div>
 
@@ -249,7 +265,9 @@ export function ProjectRequirementsPage() {
                     <option>internet-only isolated guest access</option>
                     <option>guest internet with captive portal</option>
                     <option>guest access with sponsor workflow</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -260,7 +278,9 @@ export function ProjectRequirementsPage() {
                     <option>management reachable only from trusted admin networks</option>
                     <option>management reachable through jump host or bastion only</option>
                     <option>management reachable from dedicated IT VLAN only</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -271,7 +291,9 @@ export function ProjectRequirementsPage() {
                     <option>SSL VPN or modern remote access gateway</option>
                     <option>IPsec remote access</option>
                     <option>identity-aware zero trust access</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -281,6 +303,8 @@ export function ProjectRequirementsPage() {
                   <option>segmented by function and trust level</option>
                   <option>high isolation for sensitive and administrative systems</option>
                   <option>balanced segmentation with simpler operations</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -290,6 +314,8 @@ export function ProjectRequirementsPage() {
                   <option>internal users, guests, management, and services separated</option>
                   <option>staff, infrastructure, and external access clearly separated</option>
                   <option>minimal zones with focused administrative separation</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -299,6 +325,8 @@ export function ProjectRequirementsPage() {
                   <option>privileged administration isolated from user access</option>
                   <option>dedicated admin jump path for management actions</option>
                   <option>small-team admin access with strict management VLAN boundaries</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -308,6 +336,8 @@ export function ProjectRequirementsPage() {
                   <option>central identity for staff and administrators</option>
                   <option>central identity plus stronger admin controls</option>
                   <option>separate privileged identity path for administration</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -342,6 +372,8 @@ export function ProjectRequirementsPage() {
                   <option>GCP</option>
                   <option>Private cloud / VMware</option>
                   <option>Multi-cloud</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -351,6 +383,8 @@ export function ProjectRequirementsPage() {
                   <option>private connectivity / direct circuit</option>
                   <option>SD-WAN integrated cloud edge</option>
                   <option>internet-only access to cloud services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -359,6 +393,8 @@ export function ProjectRequirementsPage() {
                   <option>shared identity between on-prem and cloud</option>
                   <option>cloud-integrated identity with restricted admin roles</option>
                   <option>separate cloud administration boundary</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -367,6 +403,8 @@ export function ProjectRequirementsPage() {
                   <option>private application traffic separated from public internet access</option>
                   <option>internet-facing services separated from internal workloads</option>
                   <option>hybrid application traffic isolated through dedicated connectivity</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -375,6 +413,8 @@ export function ProjectRequirementsPage() {
                   <option>selected services extended into cloud while core users remain on-prem</option>
                   <option>hybrid application split between on-prem and cloud workloads</option>
                   <option>mostly cloud-hosted services with retained on-prem edge and identity</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -383,6 +423,8 @@ export function ProjectRequirementsPage() {
                   <option>provider VNet/VPC with private application address space</option>
                   <option>shared services network plus segmented application subnets</option>
                   <option>hub-and-spoke cloud network with controlled spoke access</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label style={{ gridColumn: "1 / -1" }}>
@@ -391,6 +433,8 @@ export function ProjectRequirementsPage() {
                   <option>summarized site routes and controlled cloud prefixes</option>
                   <option>private connectivity with selected route advertisement only</option>
                   <option>segmented hybrid routing with explicit trust boundaries</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -424,7 +468,9 @@ export function ProjectRequirementsPage() {
                     <option>separate staff and guest SSIDs</option>
                     <option>staff, guest, and IoT SSIDs</option>
                     <option>single staff SSID plus isolated guest SSID</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -435,7 +481,9 @@ export function ProjectRequirementsPage() {
                     <option>voice prioritized over standard user traffic</option>
                     <option>voice and video prioritized</option>
                     <option>basic voice separation without advanced QoS</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -446,7 +494,9 @@ export function ProjectRequirementsPage() {
                     <option>single ISP acceptable</option>
                     <option>dual ISP with basic failover</option>
                     <option>high availability internet edge</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -457,7 +507,9 @@ export function ProjectRequirementsPage() {
                     <option>basic prioritization for voice and critical interactive traffic</option>
                     <option>structured QoS for voice, video, and business-critical apps</option>
                     <option>minimal QoS beyond simple edge prioritization</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -515,6 +567,8 @@ export function ProjectRequirementsPage() {
                   <option>organization block to site block to segment subnet hierarchy</option>
                   <option>site-first hierarchy with summarized regional blocks</option>
                   <option>compact single-site hierarchy with reserved future blocks</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -524,6 +578,8 @@ export function ProjectRequirementsPage() {
                   <option>reserve consistent site blocks for clean summarization</option>
                   <option>allocate right-sized site blocks with reserved expansion space</option>
                   <option>use larger core sites and smaller branch blocks</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -533,6 +589,8 @@ export function ProjectRequirementsPage() {
                   <option>first usable address as default gateway</option>
                   <option>standardized .1 gateway model where possible</option>
                   <option>infrastructure-reserved low addresses with documented gateway slots</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -542,6 +600,8 @@ export function ProjectRequirementsPage() {
                   <option>leave headroom for expansion in each site and segment</option>
                   <option>conservative allocation with explicit future subnet space</option>
                   <option>balanced allocation based on current needs plus moderate growth</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -551,6 +611,8 @@ export function ProjectRequirementsPage() {
                   <option>reserve infrastructure and management ranges inside each site block</option>
                   <option>keep gateway, infra, and dynamic ranges explicitly separated</option>
                   <option>compact reserved ranges with documented exceptions</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -577,6 +639,8 @@ export function ProjectRequirementsPage() {
                   <option>dedicated management IP space per site and device role</option>
                   <option>centralized management ranges with site-based allocation</option>
                   <option>small environment with tightly reserved admin addressing</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -586,6 +650,8 @@ export function ProjectRequirementsPage() {
                   <option>site-role-device naming with consistent short codes</option>
                   <option>site-floor-role numbering with structured device labels</option>
                   <option>compact naming for smaller environments with role prefixes</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -595,6 +661,8 @@ export function ProjectRequirementsPage() {
                   <option>central monitoring with device health, interfaces, and alerts</option>
                   <option>lightweight monitoring focused on uptime and critical events</option>
                   <option>monitoring plus performance trending for core services and WAN</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -604,6 +672,8 @@ export function ProjectRequirementsPage() {
                   <option>central syslog and event retention for infrastructure devices</option>
                   <option>critical-event logging with retained admin actions</option>
                   <option>security-focused logging for edge, access, and remote access events</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -613,6 +683,8 @@ export function ProjectRequirementsPage() {
                   <option>scheduled configuration backups for key network devices</option>
                   <option>central backup workflow for infrastructure configurations</option>
                   <option>manual approval plus periodic backup snapshots</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -622,6 +694,8 @@ export function ProjectRequirementsPage() {
                   <option>internal IT ownership with documented admin responsibilities</option>
                   <option>shared internal and managed-service ownership model</option>
                   <option>small-team ownership with simplified operational controls</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -648,6 +722,8 @@ export function ProjectRequirementsPage() {
                   <option>single building or floor per site with a simple edge layout</option>
                   <option>multi-floor site with access closets and distributed edge</option>
                   <option>branch-style site with compact infrastructure and limited edge space</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -657,6 +733,8 @@ export function ProjectRequirementsPage() {
                   <option>basic site layout without detailed closet mapping yet</option>
                   <option>needs future MDF / IDF or closet-aware planning</option>
                   <option>distributed physical layout with multiple access areas</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -666,6 +744,8 @@ export function ProjectRequirementsPage() {
                   <option>primary office or main site</option>
                   <option>branch or satellite site</option>
                   <option>specialty site with focused local services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -685,6 +765,8 @@ export function ProjectRequirementsPage() {
                   <option>single small edge/closet footprint</option>
                   <option>MDF plus one or more IDF or access closets</option>
                   <option>distributed edge with multiple access zones</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -694,6 +776,8 @@ export function ProjectRequirementsPage() {
                   <option>compact access edge with limited local infrastructure</option>
                   <option>moderate access edge with local switching and AP density</option>
                   <option>larger edge footprint requiring distributed access planning</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -742,7 +826,9 @@ export function ProjectRequirementsPage() {
                     <option>mostly wireless users with wired infrastructure and shared devices</option>
                     <option>balanced wired and wireless access across users</option>
                     <option>mostly wired users with focused wireless coverage</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
             </div>
@@ -772,6 +858,8 @@ export function ProjectRequirementsPage() {
                   <option>general business apps, collaboration, file access, and internet browsing</option>
                   <option>voice, collaboration, cloud apps, and shared file services</option>
                   <option>mixed office plus specialty systems and internal services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -781,6 +869,8 @@ export function ProjectRequirementsPage() {
                   <option>directory, DHCP/DNS, file access, and internet edge are important services</option>
                   <option>cloud identity, shared apps, and WAN edge are critical service dependencies</option>
                   <option>mixed local and centralized services require controlled failover behavior</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -791,7 +881,9 @@ export function ProjectRequirementsPage() {
                     <option>moderate inter-site traffic for shared services and administration</option>
                     <option>light inter-site traffic with mostly local internet use</option>
                     <option>heavy inter-site traffic due to centralized services and shared apps</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -801,6 +893,8 @@ export function ProjectRequirementsPage() {
                   <option>balanced branch and user bandwidth with normal business traffic</option>
                   <option>higher WAN and internet demand due to cloud and collaboration</option>
                   <option>lighter steady-state usage with some peak traffic windows</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -811,7 +905,9 @@ export function ProjectRequirementsPage() {
                     <option>voice and interactive apps should remain responsive</option>
                     <option>some business apps are latency-sensitive across sites</option>
                     <option>latency is moderate but reliability matters more than speed</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -822,7 +918,9 @@ export function ProjectRequirementsPage() {
                     <option>basic prioritization for voice and critical interactive traffic</option>
                     <option>structured QoS for voice, video, and business-critical apps</option>
                     <option>minimal QoS beyond simple edge prioritization</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
 
@@ -832,6 +930,8 @@ export function ProjectRequirementsPage() {
                   <option>short outages acceptable but critical services should recover quickly</option>
                   <option>low outage tolerance for WAN and core business services</option>
                   <option>moderate outage tolerance with planned recovery expectations</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -841,6 +941,8 @@ export function ProjectRequirementsPage() {
                   <option>plan for 1 to 3 years of moderate growth</option>
                   <option>plan for near-term growth with later redesign flexibility</option>
                   <option>plan for aggressive growth and heavier service demand</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -870,6 +972,8 @@ export function ProjectRequirementsPage() {
                   <option>balanced budget with room for core security and reliability controls</option>
                   <option>cost-sensitive design with practical compromises</option>
                   <option>higher assurance budget for resilience and manageability</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -879,6 +983,8 @@ export function ProjectRequirementsPage() {
                   <option>vendor-flexible with preference for practical supportable options</option>
                   <option>prefer mainstream enterprise vendors and documented support paths</option>
                   <option>mixed vendor approach with interoperability in mind</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -888,6 +994,8 @@ export function ProjectRequirementsPage() {
                   <option>normal phased project timeline</option>
                   <option>fast delivery with focused scope and controlled tradeoffs</option>
                   <option>longer staged timeline with validation at each step</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -897,6 +1005,8 @@ export function ProjectRequirementsPage() {
                   <option>phased rollout with validation before wider deployment</option>
                   <option>pilot site first, then broader rollout</option>
                   <option>single implementation window with strong preparation</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -906,6 +1016,8 @@ export function ProjectRequirementsPage() {
                   <option>limited downtime should be planned and communicated</option>
                   <option>minimal downtime is required for user-facing systems</option>
                   <option>maintenance windows are available for planned changes</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -915,6 +1027,8 @@ export function ProjectRequirementsPage() {
                   <option>small to mid-sized internal team with practical support needs</option>
                   <option>strong internal technical team comfortable with richer design controls</option>
                   <option>limited internal staff with need for simpler maintainable design</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -924,6 +1038,8 @@ export function ProjectRequirementsPage() {
                   <option>technical handoff plus stakeholder summary</option>
                   <option>implementation-focused technical package</option>
                   <option>review-oriented planning summary with design rationale</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
 
@@ -933,7 +1049,19 @@ export function ProjectRequirementsPage() {
                   <option>internal IT team and technical reviewers</option>
                   <option>mixed technical and management audience</option>
                   <option>client-facing or stakeholder review audience</option>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
+              </label>
+
+              <label style={{ gridColumn: "1 / -1" }}>
+                <span>Custom requirement notes</span>
+                <textarea
+                  rows={4}
+                  value={requirements.customRequirementsNotes}
+                  onChange={(event) => setRequirements((current) => ({ ...current, customRequirementsNotes: event.target.value }))}
+                  placeholder="Use this when a menu needs a custom answer, a special exception, or a real-world note that does not fit the preset options."
+                />
               </label>
             </div>
           </section>
@@ -1011,7 +1139,7 @@ export function ProjectRequirementsPage() {
   }, [
     advancedScenario,
     activeTracks,
-    description,
+    summaryDescription,
     multiSitePlanning,
     performancePlanning,
     readinessSummary.completionLabel,

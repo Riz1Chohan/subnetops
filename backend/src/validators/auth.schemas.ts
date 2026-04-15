@@ -6,7 +6,11 @@ const passwordSchema = z
   .max(100, "Password must be 100 characters or less");
 
 export const registerSchema = z.object({
-  fullName: z.string().trim().min(1).max(100).optional(),
+  fullName: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  }, z.string().max(100).optional()),
   email: z.string().trim().email(),
   password: passwordSchema,
 });

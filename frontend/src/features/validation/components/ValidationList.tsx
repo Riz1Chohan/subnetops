@@ -63,8 +63,8 @@ export function ValidationList({
             {onConvertToTask || onExplain || fixPath ? (
               <div className="form-actions">
                 {fixPath ? <Link to={fixPath} className="link-button">{fixLabel}</Link> : null}
+                {onExplain ? <button type="button" onClick={() => onExplain(item)}>Suggest fix</button> : null}
                 {onConvertToTask ? <button type="button" onClick={() => onConvertToTask(item)} disabled={alreadyTracked}>Convert to Task</button> : null}
-                {onExplain ? <button type="button" onClick={() => onExplain(item)}>Explain with AI</button> : null}
               </div>
             ) : null}
           </div>

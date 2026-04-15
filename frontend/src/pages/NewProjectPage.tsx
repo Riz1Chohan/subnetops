@@ -11,6 +11,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { runValidation } from "../features/validation/api";
 import { HelpTip } from "../components/app/HelpTip";
 import {
+  buildProjectSummaryDescription,
   buildGuidedDescription,
   conditionalSections,
   defaultRequirementsProfile,
@@ -264,6 +265,7 @@ export function NewProjectPage() {
   }, []);
 
   const guidedDescription = useMemo(() => buildGuidedDescription(guided), [guided]);
+  const guidedSummaryDescription = useMemo(() => buildProjectSummaryDescription(guided), [guided]);
   const scenario = useMemo(() => conditionalSections(guided), [guided]);
   const readinessSummary = useMemo(() => planningReadinessSummary(guided), [guided]);
   const multiSitePlanning = Number(guided.siteCount || "0") > 1 || guided.internetModel !== "internet at each site";
@@ -274,13 +276,13 @@ export function NewProjectPage() {
     if (!aiDraft || !useOptions.applyProjectFields) {
       return {
         name: guided.planningFor === "Custom" ? "" : `${guided.planningFor} Network Plan`,
-        description: guidedDescription,
+        description: guidedSummaryDescription,
         environmentType: guided.environmentType,
       };
     }
     return {
       name: aiDraft.project.name,
-      description: aiDraft.project.description,
+      description: (aiDraft.project.description || "").slice(0, 320),
       organizationName: aiDraft.project.organizationName,
       environmentType: aiDraft.project.environmentType,
       basePrivateRange: aiDraft.project.basePrivateRange,
@@ -315,6 +317,8 @@ export function NewProjectPage() {
                   <option>Warehouse</option>
                   <option>Multi-site business</option>
                   <option>Custom</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -323,6 +327,8 @@ export function NewProjectPage() {
                   <option>New network build</option>
                   <option>Existing network redesign</option>
                   <option>Network expansion</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -332,6 +338,8 @@ export function NewProjectPage() {
                   <option>Hybrid</option>
                   <option>Public cloud connected</option>
                   <option>Private cloud connected</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -342,6 +350,8 @@ export function NewProjectPage() {
                   <option>Education-oriented</option>
                   <option>Retail / transactional</option>
                   <option>Internal / low sensitivity</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -359,6 +369,8 @@ export function NewProjectPage() {
                   <option>centralized breakout</option>
                   <option>site-to-site VPN</option>
                   <option>SD-WAN or managed WAN</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -367,6 +379,8 @@ export function NewProjectPage() {
                   <option>centralized servers or services</option>
                   <option>mixed local and centralized services</option>
                   <option>mostly cloud-hosted services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -388,6 +402,8 @@ export function NewProjectPage() {
                   <option>performance and user experience</option>
                   <option>availability and redundancy</option>
                   <option>hybrid connectivity and flexibility</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -413,7 +429,9 @@ export function NewProjectPage() {
                         <option>internet-only isolated guest access</option>
                         <option>guest internet with captive portal</option>
                         <option>guest access with sponsor workflow</option>
-                      </select>
+                      <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                     </label>
                   ) : null}
                   {guided.management ? (
@@ -423,7 +441,9 @@ export function NewProjectPage() {
                         <option>management reachable only from trusted admin networks</option>
                         <option>management reachable through jump host or bastion only</option>
                         <option>management reachable from dedicated IT VLAN only</option>
-                      </select>
+                      <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                     </label>
                   ) : null}
                   {guided.remoteAccess ? (
@@ -433,7 +453,9 @@ export function NewProjectPage() {
                         <option>SSL VPN or modern remote access gateway</option>
                         <option>IPsec remote access</option>
                         <option>identity-aware zero trust access</option>
-                      </select>
+                      <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                     </label>
                   ) : null}
                   <label>
@@ -442,7 +464,9 @@ export function NewProjectPage() {
                       <option>segmented by function and trust level</option>
                       <option>high isolation for sensitive and administrative systems</option>
                       <option>balanced segmentation with simpler operations</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Trust boundary model</span>
@@ -450,7 +474,9 @@ export function NewProjectPage() {
                       <option>internal users, guests, management, and services separated</option>
                       <option>staff, infrastructure, and external access clearly separated</option>
                       <option>minimal zones with focused administrative separation</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Privileged admin boundary</span>
@@ -458,7 +484,9 @@ export function NewProjectPage() {
                       <option>privileged administration isolated from user access</option>
                       <option>dedicated admin jump path for management actions</option>
                       <option>small-team admin access with strict management VLAN boundaries</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Identity model</span>
@@ -466,7 +494,9 @@ export function NewProjectPage() {
                       <option>central identity for staff and administrators</option>
                       <option>central identity plus stronger admin controls</option>
                       <option>separate privileged identity path for administration</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                 </>
               ) : null}
@@ -477,7 +507,9 @@ export function NewProjectPage() {
                     <option>separate staff and guest SSIDs</option>
                     <option>staff, guest, and IoT SSIDs</option>
                     <option>single staff SSID plus isolated guest SSID</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
               {scenario.voice ? (
@@ -487,7 +519,9 @@ export function NewProjectPage() {
                     <option>voice prioritized over standard user traffic</option>
                     <option>voice and video prioritized</option>
                     <option>basic voice separation without advanced QoS</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
               {scenario.cloud ? (
@@ -500,7 +534,9 @@ export function NewProjectPage() {
                       <option>GCP</option>
                       <option>Private cloud / VMware</option>
                       <option>Multi-cloud</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud connectivity pattern</span>
@@ -509,7 +545,9 @@ export function NewProjectPage() {
                       <option>private connectivity / direct circuit</option>
                       <option>SD-WAN integrated cloud edge</option>
                       <option>internet-only access to cloud services</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud identity boundary</span>
@@ -517,7 +555,9 @@ export function NewProjectPage() {
                       <option>shared identity between on-prem and cloud</option>
                       <option>cloud-integrated identity with restricted admin roles</option>
                       <option>separate cloud administration boundary</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud traffic boundary</span>
@@ -525,7 +565,9 @@ export function NewProjectPage() {
                       <option>private application traffic separated from public internet access</option>
                       <option>internet-facing services separated from internal workloads</option>
                       <option>hybrid application traffic isolated through dedicated connectivity</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud hosting model</span>
@@ -533,7 +575,9 @@ export function NewProjectPage() {
                       <option>selected services extended into cloud while core users remain on-prem</option>
                       <option>hybrid application split between on-prem and cloud workloads</option>
                       <option>mostly cloud-hosted services with retained on-prem edge and identity</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud network model</span>
@@ -541,7 +585,9 @@ export function NewProjectPage() {
                       <option>provider VNet/VPC with private application address space</option>
                       <option>shared services network plus segmented application subnets</option>
                       <option>hub-and-spoke cloud network with controlled spoke access</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                   <label>
                     <span>Cloud routing model</span>
@@ -549,7 +595,9 @@ export function NewProjectPage() {
                       <option>summarized site routes and controlled cloud prefixes</option>
                       <option>private connectivity with selected route advertisement only</option>
                       <option>segmented hybrid routing with explicit trust boundaries</option>
-                    </select>
+                    <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                   </label>
                 </>
               ) : null}
@@ -560,7 +608,9 @@ export function NewProjectPage() {
                     <option>single ISP acceptable</option>
                     <option>dual ISP with basic failover</option>
                     <option>high availability internet edge</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
             </div>
@@ -580,6 +630,8 @@ export function NewProjectPage() {
                   <option>organization block to site block to segment subnet hierarchy</option>
                   <option>site-first hierarchy with summarized regional blocks</option>
                   <option>compact single-site hierarchy with reserved future blocks</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -588,6 +640,8 @@ export function NewProjectPage() {
                   <option>reserve consistent site blocks for clean summarization</option>
                   <option>allocate right-sized site blocks with reserved expansion space</option>
                   <option>use larger core sites and smaller branch blocks</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -596,6 +650,8 @@ export function NewProjectPage() {
                   <option>first usable address as default gateway</option>
                   <option>standardized .1 gateway model where possible</option>
                   <option>infrastructure-reserved low addresses with documented gateway slots</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -604,6 +660,8 @@ export function NewProjectPage() {
                   <option>leave headroom for expansion in each site and segment</option>
                   <option>conservative allocation with explicit future subnet space</option>
                   <option>balanced allocation based on current needs plus moderate growth</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label style={{ gridColumn: "1 / -1" }}>
@@ -612,6 +670,8 @@ export function NewProjectPage() {
                   <option>reserve infrastructure and management ranges inside each site block</option>
                   <option>reserve low-address space for gateways, switches, firewalls, and services</option>
                   <option>reserve dedicated address ranges for management, edge, and future growth</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -631,6 +691,8 @@ export function NewProjectPage() {
                   <option>dedicated management IP space per site and device role</option>
                   <option>centralized management ranges with site-based allocation</option>
                   <option>small environment with tightly reserved admin addressing</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -639,6 +701,8 @@ export function NewProjectPage() {
                   <option>site-role-device naming with consistent short codes</option>
                   <option>site-floor-role numbering with structured device labels</option>
                   <option>compact naming for smaller environments with role prefixes</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -647,6 +711,8 @@ export function NewProjectPage() {
                   <option>central monitoring with device health, interfaces, and alerts</option>
                   <option>lightweight monitoring focused on uptime and critical events</option>
                   <option>monitoring plus performance trending for core services and WAN</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -655,6 +721,8 @@ export function NewProjectPage() {
                   <option>central syslog and event retention for infrastructure devices</option>
                   <option>critical-event logging with retained admin actions</option>
                   <option>security-focused logging for edge, access, and remote access events</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -663,6 +731,8 @@ export function NewProjectPage() {
                   <option>scheduled configuration backups for key network devices</option>
                   <option>central backup workflow for infrastructure configurations</option>
                   <option>manual approval plus periodic backup snapshots</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -671,6 +741,8 @@ export function NewProjectPage() {
                   <option>internal IT ownership with documented admin responsibilities</option>
                   <option>shared internal and managed-service ownership model</option>
                   <option>small-team ownership with simplified operational controls</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -690,6 +762,8 @@ export function NewProjectPage() {
                   <option>single building or floor per site with a simple edge layout</option>
                   <option>multi-floor site with access closets and distributed edge</option>
                   <option>branch-style site with compact infrastructure and limited edge space</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -698,6 +772,8 @@ export function NewProjectPage() {
                   <option>basic site layout without detailed closet mapping yet</option>
                   <option>needs future MDF / IDF or closet-aware planning</option>
                   <option>distributed physical layout with multiple access areas</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -706,6 +782,8 @@ export function NewProjectPage() {
                   <option>primary office or main site</option>
                   <option>branch or satellite site</option>
                   <option>specialty site with focused local services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -722,6 +800,8 @@ export function NewProjectPage() {
                   <option>single small edge/closet footprint</option>
                   <option>MDF plus one or more IDF or access closets</option>
                   <option>distributed edge with multiple access zones</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label style={{ gridColumn: "1 / -1" }}>
@@ -730,6 +810,8 @@ export function NewProjectPage() {
                   <option>compact access edge with limited local infrastructure</option>
                   <option>moderate access edge with local switching and AP density</option>
                   <option>larger edge footprint requiring distributed access planning</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -771,7 +853,9 @@ export function NewProjectPage() {
                     <option>mostly wireless users with wired infrastructure and shared devices</option>
                     <option>balanced wired and wireless access across users</option>
                     <option>mostly wired users with focused wireless coverage</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
             </div>
@@ -791,6 +875,8 @@ export function NewProjectPage() {
                   <option>general business apps, collaboration, file access, and internet browsing</option>
                   <option>voice, collaboration, cloud apps, and shared file services</option>
                   <option>mixed office plus specialty systems and internal services</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label style={{ gridColumn: "1 / -1" }}>
@@ -799,6 +885,8 @@ export function NewProjectPage() {
                   <option>directory, DHCP/DNS, file access, and internet edge are important services</option>
                   <option>cloud identity, shared apps, and WAN edge are critical service dependencies</option>
                   <option>mixed local and centralized services require controlled failover behavior</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               {multiSitePlanning ? (
@@ -808,7 +896,9 @@ export function NewProjectPage() {
                     <option>moderate inter-site traffic for shared services and administration</option>
                     <option>light inter-site traffic with mostly local internet use</option>
                     <option>heavy inter-site traffic due to centralized services and shared apps</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
               <label>
@@ -817,6 +907,8 @@ export function NewProjectPage() {
                   <option>balanced branch and user bandwidth with normal business traffic</option>
                   <option>higher WAN and internet demand due to cloud and collaboration</option>
                   <option>lighter steady-state usage with some peak traffic windows</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               {voicePlanning || guided.primaryGoal === "performance and user experience" ? (
@@ -826,7 +918,9 @@ export function NewProjectPage() {
                     <option>voice and interactive apps should remain responsive</option>
                     <option>some business apps are latency-sensitive across sites</option>
                     <option>latency is moderate but reliability matters more than speed</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
               {voicePlanning || guided.voice ? (
@@ -836,7 +930,9 @@ export function NewProjectPage() {
                     <option>basic prioritization for voice and critical interactive traffic</option>
                     <option>structured QoS for voice, video, and business-critical apps</option>
                     <option>minimal QoS beyond simple edge prioritization</option>
-                  </select>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
                 </label>
               ) : null}
               <label>
@@ -845,6 +941,8 @@ export function NewProjectPage() {
                   <option>short outages acceptable but critical services should recover quickly</option>
                   <option>low outage tolerance for WAN and core business services</option>
                   <option>moderate outage tolerance with planned recovery expectations</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -853,6 +951,8 @@ export function NewProjectPage() {
                   <option>plan for 1 to 3 years of moderate growth</option>
                   <option>plan for near-term growth with later redesign flexibility</option>
                   <option>plan for aggressive growth and heavier service demand</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -872,6 +972,8 @@ export function NewProjectPage() {
                   <option>balanced budget with room for core security and reliability controls</option>
                   <option>cost-sensitive design with practical compromises</option>
                   <option>higher assurance budget for resilience and manageability</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -880,6 +982,8 @@ export function NewProjectPage() {
                   <option>vendor-flexible with preference for practical supportable options</option>
                   <option>prefer mainstream enterprise vendors and documented support paths</option>
                   <option>mixed vendor approach with interoperability in mind</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -888,6 +992,8 @@ export function NewProjectPage() {
                   <option>normal phased project timeline</option>
                   <option>fast delivery with focused scope and controlled tradeoffs</option>
                   <option>longer staged timeline with validation at each step</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -896,6 +1002,8 @@ export function NewProjectPage() {
                   <option>phased rollout with validation before wider deployment</option>
                   <option>pilot site first, then broader rollout</option>
                   <option>single implementation window with strong preparation</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -904,6 +1012,8 @@ export function NewProjectPage() {
                   <option>limited downtime should be planned and communicated</option>
                   <option>minimal downtime is required for user-facing systems</option>
                   <option>maintenance windows are available for planned changes</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -912,6 +1022,8 @@ export function NewProjectPage() {
                   <option>small to mid-sized internal team with practical support needs</option>
                   <option>strong internal technical team comfortable with richer design controls</option>
                   <option>limited internal staff with need for simpler maintainable design</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -920,6 +1032,8 @@ export function NewProjectPage() {
                   <option>technical handoff plus stakeholder summary</option>
                   <option>implementation-focused technical package</option>
                   <option>review-oriented planning summary with design rationale</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -928,6 +1042,8 @@ export function NewProjectPage() {
                   <option>internal IT team and technical reviewers</option>
                   <option>mixed technical and management audience</option>
                   <option>client-facing or stakeholder review audience</option>
+                <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
                 </select>
               </label>
             </div>
@@ -960,6 +1076,7 @@ export function NewProjectPage() {
                     <div className="planner-snapshot-row"><span>Users per site</span><strong>{guided.usersPerSite}</strong></div>
                     <div className="planner-snapshot-row"><span>Primary goal</span><strong>{guided.primaryGoal}</strong></div>
                     <div className="planner-snapshot-row"><span>Output package</span><strong>{guided.outputPackage}</strong></div>
+                    {guided.customRequirementsNotes ? <div className="planner-snapshot-row"><span>Custom notes</span><strong>{guided.customRequirementsNotes}</strong></div> : null}
                   </div>
                 </div>
                 <div className="panel" style={{ display: "grid", gap: 8 }}>
@@ -1000,7 +1117,7 @@ export function NewProjectPage() {
                   setSubmitError(null);
 
                   try {
-                    const project = await mutation.mutateAsync({ ...values, requirementsJson: stringifyRequirementsProfile(guided) });
+                    const project = await mutation.mutateAsync({ ...values, description: (values.description || guidedSummaryDescription).slice(0, 320), requirementsJson: stringifyRequirementsProfile(guided) });
                     let importWarning = "";
 
                     if (aiDraft && (useOptions.applySites || useOptions.applyVlans)) {

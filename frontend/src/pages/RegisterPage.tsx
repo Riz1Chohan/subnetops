@@ -17,7 +17,7 @@ export function RegisterPage() {
         style={{ display: "grid", gap: 12 }}
         onSubmit={async (e) => {
           e.preventDefault();
-          await registerMutation.mutateAsync({ fullName, email, password });
+          await registerMutation.mutateAsync({ fullName: fullName.trim() || undefined, email, password });
           navigate("/dashboard", { replace: true });
         }}
       >
