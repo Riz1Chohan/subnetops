@@ -6,7 +6,7 @@ import { useCurrentUser } from "../features/auth/hooks";
 import { UsageBanner } from "../components/app/UsageBanner";
 import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import { ValidationList } from "../features/validation/components/ValidationList";
-import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
+import { buildNamingPreviewExamples, parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
@@ -148,6 +148,7 @@ export function ProjectReportPage() {
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
   const status = reportStatus(errorCount, warningCount, project.approvalStatus);
   const readinessSummary = planningReadinessSummary(requirementsProfile);
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location })));
   const summary = generatedSummary({
     projectName: project.name,
     environmentType: project.environmentType,
@@ -290,6 +291,46 @@ export function ProjectReportPage() {
               "No major constraints recorded yet.",
             )}
           </div>
+        </div>
+      </div>
+
+
+      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ margin: "0 0 8px 0" }}>1A. Naming and site identity standard</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Device labels, report references, and diagram labels should all follow the same naming pattern. This section makes the chosen naming standard explicit before the report starts referencing device objects deeper in the design.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Naming standard", requirementsProfile.namingStandard)}
+          {summaryCard("Device convention", requirementsProfile.deviceNamingConvention)}
+          {summaryCard("Primary token", requirementsProfile.namingTokenPreference)}
+          {summaryCard("Site identity", requirementsProfile.siteIdentityCapture)}
+        </div>
+        <div className="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Site</th>
+                <th>Primary token</th>
+                <th>Firewall example</th>
+                <th>Switch example</th>
+                <th>AP example</th>
+              </tr>
+            </thead>
+            <tbody>
+              {namingPreview.map((item) => (
+                <tr key={item.siteLabel}>
+                  <td>{item.siteLabel}</td>
+                  <td><code>{item.token}</code></td>
+                  <td><code>{item.firewall}</code></td>
+                  <td><code>{item.switchName}</code></td>
+                  <td><code>{item.accessPoint}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

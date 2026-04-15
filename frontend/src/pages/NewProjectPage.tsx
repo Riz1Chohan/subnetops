@@ -11,6 +11,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { runValidation } from "../features/validation/api";
 import { HelpTip } from "../components/app/HelpTip";
 import {
+  buildNamingPreviewExamples,
   buildProjectSummaryDescription,
   buildGuidedDescription,
   conditionalSections,
@@ -107,6 +108,7 @@ function PlanSidebar({
   const activeTracks = planningTracks(guided);
   const trackStatuses = planningTrackStatuses(guided);
   const readinessSummary = planningReadinessSummary(guided);
+  const namingPreview = buildNamingPreviewExamples(guided);
   const snapshotItems = [
     { label: "Planning for", value: guided.planningFor },
     { label: "Environment", value: guided.environmentType },
@@ -725,6 +727,44 @@ export function NewProjectPage() {
                   <option value="Custom">Custom</option>
                 </select>
               </label>
+              <label>
+                <span>Naming token preference</span>
+                <select value={guided.namingTokenPreference} onChange={(event) => setGuided((current) => ({ ...current, namingTokenPreference: event.target.value }))}>
+                  <option>prefer site code when available, otherwise derive from the location or site name</option>
+                  <option>always prefer site code as the primary token</option>
+                  <option>always prefer full location name as the primary token</option>
+                </select>
+              </label>
+              <div className="panel" style={{ gridColumn: '1 / -1', display: 'grid', gap: 10, background: 'rgba(15,23,42,0.03)' }}>
+                <div>
+                  <strong style={{ display: 'block', marginBottom: 6 }}>Naming preview</strong>
+                  <p className="muted" style={{ margin: 0 }}>These examples update immediately so users can see whether site code or full location naming will read better before saving the plan.</p>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Site</th>
+                        <th align="left">Primary token</th>
+                        <th align="left">Firewall example</th>
+                        <th align="left">Switch example</th>
+                        <th align="left">AP example</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {namingPreview.map((item) => (
+                        <tr key={item.siteLabel}>
+                          <td>{item.siteLabel}</td>
+                          <td>{item.token}</td>
+                          <td><code>{item.firewall}</code></td>
+                          <td><code>{item.switchName}</code></td>
+                          <td><code>{item.accessPoint}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               <label>
                 <span>Monitoring model</span>
                 <select value={guided.monitoringModel} onChange={(event) => setGuided((current) => ({ ...current, monitoringModel: event.target.value }))}>

@@ -44,6 +44,7 @@ export type RequirementsProfile = {
   siteIdentityCapture: string;
   namingStandard: string;
   deviceNamingConvention: string;
+  namingTokenPreference: string;
   monitoringModel: string;
   loggingModel: string;
   backupPolicy: string;
@@ -127,6 +128,7 @@ export const defaultRequirementsProfile: RequirementsProfile = {
   siteIdentityCapture: "capture site name, city or location label, and optional street address for each site",
   namingStandard: "site-role-device naming with consistent short codes",
   deviceNamingConvention: "automatic short-code standard (SW_TOR_01 / FW_TOR_01)",
+  namingTokenPreference: "prefer site code when available, otherwise derive from the location or site name",
   monitoringModel: "central monitoring with device health, interfaces, and alerts",
   loggingModel: "central syslog and event retention for infrastructure devices",
   backupPolicy: "scheduled configuration backups for key network devices",
@@ -192,13 +194,73 @@ export function buildGuidedPrompt(values: RequirementsProfile) {
   if (values.cloudConnected || values.environmentType !== "On-prem") features.push(`cloud connectivity via ${values.cloudConnectivity} with ${values.cloudProvider}`, `cloud identity boundary of ${values.cloudIdentityBoundary}`, `cloud traffic boundary of ${values.cloudTrafficBoundary}`, `cloud hosting model of ${values.cloudHostingModel}`, `cloud network model of ${values.cloudNetworkModel}`, `cloud routing model of ${values.cloudRoutingModel}`);
   if (values.management || values.guestWifi || values.remoteAccess || values.iot || values.cameras) features.push(`security posture of ${values.securityPosture}`, `trust boundary model of ${values.trustBoundaryModel}`, `administrative boundary of ${values.adminBoundary}`, `identity model of ${values.identityModel}`);
   features.push(`address hierarchy of ${values.addressHierarchyModel}`, `site block strategy of ${values.siteBlockStrategy}`, `gateway convention of ${values.gatewayConvention}`, `growth buffer model of ${values.growthBufferModel}`, `reserved range policy of ${values.reservedRangePolicy}`);
-  features.push(`management IP policy of ${values.managementIpPolicy}`, `site identity capture of ${values.siteIdentityCapture}`, `naming standard of ${values.namingStandard}`, `device naming convention of ${values.deviceNamingConvention}`, `monitoring model of ${values.monitoringModel}`, `logging model of ${values.loggingModel}`, `backup policy of ${values.backupPolicy}`, `operations ownership of ${values.operationsOwnerModel}`);
+  features.push(`management IP policy of ${values.managementIpPolicy}`, `site identity capture of ${values.siteIdentityCapture}`, `naming standard of ${values.namingStandard}`, `device naming convention of ${values.deviceNamingConvention}`, `naming token preference of ${values.namingTokenPreference}`, `monitoring model of ${values.monitoringModel}`, `logging model of ${values.loggingModel}`, `backup policy of ${values.backupPolicy}`, `operations ownership of ${values.operationsOwnerModel}`);
   features.push(`site layout model of ${values.siteLayoutModel}`, `site role of ${values.siteRoleModel}`, `physical scope of ${values.physicalScope}`, `${values.buildingCount} building(s)`, `${values.floorCount} floor(s)`, `closet model of ${values.closetModel}`, `edge footprint of ${values.edgeFootprint}`, `about ${values.printerCount} printers`, `about ${values.phoneCount} phones`, `about ${values.apCount} access points`, `about ${values.cameraCount} cameras`, `about ${values.serverCount} servers`, `about ${values.iotDeviceCount} IoT or specialty devices`, `a user access mix of ${values.wiredWirelessMix}`);
   features.push(`application profile of ${values.applicationProfile}`, `critical services model of ${values.criticalServicesModel}`, `inter-site traffic model of ${values.interSiteTrafficModel}`, `bandwidth profile of ${values.bandwidthProfile}`, `latency sensitivity of ${values.latencySensitivity}`, `QoS model of ${values.qosModel}`, `outage tolerance of ${values.outageTolerance}`, `growth horizon of ${values.growthHorizon}`);
   features.push(`budget model of ${values.budgetModel}`, `vendor preference of ${values.vendorPreference}`, `implementation timeline of ${values.implementationTimeline}`, `rollout model of ${values.rolloutModel}`, `downtime constraint of ${values.downtimeConstraint}`, `team capability of ${values.teamCapability}`, `output package of ${values.outputPackage}`, `primary audience of ${values.primaryAudience}`);
   if (values.customRequirementsNotes.trim()) features.push(`custom requirements notes: ${values.customRequirementsNotes.trim()}`);
 
   return `${values.planningFor} network, ${values.projectPhase.toLowerCase()}, ${values.environmentType} environment, ${values.complianceProfile} context, about ${values.siteCount} site(s), around ${values.usersPerSite} users per site, ${values.internetModel}, ${values.serverPlacement}, primary goal is ${values.primaryGoal}. Include ${features.length > 0 ? features.join(", ") : "realistic segmentation and subnet planning"}.`;
+}
+
+
+
+type NamingPreviewSite = {
+  name: string;
+  siteCode?: string | null;
+  location?: string | null;
+};
+
+function previewSiteToken(site: NamingPreviewSite, preference: string) {
+  const pref = (preference || '').toLowerCase();
+  const cleanedCode = (site.siteCode || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const fullName = (site.location || site.name || 'Site').trim();
+  const fullToken = fullName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 18) || 'SITE';
+  const shortFromName = fullName.toUpperCase().replace(/[^A-Z0-9 ]+/g, '').split(/\s+/).filter(Boolean).map((part) => part.slice(0, 3)).join('_').slice(0, 12) || 'SITE';
+  if (pref.includes('full location') || pref.includes('full site name')) return fullToken;
+  if (pref.includes('site code')) return cleanedCode || shortFromName;
+  return cleanedCode || shortFromName;
+}
+
+function previewDevicePrefix(role: string) {
+  switch (role) {
+    case 'firewall': return 'FW';
+    case 'router': return 'RTR';
+    case 'access-switch':
+    case 'core-switch': return 'SW';
+    case 'access-point': return 'AP';
+    case 'server': return 'SRV';
+    default: return 'DEV';
+  }
+}
+
+function previewDeviceName(input: { site: NamingPreviewSite; role: string; convention: string; preference: string; index?: number; }) {
+  const { site, role, convention, preference, index = 1 } = input;
+  const token = previewSiteToken(site, preference);
+  const prefix = previewDevicePrefix(role);
+  const siteLabel = site.location || site.name || 'Site';
+  const normalizedConvention = (convention || '').toLowerCase();
+  if (normalizedConvention.includes('short-code')) return `${prefix}_${token}_${String(index).padStart(2, '0')}`;
+  if (normalizedConvention.includes('location-role-index')) return `${token}-${prefix}-${String(index).padStart(2, '0')}`;
+  if (normalizedConvention.includes('readable')) return `${siteLabel}-${prefix}${index}`;
+  return `${siteLabel} ${role.replace(/-/g, ' ')}`;
+}
+
+export function buildNamingPreviewExamples(values: RequirementsProfile, sites?: NamingPreviewSite[]) {
+  const previewSites = sites && sites.length > 0
+    ? sites.slice(0, 3)
+    : [
+        { name: 'Toronto HQ', siteCode: 'TOR', location: 'Toronto HQ' },
+        { name: 'Vancouver Branch', siteCode: 'VAN', location: 'Vancouver Branch' },
+      ];
+
+  return previewSites.map((site) => ({
+    siteLabel: site.location || site.name,
+    token: previewSiteToken(site, values.namingTokenPreference),
+    firewall: previewDeviceName({ site, role: 'firewall', convention: values.deviceNamingConvention, preference: values.namingTokenPreference, index: 1 }),
+    switchName: previewDeviceName({ site, role: 'core-switch', convention: values.deviceNamingConvention, preference: values.namingTokenPreference, index: 1 }),
+    accessPoint: previewDeviceName({ site, role: 'access-point', convention: values.deviceNamingConvention, preference: values.namingTokenPreference, index: 1 }),
+  }));
 }
 
 export function buildProjectSummaryDescription(values: RequirementsProfile, maxLength = 320) {
@@ -236,7 +298,7 @@ export function buildGuidedDescription(values: RequirementsProfile) {
   if (values.cloudConnected || values.environmentType !== "On-prem") details.push(`cloud pattern: ${values.cloudProvider} over ${values.cloudConnectivity}`, `cloud identity boundary: ${values.cloudIdentityBoundary}`, `cloud traffic boundary: ${values.cloudTrafficBoundary}`, `cloud hosting model: ${values.cloudHostingModel}`, `cloud network model: ${values.cloudNetworkModel}`, `cloud routing model: ${values.cloudRoutingModel}`);
   if (values.management || values.guestWifi || values.remoteAccess || values.iot || values.cameras) details.push(`security posture: ${values.securityPosture}`, `trust boundaries: ${values.trustBoundaryModel}`, `admin boundary: ${values.adminBoundary}`, `identity model: ${values.identityModel}`);
   details.push(`address hierarchy: ${values.addressHierarchyModel}`, `site block strategy: ${values.siteBlockStrategy}`, `gateway convention: ${values.gatewayConvention}`, `growth buffer model: ${values.growthBufferModel}`, `reserved range policy: ${values.reservedRangePolicy}`);
-  details.push(`management IP policy: ${values.managementIpPolicy}`, `site identity capture: ${values.siteIdentityCapture}`, `naming standard: ${values.namingStandard}`, `device naming convention: ${values.deviceNamingConvention}`, `monitoring model: ${values.monitoringModel}`, `logging model: ${values.loggingModel}`, `backup policy: ${values.backupPolicy}`, `operations ownership: ${values.operationsOwnerModel}`);
+  details.push(`management IP policy: ${values.managementIpPolicy}`, `site identity capture: ${values.siteIdentityCapture}`, `naming standard: ${values.namingStandard}`, `device naming convention: ${values.deviceNamingConvention}`, `naming token preference: ${values.namingTokenPreference}`, `monitoring model: ${values.monitoringModel}`, `logging model: ${values.loggingModel}`, `backup policy: ${values.backupPolicy}`, `operations ownership: ${values.operationsOwnerModel}`);
   details.push(`site layout: ${values.siteLayoutModel}`, `site role: ${values.siteRoleModel}`, `physical scope: ${values.physicalScope}`, `buildings: ${values.buildingCount}`, `floors: ${values.floorCount}`, `closet model: ${values.closetModel}`, `edge footprint: ${values.edgeFootprint}`, `printers: ${values.printerCount}`, `phones: ${values.phoneCount}`, `access points: ${values.apCount}`, `cameras: ${values.cameraCount}`, `servers: ${values.serverCount}`, `IoT/specialty devices: ${values.iotDeviceCount}`, `wired/wireless mix: ${values.wiredWirelessMix}`);
   details.push(`application profile: ${values.applicationProfile}`, `critical services: ${values.criticalServicesModel}`, `inter-site traffic: ${values.interSiteTrafficModel}`, `bandwidth profile: ${values.bandwidthProfile}`, `latency sensitivity: ${values.latencySensitivity}`, `QoS model: ${values.qosModel}`, `outage tolerance: ${values.outageTolerance}`, `growth horizon: ${values.growthHorizon}`);
   details.push(`budget model: ${values.budgetModel}`, `vendor preference: ${values.vendorPreference}`, `implementation timeline: ${values.implementationTimeline}`, `rollout model: ${values.rolloutModel}`, `downtime constraint: ${values.downtimeConstraint}`, `team capability: ${values.teamCapability}`, `output package: ${values.outputPackage}`, `primary audience: ${values.primaryAudience}`);

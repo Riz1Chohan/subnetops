@@ -6,7 +6,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
-import { parseRequirementsProfile } from "../lib/requirementsProfile";
+import { buildNamingPreviewExamples, parseRequirementsProfile } from "../lib/requirementsProfile";
 import { useValidationResults } from "../features/validation/hooks";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
 
@@ -55,6 +55,7 @@ export function ProjectDiagramPage() {
   const openVlanTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "VLAN").length;
   const cloudContext = requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected;
   const topValidationItems = validations.filter((item) => item.severity !== "INFO").slice(0, 5);
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, enrichedProject.sites.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location })) );
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -77,6 +78,8 @@ export function ProjectDiagramPage() {
             <span className="badge-soft">Site tasks {openSiteTasks}</span>
             <span className="badge-soft">VLAN tasks {openVlanTasks}</span>
             <span className="badge-soft">Mode-ready for export</span>
+            <span className="badge-soft">Naming {requirementsProfile.deviceNamingConvention}</span>
+            <span className="badge-soft">Token {requirementsProfile.namingTokenPreference}</span>
           </div>
           <p className="muted" style={{ margin: 0 }}>
             The canvas below gets priority on widescreen layouts. In v100 the diagram also carries topology-specific interface labels, device-level validation emphasis, explicit zone labels on perimeter/core segments, and naming aligned more tightly with the report.
@@ -85,6 +88,36 @@ export function ProjectDiagramPage() {
 
         <div className="diagram-canvas-panel">
           <ProjectDiagram project={enrichedProject} comments={comments} validations={validations} />
+        </div>
+      </div>
+
+
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div>
+          <strong style={{ display: "block", marginBottom: 6 }}>Diagram naming preview</strong>
+          <p className="muted" style={{ margin: 0 }}>The same naming standard should now flow into device labels on the diagram and into the report. Use this preview to confirm whether site code or full location tokens read better before deeper review.</p>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Site</th>
+                <th align="left">Token</th>
+                <th align="left">Firewall label</th>
+                <th align="left">Switch label</th>
+              </tr>
+            </thead>
+            <tbody>
+              {namingPreview.map((item) => (
+                <tr key={item.siteLabel}>
+                  <td>{item.siteLabel}</td>
+                  <td><code>{item.token}</code></td>
+                  <td><code>{item.firewall}</code></td>
+                  <td><code>{item.switchName}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

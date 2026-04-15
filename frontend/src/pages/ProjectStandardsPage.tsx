@@ -5,7 +5,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
-import { parseRequirementsProfile } from "../lib/requirementsProfile";
+import { buildNamingPreviewExamples, parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 
 function kpiCard(label: string, value: number | string, note?: string) {
@@ -32,6 +32,7 @@ export function ProjectStandardsPage() {
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
   );
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location })) );
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading configuration standards" message="Preparing baseline standards and reusable template artifacts." />;
@@ -76,6 +77,8 @@ export function ProjectStandardsPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Naming {requirementsProfile.namingStandard}</span>
           <span className="badge-soft">Gateway {requirementsProfile.gatewayConvention}</span>
+          <span className="badge-soft">Device naming {requirementsProfile.deviceNamingConvention}</span>
+          <span className="badge-soft">Primary token {requirementsProfile.namingTokenPreference}</span>
           <span className="badge-soft">Monitoring {requirementsProfile.monitoringModel}</span>
           <span className="badge-soft">Backup {requirementsProfile.backupPolicy}</span>
         </div>
@@ -83,6 +86,22 @@ export function ProjectStandardsPage() {
           Senior-quality delivery needs more than a good design. It needs a repeatable baseline pack so the same naming, management,
           telemetry, routing, security, and interface expectations follow the project from design into implementation.
         </p>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <strong>Device naming preview</strong>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr><th align="left">Site</th><th align="left">Token</th><th align="left">Firewall</th><th align="left">Switch</th></tr>
+            </thead>
+            <tbody>
+              {namingPreview.map((item) => (
+                <tr key={item.siteLabel}><td>{item.siteLabel}</td><td><code>{item.token}</code></td><td><code>{item.firewall}</code></td><td><code>{item.switchName}</code></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>

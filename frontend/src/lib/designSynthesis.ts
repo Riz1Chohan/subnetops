@@ -3124,11 +3124,15 @@ function buildInterfaceLabels(deviceType: SitePlacementDevice["deviceType"], sit
   return labels.slice(0, 5);
 }
 
-function siteToken(input: { siteName: string; siteCode?: string }) {
+function siteToken(input: { siteName: string; siteCode?: string; namingTokenPreference?: string }) {
   const cleanedCode = (input.siteCode || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const preference = (input.namingTokenPreference || '').toLowerCase();
+  const fullName = input.siteName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const abbreviatedName = input.siteName.toUpperCase().replace(/[^A-Z0-9 ]+/g, '').split(/\s+/).filter(Boolean).map((part) => part.slice(0, 3)).join('_');
+  if (preference.includes('full location') || preference.includes('full site name')) return (fullName || cleanedCode || 'SITE').slice(0, 18);
+  if (preference.includes('site code')) return (cleanedCode || abbreviatedName || 'SITE').slice(0, 12);
   if (cleanedCode) return cleanedCode;
-  const letters = input.siteName.toUpperCase().replace(/[^A-Z0-9 ]+/g, '').split(/\s+/).filter(Boolean).map((part) => part.slice(0, 3)).join('_');
-  return (letters || 'SITE').slice(0, 12);
+  return (abbreviatedName || fullName || 'SITE').slice(0, 12);
 }
 
 function devicePrefix(deviceType: SitePlacementDevice["deviceType"]) {
@@ -3161,10 +3165,10 @@ function readableDeviceLabel(deviceType: SitePlacementDevice["deviceType"], inpu
   }
 }
 
-function deviceNameForPlacement(input: { siteName: string; siteCode?: string; deviceType: SitePlacementDevice["deviceType"]; isPrimary: boolean; topologyType: TopologyBlueprint["topologyType"]; namingConvention?: string; sequence?: number; }) {
-  const { siteName, siteCode, deviceType, isPrimary, topologyType, namingConvention, sequence = 1 } = input;
+function deviceNameForPlacement(input: { siteName: string; siteCode?: string; deviceType: SitePlacementDevice["deviceType"]; isPrimary: boolean; topologyType: TopologyBlueprint["topologyType"]; namingConvention?: string; namingTokenPreference?: string; sequence?: number; }) {
+  const { siteName, siteCode, deviceType, isPrimary, topologyType, namingConvention, namingTokenPreference, sequence = 1 } = input;
   const convention = (namingConvention || '').toLowerCase();
-  const token = siteToken({ siteName, siteCode });
+  const token = siteToken({ siteName, siteCode, namingTokenPreference });
   const prefix = devicePrefix(deviceType);
   const readable = readableDeviceLabel(deviceType, { isPrimary, topologyType });
   if (/short-code/.test(convention)) return `${prefix}_${token}_${String(sequence).padStart(2, '0')}`;
@@ -3188,7 +3192,7 @@ function buildSitePlacements(input: { profile: RequirementsProfile; topology: To
       id: `${site.id}-edge-firewall`,
       siteId: site.id,
       siteName: site.name,
-      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: edgeDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: edgeDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
       uplinkTarget: isPrimary ? (topology.cloudConnected ? `${profile.cloudProvider || "Cloud"} edge` : "Internet edge") : (topology.primarySiteName || "Primary site"),
       deviceType: edgeDeviceType,
@@ -3208,7 +3212,7 @@ function buildSitePlacements(input: { profile: RequirementsProfile; topology: To
       id: `${site.id}-core-switch`,
       siteId: site.id,
       siteName: site.name,
-      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: switchingDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: switchingDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
       uplinkTarget: edgeDeviceType === "router" ? `${site.name} branch edge` : `${site.name} perimeter edge`,
       deviceType: switchingDeviceType,
@@ -3228,7 +3232,7 @@ function buildSitePlacements(input: { profile: RequirementsProfile; topology: To
         id: `${site.id}-wireless`,
         siteId: site.id,
         siteName: site.name,
-        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: "access-point", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: "access-point", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
         siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
         uplinkTarget: switchingDeviceType === "core-switch" ? `${site.name} core switch` : `${site.name} access switch`,
         deviceType: "access-point",
@@ -3248,7 +3252,7 @@ function buildSitePlacements(input: { profile: RequirementsProfile; topology: To
         id: `${site.id}-server-stack`,
         siteId: site.id,
         siteName: site.name,
-        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: "server", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, deviceType: "server", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
         siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
         uplinkTarget: switchingDeviceType === "core-switch" ? `${site.name} core switch` : `${site.name} access switch`,
         deviceType: "server",
@@ -3307,8 +3311,8 @@ function buildServicePlacements(input: { profile: RequirementsProfile; topology:
       subnetCidr: centralServerRow.subnetCidr,
       dependsOn: ['Routing identity', 'Trusted internal routing', 'Directory/DNS/DHCP reachability'],
       consumers: topology.topologyType === 'collapsed-core' ? ['Local user and management segments'] : ['Primary site users', 'Branch users', 'Management zone'],
-      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
-      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       ingressInterface: 'Vlan20 / server gateway',
       notes: ['This placement object names where shared internal services are expected to live instead of leaving them as generic report language.'],
     });
@@ -3325,7 +3329,7 @@ function buildServicePlacements(input: { profile: RequirementsProfile; topology:
       subnetCidr: managementRow.subnetCidr,
       dependsOn: ['Privileged access boundary', 'Logging', 'Monitoring'],
       consumers: ['Network operations', 'Security / admin operators'],
-      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       upstreamDevice: `${siteName} management boundary`,
       ingressInterface: 'Vlan90 / management gateway',
       notes: [profile.managementAccess || 'Management access assumptions not yet set'],
@@ -3345,8 +3349,8 @@ function buildServicePlacements(input: { profile: RequirementsProfile; topology:
       consumers: ['Internet users for published services', 'Trusted management zone for administration'],
       publishedExternally: true,
       ingressPath: ['Internet', `${siteName} perimeter edge`, `${siteName} DMZ subnet`, `${siteName} DMZ host`],
-      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
-      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       ingressInterface: 'Gi0/2 dmz / published services',
       notes: ['DMZ placement is now explicit: this subnet sits behind the perimeter edge and should not be treated as a generic internal server segment.'],
     });
@@ -3378,8 +3382,8 @@ function buildServicePlacements(input: { profile: RequirementsProfile; topology:
       consumers: ['Remote staff', 'Administrators'],
       publishedExternally: true,
       ingressPath: ['Internet', `${siteName} perimeter edge`, `${siteName} remote access boundary`],
-      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
-      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, sequence: 1 }),
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, sequence: 1 }),
       ingressInterface: 'Gi0/0 outside → Gi0/2 dmz',
       notes: [profile.remoteAccessMethod || 'Remote access method not set'],
     });
