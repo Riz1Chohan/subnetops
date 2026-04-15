@@ -14,7 +14,12 @@ import {
   WidthType,
   BorderStyle,
 } from "docx";
-import { composeProfessionalReport, getCsvRows, getProjectExportData, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
+import { composeProfessionalReport, getCsvRows, getProjectExportData, type ExportSnapshot, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
+
+function readExportSnapshot(req: Request): ExportSnapshot | undefined {
+  const body = req.body as { exportSnapshot?: ExportSnapshot } | undefined;
+  return body?.exportSnapshot;
+}
 
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
@@ -126,17 +131,22 @@ function drawTable(
   state.y -= 10;
 }
 
-async function buildPdf(projectId: string) {
+async function buildPdf(projectId: string, snapshot?: ExportSnapshot) {
   const project = await getProjectExportData(projectId);
-  const report = composeProfessionalReport(project);
-  if (!project || !report) return null;
+  const report = composeProfessionalReport(project, snapshot);
+  const snapshotProject = (snapshot?.project ?? {}) as Record<string, unknown>;
+  if ((!project && !snapshot?.project) || !report) return null;
+  const projectName = typeof snapshotProject.name === "string" && snapshotProject.name.trim() ? snapshotProject.name : project?.name ?? "SubnetOps Project";
+  const organizationName = typeof snapshotProject.organizationName === "string" && snapshotProject.organizationName.trim() ? snapshotProject.organizationName : project?.organizationName ?? "To be confirmed";
+  const environmentType = typeof snapshotProject.environmentType === "string" && snapshotProject.environmentType.trim() ? snapshotProject.environmentType : project?.environmentType ?? "Custom";
+  const logoUrl = typeof snapshotProject.logoUrl === "string" && snapshotProject.logoUrl.trim() ? snapshotProject.logoUrl : project?.logoUrl;
 
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const cover = pdf.addPage([612, 792]);
-  const logo = await tryEmbedRemoteLogo(pdf, project.logoUrl);
+  const logo = await tryEmbedRemoteLogo(pdf, logoUrl);
 
   cover.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(0.985, 0.988, 0.995) });
   cover.drawRectangle({ x: 0, y: 640, width: 612, height: 152, color: rgb(0.12, 0.31, 0.77) });
@@ -148,9 +158,9 @@ async function buildPdf(projectId: string) {
     cover.drawImage(logo, { x: 54, y: 500, width: scaled.width, height: scaled.height });
   }
 
-  cover.drawText(`Project: ${project.name}`, { x: 54, y: 446, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-  cover.drawText(`Organization: ${project.organizationName || "To be confirmed"}`, { x: 54, y: 418, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
-  cover.drawText(`Environment: ${project.environmentType || "Custom"}`, { x: 54, y: 398, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Project: ${projectName}`, { x: 54, y: 446, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
+  cover.drawText(`Organization: ${organizationName}`, { x: 54, y: 418, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Environment: ${environmentType}`, { x: 54, y: 398, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
   cover.drawText(`Generated: ${report.generatedAt}`, { x: 54, y: 378, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
   cover.drawText(`Prepared by: SubnetOps Professional Report Composer`, { x: 54, y: 358, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
   cover.drawText(`Professional network design and planning package`, { x: 54, y: 318, size: 12, font, color: rgb(0.34, 0.39, 0.47) });
@@ -205,10 +215,15 @@ function cellParagraph(text: string, bold = false) {
   });
 }
 
-async function buildDocx(projectId: string) {
+async function buildDocx(projectId: string, snapshot?: ExportSnapshot) {
   const project = await getProjectExportData(projectId);
-  const report = composeProfessionalReport(project);
-  if (!project || !report) return null;
+  const report = composeProfessionalReport(project, snapshot);
+  const snapshotProject = (snapshot?.project ?? {}) as Record<string, unknown>;
+  if ((!project && !snapshot?.project) || !report) return null;
+  const projectName = typeof snapshotProject.name === "string" && snapshotProject.name.trim() ? snapshotProject.name : project?.name ?? "SubnetOps Project";
+  const organizationName = typeof snapshotProject.organizationName === "string" && snapshotProject.organizationName.trim() ? snapshotProject.organizationName : project?.organizationName ?? "To be confirmed";
+  const environmentType = typeof snapshotProject.environmentType === "string" && snapshotProject.environmentType.trim() ? snapshotProject.environmentType : project?.environmentType ?? "Custom";
+  const logoUrl = typeof snapshotProject.logoUrl === "string" && snapshotProject.logoUrl.trim() ? snapshotProject.logoUrl : project?.logoUrl;
 
   const children: Array<Paragraph | Table> = [];
 
@@ -295,7 +310,7 @@ async function buildDocx(projectId: string) {
 }
 
 export async function exportCsv(req: Request, res: Response) {
-  const rows = await getCsvRows(requireParam(req, "projectId"));
+  const rows = await getCsvRows(requireParam(req, "projectId"), readExportSnapshot(req));
   const csv = toCsv(rows);
 
   res.setHeader("Content-Type", "text/csv");
@@ -304,7 +319,7 @@ export async function exportCsv(req: Request, res: Response) {
 }
 
 export async function exportPdf(req: Request, res: Response) {
-  const pdfBytes = await buildPdf(requireParam(req, "projectId"));
+  const pdfBytes = await buildPdf(requireParam(req, "projectId"), readExportSnapshot(req));
   if (!pdfBytes) {
     return res.status(404).json({ message: "Project not found" });
   }
@@ -315,7 +330,7 @@ export async function exportPdf(req: Request, res: Response) {
 }
 
 export async function exportDocx(req: Request, res: Response) {
-  const docxBytes = await buildDocx(requireParam(req, "projectId"));
+  const docxBytes = await buildDocx(requireParam(req, "projectId"), readExportSnapshot(req));
   if (!docxBytes) {
     return res.status(404).json({ message: "Project not found" });
   }

@@ -172,10 +172,23 @@ export function ProjectReportPage() {
     `${validations.length} validation findings`,
   ];
 
+  const exportSnapshot = useMemo(() => ({
+    generatedAt: new Date().toISOString(),
+    project,
+    requirementsProfile,
+    validations,
+    synthesized,
+    discoverySummary,
+    platformFoundation,
+  }), [project, requirementsProfile, validations, synthesized, discoverySummary, platformFoundation]);
+
   const downloadExport = async (kind: "pdf" | "docx" | "csv") => {
     try {
       setExportMessage(kind === "pdf" ? "Preparing professional PDF report..." : kind === "docx" ? "Preparing professional DOCX report..." : "Preparing Excel-friendly CSV export...");
-      const blob = await apiBlob(`/export/projects/${projectId}/${kind}`);
+      const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
+        method: "POST",
+        body: JSON.stringify({ exportSnapshot }),
+      });
       saveBlob(
         blob,
         kind === "pdf"

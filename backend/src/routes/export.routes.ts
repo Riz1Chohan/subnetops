@@ -7,7 +7,10 @@ const router = Router();
 
 router.use(requireAuth);
 router.get("/projects/:projectId/csv", asyncHandler(exportController.exportCsv));
+router.post("/projects/:projectId/csv", asyncHandler(exportController.exportCsv));
 router.get("/projects/:projectId/pdf", asyncHandler(exportController.exportPdf));
+router.post("/projects/:projectId/pdf", asyncHandler(exportController.exportPdf));
 router.get("/projects/:projectId/docx", asyncHandler(exportController.exportDocx));
+router.post("/projects/:projectId/docx", asyncHandler(exportController.exportDocx));
 
 export default router;

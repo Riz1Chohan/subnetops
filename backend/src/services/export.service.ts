@@ -97,6 +97,16 @@ export interface ProfessionalReport {
   sections: ReportSection[];
   appendices?: ReportSection[];
 }
+export interface ExportSnapshot {
+  generatedAt?: string;
+  project?: JsonMap;
+  requirementsProfile?: JsonMap;
+  validations?: ValidationItem[];
+  synthesized?: JsonMap;
+  discoverySummary?: JsonMap;
+  platformFoundation?: JsonMap;
+}
+
 
 export async function getProjectExportData(projectId: string) {
   return prisma.project.findUnique({
@@ -216,7 +226,8 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
   };
 }
 
-export function composeProfessionalReport(project: Awaited<ReturnType<typeof getProjectExportData>>) {
+export function composeProfessionalReport(project: Awaited<ReturnType<typeof getProjectExportData>>, snapshot?: ExportSnapshot) {
+  if (snapshot?.synthesized) return composeProfessionalReportFromSnapshot(snapshot);
   const ctx = buildExportContext(project);
   if (!ctx) return null;
 
@@ -518,7 +529,8 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   } satisfies ProfessionalReport;
 }
 
-export async function getCsvRows(projectId: string) {
+export async function getCsvRows(projectId: string, snapshot?: ExportSnapshot) {
+  if (snapshot?.synthesized) return getCsvRowsFromSnapshot(snapshot);
   const project = await getProjectExportData(projectId);
   const ctx = buildExportContext(project);
   if (!ctx) return [];
@@ -565,5 +577,529 @@ export async function getCsvRows(projectId: string) {
     rows.push({ Section: "Discovery", Scope: "Project", Name: ctx.project.name, Key: "Highlight", Value: item, Notes: "Current-state input" });
   }
 
+  return rows;
+}
+
+function jsonObject(value: unknown): JsonMap {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonMap) : {};
+}
+
+function jsonArray<T = JsonMap>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function boolLabel(value: unknown, yes = "Yes", no = "No") {
+  return truthy(value) ? yes : no;
+}
+
+function valueOrDash(value: unknown) {
+  const text = asString(value);
+  return text || "—";
+}
+
+function severityCounts(validations: ValidationItem[]) {
+  return {
+    errors: validations.filter((item) => item.severity === "ERROR").length,
+    warnings: validations.filter((item) => item.severity === "WARNING").length,
+    infos: validations.filter((item) => item.severity === "INFO").length,
+  };
+}
+
+function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): ProfessionalReport | null {
+  const project = jsonObject(snapshot.project);
+  const profile = jsonObject(snapshot.requirementsProfile);
+  const synthesized = jsonObject(snapshot.synthesized);
+  const discovery = jsonObject(snapshot.discoverySummary);
+  const platform = jsonObject(snapshot.platformFoundation);
+  const validations = jsonArray<ValidationItem>(snapshot.validations);
+
+  const siteSummaries = jsonArray<JsonMap>(synthesized.siteSummaries);
+  const siteHierarchy = jsonArray<JsonMap>(synthesized.siteHierarchy);
+  const addressingPlan = jsonArray<JsonMap>(synthesized.addressingPlan);
+  const logicalDomains = jsonArray<JsonMap>(synthesized.logicalDomains);
+  const securityZones = jsonArray<JsonMap>(synthesized.securityZones);
+  const securityControls = jsonArray<JsonMap>(synthesized.securityControls);
+  const securityPolicyMatrix = jsonArray<JsonMap>(synthesized.securityPolicyMatrix);
+  const routePolicies = jsonArray<JsonMap>(synthesized.routePolicies);
+  const routingProtocols = jsonArray<JsonMap>(synthesized.routingProtocols);
+  const switchingDesign = jsonArray<JsonMap>(synthesized.switchingDesign);
+  const qosPlan = jsonArray<JsonMap>(synthesized.qosPlan);
+  const wanLinks = jsonArray<JsonMap>(synthesized.wanLinks);
+  const implementationPhases = jsonArray<JsonMap>(synthesized.implementationPhases);
+  const cutoverChecklist = jsonArray<JsonMap>(synthesized.cutoverChecklist);
+  const rollbackPlan = jsonArray<JsonMap>(synthesized.rollbackPlan);
+  const validationPlan = jsonArray<JsonMap>(synthesized.validationPlan);
+  const lowLevelDesign = jsonArray<JsonMap>(synthesized.lowLevelDesign);
+  const designReview = jsonArray<JsonMap>(synthesized.designReview);
+  const openIssues = jsonArray<unknown>(synthesized.openIssues).map((item) => String(item));
+  const implementationNextSteps = jsonArray<unknown>(synthesized.implementationNextSteps).map((item) => String(item));
+  const highLevelDesign = jsonObject(synthesized.highLevelDesign);
+  const organizationHierarchy = jsonObject(synthesized.organizationHierarchy);
+  const platformSummary = jsonObject(platform.platformSummary);
+  const bomItems = jsonArray<JsonMap>(platform.bomItems);
+  const bomAssumptions = jsonArray<unknown>(platform.bomAssumptions).map((item) => String(item));
+  const procurementNotes = jsonArray<unknown>(platform.procurementNotes).map((item) => String(item));
+  const licensingAndSupport = jsonArray<unknown>(platform.licensingAndSupport).map((item) => String(item));
+  const discoveryHighlights = jsonArray<unknown>(discovery.currentStateHighlights).map((item) => String(item));
+  const discoveryGaps = jsonArray<unknown>(discovery.gaps).map((item) => String(item));
+  const discoveryConstraints = jsonArray<unknown>(discovery.constraints).map((item) => String(item));
+  const discoveryRisks = jsonArray<unknown>(discovery.inferredRisks).map((item) => String(item));
+  const discoveryNextInputs = jsonArray<unknown>(discovery.suggestedNextInputs).map((item) => String(item));
+  const counts = severityCounts(validations);
+  const generatedAt = snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : new Date().toLocaleString();
+  const projectName = asString(project.name, "SubnetOps Project");
+  const organizationName = asString(project.organizationName, "To be confirmed");
+  const environment = titleCase(asString(project.environmentType, "Custom"));
+  const siteCount = siteSummaries.length;
+  const rowCount = addressingPlan.length;
+  const zonesInScope = securityZones.length > 0 ? securityZones.map((zone) => asString(zone.zoneName)).filter(Boolean) : sortUnique(logicalDomains.map((domain) => asString(domain.name)).filter(Boolean));
+  const architecturePattern = asString(highLevelDesign.architecturePattern, siteCount > 1 ? "a multi-site architecture with per-site addressing boundaries and summarized routing" : "a compact single-site architecture with segmented trust boundaries");
+  const introBullets = [
+    `Environment: ${environment}`,
+    `Planning focus: ${asString(profile.planningFor, "To be confirmed")}`,
+    `Current project phase: ${asString(profile.projectPhase, "To be confirmed")}`,
+    `Primary design objective: ${asString(profile.primaryGoal, "To be confirmed")}`,
+    `Estimated users per site: ${asString(profile.usersPerSite, "To be confirmed")}`,
+    `Compliance or governance profile: ${asString(profile.complianceProfile, "To be confirmed")}`,
+  ];
+
+  const executiveSummary = [
+    `${projectName} is presented as a ${environment.toLowerCase()} technical design report covering ${siteCount} site${siteCount === 1 ? "" : "s"}, ${rowCount} logical addressing row${rowCount === 1 ? "" : "s"}, and a complete package of design, security, routing, implementation, and delivery outputs generated from the current planning workspace.`,
+    `The present design direction follows ${architecturePattern}. The package is intended to support technical review, stakeholder approval, and implementation preparation without reducing the network plan to a shallow screen dump or placeholder export.`,
+    counts.errors > 0
+      ? `The current design still contains ${counts.errors} error-level blocker${counts.errors === 1 ? "" : "s"} and ${counts.warnings} warning${counts.warnings === 1 ? "" : "s"}. Those findings should be resolved or explicitly accepted before implementation approval.`
+      : counts.warnings > 0
+        ? `The current design has ${counts.warnings} warning${counts.warnings === 1 ? "" : "s"} and ${counts.infos} informational review item${counts.infos === 1 ? "" : "s"}. No active error-level blockers are recorded in the latest validation state.`
+        : `The current design is in a clean validation posture with ${counts.infos} informational review item${counts.infos === 1 ? "" : "s"} and no active error-level or warning-level blockers.`,
+    `The report pulls from the active synthesized design package, including discovery context, high-level design, logical topology, addressing hierarchy, security boundaries, routing intent, implementation planning, and platform foundations, so the exported file reflects the same planning result visible in the application workspace.`,
+  ];
+
+  const siteSummaryRows = siteHierarchy.map((site) => [
+    asString(site.name),
+    asString(site.siteCode, "—"),
+    asString(site.location, "Location not set"),
+    asString(site.siteBlockCidr, "Not assigned"),
+    String(asNumber(site.configuredSegmentCount) ?? 0),
+    String(asNumber(site.proposedSegmentCount) ?? 0),
+    `${Math.round(asNumber(site.blockUtilization) ?? 0)}%`,
+  ]);
+
+  const logicalDomainRows = logicalDomains.map((domain) => [
+    asString(domain.name),
+    asString(domain.purpose),
+    asString(domain.placement),
+    asString(domain.policy),
+  ]);
+
+  const securityZoneRows = securityZones.map((zone) => [
+    asString(zone.zoneName),
+    asString(zone.zoneType),
+    asString(zone.trustLevel),
+    asString(zone.enforcement),
+    asString(zone.northSouthPolicy),
+  ]);
+
+  const addressingRows = addressingPlan.map((row) => [
+    asString(row.siteName),
+    valueOrDash(row.vlanId),
+    asString(row.segmentName),
+    asString(row.source),
+    asString(row.subnetCidr),
+    asString(row.gatewayIp),
+    boolLabel(row.dhcpEnabled, "Enabled", "No"),
+    valueOrDash(row.estimatedHosts),
+    valueOrDash(row.headroom),
+  ]);
+
+  const routingProtocolRows = routingProtocols.map((item) => [
+    asString(item.protocol),
+    asString(item.scope),
+    asString(item.purpose),
+    asString(item.recommendation),
+  ]);
+  const routePolicyRows = routePolicies.map((item) => [
+    asString(item.policyName),
+    asString(item.scope),
+    asString(item.intent),
+    asString(item.recommendation),
+  ]);
+  const wanLinkRows = wanLinks.map((item) => [
+    asString(item.linkName),
+    asString(item.transport),
+    asString(item.endpointASiteName),
+    asString(item.endpointAIp),
+    asString(item.endpointBSiteName),
+    asString(item.endpointBIp),
+    asString(item.subnetCidr),
+  ]);
+  const switchingRows = switchingDesign.map((item) => [
+    asString(item.topic),
+    asString(item.recommendation),
+    asString(item.implementationHint),
+  ]);
+  const qosRows = qosPlan.map((item) => [
+    asString(item.trafficClass),
+    asString(item.treatment),
+    asString(item.marking),
+    asString(item.scope),
+  ]);
+  const implementationPhaseRows = implementationPhases.map((item) => [
+    asString(item.phase),
+    asString(item.objective),
+    asString(item.scope),
+    jsonArray<unknown>(item.dependencies).map((value) => String(value)).join("; ") || "—",
+  ]);
+  const cutoverRows = cutoverChecklist.map((item) => [
+    asString(item.stage),
+    asString(item.item),
+    asString(item.owner),
+    asString(item.rationale),
+  ]);
+  const rollbackRows = rollbackPlan.map((item) => [
+    asString(item.trigger),
+    asString(item.action),
+    asString(item.scope),
+  ]);
+  const validationTestRows = validationPlan.map((item) => [
+    asString(item.stage),
+    asString(item.test),
+    asString(item.expectedOutcome),
+    asString(item.evidence),
+  ]);
+  const bomRows = bomItems.map((item) => [
+    asString(item.category),
+    asString(item.item),
+    valueOrDash(item.quantity),
+    asString(item.unit),
+    asString(item.scope),
+    asString(item.basis),
+  ]);
+  const validationRows = validations.map((item) => [
+    item.severity,
+    asString(item.entityType, "PROJECT"),
+    item.title,
+    item.message,
+  ]);
+  const lowLevelRows = lowLevelDesign.map((item) => [
+    asString(item.siteName),
+    asString(item.siteRole),
+    asString(item.routingRole),
+    asString(item.switchingProfile),
+    asString(item.securityBoundary),
+    asString(item.summaryRoute || item.loopbackCidr || "—"),
+  ]);
+  const securityMatrixRows = securityPolicyMatrix.map((row) => [
+    asString(row.sourceZone),
+    asString(row.targetZone),
+    asString(row.defaultAction),
+    asString(row.allowedFlows),
+    asString(row.controlPoint),
+  ]);
+  const designReviewBullets = designReview.map((item) => `${asString(item.kind, "review")}: ${asString(item.title)} — ${asString(item.detail)}`);
+
+  const sections: ReportSection[] = [
+    {
+      title: "1. Introduction and Project Scope",
+      paragraphs: [
+        `${projectName} is currently being developed as a ${environment.toLowerCase()} network plan. The saved brief and generated outputs indicate a scope centered on ${asString(profile.planningFor, "a structured network delivery").toLowerCase()}, with ${asString(profile.primaryGoal, "reviewable network planning").toLowerCase()} as the leading design driver. This export is intended to function as an approval-ready technical package rather than a simple print of application cards or screen summaries.`,
+        `The report is built from the active design package visible in the application workspace. That means the narrative, tables, and appendices are tied to the same synthesized site hierarchy, addressing rows, security model, routing posture, and implementation plan the user is reviewing on screen at export time.`,
+      ],
+      bullets: introBullets,
+    },
+    {
+      title: "2. Discovery and Requirements Baseline",
+      paragraphs: [
+        discoveryHighlights.length > 0
+          ? "Discovery information is present and has been used to anchor the design package in known current-state conditions. The exported package therefore reflects both target-state planning and currently captured operational context."
+          : "The current-state baseline is still relatively light. The design package can still be used for target-state review, but migration planning and procurement decisions should be treated cautiously until discovery detail is strengthened.",
+        `The current requirements emphasize ${asString(profile.primaryGoal, "network planning")}. As a result, the design package currently prioritizes segmentation, addressing structure, operational supportability, and cleaner review boundaries before vendor-specific implementation detail is introduced.`,
+      ],
+      bullets: [
+        ...discoveryHighlights,
+        ...discoveryGaps.map((item) => `Gap: ${item}`),
+        ...discoveryConstraints.map((item) => `Constraint: ${item}`),
+      ].slice(0, 14),
+    },
+    {
+      title: "3. High-Level Design Overview",
+      paragraphs: [
+        `The proposed high-level design follows ${architecturePattern}. The package uses an organizational address hierarchy of ${asString(synthesized.organizationBlock, asString(project.basePrivateRange, "a working parent range"))}, with ${siteCount} site${siteCount === 1 ? "" : "s"} currently represented in the generated design and ${rowCount} total logical addressing row${rowCount === 1 ? "" : "s"}.`,
+        `At the organizational level, approximately ${valueOrDash(organizationHierarchy.allocatedSiteAddresses)} addresses are allocated into site blocks out of ${valueOrDash(organizationHierarchy.organizationCapacity)} available, leaving ${valueOrDash(organizationHierarchy.organizationHeadroom)} addresses of remaining org-level headroom.`,
+      ],
+      bullets: [
+        `Architecture pattern: ${asString(highLevelDesign.architecturePattern, architecturePattern)}`,
+        `Layer model: ${asString(highLevelDesign.layerModel, "To be confirmed")}`,
+        `WAN architecture: ${asString(highLevelDesign.wanArchitecture, "To be confirmed")}`,
+        `Cloud / hybrid posture: ${asString(highLevelDesign.cloudArchitecture, "To be confirmed")}`,
+        `Data center / service posture: ${asString(highLevelDesign.dataCenterArchitecture, "To be confirmed")}`,
+        `Redundancy model: ${asString(highLevelDesign.redundancyModel, "To be confirmed")}`,
+        `Security domains in scope: ${zonesInScope.join(", ") || "To be confirmed"}`,
+      ],
+      tables: [
+        {
+          title: "Site Hierarchy Summary",
+          headers: ["Site", "Code", "Location", "Site Block", "Configured Rows", "Proposed Rows", "Utilization"],
+          rows: siteSummaryRows.length > 0 ? siteSummaryRows : [["No synthesized site hierarchy available", "—", "—", "—", "0", "0", "0%"]],
+        },
+      ],
+    },
+    {
+      title: "4. Logical Domains, Security Architecture, and Segmentation Model",
+      paragraphs: [
+        "Security in this package is treated as a structural design layer that shapes how segments, trust boundaries, routing edges, and implementation controls should be interpreted. The outputs below do not replace final firewall engineering, but they do define the zones, default behaviors, and policy boundaries that implementation must preserve.",
+        "The combination of logical domains, mapped zones, control recommendations, and inter-zone access expectations should be reviewed together. This is the point where segmentation becomes an implementation-ready security model rather than a list of definitions.",
+      ],
+      bullets: securityControls.map((item) => `${asString(item.status, "review")}: ${asString(item.control)} — ${asString(item.rationale)}`).slice(0, 12),
+      tables: [
+        {
+          title: "Logical Domains",
+          headers: ["Domain", "Purpose", "Placement", "Policy"],
+          rows: logicalDomainRows.length > 0 ? logicalDomainRows : [["No logical domains generated", "—", "—", "—"]],
+        },
+        {
+          title: "Security Zone Summary",
+          headers: ["Zone", "Type", "Trust Level", "Enforcement", "North-South Policy"],
+          rows: securityZoneRows.length > 0 ? securityZoneRows : [["No security zones generated", "—", "—", "—", "—"]],
+        },
+      ],
+    },
+    {
+      title: "5. Logical Design and Addressing Plan",
+      paragraphs: [
+        `The logical design currently contains ${rowCount} addressing row${rowCount === 1 ? "" : "s"}. These rows represent the actual generated planning result and should be treated as the primary implementation artifact for subnet ownership, gateway placement, DHCP posture, host sizing, and site-level segmentation.`,
+        "Configured rows and proposed rows should both be reviewed. Configured rows reflect explicit saved records, while proposed rows show where the synthesis engine is carrying the design beyond what has already been manually recorded.",
+      ],
+      tables: [
+        {
+          title: "Low-Level Design by Site",
+          headers: ["Site", "Role", "Routing Role", "Switching Profile", "Security Boundary", "Summary / Loopback"],
+          rows: lowLevelRows.length > 0 ? lowLevelRows : [["No LLD rows generated", "—", "—", "—", "—", "—"]],
+        },
+        {
+          title: "Addressing Plan Summary",
+          headers: ["Site", "VLAN", "Segment", "Source", "Subnet", "Gateway", "DHCP", "Est. Hosts", "Headroom"],
+          rows: addressingRows.slice(0, 40).length > 0 ? addressingRows.slice(0, 40) : [["No addressing rows generated", "—", "—", "—", "—", "—", "—", "—", "—"]],
+        },
+      ],
+    },
+    {
+      title: "6. Routing, Switching, and Transport Intent",
+      paragraphs: [
+        "Routing and switching outputs should be read together with the security and addressing sections. Gateway ownership, summaries, route boundaries, WAN or cloud edge links, switching fault domains, and QoS posture should all reinforce the same logical hierarchy rather than competing with it.",
+        `The current design package contains ${routingProtocols.length} protocol or transport posture item${routingProtocols.length === 1 ? "" : "s"}, ${routePolicies.length} route-policy item${routePolicies.length === 1 ? "" : "s"}, ${switchingDesign.length} switching design control${switchingDesign.length === 1 ? "" : "s"}, and ${wanLinks.length} synthesized WAN or cloud link${wanLinks.length === 1 ? "" : "s"}.`,
+      ],
+      tables: [
+        {
+          title: "Routing Protocol / Transport Posture",
+          headers: ["Protocol / Transport", "Scope", "Purpose", "Recommendation"],
+          rows: routingProtocolRows.length > 0 ? routingProtocolRows : [["No routing posture generated", "—", "—", "—"]],
+        },
+        {
+          title: "Route Policy Summary",
+          headers: ["Policy", "Scope", "Intent", "Recommendation"],
+          rows: routePolicyRows.length > 0 ? routePolicyRows : [["No route-policy items generated", "—", "—", "—"]],
+        },
+        {
+          title: "WAN / Cloud Edge Links",
+          headers: ["Link", "Transport", "Endpoint A", "IP A", "Endpoint B", "IP B", "Subnet"],
+          rows: wanLinkRows.length > 0 ? wanLinkRows : [["No dedicated WAN or cloud links synthesized", "—", "—", "—", "—", "—", "—"]],
+        },
+      ],
+      bullets: [
+        ...switchingRows.slice(0, 6).map((row) => `${row[0]}: ${row[1]}`),
+        ...qosRows.slice(0, 4).map((row) => `${row[0]} — ${row[1]} (${row[2]})`),
+      ],
+    },
+    {
+      title: "7. Implementation, Testing, and Validation Strategy",
+      paragraphs: [
+        `Implementation should follow ${asString(jsonObject(synthesized.implementationPlan).rolloutStrategy, "a phased sequence")}, with ${implementationPhases.length} explicit phase${implementationPhases.length === 1 ? "" : "s"}, ${cutoverChecklist.length} cutover or pre/post-check item${cutoverChecklist.length === 1 ? "" : "s"}, ${rollbackPlan.length} rollback trigger${rollbackPlan.length === 1 ? "" : "s"}, and ${validationPlan.length} validation test${validationPlan.length === 1 ? "" : "s"} currently captured in the package.`,
+        counts.errors > 0
+          ? "Because active error-level blockers still exist, the design should not move into implementation approval until those items are resolved or explicitly accepted."
+          : "The present validation posture does not show active error-level blockers. The design can therefore move into deeper technical sign-off, provided the remaining assumptions and open issues are still reviewed carefully.",
+      ],
+      tables: [
+        {
+          title: "Implementation Phases",
+          headers: ["Phase", "Objective", "Scope", "Dependencies"],
+          rows: implementationPhaseRows.length > 0 ? implementationPhaseRows : [["No implementation phases generated", "—", "—", "—"]],
+        },
+        {
+          title: "Validation Test Plan",
+          headers: ["Stage", "Test", "Expected Outcome", "Evidence"],
+          rows: validationTestRows.length > 0 ? validationTestRows : [["No validation tests generated", "—", "—", "—"]],
+        },
+      ],
+      bullets: [
+        ...cutoverRows.slice(0, 8).map((row) => `${row[0]}: ${row[1]} — ${row[2]}`),
+        ...rollbackRows.slice(0, 4).map((row) => `Rollback trigger: ${row[0]} — ${row[1]}`),
+      ],
+    },
+    {
+      title: "8. Platform Profile and Bill of Materials Foundation",
+      paragraphs: [
+        "The platform profile and BOM should be treated as a role-based engineering and procurement foundation. It is intended to keep the design grounded in deployment reality before exact model selection, licensing, optics, and commercial review are finalized.",
+        `The current BOM foundation includes ${bomItems.length} line item${bomItems.length === 1 ? "" : "s"}. These quantities and categories are derived from the current synthesized design and saved platform posture, not from final SKU-level procurement choices.`,
+      ],
+      bullets: [
+        `Profile label: ${asString(platformSummary.profileLabel, "To be confirmed")}`,
+        `Deployment class: ${asString(platformSummary.deploymentClass, "To be confirmed")}`,
+        `Management style: ${asString(platformSummary.managementStyle, "To be confirmed")}`,
+        `Operations fit: ${asString(platformSummary.operationsFit, "To be confirmed")}`,
+        ...bomAssumptions.slice(0, 6),
+        ...procurementNotes.slice(0, 6),
+        ...licensingAndSupport.slice(0, 4),
+      ],
+      tables: [
+        {
+          title: "Role-Based BOM Foundation",
+          headers: ["Category", "Item", "Qty", "Unit", "Scope", "Basis"],
+          rows: bomRows.slice(0, 30).length > 0 ? bomRows.slice(0, 30) : [["No BOM items generated", "—", "—", "—", "—", "—"]],
+        },
+      ],
+    },
+    {
+      title: "9. Assumptions, Risks, and Open Review Items",
+      paragraphs: [
+        "Professional design packages should make uncertainty visible instead of hiding it. The following items are assumptions, risks, and open review points that still matter before the package is treated as final implementation truth.",
+      ],
+      bullets: [
+        ...openIssues,
+        ...discoveryRisks,
+        ...designReviewBullets,
+        ...implementationNextSteps,
+        ...validations.filter((item) => item.severity !== "INFO").slice(0, 10).map((item) => `${item.severity}: ${item.title} — ${item.message}`),
+      ].slice(0, 24),
+    },
+    {
+      title: "10. Conclusion and Handoff Notes",
+      paragraphs: [
+        `${projectName} now has a structured professional network plan covering discovery context, project requirements, high-level architecture, logical design, security boundaries, routing posture, implementation planning, validation review, and platform foundations. The export is intended to function as a real review package for approvals and technical discussion, not just as a shallow application summary.`,
+        `The next priority should be to confirm any remaining open assumptions, align the design with final platform choices, and carry the approved logical package into implementation artifacts, diagrams, change controls, and evidence collection.`,
+      ],
+    },
+  ];
+
+  const appendices: ReportSection[] = [
+    {
+      title: "Appendix A. Full Addressing Schedule",
+      paragraphs: ["This appendix preserves the row-level addressing detail from the active synthesized design package."],
+      tables: [{
+        title: "Addressing Rows",
+        headers: ["Site", "VLAN", "Segment", "Source", "Subnet", "Gateway", "DHCP", "Est. Hosts", "Headroom"],
+        rows: addressingRows.length > 0 ? addressingRows : [["No addressing rows generated", "—", "—", "—", "—", "—", "—", "—", "—"]],
+      }],
+    },
+    {
+      title: "Appendix B. Security Policy Matrix",
+      paragraphs: ["The inter-zone matrix below reflects the current structural security model and should guide detailed policy review and firewall planning."],
+      tables: [{
+        title: "Security Policy Matrix",
+        headers: ["Source Zone", "Target Zone", "Default Action", "Allowed Flows", "Control Point"],
+        rows: securityMatrixRows.length > 0 ? securityMatrixRows : [["No policy rows generated", "—", "—", "—", "—"]],
+      }],
+    },
+    {
+      title: "Appendix C. Routing and Transport Detail",
+      paragraphs: ["This appendix groups the route-policy and WAN transport details that support the logical design narrative in the main report body."],
+      tables: [
+        {
+          title: "Route Policies",
+          headers: ["Policy", "Scope", "Intent", "Recommendation"],
+          rows: routePolicyRows.length > 0 ? routePolicyRows : [["No route policies generated", "—", "—", "—"]],
+        },
+        {
+          title: "Transport Links",
+          headers: ["Link", "Transport", "Endpoint A", "IP A", "Endpoint B", "IP B", "Subnet"],
+          rows: wanLinkRows.length > 0 ? wanLinkRows : [["No dedicated transport links generated", "—", "—", "—", "—", "—", "—"]],
+        },
+      ],
+    },
+    {
+      title: "Appendix D. Validation Detail",
+      paragraphs: ["The following findings reflect the latest validation state carried into the export package."],
+      tables: [{
+        title: "Validation Findings",
+        headers: ["Severity", "Entity", "Title", "Message"],
+        rows: validationRows.length > 0 ? validationRows : [["INFO", "PROJECT", "No validation findings captured", "No validation findings are currently present in the export payload."]],
+      }],
+    },
+    {
+      title: "Appendix E. Bill of Materials Detail",
+      paragraphs: ["The role-based BOM detail below remains review-oriented rather than quote-ready, but it captures the deployment categories and quantities implied by the current design package."],
+      tables: [{
+        title: "BOM Detail",
+        headers: ["Category", "Item", "Qty", "Unit", "Scope", "Basis"],
+        rows: bomRows.length > 0 ? bomRows : [["No BOM detail generated", "—", "—", "—", "—", "—"]],
+      }],
+    },
+  ];
+
+  return {
+    title: asString(project.reportHeader, `${projectName} Technical Design Report`),
+    subtitle: `${projectName} — Professional Network Planning Package`,
+    generatedAt,
+    executiveSummary,
+    sections,
+    appendices,
+  } satisfies ProfessionalReport;
+}
+
+function getCsvRowsFromSnapshot(snapshot: ExportSnapshot): Array<Record<string, unknown>> {
+  const project = jsonObject(snapshot.project);
+  const profile = jsonObject(snapshot.requirementsProfile);
+  const synthesized = jsonObject(snapshot.synthesized);
+  const discovery = jsonObject(snapshot.discoverySummary);
+  const platform = jsonObject(snapshot.platformFoundation);
+  const validations = jsonArray<ValidationItem>(snapshot.validations);
+  const addressingPlan = jsonArray<JsonMap>(synthesized.addressingPlan);
+  const siteHierarchy = jsonArray<JsonMap>(synthesized.siteHierarchy);
+  const securityZones = jsonArray<JsonMap>(synthesized.securityZones);
+  const securityPolicyMatrix = jsonArray<JsonMap>(synthesized.securityPolicyMatrix);
+  const routePolicies = jsonArray<JsonMap>(synthesized.routePolicies);
+  const wanLinks = jsonArray<JsonMap>(synthesized.wanLinks);
+  const implementationPhases = jsonArray<JsonMap>(synthesized.implementationPhases);
+  const bomItems = jsonArray<JsonMap>(jsonObject(platform).bomItems);
+  const rows: Array<Record<string, unknown>> = [];
+
+  rows.push(
+    { Section: "Project", Scope: "Project", Name: asString(project.name), Key: "Organization", Value: asString(project.organizationName), Notes: "" },
+    { Section: "Project", Scope: "Project", Name: asString(project.name), Key: "Environment", Value: asString(project.environmentType), Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: asString(project.name), Key: "Planning For", Value: asString(profile.planningFor), Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: asString(project.name), Key: "Project Phase", Value: asString(profile.projectPhase), Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: asString(project.name), Key: "Primary Goal", Value: asString(profile.primaryGoal), Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: asString(project.name), Key: "Users Per Site", Value: asString(profile.usersPerSite), Notes: "" },
+  );
+
+  for (const site of siteHierarchy) {
+    rows.push({ Section: "Sites", Scope: asString(site.name), Name: asString(site.siteCode), Key: "Site Block", Value: asString(site.siteBlockCidr), Notes: `Configured ${valueOrDash(site.configuredSegmentCount)} | Proposed ${valueOrDash(site.proposedSegmentCount)}` });
+  }
+  for (const row of addressingPlan) {
+    rows.push({ Section: "Addressing", Scope: asString(row.siteName), Name: asString(row.segmentName), Key: asString(row.subnetCidr), Value: asString(row.gatewayIp), Notes: `VLAN ${valueOrDash(row.vlanId)} | ${boolLabel(row.dhcpEnabled)} | ${valueOrDash(row.source)}` });
+  }
+  for (const zone of securityZones) {
+    rows.push({ Section: "Security Zones", Scope: asString(zone.zoneName), Name: asString(zone.zoneType), Key: "Trust Level", Value: asString(zone.trustLevel), Notes: asString(zone.northSouthPolicy) });
+  }
+  for (const row of securityPolicyMatrix) {
+    rows.push({ Section: "Security Policy", Scope: asString(row.sourceZone), Name: asString(row.targetZone), Key: asString(row.defaultAction), Value: asString(row.allowedFlows), Notes: asString(row.controlPoint) });
+  }
+  for (const row of routePolicies) {
+    rows.push({ Section: "Routing", Scope: asString(row.scope), Name: asString(row.policyName), Key: asString(row.intent), Value: asString(row.recommendation), Notes: "" });
+  }
+  for (const row of wanLinks) {
+    rows.push({ Section: "Transport", Scope: asString(row.transport), Name: asString(row.linkName), Key: asString(row.subnetCidr), Value: `${asString(row.endpointASiteName)} ${asString(row.endpointAIp)} -> ${asString(row.endpointBSiteName)} ${asString(row.endpointBIp)}`, Notes: "" });
+  }
+  for (const row of implementationPhases) {
+    rows.push({ Section: "Implementation", Scope: asString(row.phase), Name: asString(row.objective), Key: asString(row.scope), Value: jsonArray<unknown>(row.dependencies).map((value) => String(value)).join("; "), Notes: "" });
+  }
+  for (const row of bomItems) {
+    rows.push({ Section: "BOM", Scope: asString(row.category), Name: asString(row.item), Key: valueOrDash(row.quantity), Value: asString(row.scope), Notes: asString(row.basis) });
+  }
+  for (const item of jsonArray<unknown>(jsonObject(discovery).currentStateHighlights)) {
+    rows.push({ Section: "Discovery", Scope: "Project", Name: asString(project.name), Key: "Highlight", Value: String(item), Notes: "" });
+  }
+  for (const item of validations) {
+    rows.push({ Section: "Validation", Scope: asString(item.entityType, "PROJECT"), Name: item.title, Key: item.severity, Value: item.message, Notes: item.ruleCode ?? "" });
+  }
   return rows;
 }
