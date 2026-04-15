@@ -174,9 +174,32 @@ export function ProjectReportPage() {
 
   const exportSnapshot = useMemo(() => ({
     generatedAt: new Date().toISOString(),
-    project,
+    project: project
+      ? {
+          id: project.id,
+          name: project.name,
+          organizationName: project.organizationName,
+          environmentType: project.environmentType,
+          basePrivateRange: project.basePrivateRange,
+          reportHeader: project.reportHeader,
+          planningNarrative: project.planningNarrative,
+          logoUrl: project.logoUrl,
+          approvalStatus: project.approvalStatus,
+          requirementsJson: project.requirementsJson,
+          discoveryJson: project.discoveryJson,
+          platformProfileJson: project.platformProfileJson,
+        }
+      : null,
     requirementsProfile,
-    validations,
+    validations: validations.map((item) => ({
+      id: item.id,
+      ruleCode: item.ruleCode,
+      severity: item.severity,
+      entityType: item.entityType,
+      title: item.title,
+      message: item.message,
+      createdAt: item.createdAt,
+    })),
     synthesized,
     discoverySummary,
     platformFoundation,
