@@ -645,12 +645,34 @@ export function ProjectRequirementsPage() {
               </label>
 
               <label>
+                <span>Site identity capture</span>
+                <select value={requirements.siteIdentityCapture} onChange={(event) => setRequirements((current) => ({ ...current, siteIdentityCapture: event.target.value }))}>
+                  <option>capture site name, city or location label, and optional street address for each site</option>
+                  <option>capture formal branch or campus name plus concise location label</option>
+                  <option>capture real street address for implementation and shipping context</option>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+
+              <label>
                 <span>Naming standard</span>
                 <select value={requirements.namingStandard} onChange={(event) => setRequirements((current) => ({ ...current, namingStandard: event.target.value }))}>
                   <option>site-role-device naming with consistent short codes</option>
                   <option>site-floor-role numbering with structured device labels</option>
                   <option>compact naming for smaller environments with role prefixes</option>
                 <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Device naming convention</span>
+                <select value={requirements.deviceNamingConvention} onChange={(event) => setRequirements((current) => ({ ...current, deviceNamingConvention: event.target.value }))}>
+                  <option>automatic short-code standard (SW_TOR_01 / FW_TOR_01)</option>
+                  <option>automatic readable standard (Toronto-SW1 / Toronto-FW1)</option>
+                  <option>automatic location-role-index standard (TOR-SW-01 / TOR-FW-01)</option>
+                  <option>no preference - generate automatically from site names and roles</option>
                   <option value="Custom">Custom</option>
                 </select>
               </label>

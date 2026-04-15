@@ -103,6 +103,7 @@ export function ProjectReportPage() {
         siteCode: site.siteCode,
         defaultAddressBlock: site.siteBlockCidr,
         location: site.location,
+        streetAddress: (site as any).streetAddress,
         notes: site.note,
         projectId: project.id,
         vlans: synthesized.addressingPlan
@@ -323,8 +324,8 @@ export function ProjectReportPage() {
                   {synthesized.sitePlacements.map((item) => (
                     <tr key={item.id}>
                       <td>{item.siteName}</td>
+                      <td>{item.deviceName}<div className="muted" style={{ fontSize: 12 }}>{item.siteTier}{item.uplinkTarget ? ` • uplink ${item.uplinkTarget}` : ""}</div></td>
                       <td>{item.role}</td>
-                      <td>{item.deviceType}</td>
                       <td>{item.placement}</td>
                       <td>{item.connectedZones.join(", ") || "—"}</td>
                     </tr>
@@ -413,7 +414,7 @@ export function ProjectReportPage() {
                       <td>{item.placementType}</td>
                       <td>{item.siteName}</td>
                       <td>{item.zoneName}</td>
-                      <td>{item.subnetCidr || "TBD"}</td>
+                      <td>{item.subnetCidr || "TBD"}<div className="muted" style={{ fontSize: 12 }}>{item.attachedDevice || "Attachment TBD"}{item.ingressInterface ? ` • ${item.ingressInterface}` : ""}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -427,10 +428,11 @@ export function ProjectReportPage() {
                 <div key={`${item.siteName}-${item.zoneName}`} className="panel" style={{ padding: 14 }}>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                     <span className="badge-soft">{item.siteName}</span>
-                    <span className="badge-soft">{item.zoneName}</span>
+                    <span className="badge-soft">{item.boundaryName}</span>
                     <span className="badge-soft">{item.attachedDevice}</span>
                   </div>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Subnets:</strong> {item.subnetCidrs.join(", ") || "TBD"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Attachment:</strong> {item.attachedInterface || item.attachedDevice} → {item.upstreamInterface || item.upstreamBoundary}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Peers:</strong> {item.permittedPeers.join(", ") || "Restricted"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Inbound policy:</strong> {item.inboundPolicy}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>East-west policy:</strong> {item.eastWestPolicy}</p>
@@ -446,7 +448,7 @@ export function ProjectReportPage() {
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>5. Routing and traffic-flow design</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This section is meant to answer how traffic should move, which path it follows, where policy is enforced, and whether NAT or edge treatment changes the path.
+            This section answers exactly how traffic should move, which named devices and interfaces it traverses, where policy is enforced, and whether NAT or edge treatment changes the path.
           </p>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
@@ -459,8 +461,10 @@ export function ProjectReportPage() {
                     <span className="badge-soft">{item.sourceZone}</span>
                     <span className="badge-soft">{item.destinationZone}</span>
                   </div>
-                  <h4 style={{ margin: "0 0 8px 0" }}>{item.flowName}</h4>
+                  <h4 style={{ margin: "0 0 8px 0" }}>{item.flowLabel}</h4>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Path:</strong> {item.path.join(" → ")}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Named flow:</strong> {item.flowName}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Control points:</strong> {item.controlPoints.join(", ")}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Route model:</strong> {item.routeModel}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>NAT:</strong> {item.natBehavior}</p>
                   <p style={{ margin: 0 }}><strong>Enforcement:</strong> {item.enforcementPolicy}</p>
@@ -555,7 +559,7 @@ export function ProjectReportPage() {
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This section keeps the execution picture visible: rollout model, validation approach, rollback posture, and the first cutover checkpoints.
+            This section keeps the execution picture visible: rollout model, validation approach, rollback posture, cutover checkpoints, and the interfaces and boundary attachments that matter during review.
           </p>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>

@@ -43,7 +43,7 @@ export function ProjectSitesPage() {
   const filteredSites = useMemo(() => {
     const needle = siteQuery.trim().toLowerCase();
     if (!needle) return sites;
-    return sites.filter((site) => `${site.name} ${site.location || ""} ${site.siteCode || ""} ${site.defaultAddressBlock || ""}`.toLowerCase().includes(needle));
+    return sites.filter((site) => `${site.name} ${site.location || ""} ${site.streetAddress || ""} ${site.siteCode || ""} ${site.defaultAddressBlock || ""}`.toLowerCase().includes(needle));
   }, [sites, siteQuery]);
   const isSubmitting = createSiteMutation.isPending || updateSiteMutation.isPending;
 
@@ -51,7 +51,7 @@ export function ProjectSitesPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Sites"
-        description="Manage site locations and their default address blocks in a more operational workspace."
+        description="Manage site names, locations, street addresses, codes, and default address blocks in a more operational workspace."
         actions={
           !showCreate && !editingSite ? (
             <button type="button" onClick={() => setShowCreate(true)}>Add Site</button>
@@ -118,7 +118,7 @@ export function ProjectSitesPage() {
       <div className="panel">
         <div className="toolbar-row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
           <input
-            placeholder="Search site name, code, location, or address block"
+            placeholder="Search site name, location, address, code, or address block"
             value={siteQuery}
             onChange={(event) => setSiteQuery(event.target.value)}
           />

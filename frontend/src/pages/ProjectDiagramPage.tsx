@@ -79,12 +79,12 @@ export function ProjectDiagramPage() {
             <span className="badge-soft">Mode-ready for export</span>
           </div>
           <p className="muted" style={{ margin: 0 }}>
-            The canvas below gets priority on widescreen layouts. In v98 the diagram is also expected to be checked directly against the report sections and active validation findings.
+            The canvas below gets priority on widescreen layouts. In v100 the diagram also carries topology-specific interface labels, device-level validation emphasis, explicit zone labels on perimeter/core segments, and naming aligned more tightly with the report.
           </p>
         </div>
 
         <div className="diagram-canvas-panel">
-          <ProjectDiagram project={enrichedProject} comments={comments} />
+          <ProjectDiagram project={enrichedProject} comments={comments} validations={validations} />
         </div>
       </div>
 
@@ -95,7 +95,7 @@ export function ProjectDiagramPage() {
             <li style={{ marginBottom: 8 }}><strong>Placement</strong> should match report section 2 and the site-by-site design section.</li>
             <li style={{ marginBottom: 8 }}><strong>Addressing</strong> should match report section 3 exactly, including block labels and gateways.</li>
             <li style={{ marginBottom: 8 }}><strong>Security</strong> should match report section 4, especially DMZ placement, attached devices, and peers.</li>
-            <li style={{ marginBottom: 0 }}><strong>Flows</strong> should match report section 5 and the validation findings if a path or boundary looks wrong.</li>
+            <li style={{ marginBottom: 0 }}><strong>Flows</strong> should match report section 7 and the validation findings if a path or boundary looks wrong.</li>
           </ul>
         </div>
 
