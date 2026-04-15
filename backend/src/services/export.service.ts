@@ -13,6 +13,10 @@ function truthy(value: unknown) {
   return value === true || value === "true" || value === 1 || value === "1";
 }
 
+function isEnabled(value: unknown) {
+  return truthy(value);
+}
+
 function asString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -68,7 +72,7 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
   const discovery = parseJson<Record<string, unknown>>(project.discoveryJson) || {};
   const platform = parseJson<Record<string, unknown>>(project.platformProfileJson) || {};
   const siteCount = project.sites.length;
-  const vlanCount = project.sites.reduce((sum, site: any) => sum + site.vlans.length, 0);
+  const vlanCount = project.sites.reduce((sum: number, site: any) => sum + site.vlans.length, 0);
   const errors = project.validations.filter((item: any) => item.severity === "ERROR");
   const warnings = project.validations.filter((item: any) => item.severity === "WARNING");
 

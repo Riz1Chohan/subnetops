@@ -1,0 +1,17 @@
+import { Router } from "express";
+import { requireAuth } from "../middleware/auth.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import * as commentController from "../controllers/comment.controller.js";
+const router = Router();
+router.use(requireAuth);
+router.get("/assigned/me", asyncHandler(commentController.listAssignedTasks));
+router.post("/digests/me/queue", asyncHandler(commentController.queueMyDigest));
+router.get("/projects/:projectId", asyncHandler(commentController.listComments));
+router.get("/projects/:projectId/mention-suggestions", asyncHandler(commentController.listMentionSuggestions));
+router.post("/projects/:projectId", asyncHandler(commentController.createComment));
+router.post("/projects/:projectId/bulk-reassign", asyncHandler(commentController.bulkReassignTasks));
+router.post("/projects/:projectId/reminders/queue", asyncHandler(commentController.queueOverdueReminders));
+router.patch("/:commentId/resolve", asyncHandler(commentController.toggleResolve));
+router.patch("/:commentId/pin", asyncHandler(commentController.togglePin));
+router.patch("/:commentId/task", asyncHandler(commentController.updateTask));
+export default router;
