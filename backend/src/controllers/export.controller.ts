@@ -77,12 +77,12 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number) {
 }
 
 function ensurePage(state: { pdf: PDFDocument; page: PDFPage; y: number; width: number; height: number }) {
-  if (state.y >= 64) return;
-  state.page = state.pdf.addPage([792, 612]);
+  if (state.y >= 70) return;
+  state.page = state.pdf.addPage([612, 792]);
   const size = state.page.getSize();
   state.width = size.width;
   state.height = size.height;
-  state.y = state.height - 44;
+  state.y = state.height - 56;
 }
 
 function drawParagraph(
@@ -95,12 +95,12 @@ function drawParagraph(
   const indent = options?.indent ?? 0;
   const lineGap = options?.lineGap ?? 4;
   const drawFont = options?.bold && options.boldFont ? options.boldFont : font;
-  const lines = wrapText(drawFont, text, size, state.width - 96 - indent);
+  const lines = wrapText(drawFont, text, size, state.width - 108 - indent);
 
   for (const line of lines) {
     ensurePage(state);
     state.page.drawText(line, {
-      x: 48 + indent,
+      x: 54 + indent,
       y: state.y,
       size,
       font: drawFont,
@@ -118,7 +118,7 @@ function drawTable(
 ) {
   drawParagraph(state, font, table.title, { size: 12, bold: true, boldFont });
   const headers = table.headers.join(" | ");
-  drawParagraph(state, font, headers, { size: 10, bold: true, boldFont });
+  drawParagraph(state, font, headers, { size: 10, bold: true, boldFont, color: rgb(0.12, 0.31, 0.77) });
   drawParagraph(state, font, "-".repeat(Math.min(110, Math.max(20, headers.length))), { size: 9 });
   for (const row of table.rows) {
     drawParagraph(state, font, row.join(" | "), { size: 9 });
@@ -135,26 +135,27 @@ async function buildPdf(projectId: string) {
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const cover = pdf.addPage([792, 612]);
+  const cover = pdf.addPage([612, 792]);
   const logo = await tryEmbedRemoteLogo(pdf, project.logoUrl);
 
-  cover.drawRectangle({ x: 0, y: 0, width: 792, height: 612, color: rgb(0.98, 0.985, 1) });
-  cover.drawRectangle({ x: 0, y: 520, width: 792, height: 92, color: rgb(0.12, 0.31, 0.77) });
-  cover.drawText(report.title, { x: 48, y: 555, size: 25, font: boldFont, color: rgb(1, 1, 1), maxWidth: 690 });
-  cover.drawText(report.subtitle, { x: 48, y: 528, size: 13, font, color: rgb(0.9, 0.94, 1), maxWidth: 690 });
+  cover.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(0.985, 0.988, 0.995) });
+  cover.drawRectangle({ x: 0, y: 640, width: 612, height: 152, color: rgb(0.12, 0.31, 0.77) });
+  cover.drawText(report.title, { x: 54, y: 724, size: 24, font: boldFont, color: rgb(1, 1, 1), maxWidth: 500 });
+  cover.drawText(report.subtitle, { x: 54, y: 694, size: 13, font, color: rgb(0.9, 0.94, 1), maxWidth: 500 });
 
   if (logo) {
-    const scaled = logo.scale(0.28);
-    cover.drawImage(logo, { x: 48, y: 404, width: scaled.width, height: scaled.height });
+    const scaled = logo.scale(0.22);
+    cover.drawImage(logo, { x: 54, y: 500, width: scaled.width, height: scaled.height });
   }
 
-  cover.drawText(`Project: ${project.name}`, { x: 48, y: 370, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-  cover.drawText(`Organization: ${project.organizationName || "Not set"}`, { x: 48, y: 344, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
-  cover.drawText(`Environment: ${project.environmentType || "Custom"}`, { x: 48, y: 324, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
-  cover.drawText(`Generated: ${report.generatedAt}`, { x: 48, y: 304, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
-  cover.drawText(`Prepared by: SubnetOps Professional Report Composer`, { x: 48, y: 284, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Project: ${project.name}`, { x: 54, y: 446, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
+  cover.drawText(`Organization: ${project.organizationName || "To be confirmed"}`, { x: 54, y: 418, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Environment: ${project.environmentType || "Custom"}`, { x: 54, y: 398, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Generated: ${report.generatedAt}`, { x: 54, y: 378, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Prepared by: SubnetOps Professional Report Composer`, { x: 54, y: 358, size: 12, font, color: rgb(0.2, 0.25, 0.32) });
+  cover.drawText(`Professional network design and planning package`, { x: 54, y: 318, size: 12, font, color: rgb(0.34, 0.39, 0.47) });
 
-  let state = { pdf, page: pdf.addPage([792, 612]), y: 560, width: 792, height: 612 };
+  let state = { pdf, page: pdf.addPage([612, 792]), y: 730, width: 612, height: 792 };
   drawParagraph(state, font, "Executive Summary", { size: 18, bold: true, boldFont });
   for (const paragraph of report.executiveSummary) {
     drawParagraph(state, font, paragraph, { size: 11 });
@@ -164,11 +165,13 @@ async function buildPdf(projectId: string) {
   drawParagraph(state, font, "Table of Contents", { size: 18, bold: true, boldFont });
   report.sections.forEach((section) => drawParagraph(state, font, section.title, { size: 11 }));
 
-  for (const section of report.sections) {
-    state.page = pdf.addPage([792, 612]);
-    state.width = 792;
-    state.height = 612;
-    state.y = 560;
+  const allSections = [...report.sections, ...(report.appendices ?? [])];
+
+  for (const section of allSections) {
+    state.page = pdf.addPage([612, 792]);
+    state.width = 612;
+    state.height = 792;
+    state.y = 730;
 
     drawParagraph(state, font, section.title, { size: 18, bold: true, boldFont, color: rgb(0.12, 0.31, 0.77) });
     state.y -= 4;
@@ -225,11 +228,12 @@ async function buildDocx(projectId: string) {
   });
 
   children.push(new Paragraph({ text: "Table of Contents", heading: HeadingLevel.HEADING_1 }));
-  report.sections.forEach((section) => {
+  const allSectionsDocx = [...report.sections, ...(report.appendices ?? [])];
+  allSectionsDocx.forEach((section) => {
     children.push(new Paragraph({ text: section.title, bullet: { level: 0 }, spacing: { after: 100 } }));
   });
 
-  report.sections.forEach((section) => {
+  allSectionsDocx.forEach((section) => {
     children.push(new Paragraph({ text: section.title, heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
     section.paragraphs.forEach((paragraph) => {
       children.push(new Paragraph({ text: paragraph, spacing: { after: 160 } }));
