@@ -47,7 +47,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   const headers = new Headers(init?.headers || {});
-  if (headers.has("Content-Type")) headers.delete("Content-Type");
+  if (init?.body) {
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  } else if (headers.has("Content-Type")) {
+    headers.delete("Content-Type");
+  }
 
   const response = await fetch(apiUrl(path), {
     ...init,

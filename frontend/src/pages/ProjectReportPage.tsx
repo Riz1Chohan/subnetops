@@ -172,12 +172,54 @@ export function ProjectReportPage() {
     `${validations.length} validation findings`,
   ];
 
-  const downloadExport = async (kind: "pdf" | "csv") => {
+  const exportSnapshot = useMemo(() => ({
+    generatedAt: new Date().toISOString(),
+    project: project
+      ? {
+          id: project.id,
+          name: project.name,
+          organizationName: project.organizationName,
+          environmentType: project.environmentType,
+          basePrivateRange: project.basePrivateRange,
+          reportHeader: project.reportHeader,
+          logoUrl: project.logoUrl,
+          approvalStatus: project.approvalStatus,
+          requirementsJson: project.requirementsJson,
+          discoveryJson: project.discoveryJson,
+          platformProfileJson: project.platformProfileJson,
+        }
+      : null,
+    requirementsProfile,
+    validations: validations.map((item) => ({
+      id: item.id,
+      ruleCode: item.ruleCode,
+      severity: item.severity,
+      entityType: item.entityType,
+      title: item.title,
+      message: item.message,
+      createdAt: item.createdAt,
+    })),
+    synthesized,
+    discoverySummary,
+    platformFoundation,
+  }), [project, requirementsProfile, validations, synthesized, discoverySummary, platformFoundation]);
+
+  const downloadExport = async (kind: "pdf" | "docx" | "csv") => {
     try {
-      setExportMessage(kind === "pdf" ? "Preparing technical PDF export..." : "Preparing Excel-friendly CSV export...");
-      const blob = await apiBlob(`/export/projects/${projectId}/${kind}`);
-      saveBlob(blob, kind === "pdf" ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-technical-package.pdf` : `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-addressing-export.csv`);
-      setExportMessage(kind === "pdf" ? "Technical PDF exported." : "Excel-friendly CSV exported.");
+      setExportMessage(kind === "pdf" ? "Preparing professional PDF report..." : kind === "docx" ? "Preparing professional DOCX report..." : "Preparing Excel-friendly CSV export...");
+      const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
+        method: "POST",
+        body: JSON.stringify({ exportSnapshot }),
+      });
+      saveBlob(
+        blob,
+        kind === "pdf"
+          ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-professional-report.pdf`
+          : kind === "docx"
+            ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-professional-report.docx`
+            : `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-addressing-export.csv`,
+      );
+      setExportMessage(kind === "pdf" ? "Professional PDF report exported." : kind === "docx" ? "Professional DOCX report exported." : "Excel-friendly CSV exported.");
     } catch (error) {
       setExportMessage(error instanceof Error ? error.message : "Export failed.");
     }
@@ -198,7 +240,8 @@ export function ProjectReportPage() {
             <p className="muted" style={{ margin: 0 }}>{summary}</p>
           </div>
           <div className="form-actions" style={{ flexWrap: "wrap" }}>
-            <button type="button" onClick={() => void downloadExport("pdf")}>Export Technical PDF</button>
+            <button type="button" onClick={() => void downloadExport("pdf")}>Export Professional PDF</button>
+            <button type="button" className="link-button" onClick={() => void downloadExport("docx")}>Export Professional DOCX</button>
             <button type="button" className="link-button" onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
             <button type="button" className="link-button" onClick={() => window.print()}>Print / Save current view</button>
             <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
@@ -215,7 +258,7 @@ export function ProjectReportPage() {
           <div>
             <h2 style={{ margin: "0 0 8px 0" }}>Deliver Center</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Use this area to export the technical package, save an approval PDF, and confirm whether the current design is ready to hand off.
+              Use this area to export a professional PDF report, a professional DOCX report, and the spreadsheet-friendly data pack once the current design is ready to hand off.
             </p>
           </div>
           <span className="badge-soft">{exportBlockers.length === 0 ? "Export ready" : `${exportBlockers.length} review item${exportBlockers.length === 1 ? "" : "s"}`}</span>
@@ -569,7 +612,7 @@ export function ProjectReportPage() {
                   <p style={{ marginBottom: 8 }}><strong>Implementation focus</strong></p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {site.implementationFocus.map((item) => (
-                      <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+          <li key={item} style={{ marginBottom: 8 }}>{item}</li>
                     ))}
                   </ul>
                 </div>
