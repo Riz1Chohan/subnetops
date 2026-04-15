@@ -1029,7 +1029,7 @@ export function NewProjectPage() {
                     }
                   }
 
-                  navigate(`/projects/${project.id}/requirements`);
+                  navigate(`/projects/${project.id}/discovery?created=1`);
                 }}
               />
             </section>

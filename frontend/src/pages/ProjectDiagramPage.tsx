@@ -49,68 +49,73 @@ export function ProjectDiagramPage() {
 
   const openSiteTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "SITE").length;
   const openVlanTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "VLAN").length;
+  const cloudContext = requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected;
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
-        title="Diagram"
-        description="Network-style logical and topology views that are closer to real infrastructure storytelling than an abstract decision tree."
+        title="Diagram workspace"
+        description="The diagram is now treated like a main artifact, not a squeezed side card. Use this stage for design review, explanation, and export."
+        actions={(
+          <div className="form-actions">
+            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
+            <Link to={`/projects/${projectId}/report`} className="link-button">Open Deliver Area</Link>
+          </div>
+        )}
       />
 
-      <div className="summary-grid">
-        <div className="summary-card"><div className="muted">Sites in view</div><div className="value">{enrichedProject.sites.length}</div></div>
-        <div className="summary-card"><div className="muted">VLANs represented</div><div className="value">{vlans.length}</div></div>
-        <div className="summary-card"><div className="muted">Open site tasks</div><div className="value">{openSiteTasks}</div></div>
-        <div className="summary-card"><div className="muted">Open VLAN tasks</div><div className="value">{openVlanTasks}</div></div>
-      </div>
-
-      <div className="workspace-grid">
-        <div style={{ minWidth: 0 }}>
-          <ProjectDiagram project={enrichedProject} comments={comments} />
+      <div className="panel diagram-stage-shell">
+        <div className="diagram-stage-meta">
+          <div className="network-chip-list">
+            <span className="badge-soft">Sites {enrichedProject.sites.length}</span>
+            <span className="badge-soft">VLANs {vlans.length}</span>
+            <span className="badge-soft">Site tasks {openSiteTasks}</span>
+            <span className="badge-soft">VLAN tasks {openVlanTasks}</span>
+            <span className="badge-soft">Mode-ready for export</span>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            The canvas below gets priority on widescreen layouts. Guide content is pushed down so the actual diagram can use the screen.
+          </p>
         </div>
 
-        <aside className="panel" style={{ display: "grid", gap: 12, alignSelf: "start" }}>
-          <h2 style={{ margin: 0 }}>Diagram guide</h2>
-          <div className="trust-note">
-            <strong>How this is different now</strong>
-            <p className="muted" style={{ margin: "6px 0 0 0" }}>
-              The diagram page now aims to look and read more like a network plan, with a visible internet edge, firewall/core structure, site containers, and recognizable topology flow.
-            </p>
-          </div>
+        <div className="diagram-canvas-panel">
+          <ProjectDiagram project={enrichedProject} comments={comments} />
+        </div>
+      </div>
 
-          <details open>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Reading the two views</summary>
-            <ul style={{ margin: "10px 0 0 0", paddingLeft: 18 }}>
-              <li><strong>Logical Design</strong> is best for segmentation, site blocks, VLAN structure, and design review.</li>
+      <details className="panel diagram-guide-panel">
+        <summary>Diagram reading guide and workflow tips</summary>
+        <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+          <div className="trust-note">
+            <strong>Reading the views</strong>
+            <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
+              <li><strong>Logical Design</strong> is best for segmentation, site blocks, VLAN structure, and engineering review.</li>
               <li><strong>Physical / Topology</strong> is best for presenting perimeter, core, branch attachment, and local edge components.</li>
               <li>Task markers still show where review work is concentrated.</li>
             </ul>
-          </details>
-
-          <details>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Recommended workflow</summary>
-            <ol style={{ margin: "10px 0 0 0", paddingLeft: 18 }}>
-              <li>Run validation first so the diagram reflects a cleaner design state.</li>
-              <li>Use the logical view for engineering review.</li>
-              <li>Use the physical/topology view for handoff and explanation.</li>
-            </ol>
-          </details>
-
-          {(requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected) ? (
-            <div className="trust-note">
-              <strong>Cloud / hybrid planning context</strong>
-              <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                This project assumes {requirementsProfile.cloudProvider} over {requirementsProfile.cloudConnectivity}, with {requirementsProfile.cloudHostingModel}. The diagram should be read with a cloud boundary of {requirementsProfile.cloudIdentityBoundary} and a traffic model of {requirementsProfile.cloudTrafficBoundary}.
-              </p>
-            </div>
-          ) : null}
-
-          <div className="toolbar-row">
-            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Open Report</Link>
           </div>
-        </aside>
-      </div>
+
+          <div className="grid-2" style={{ alignItems: "start" }}>
+            <div className="panel" style={{ padding: 14 }}>
+              <strong style={{ display: "block", marginBottom: 8 }}>Recommended workflow</strong>
+              <ol style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Run validation first so the diagram reflects a cleaner design state.</li>
+                <li>Use the logical view for engineering review.</li>
+                <li>Use the physical/topology view for handoff and explanation.</li>
+              </ol>
+            </div>
+
+            {cloudContext ? (
+              <div className="panel" style={{ padding: 14 }}>
+                <strong style={{ display: "block", marginBottom: 8 }}>Cloud / hybrid planning context</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  This project assumes {requirementsProfile.cloudProvider} over {requirementsProfile.cloudConnectivity}, with {requirementsProfile.cloudHostingModel}. The diagram should be read with a cloud boundary of {requirementsProfile.cloudIdentityBoundary} and a traffic model of {requirementsProfile.cloudTrafficBoundary}.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </details>
     </section>
   );
 }

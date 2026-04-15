@@ -76,7 +76,7 @@ export const router = createBrowserRouter([
         path: "/projects/:projectId",
         element: <ProjectLayout />,
         children: [
-          { index: true, element: <Navigate to="requirements" replace /> },
+          { index: true, element: <Navigate to="discovery" replace /> },
           { path: "discovery", element: <ProjectDiscoveryPage /> },
           { path: "requirements", element: <ProjectRequirementsPage /> },
           { path: "logical-design", element: <ProjectOverviewPage /> },

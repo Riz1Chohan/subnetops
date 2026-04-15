@@ -160,15 +160,11 @@ export function ProjectReportPage() {
             <p className="muted" style={{ margin: 0 }}>{summary}</p>
           </div>
           <div className="form-actions">
-            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Back to Logical Design</Link>
-            <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Plan</Link>
-            <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
-            <Link to={`/projects/${projectId}/routing`} className="link-button">Routing & Switching</Link>
-            <Link to={`/projects/${projectId}/implementation`} className="link-button">Implementation</Link>
-            <Link to={`/projects/${projectId}/standards`} className="link-button">Config Standards</Link>
-            <Link to={`/projects/${projectId}/discovery`} className="link-button">Discovery</Link>
+            <button type="button" onClick={() => window.print()}>Print / Save PDF</button>
+            <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
+            <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Table</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link>
-            <Link to={`/projects/${projectId}/diagram`} className="link-button">Diagram</Link>
+            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Design Package</Link>
           </div>
         </div>
       </header>

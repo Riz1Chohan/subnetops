@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useLogout, useCurrentUser } from "../features/auth/hooks";
 import { useAssignedTasks } from "../features/comments/hooks";
 import { useNotificationSummary } from "../features/notifications/hooks";
@@ -6,11 +6,14 @@ import { Brand } from "../components/app/Brand";
 
 export function DashboardLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data } = useCurrentUser();
   const logoutMutation = useLogout();
   const notificationSummaryQuery = useNotificationSummary();
   const assignedTasksQuery = useAssignedTasks();
   const overdueTasks = (assignedTasksQuery.data ?? []).filter((task) => task.dueDate && task.taskStatus !== "DONE" && new Date(task.dueDate).getTime() < Date.now()).length;
+
+  const isProjectWorkspace = location.pathname.startsWith("/projects/") && location.pathname !== "/projects/new";
 
   return (
     <div className="app-shell">
@@ -41,7 +44,7 @@ export function DashboardLayout() {
           </button>
         </nav>
       </header>
-      <main className="page">
+      <main className={isProjectWorkspace ? "page page-workspace" : "page"}>
         <Outlet />
       </main>
     </div>

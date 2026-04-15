@@ -134,6 +134,12 @@ tr:last-child td {
   padding: 28px;
 }
 
+.page.page-workspace {
+  max-width: none;
+  width: 100%;
+  padding: 20px 24px 32px;
+}
+
 .panel {
   background: white;
   border: 1px solid #e8edf5;
@@ -893,4 +899,208 @@ tr:last-child td {
   padding: 10px 12px;
   color: #30465f;
   font-size: 0.92rem;
+}
+
+.project-workspace-page {
+  display: grid;
+  gap: 18px;
+}
+
+.project-created-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border-color: #cfe0fb;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef4ff 100%);
+}
+
+.project-shell-header-compact {
+  align-items: start;
+}
+
+.project-summary-metrics-compact {
+  justify-content: flex-end;
+}
+
+.project-workspace-shell {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.project-sidebar-grouped {
+  position: sticky;
+  top: 84px;
+  display: grid;
+  gap: 16px;
+}
+
+.project-group-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.project-group-block {
+  display: grid;
+  gap: 8px;
+}
+
+.project-group-link {
+  display: grid;
+  gap: 4px;
+  text-decoration: none;
+  color: #163257;
+  border: 1px solid #d9e3f2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.project-group-link:hover {
+  text-decoration: none;
+  background: #f8fbff;
+  border-color: #bfd0ec;
+}
+
+.project-group-link small {
+  color: #61738c;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.project-group-link.active {
+  border-color: #b7caef;
+  background: #eef4ff;
+  box-shadow: 0 8px 22px rgba(35, 87, 216, 0.08);
+}
+
+.project-subnav-list {
+  display: grid;
+  gap: 6px;
+  padding-left: 10px;
+}
+
+.project-subnav-link {
+  display: grid;
+  gap: 2px;
+  text-decoration: none;
+  color: #495d77;
+  border-left: 2px solid #d7e2f3;
+  padding: 8px 0 8px 12px;
+}
+
+.project-subnav-link:hover {
+  text-decoration: none;
+  color: #17345e;
+}
+
+.project-subnav-link small {
+  color: #72829a;
+  font-size: 0.78rem;
+}
+
+.project-subnav-link.active {
+  color: #163257;
+  border-left-color: #2357d8;
+  font-weight: 700;
+}
+
+.project-support-group {
+  border-top: 1px solid #e4ebf6;
+  padding-top: 10px;
+}
+
+.project-support-group summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #32465f;
+}
+
+.project-main-shell {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.project-tab-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.project-tab-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.project-tab-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid #d7deea;
+  background: #fff;
+  color: #24384f;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.project-tab-link:hover {
+  text-decoration: none;
+  background: #f8fbff;
+}
+
+.project-tab-link.active {
+  background: #2357d8;
+  border-color: #2357d8;
+  color: #fff;
+}
+
+.diagram-stage-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.diagram-stage-meta {
+  display: grid;
+  gap: 10px;
+}
+
+.diagram-canvas-panel {
+  border: 1px solid #e2e9f5;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  padding: 14px;
+}
+
+.diagram-guide-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .project-workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .project-sidebar-grouped {
+    position: static;
+  }
+}
+
+@media (max-width: 780px) {
+  .page.page-workspace {
+    padding: 16px;
+  }
+
+  .project-created-banner,
+  .project-tab-strip {
+    grid-template-columns: 1fr;
+  }
 }

@@ -7,31 +7,21 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
 
-const projectNavItems = [
-  { key: "discovery", label: "Discovery & Current State" },
-  { key: "requirements", label: "Requirements" },
-  { key: "logical-design", label: "Logical Design" },
-  { key: "addressing", label: "Addressing Plan" },
-  { key: "security", label: "Security Architecture" },
-  { key: "routing", label: "Routing & Switching" },
-  { key: "implementation", label: "Implementation & Migration" },
-  { key: "standards", label: "Config Standards" },
-  { key: "platform", label: "Platform & BOM" },
-  { key: "validation", label: "Validation" },
-  { key: "diagram", label: "Diagram" },
-  { key: "report", label: "Report / Export" },
-  { key: "tasks", label: "Tasks" },
-  { key: "settings", label: "Settings" },
-];
+type TabLink = {
+  key: string;
+  label: string;
+  path: string;
+  description?: string;
+};
 
-const workflowStages = [
-  { key: "discovery", label: "Discovery", route: "discovery", description: "Capture the current environment, topology, risks, and migration constraints before shaping the target design." },
-  { key: "requirements", label: "Requirements", route: "requirements", description: "Capture the planning brief, environment, security posture, and delivery assumptions." },
-  { key: "logical-design", label: "Logical Design", route: "logical-design", description: "Shape sites, addressing, segmentation, and the core network structure from the saved requirements." },
-  { key: "validation", label: "Validation", route: "validation", description: "Review conflicts, capacity, gateway logic, and overall design health before diagramming or handoff." },
-  { key: "diagram", label: "Diagram", route: "diagram", description: "Translate the design into logical and topology views for review and communication." },
-  { key: "report", label: "Report / Export", route: "report", description: "Turn the project into a clean handoff summary for review, export, and delivery." },
-] as const;
+type GroupLink = {
+  key: string;
+  label: string;
+  path: string;
+  summary: string;
+  matchers: string[];
+  children?: TabLink[];
+};
 
 function summaryPill(label: string, value: number | string) {
   return (
@@ -54,45 +44,8 @@ function approvalLabel(approvalStatus?: string) {
   return "Draft";
 }
 
-function workflowStateForIndex(index: number, activeIndex: number) {
-  if (index < activeIndex) return "complete";
-  if (index === activeIndex) return "current";
-  return "upcoming";
-}
-
-function workflowStatusLabel(stageKey: string, readinessLabel: string, errorCount: number, sitesCount: number, vlanCount: number) {
-  if (stageKey === "discovery") {
-    if (sitesCount > 0 || vlanCount > 0) return "In progress";
-    return "Start here";
-  }
-
-  if (stageKey === "requirements") {
-    if (readinessLabel === "Review-ready" || readinessLabel === "Mostly shaped") return "Ready";
-    return "Needs review";
-  }
-
-  if (stageKey === "logical-design") {
-    if (sitesCount > 0 || vlanCount > 0) return "In progress";
-    return "Not started";
-  }
-
-  if (stageKey === "validation") {
-    if (errorCount > 0) return `${errorCount} error${errorCount === 1 ? "" : "s"}`;
-    if (sitesCount > 0 || vlanCount > 0) return "Clear";
-    return "Pending design";
-  }
-
-  if (stageKey === "diagram") {
-    if (sitesCount > 0 || vlanCount > 0) return "Available";
-    return "Waiting on design";
-  }
-
-  if (stageKey === "report") {
-    if (sitesCount > 0 || vlanCount > 0) return "Ready to review";
-    return "Waiting on design";
-  }
-
-  return "Review";
+function activeForPath(pathname: string, matchers: string[]) {
+  return matchers.some((matcher) => pathname.includes(matcher));
 }
 
 export function ProjectLayout() {
@@ -111,12 +64,93 @@ export function ProjectLayout() {
   const comments = commentsQuery.data ?? [];
   const openTasks = comments.filter((item) => item.taskStatus !== "DONE").length;
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
+  const warningCount = validations.filter((item) => item.severity === "WARNING").length;
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const readiness = planningReadinessSummary(requirementsProfile);
-  const workflowRoute = location.pathname.includes("/addressing") || location.pathname.includes("/security") || location.pathname.includes("/routing") ? "logical-design" : (location.pathname.includes("/implementation") || location.pathname.includes("/standards") || location.pathname.includes("/platform")) ? "report" : undefined;
-  const activeStageIndex = Math.max(0, workflowStages.findIndex((stage) => workflowRoute ? stage.route === workflowRoute : location.pathname.includes(`/${stage.route}`)));
-  const currentStage = workflowStages[activeStageIndex] ?? workflowStages[0];
-  const nextStage = workflowStages[activeStageIndex + 1] ?? null;
+  const createdFromWizard = new URLSearchParams(location.search).get("created") === "1";
+
+  const designTabs: TabLink[] = [
+    { key: "logical-design", label: "Overview", path: `/projects/${projectId}/logical-design`, description: "Architecture and design summary" },
+    { key: "addressing", label: "Addressing", path: `/projects/${projectId}/addressing`, description: "Subnets, gateways, ranges" },
+    { key: "security", label: "Security", path: `/projects/${projectId}/security`, description: "Zones and boundary model" },
+    { key: "routing", label: "Routing", path: `/projects/${projectId}/routing`, description: "Routing and switching intent" },
+    { key: "implementation", label: "Implementation", path: `/projects/${projectId}/implementation`, description: "Migration and cutover plan" },
+    { key: "standards", label: "Standards", path: `/projects/${projectId}/standards`, description: "Config standards and templates" },
+    { key: "platform", label: "Platform & BOM", path: `/projects/${projectId}/platform`, description: "Platform profile and BOM" },
+  ];
+
+  const deliverTabs: TabLink[] = [
+    { key: "diagram", label: "Diagram", path: `/projects/${projectId}/diagram`, description: "Canvas and topology view" },
+    { key: "report", label: "Report & Export", path: `/projects/${projectId}/report`, description: "Report preview and export" },
+  ];
+
+  const supportTabs: TabLink[] = [
+    { key: "tasks", label: "Tasks", path: `/projects/${projectId}/tasks` },
+    { key: "settings", label: "Settings", path: `/projects/${projectId}/settings` },
+  ];
+
+  const groups: GroupLink[] = [
+    {
+      key: "discovery",
+      label: "Discovery",
+      path: `/projects/${projectId}/discovery`,
+      summary: "Ground the project in what exists today.",
+      matchers: ["/discovery"],
+    },
+    {
+      key: "requirements",
+      label: "Requirements",
+      path: `/projects/${projectId}/requirements`,
+      summary: "Capture the planning brief and constraints.",
+      matchers: ["/requirements"],
+    },
+    {
+      key: "design",
+      label: "Design Package",
+      path: `/projects/${projectId}/logical-design`,
+      summary: "Review the generated design in focused tabs.",
+      matchers: ["/logical-design", "/overview", "/addressing", "/security", "/routing", "/implementation", "/standards", "/platform"],
+      children: designTabs,
+    },
+    {
+      key: "validation",
+      label: "Validation",
+      path: `/projects/${projectId}/validation`,
+      summary: "Check blockers, warnings, and review items.",
+      matchers: ["/validation"],
+    },
+    {
+      key: "deliver",
+      label: "Deliver",
+      path: `/projects/${projectId}/report`,
+      summary: "Diagram, report, and export the handoff package.",
+      matchers: ["/diagram", "/report"],
+      children: deliverTabs,
+    },
+  ];
+
+  const activeGroup = groups.find((group) => activeForPath(location.pathname, group.matchers))?.key
+    ?? (activeForPath(location.pathname, ["/tasks", "/settings"]) ? "support" : "discovery");
+
+  const tabSet = activeGroup === "design"
+    ? designTabs
+    : activeGroup === "deliver"
+      ? deliverTabs
+      : activeGroup === "support"
+        ? supportTabs
+        : [];
+
+  const nextAction = errorCount > 0
+    ? { label: `Resolve ${errorCount} validation blocker${errorCount === 1 ? "" : "s"}`, path: `/projects/${projectId}/validation` }
+    : activeGroup === "discovery"
+      ? { label: "Move into requirements", path: `/projects/${projectId}/requirements` }
+      : activeGroup === "requirements"
+        ? { label: "Open the design package", path: `/projects/${projectId}/logical-design` }
+        : activeGroup === "design"
+          ? { label: "Review validation findings", path: `/projects/${projectId}/validation` }
+          : activeGroup === "validation"
+            ? { label: "Open the deliver area", path: `/projects/${projectId}/report` }
+            : { label: "Review the report package", path: `/projects/${projectId}/report` };
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading project workspace" message="Preparing the project shell and navigation." />;
@@ -143,101 +177,140 @@ export function ProjectLayout() {
   }
 
   return (
-    <section style={{ display: "grid", gap: 18 }}>
-      <div className="panel project-shell-header">
+    <section className="project-workspace-page">
+      {createdFromWizard ? (
+        <div className="panel project-created-banner">
+          <div>
+            <strong style={{ display: "block", marginBottom: 6 }}>Project created successfully</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              Start by checking the discovery baseline, then move into requirements and the design package. The app now keeps those stages grouped instead of scattering them across the screen.
+            </p>
+          </div>
+          <div className="form-actions">
+            <Link to={`/projects/${projectId}/requirements`} className="link-button">Open Requirements</Link>
+          </div>
+        </div>
+      ) : null}
+
+      <header className="panel project-shell-header project-shell-header-compact">
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
             <span className={approvalBadge(project.approvalStatus)}>{approvalLabel(project.approvalStatus)}</span>
+            <span className="badge-soft">Requirements {readiness.completionLabel}</span>
+            {warningCount > 0 ? <span className="badge-soft">Warnings {warningCount}</span> : null}
             <span className="muted">Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
           </div>
           <div>
-            <h1 style={{ marginBottom: 8 }}>{project.name}</h1>
+            <h1 style={{ margin: "0 0 8px 0" }}>{project.name}</h1>
             <p className="muted" style={{ margin: 0 }}>{project.organizationName || "No organization label set"}</p>
-            <p className="muted" style={{ marginTop: 8 }}>{project.description || "No description yet."}</p>
-          </div>
-          <div className="form-actions">
-            <Link to={`/projects/${projectId}/discovery`} className="link-button">Discovery</Link>
-            <Link to={`/projects/${projectId}/requirements`} className="link-button">Requirements</Link>
-            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
-            <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Plan</Link>
-            <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
-            <Link to={`/projects/${projectId}/routing`} className="link-button">Routing & Switching</Link>
-            <Link to={`/projects/${projectId}/implementation`} className="link-button">Implementation</Link>
-            <Link to={`/projects/${projectId}/standards`} className="link-button">Config Standards</Link>
-            <Link to={`/projects/${projectId}/platform`} className="link-button">Platform & BOM</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
+            <p className="muted" style={{ marginTop: 8 }}>{project.description || "Use discovery, requirements, and the design package tabs to turn this into a reviewable network plan."}</p>
           </div>
         </div>
-        <div className="usage-metrics project-summary-metrics">
+        <div className="usage-metrics project-summary-metrics project-summary-metrics-compact">
           {summaryPill("Sites", sites.length)}
           {summaryPill("VLANs", vlans.length)}
-          {summaryPill("Errors", errorCount)}
+          {summaryPill("Blockers", errorCount)}
           {summaryPill("Open tasks", openTasks)}
         </div>
-      </div>
+      </header>
 
-      <section className="panel workflow-panel" style={{ display: "grid", gap: 14 }}>
-        <div className="section-header">
+      <section className="project-workspace-shell">
+        <aside className="panel project-sidebar project-sidebar-grouped">
           <div>
-            <h2 style={{ margin: 0 }}>Workflow progress</h2>
-            <p className="muted" style={{ margin: "6px 0 0" }}>
-              SubnetOps is meant to move a plan from requirements through review and handoff. The current workspace stage is highlighted below.
-            </p>
-          </div>
-          <div className="workflow-meta">
-            <span className="badge-soft">Current stage: {currentStage.label}</span>
-            <span className="badge-soft">Requirements: {readiness.completionLabel}</span>
-            {nextStage ? <span className="badge-soft">Next: {nextStage.label}</span> : <span className="badge-soft">Next: Final review</span>}
-          </div>
-        </div>
-
-        <div className="workflow-stage-grid">
-          {workflowStages.map((stage, index) => {
-            const state = workflowStateForIndex(index, activeStageIndex);
-            const statusLabel = workflowStatusLabel(stage.key, readiness.completionLabel, errorCount, sites.length, vlans.length);
-            return (
-              <Link
-                key={stage.key}
-                to={`/projects/${projectId}/${stage.route}`}
-                className={`workflow-stage-card ${state}`}
-              >
-                <div className="workflow-stage-topline">
-                  <span className="workflow-stage-step">Stage {index + 1}</span>
-                  <span className="workflow-stage-status">{statusLabel}</span>
-                </div>
-                <strong>{stage.label}</strong>
-                <p className="muted" style={{ margin: 0 }}>{stage.description}</p>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 20, alignItems: "start" }}>
-        <aside className="panel project-sidebar" style={{ position: "sticky", top: 16 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 12 }}>Workspace</h2>
-          <nav style={{ display: "grid", gap: 8 }}>
-            {projectNavItems.map((item) => (
-              <NavLink
-                key={item.key}
-                to={`/projects/${projectId}/${item.key}`}
-                className={({ isActive }) => (isActive ? "project-nav-link active" : "project-nav-link")}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="trust-note" style={{ marginTop: 16 }}>
-            <strong style={{ display: "block", marginBottom: 6 }}>Current workflow focus</strong>
+            <h2 style={{ margin: "0 0 6px 0" }}>Project workspace</h2>
             <p className="muted" style={{ margin: 0 }}>
-              <strong>{currentStage.label}</strong> is active now. {currentStage.description}{" "}
-              {nextStage ? `When this stage feels solid, move next into ${nextStage.label}.` : "This is the final handoff stage for the current workflow."}
+              The app is regrouped into fewer major stages so you can see where to start, where the design lives, and where delivery happens.
             </p>
+          </div>
+
+          <nav className="project-group-nav">
+            {groups.map((group) => {
+              const isActive = activeGroup === group.key;
+              return (
+                <div key={group.key} className="project-group-block">
+                  <NavLink
+                    to={group.path}
+                    className={({ isActive: routeActive }) => (
+                      isActive || routeActive ? "project-group-link active" : "project-group-link"
+                    )}
+                  >
+                    <span>{group.label}</span>
+                    <small>{group.summary}</small>
+                  </NavLink>
+
+                  {isActive && group.children ? (
+                    <div className="project-subnav-list">
+                      {group.children.map((tab) => (
+                        <NavLink
+                          key={tab.key}
+                          to={tab.path}
+                          className={({ isActive: routeActive }) => (routeActive ? "project-subnav-link active" : "project-subnav-link")}
+                        >
+                          <span>{tab.label}</span>
+                          {tab.description ? <small>{tab.description}</small> : null}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+
+            <details className="project-support-group" open={activeGroup === "support"}>
+              <summary>Support</summary>
+              <div className="project-subnav-list" style={{ marginTop: 10 }}>
+                {supportTabs.map((tab) => (
+                  <NavLink
+                    key={tab.key}
+                    to={tab.path}
+                    className={({ isActive }) => (isActive ? "project-subnav-link active" : "project-subnav-link")}
+                  >
+                    <span>{tab.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </details>
+          </nav>
+
+          <div className="trust-note">
+            <strong style={{ display: "block", marginBottom: 6 }}>Recommended next move</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              Keep the workflow simple: Discovery → Requirements → Design Package → Validation → Deliver.
+            </p>
+            <div className="form-actions" style={{ marginTop: 10 }}>
+              <Link to={nextAction.path} className="link-button">{nextAction.label}</Link>
+            </div>
           </div>
         </aside>
 
-        <main style={{ minWidth: 0 }}>
+        <main className="project-main-shell">
+          {tabSet.length > 0 ? (
+            <section className="panel project-tab-strip">
+              <div>
+                <strong style={{ display: "block", marginBottom: 4 }}>{activeGroup === "design" ? "Design Package" : activeGroup === "deliver" ? "Deliver" : "Support"}</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  {activeGroup === "design"
+                    ? "Use these focused tabs instead of hunting through many separate top-level pages."
+                    : activeGroup === "deliver"
+                      ? "Diagram, report, and export now live together as the delivery area."
+                      : "Secondary project tools live here instead of taking over the main workflow."}
+                </p>
+              </div>
+              <div className="project-tab-links">
+                {tabSet.map((tab) => (
+                  <NavLink
+                    key={tab.key}
+                    to={tab.path}
+                    className={({ isActive }) => (isActive ? "project-tab-link active" : "project-tab-link")}
+                  >
+                    {tab.label}
+                  </NavLink>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <Outlet />
         </main>
       </section>
