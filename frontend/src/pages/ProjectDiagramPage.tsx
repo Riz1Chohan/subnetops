@@ -1,0 +1,121 @@
+import { Link, useParams } from "react-router-dom";
+import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
+import { useProject, useProjectVlans } from "../features/projects/hooks";
+import { useProjectComments } from "../features/comments/hooks";
+import { SectionHeader } from "../components/app/SectionHeader";
+import { LoadingState } from "../components/app/LoadingState";
+import { EmptyState } from "../components/app/EmptyState";
+import { ErrorState } from "../components/app/ErrorState";
+import { parseRequirementsProfile } from "../lib/requirementsProfile";
+
+export function ProjectDiagramPage() {
+  const { projectId = "" } = useParams();
+  const projectQuery = useProject(projectId);
+  const vlansQuery = useProjectVlans(projectId);
+  const commentsQuery = useProjectComments(projectId);
+
+  const project = projectQuery.data;
+  const vlans = vlansQuery.data ?? [];
+  const comments = commentsQuery.data ?? [];
+  const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
+
+  if (projectQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the logical and physical diagram workspace." />;
+  if (projectQuery.isError) {
+    return (
+      <ErrorState
+        title="Unable to load diagram workspace"
+        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this diagram right now."}
+        action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
+      />
+    );
+  }
+  if (!project) {
+    return (
+      <EmptyState
+        title="Project not found"
+        message="The requested diagram workspace could not be loaded."
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
+
+  const enrichedProject = {
+    ...project,
+    sites: project.sites.map((site) => ({
+      ...site,
+      vlans: vlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
+    })),
+  };
+
+  const openSiteTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "SITE").length;
+  const openVlanTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "VLAN").length;
+  const cloudContext = requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected;
+
+  return (
+    <section style={{ display: "grid", gap: 18 }}>
+      <SectionHeader
+        title="Diagram workspace"
+        description="The diagram is now treated like a main artifact, not a squeezed side card. Use this stage for design review, explanation, and export."
+        actions={(
+          <div className="form-actions">
+            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
+            <Link to={`/projects/${projectId}/report`} className="link-button">Open Deliver Area</Link>
+          </div>
+        )}
+      />
+
+      <div className="panel diagram-stage-shell">
+        <div className="diagram-stage-meta">
+          <div className="network-chip-list">
+            <span className="badge-soft">Sites {enrichedProject.sites.length}</span>
+            <span className="badge-soft">VLANs {vlans.length}</span>
+            <span className="badge-soft">Site tasks {openSiteTasks}</span>
+            <span className="badge-soft">VLAN tasks {openVlanTasks}</span>
+            <span className="badge-soft">Mode-ready for export</span>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            The canvas below gets priority on widescreen layouts. Guide content is pushed down so the actual diagram can use the screen.
+          </p>
+        </div>
+
+        <div className="diagram-canvas-panel">
+          <ProjectDiagram project={enrichedProject} comments={comments} />
+        </div>
+      </div>
+
+      <details className="panel diagram-guide-panel">
+        <summary>Diagram reading guide and workflow tips</summary>
+        <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+          <div className="trust-note">
+            <strong>Reading the views</strong>
+            <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
+              <li><strong>Logical Design</strong> is best for segmentation, site blocks, VLAN structure, and engineering review.</li>
+              <li><strong>Physical / Topology</strong> is best for presenting perimeter, core, branch attachment, and local edge components.</li>
+              <li>Task markers still show where review work is concentrated.</li>
+            </ul>
+          </div>
+
+          <div className="grid-2" style={{ alignItems: "start" }}>
+            <div className="panel" style={{ padding: 14 }}>
+              <strong style={{ display: "block", marginBottom: 8 }}>Recommended workflow</strong>
+              <ol style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Run validation first so the diagram reflects a cleaner design state.</li>
+                <li>Use the logical view for engineering review.</li>
+                <li>Use the physical/topology view for handoff and explanation.</li>
+              </ol>
+            </div>
+
+            {cloudContext ? (
+              <div className="panel" style={{ padding: 14 }}>
+                <strong style={{ display: "block", marginBottom: 8 }}>Cloud / hybrid planning context</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  This project assumes {requirementsProfile.cloudProvider} over {requirementsProfile.cloudConnectivity}, with {requirementsProfile.cloudHostingModel}. The diagram should be read with a cloud boundary of {requirementsProfile.cloudIdentityBoundary} and a traffic model of {requirementsProfile.cloudTrafficBoundary}.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </details>
+    </section>
+  );
+}
