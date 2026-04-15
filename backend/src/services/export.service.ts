@@ -89,6 +89,24 @@ export interface ReportSection {
   tables?: ReportTable[];
 }
 
+export interface ReportMetadata {
+  organizationName: string;
+  environment: string;
+  reportVersion: string;
+  revisionStatus: string;
+  documentOwner: string;
+  approvalStatus: string;
+  projectPhase?: string;
+  planningFocus?: string;
+  primaryObjective?: string;
+  generatedFrom: string;
+}
+
+export interface ReportVisualSnapshot {
+  metrics: Array<[string, string]>;
+  topologyRows: string[][];
+}
+
 export interface ProfessionalReport {
   title: string;
   subtitle: string;
@@ -96,6 +114,8 @@ export interface ProfessionalReport {
   executiveSummary: string[];
   sections: ReportSection[];
   appendices?: ReportSection[];
+  metadata?: ReportMetadata;
+  visualSnapshot?: ReportVisualSnapshot;
 }
 export interface ExportSnapshot {
   generatedAt?: string;
@@ -519,6 +539,36 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     },
   ];
 
+  const reportMetadata: ReportMetadata = {
+    organizationName: asString(ctx.project.organizationName, "To be confirmed"),
+    environment: projectEnvironment,
+    reportVersion: "Version 0.92",
+    revisionStatus: ctx.errors.length > 0 ? "Draft - blockers present" : ctx.warnings.length > 0 ? "Review draft" : "Review-ready draft",
+    documentOwner: asString(ctx.project.ownerName, "SubnetOps project owner"),
+    approvalStatus: ctx.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
+    projectPhase: asString(ctx.requirements.projectPhase, "To be confirmed"),
+    planningFocus: asString(ctx.planningFor, "To be confirmed"),
+    primaryObjective: asString(ctx.primaryGoal, "To be confirmed"),
+    generatedFrom: "Saved project records and synthesized planning outputs",
+  };
+
+  const visualSnapshot: ReportVisualSnapshot = {
+    metrics: [
+      ["Sites in scope", String(ctx.siteCount)],
+      ["Addressing rows", String(ctx.vlanCount)],
+      ["Security zones", String(ctx.securityZones.length)],
+      ["Validation blockers", String(ctx.errors.length)],
+      ["Validation warnings", String(ctx.warnings.length)],
+      ["Base range", asString(ctx.project.basePrivateRange, "Working range pending confirmation")],
+    ],
+    topologyRows: [
+      ["Edge / Internet", ctx.internetModel || "Single internet edge pending refinement", ctx.siteCount > 1 ? "Prefer explicit WAN summaries between sites" : "Keep the routed edge intentionally simple"],
+      ["Core / Distribution", ctx.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
+      ["Services", ctx.serverPlacement || "Small centralized service block", "Keep shared services separated from users and guest access"],
+      ["Security", humanJoin(ctx.securityZones) || "Users and services", "Apply default-deny principles between unlike trust boundaries"],
+    ],
+  };
+
   return {
     title: ctx.project.reportHeader || `${ctx.project.name} Technical Design Report`,
     subtitle: `${ctx.project.name} — Professional Network Planning Package`,
@@ -526,6 +576,8 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     executiveSummary,
     sections: [introSection, discoverySection, hldSection, securitySection, addressingSection, routingSection, implementationSection, platformSection, risksSection, conclusionSection],
     appendices,
+    metadata: reportMetadata,
+    visualSnapshot,
   } satisfies ProfessionalReport;
 }
 
@@ -1108,6 +1160,36 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     },
   ];
 
+  const reportMetadata: ReportMetadata = {
+    organizationName,
+    environment,
+    reportVersion: "Version 0.92",
+    revisionStatus: counts.errors > 0 ? "Draft - blockers present" : counts.warnings > 0 ? "Review draft" : "Review-ready draft",
+    documentOwner: asString(project.ownerName, "SubnetOps project owner"),
+    approvalStatus: counts.errors > 0 ? "Not ready for approval" : "Ready for technical review",
+    projectPhase: asString(profile.projectPhase, "To be confirmed"),
+    planningFocus: asString(profile.planningFor, "To be confirmed"),
+    primaryObjective: asString(profile.primaryGoal, "To be confirmed"),
+    generatedFrom: "Active synthesized design snapshot from Deliver / Report",
+  };
+
+  const visualSnapshot: ReportVisualSnapshot = {
+    metrics: [
+      ["Sites in scope", String(siteCount)],
+      ["Addressing rows", String(rowCount)],
+      ["Security zones", String(securityZones.length || logicalDomains.length)],
+      ["Validation blockers", String(counts.errors)],
+      ["Validation warnings", String(counts.warnings)],
+      ["Base range", organizationBlock],
+    ],
+    topologyRows: [
+      ["Edge / Internet", asString(profile.internetModel, asString(highLevelDesign.wanArchitecture, "Edge model to be confirmed")), siteCount > 1 ? "Keep site-to-site transport summarized and review cloud/provider boundaries carefully" : "Keep north-south routing ownership explicit at the edge"],
+      ["Core / Distribution", asString(highLevelDesign.layerModel, "Layering still requires confirmation"), siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed edge should still preserve segmentation and fault boundaries"],
+      ["Services", asString(profile.serverPlacement, asString(highLevelDesign.dataCenterArchitecture, "Service placement to be confirmed")), "Keep service zones separated from users, guest access, and management"],
+      ["Security", zonesInScope.join(", ") || "To be confirmed", "Treat the zone model as a structural boundary plan for later enforcement"],
+    ],
+  };
+
   return {
     title: asString(project.reportHeader, `${projectName} Technical Design Report`),
     subtitle: `${projectName} — Professional Network Planning Package`,
@@ -1115,6 +1197,8 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     executiveSummary,
     sections,
     appendices,
+    metadata: reportMetadata,
+    visualSnapshot,
   } satisfies ProfessionalReport;
 }
 
