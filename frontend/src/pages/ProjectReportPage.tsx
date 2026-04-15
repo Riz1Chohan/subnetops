@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -15,6 +15,7 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "../lib/discoveryFoundation";
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
+import { apiBlob } from "../lib/api";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -44,6 +45,18 @@ function generatedSummary({ projectName, environmentType, siteCount, rowCount, e
   return `${projectName} is a ${environment.toLowerCase()} network plan covering ${siteCount} site${siteCount === 1 ? "" : "s"} and ${rowCount} addressing plan row${rowCount === 1 ? "" : "s"}. ${readiness}`;
 }
 
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export function ProjectReportPage() {
   const { projectId = "" } = useParams();
   const authQuery = useCurrentUser();
@@ -51,6 +64,7 @@ export function ProjectReportPage() {
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
@@ -144,6 +158,30 @@ export function ProjectReportPage() {
     .filter((item) => item.severity !== "INFO")
     .sort((a, b) => (a.severity === b.severity ? a.createdAt.localeCompare(b.createdAt) : a.severity === "ERROR" ? -1 : 1))
     .slice(0, 8);
+  const exportBlockers = [
+    errorCount > 0 ? `${errorCount} validation blocker${errorCount === 1 ? "" : "s"} still open` : null,
+    synthesized.addressingPlan.length === 0 ? "No addressing plan rows generated yet" : null,
+    synthesized.siteSummaries.length === 0 ? "No site design has been defined yet" : null,
+  ].filter(Boolean) as string[];
+  const includedArtifacts = [
+    "Executive / technical report preview",
+    `${synthesized.addressingPlan.length} addressing rows`,
+    `${synthesized.securityZones.length} security zones`,
+    `${synthesized.routePolicies.length} routing policy items`,
+    `${platformFoundation.totals.lineItems} BOM foundation line items`,
+    `${validations.length} validation findings`,
+  ];
+
+  const downloadExport = async (kind: "pdf" | "csv") => {
+    try {
+      setExportMessage(kind === "pdf" ? "Preparing technical PDF export..." : "Preparing Excel-friendly CSV export...");
+      const blob = await apiBlob(`/export/projects/${projectId}/${kind}`);
+      saveBlob(blob, kind === "pdf" ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-technical-package.pdf` : `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-addressing-export.csv`);
+      setExportMessage(kind === "pdf" ? "Technical PDF exported." : "Excel-friendly CSV exported.");
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message : "Export failed.");
+    }
+  };
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -159,8 +197,10 @@ export function ProjectReportPage() {
             <h1 style={{ marginBottom: 8 }}>{project.reportHeader || `${project.name} — Logical Design Package`}</h1>
             <p className="muted" style={{ margin: 0 }}>{summary}</p>
           </div>
-          <div className="form-actions">
-            <button type="button" onClick={() => window.print()}>Print / Save PDF</button>
+          <div className="form-actions" style={{ flexWrap: "wrap" }}>
+            <button type="button" onClick={() => void downloadExport("pdf")}>Export Technical PDF</button>
+            <button type="button" className="link-button" onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
+            <button type="button" className="link-button" onClick={() => window.print()}>Print / Save current view</button>
             <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
             <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Table</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link>
@@ -168,6 +208,40 @@ export function ProjectReportPage() {
           </div>
         </div>
       </header>
+
+
+      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: "0 0 8px 0" }}>Deliver Center</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              Use this area to export the technical package, save an approval PDF, and confirm whether the current design is ready to hand off.
+            </p>
+          </div>
+          <span className="badge-soft">{exportBlockers.length === 0 ? "Export ready" : `${exportBlockers.length} review item${exportBlockers.length === 1 ? "" : "s"}`}</span>
+        </div>
+
+        {exportMessage ? <div className="panel" style={{ padding: 12, background: "rgba(17,24,39,0.03)" }}><span className="muted">{exportMessage}</span></div> : null}
+
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <details className="panel" open>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Included artifacts</summary>
+            <ul style={{ margin: "12px 0 0", paddingLeft: 18 }}>
+              {includedArtifacts.map((item) => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+            </ul>
+          </details>
+          <details className="panel" open>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Export blockers and review notes</summary>
+            {exportBlockers.length === 0 ? (
+              <p className="muted" style={{ margin: "12px 0 0" }}>No hard blockers are currently stopping package export.</p>
+            ) : (
+              <ul style={{ margin: "12px 0 0", paddingLeft: 18 }}>
+                {exportBlockers.map((item) => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+              </ul>
+            )}
+          </details>
+        </div>
+      </div>
 
       <UsageBanner
         planTier={authQuery.data?.user.planTier}

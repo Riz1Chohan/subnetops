@@ -23,6 +23,7 @@ export function ProjectSitesPage() {
 
   const sites = sitesQuery.data ?? [];
   const editId = searchParams.get("edit");
+  const returnToValidation = searchParams.get("returnTo") === "validation";
 
   useEffect(() => {
     if (!editId || sites.length === 0) return;
@@ -67,6 +68,16 @@ export function ProjectSitesPage() {
           )
         }
       />
+
+      {returnToValidation ? (
+        <div className="panel" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap", background: "rgba(17,24,39,0.03)" }}>
+          <div>
+            <strong style={{ display: "block", marginBottom: 6 }}>Validation fix workflow</strong>
+            <p className="muted" style={{ margin: 0 }}>Make the change here, save it, and then return to validation to confirm the finding drops out of the review list.</p>
+          </div>
+          <Link to={`/projects/${projectId}/validation`} className="link-button">Back to Validation</Link>
+        </div>
+      ) : null}
 
       {showCreate || editingSite ? (
         <div className="panel">

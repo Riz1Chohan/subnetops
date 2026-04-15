@@ -8,6 +8,7 @@ import type { AIPlanDraft, Site } from "../lib/types";
 import { createSite } from "../features/sites/api";
 import { createVlan } from "../features/vlans/api";
 import { SectionHeader } from "../components/app/SectionHeader";
+import { runValidation } from "../features/validation/api";
 import { HelpTip } from "../components/app/HelpTip";
 import {
   buildGuidedDescription,
@@ -238,6 +239,8 @@ export function NewProjectPage() {
   const [aiDraft, setAiDraft] = useState<AIPlanDraft | null>(null);
   const [useOptions, setUseOptions] = useState<AIUseDraftOptions>(defaultUseOptions);
   const [generationStatus, setGenerationStatus] = useState("");
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [guided, setGuided] = useState<RequirementsProfile>({ ...defaultRequirementsProfile, projectPhase: "New network build" });
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -985,51 +988,73 @@ export function NewProjectPage() {
                 </div>
               ) : null}
 
+              {submitMessage ? <div className="panel" style={{ padding: 12, borderColor: "rgba(40,167,69,0.35)", background: "rgba(40,167,69,0.08)" }}><strong style={{ display: "block", marginBottom: 4 }}>{submitMessage}</strong><span className="muted">Redirecting you back to the dashboard so the new project is easy to find.</span></div> : null}
+              {submitError ? <div className="panel" style={{ padding: 12, borderColor: "rgba(220,53,69,0.35)", background: "rgba(220,53,69,0.08)" }}><strong style={{ display: "block", marginBottom: 4 }}>Project creation did not finish</strong><span className="muted">{submitError}</span></div> : null}
+
               <ProjectForm
                 initialValues={initialValues}
                 organizations={orgsQuery.data ?? []}
                 isSubmitting={mutation.isPending}
                 onSubmit={async (values) => {
-                  const project = await mutation.mutateAsync({ ...values, requirementsJson: stringifyRequirementsProfile(guided) });
+                  setSubmitMessage(null);
+                  setSubmitError(null);
 
-                  if (aiDraft && (useOptions.applySites || useOptions.applyVlans)) {
-                    const createdSitesByName = new Map<string, Site>();
+                  try {
+                    const project = await mutation.mutateAsync({ ...values, requirementsJson: stringifyRequirementsProfile(guided) });
+                    let importWarning = "";
 
-                    if (useOptions.applySites) {
-                      for (const siteDraft of aiDraft.sites) {
-                        const site = await createSite({
-                          projectId: project.id,
-                          name: siteDraft.name,
-                          location: siteDraft.location,
-                          siteCode: siteDraft.siteCode,
-                          defaultAddressBlock: siteDraft.defaultAddressBlock,
-                          notes: siteDraft.notes,
-                        });
-                        createdSitesByName.set(siteDraft.name, site);
+                    if (aiDraft && (useOptions.applySites || useOptions.applyVlans)) {
+                      const createdSitesByName = new Map<string, Site>();
+
+                      try {
+                        if (useOptions.applySites) {
+                          for (const siteDraft of aiDraft.sites) {
+                            const site = await createSite({
+                              projectId: project.id,
+                              name: siteDraft.name,
+                              location: siteDraft.location,
+                              siteCode: siteDraft.siteCode,
+                              defaultAddressBlock: siteDraft.defaultAddressBlock,
+                              notes: siteDraft.notes,
+                            });
+                            createdSitesByName.set(siteDraft.name, site);
+                          }
+                        }
+
+                        if (useOptions.applyVlans) {
+                          for (const vlanDraft of aiDraft.vlans) {
+                            const site = createdSitesByName.get(vlanDraft.siteName);
+                            if (!site) continue;
+                            await createVlan({
+                              siteId: site.id,
+                              vlanId: vlanDraft.vlanId,
+                              vlanName: vlanDraft.vlanName,
+                              purpose: vlanDraft.purpose,
+                              subnetCidr: vlanDraft.subnetCidr,
+                              gatewayIp: vlanDraft.gatewayIp,
+                              dhcpEnabled: vlanDraft.dhcpEnabled,
+                              estimatedHosts: vlanDraft.estimatedHosts,
+                              department: vlanDraft.department,
+                              notes: vlanDraft.notes,
+                            });
+                          }
+                        }
+                      } catch (error) {
+                        importWarning = error instanceof Error ? error.message : "The project was created, but some AI-generated sites or VLANs could not be imported.";
                       }
                     }
 
-                    if (useOptions.applyVlans) {
-                      for (const vlanDraft of aiDraft.vlans) {
-                        const site = createdSitesByName.get(vlanDraft.siteName);
-                        if (!site) continue;
-                        await createVlan({
-                          siteId: site.id,
-                          vlanId: vlanDraft.vlanId,
-                          vlanName: vlanDraft.vlanName,
-                          purpose: vlanDraft.purpose,
-                          subnetCidr: vlanDraft.subnetCidr,
-                          gatewayIp: vlanDraft.gatewayIp,
-                          dhcpEnabled: vlanDraft.dhcpEnabled,
-                          estimatedHosts: vlanDraft.estimatedHosts,
-                          department: vlanDraft.department,
-                          notes: vlanDraft.notes,
-                        });
-                      }
-                    }
+                    try {
+                      await runValidation(project.id);
+                    } catch {}
+
+                    setSubmitMessage(`Project "${project.name}" created successfully.`);
+                    const params = new URLSearchParams({ created: "1", projectId: project.id, name: project.name });
+                    if (importWarning) params.set("warning", importWarning);
+                    navigate(`/dashboard?${params.toString()}`);
+                  } catch (error) {
+                    setSubmitError(error instanceof Error ? error.message : "SubnetOps could not create the project right now.");
                   }
-
-                  navigate(`/projects/${project.id}/discovery?created=1`);
                 }}
               />
             </section>

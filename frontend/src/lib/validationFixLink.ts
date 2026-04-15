@@ -11,11 +11,11 @@ function requirementsAnchorForRule(ruleCode: string) {
 
 export function buildValidationFixPath(projectId: string, item: ValidationResult) {
   if (item.entityType === "SITE") {
-    return item.entityId ? `/projects/${projectId}/sites?edit=${encodeURIComponent(item.entityId)}` : `/projects/${projectId}/sites`;
+    return item.entityId ? `/projects/${projectId}/sites?edit=${encodeURIComponent(item.entityId)}&returnTo=validation` : `/projects/${projectId}/sites?returnTo=validation`;
   }
 
   if (item.entityType === "VLAN") {
-    return item.entityId ? `/projects/${projectId}/vlans?edit=${encodeURIComponent(item.entityId)}` : `/projects/${projectId}/vlans`;
+    return item.entityId ? `/projects/${projectId}/vlans?edit=${encodeURIComponent(item.entityId)}&returnTo=validation` : `/projects/${projectId}/vlans?returnTo=validation`;
   }
 
   const anchor = requirementsAnchorForRule(item.ruleCode);

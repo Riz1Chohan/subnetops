@@ -68,3 +68,10 @@ export function createTemplateProject(templateKey: "small-office" | "branch-offi
     body: JSON.stringify({ name }),
   });
 }
+
+
+export function deleteProject(projectId: string) {
+  return api<void>(`/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}
