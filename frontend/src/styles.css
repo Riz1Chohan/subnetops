@@ -935,6 +935,11 @@ tr:last-child td {
   top: 84px;
   display: grid;
   gap: 16px;
+  max-height: calc(100vh - 108px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
 }
 
 .project-group-nav {
@@ -1103,4 +1108,19 @@ tr:last-child td {
   .project-tab-strip {
     grid-template-columns: 1fr;
   }
+}
+
+
+.project-sidebar-grouped::-webkit-scrollbar {
+  width: 10px;
+}
+
+.project-sidebar-grouped::-webkit-scrollbar-thumb {
+  background: #c8d6ee;
+  border-radius: 999px;
+  border: 2px solid #f7faff;
+}
+
+.project-sidebar-grouped::-webkit-scrollbar-track {
+  background: transparent;
 }

@@ -140,6 +140,44 @@ export function ProjectOverviewPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            v93 starts turning requirements into explicit placement, path, and boundary objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Topology", synthesized.topology.topologyLabel)}
+          {summaryCard("Breakout", synthesized.topology.internetBreakout)}
+          {summaryCard("Primary site", synthesized.topology.primarySiteName || "TBD")}
+          {summaryCard("Redundancy", synthesized.topology.redundancyModel)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Placement highlights</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {synthesized.sitePlacements.slice(0, 6).map((item) => (
+                <li key={item.id} style={{ marginBottom: 8 }}><strong>{item.siteName}:</strong> {item.role} — {item.placement}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Critical flow paths</h3>
+            {synthesized.trafficFlows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No explicit flow paths resolved yet.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {synthesized.trafficFlows.slice(0, 5).map((item) => (
+                  <li key={item.id} style={{ marginBottom: 8 }}>
+                    <strong>{item.flowName}:</strong> {item.path.join(" → ")}
+                    <div className="muted" style={{ marginTop: 4 }}>{item.routeModel}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Current-state discovery foundation</h2>
           <p className="muted" style={{ margin: 0 }}>
             The design package is stronger when it starts from what exists today. This snapshot shows whether discovery has enough current-state context to support migration-ready decisions.
@@ -185,8 +223,12 @@ export function ProjectOverviewPage() {
         {summaryCard("Configured segments", synthesized.stats.configuredSegments)}
         {summaryCard("Transit links", synthesized.wanLinks.length)}
         {summaryCard("Security zones", synthesized.securityZones.length)}
+        {summaryCard("Placement objects", synthesized.sitePlacements.length)}
+        {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
         {summaryCard("Routing policies", synthesized.routePolicies.length)}
         {summaryCard("Routing identities", synthesized.routingPlan.filter((item) => item.loopbackCidr).length)}
+        {summaryCard("Service placements", synthesized.servicePlacements.length)}
+        {summaryCard("Boundary rows", synthesized.securityBoundaries.length)}
         {summaryCard("Config templates", synthesized.configurationTemplates.length)}
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div>
