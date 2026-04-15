@@ -182,7 +182,6 @@ export function ProjectReportPage() {
           environmentType: project.environmentType,
           basePrivateRange: project.basePrivateRange,
           reportHeader: project.reportHeader,
-          planningNarrative: project.planningNarrative,
           logoUrl: project.logoUrl,
           approvalStatus: project.approvalStatus,
           requirementsJson: project.requirementsJson,
