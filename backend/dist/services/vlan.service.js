@@ -1,0 +1,36 @@
+import { prisma } from "../db/prisma.js";
+import { ApiError } from "../utils/apiError.js";
+import { addChangeLog } from "./changeLog.service.js";
+import { ensureCanEditProject } from "./access.service.js";
+export async function createVlan(userId, planTier, data, actorLabel) {
+    const site = await prisma.site.findFirst({ where: { id: data.siteId }, include: { project: true } });
+    if (!site)
+        throw new ApiError(404, "Site not found");
+    await ensureCanEditProject(userId, site.projectId);
+    if (planTier === "FREE") {
+        const vlanCount = await prisma.vlan.count({ where: { site: { projectId: site.projectId } } });
+        if (vlanCount >= 15)
+            throw new ApiError(403, "Free plan limit reached: up to 15 VLANs per project allowed.");
+    }
+    const vlan = await prisma.vlan.create({ data });
+    await addChangeLog(site.projectId, `VLAN created: ${vlan.vlanId} ${vlan.vlanName}`, actorLabel);
+    return vlan;
+}
+export async function updateVlan(vlanId, userId, data, actorLabel) {
+    const vlan = await prisma.vlan.findFirst({ where: { id: vlanId }, include: { site: true } });
+    if (!vlan)
+        throw new ApiError(404, "VLAN not found");
+    await ensureCanEditProject(userId, vlan.site.projectId);
+    const updated = await prisma.vlan.update({ where: { id: vlanId }, data });
+    await addChangeLog(vlan.site.projectId, `VLAN updated: ${updated.vlanId} ${updated.vlanName}`, actorLabel);
+    return updated;
+}
+export async function deleteVlan(vlanId, userId, actorLabel) {
+    const vlan = await prisma.vlan.findFirst({ where: { id: vlanId }, include: { site: true } });
+    if (!vlan)
+        throw new ApiError(404, "VLAN not found");
+    await ensureCanEditProject(userId, vlan.site.projectId);
+    const deleted = await prisma.vlan.delete({ where: { id: vlanId } });
+    await addChangeLog(vlan.site.projectId, `VLAN deleted: ${deleted.vlanId} ${deleted.vlanName}`, actorLabel);
+    return deleted;
+}
