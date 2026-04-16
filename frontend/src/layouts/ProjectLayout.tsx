@@ -87,7 +87,7 @@ export function ProjectLayout() {
   const unresolvedTaskCount = comments.filter((item) => item.taskStatus !== "DONE").length;
   const siteCount = Math.max(sites.length, synthesized.siteSummaries.length);
   const vlanCount = Math.max(vlans.length, synthesized.addressingPlan.length);
-  const blockerCount = Math.max(errorCount, recoveryCompletion.mustFinish.length, workflowReview.actionQueue.filter((item) => item.severity !== "next").length);
+  const blockerCount = Math.max(errorCount, recoveryCompletion.mustFinish.length, workflowReview.actionQueue.filter((item) => item.severity !== "secondary").length);
   const openTaskCount = Math.max(unresolvedTaskCount, workflowReview.actionQueue.length);
   const notificationCount = notificationSummaryQuery.data?.unread ?? 0;
   const userLabel = displayName(authQuery.data?.user?.fullName, authQuery.data?.user?.email);
