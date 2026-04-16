@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -14,6 +14,8 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -41,6 +43,7 @@ function validationHealthLabel(errorCount: number, warningCount: number) {
 
 export function ProjectOverviewPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const authQuery = useCurrentUser();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
@@ -72,6 +75,11 @@ export function ProjectOverviewPage() {
   );
   const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
   const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
+  const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
+  const focusKey = issueNotice?.focus;
+  const focusClass = (key: string) => `panel workspace-focus-target ${focusKey === key ? "active" : ""}`.trim();
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading logical design" message="Preparing the synthesized HLD, LLD, and addressing outputs." />;
@@ -99,6 +107,17 @@ export function ProjectOverviewPage() {
   const decisions = synthesized.designReview.filter((item) => item.kind === "decision");
   const assumptions = synthesized.designReview.filter((item) => item.kind === "assumption");
   const risks = synthesized.designReview.filter((item) => item.kind === "risk");
+  const focusedSectionTitle = selectedSection === "summary"
+    ? "Design summary"
+    : selectedSection === "topology"
+      ? "Topology blueprint"
+      : selectedSection === "truth"
+        ? "Unified design truth"
+        : selectedSection === "lld"
+          ? "Site low-level design"
+          : selectedSection === "traceability"
+            ? "Traceability and implementation next steps"
+            : "Logical design";
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -129,7 +148,19 @@ export function ProjectOverviewPage() {
         }
       />
 
-      <div className="panel recovery-focus-panel">
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Design Package</p>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
+            <p className="muted" style={{ margin: 0 }}>Focused design view so the right pane only shows one strong design slice at a time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className={`${focusClass("traceability")} recovery-focus-panel`} style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Current recovery focus</h2>
           <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
@@ -155,7 +186,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 12 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
           <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
@@ -170,13 +201,15 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <UsageBanner
-        planTier={authQuery.data?.user.planTier}
-        siteCount={sites.length}
-        vlanCount={vlans.length}
-      />
+      {!isFocusedSectionView ? (
+        <UsageBanner
+          planTier={authQuery.data?.user.planTier}
+          siteCount={sites.length}
+          vlanCount={vlans.length}
+        />
+      ) : null}
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery completion before the master roadmap</h2>
           <p className="muted" style={{ margin: 0 }}>{recoveryCompletion.summary}</p>
@@ -209,7 +242,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("site-authority")} style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -247,7 +280,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "truth" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Unified design truth layer</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -281,7 +314,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "truth" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Current-state discovery foundation</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -321,7 +354,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "truth" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{synthesized.designEngineFoundation.stageLabel}</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -371,7 +404,7 @@ export function ProjectOverviewPage() {
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "truth" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Platform profile and BOM foundation</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -407,7 +440,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>High-Level Design blueprint</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -438,7 +471,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing and switching design intent</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -538,7 +571,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Logical domains and trust boundaries</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -571,7 +604,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security architecture and segmentation intent</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -612,7 +645,7 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("lld")} style={{ display: selectedSection && selectedSection !== "lld" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Low-Level Design by site</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -670,7 +703,7 @@ export function ProjectOverviewPage() {
       </div>
 
       <div className="grid-2" style={{ alignItems: "start" }}>
-        <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div className={focusClass("traceability")} style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement-to-design traceability</h2>
           <p className="muted" style={{ margin: 0 }}>
             This section is important because the tool should explain why it proposed a design, not just what it proposed.
@@ -697,7 +730,7 @@ export function ProjectOverviewPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Design decisions, assumptions, and risks</h2>
           <div style={{ display: "grid", gap: 10 }}>
             <div>
@@ -738,7 +771,7 @@ export function ProjectOverviewPage() {
       </div>
 
       <div className="grid-2" style={{ alignItems: "start" }}>
-        <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Address hierarchy snapshot</h2>
           <p className="muted" style={{ margin: 0 }}>
             The HLD/LLD output still depends on a clean address hierarchy. Review this quickly here, then use the Addressing Plan workspace for full detail.
@@ -772,7 +805,7 @@ export function ProjectOverviewPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Implementation next steps</h2>
           <p className="muted" style={{ margin: 0 }}>Rollout: {synthesized.implementationPlan.rolloutStrategy}</p>
           <p className="muted" style={{ margin: 0 }}>Validation: {synthesized.implementationPlan.validationApproach}</p>

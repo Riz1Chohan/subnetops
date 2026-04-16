@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { EmptyState } from "../components/app/EmptyState";
@@ -8,6 +8,8 @@ import { useProject, useProjectSites, useProjectVlans } from "../features/projec
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -33,6 +35,7 @@ function reviewBadge(severity: "critical" | "warning" | "info") {
 
 export function ProjectSecurityPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -70,6 +73,12 @@ export function ProjectSecurityPage() {
   }
 
   const recovery = buildRecoveryRoadmapStatus(synthesized);
+  const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
+  const focusKey = issueNotice?.focus;
+  const focusClass = (key: string) => `panel workspace-focus-target ${focusKey === key ? "active" : ""}`.trim();
+  const focusedSectionTitle = selectedSection === "boundaries" ? "Security boundaries" : selectedSection === "policy" ? "Policy-intent matrix" : selectedSection === "controls" ? "Controls and segmentation review" : "Security overview";
 
   const criticalFindings = synthesized.segmentationReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.segmentationReview.filter((item) => item.severity === "warning").length;
@@ -90,7 +99,19 @@ export function ProjectSecurityPage() {
         }
       />
 
-      <div className="panel" style={{ display: "grid", gap: 12 }}>
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Design Package</p>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
+            <p className="muted" style={{ margin: 0 }}>Focused security view so the right pane stays on one trust or policy slice at a time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Security zones {synthesized.securityZones.length}</span>
           <span className="badge-soft">Controls {synthesized.securityControls.length}</span>
@@ -103,7 +124,7 @@ export function ProjectSecurityPage() {
         </p>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security recovery status</h2>
@@ -139,14 +160,14 @@ export function ProjectSecurityPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "boundaries" ? "none" : "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Security zones", synthesized.securityZones.length, "Distinct trust boundaries carried in the logical design.")}
         {summaryCard("Required controls", synthesized.securityControls.filter((item) => item.status === "required").length, "Controls that should not be skipped for the saved scope.")}
         {summaryCard("Policy-intent flows", synthesized.securityPolicyMatrix.length, "Reviewed inter-zone flow expectations before implementation.")}
         {summaryCard("Open security findings", synthesized.segmentationReview.filter((item) => item.severity !== "info").length, "Critical and warning findings that still need engineering review.")}
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("boundary-truth")} style={{ display: "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Boundary truth layer from the core model</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -183,7 +204,7 @@ export function ProjectSecurityPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "boundaries" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security zones and trust boundaries</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -222,7 +243,7 @@ export function ProjectSecurityPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "controls" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Control recommendations</h2>
@@ -244,7 +265,7 @@ export function ProjectSecurityPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div className={focusClass("segmentation-review")} style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Segmentation review</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -266,7 +287,7 @@ export function ProjectSecurityPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "policy" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Policy-intent matrix</h2>
           <p className="muted" style={{ margin: 0 }}>

@@ -21,11 +21,15 @@ import {
 } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 export function ProjectRequirementsPage() {
   const { projectId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const requestedStep = searchParams.get("step");
+  const isFocusedStepView = Boolean(requestedStep);
+  const issueNotice = parseWorkspaceIssueNotice(`?${searchParams.toString()}`);
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -1395,6 +1399,58 @@ export function ProjectRequirementsPage() {
     return <EmptyState title="Project not found" message="The requirements workspace could not be loaded for this project." action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>} />;
   }
 
+  if (isFocusedStepView) {
+    return (
+      <section className="workspace-detail-shell">
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Requirements</p>
+            <h1 style={{ margin: "0 0 8px 0" }}>{currentStep.title}</h1>
+            <p className="muted" style={{ margin: 0 }}>{currentStep.summary}</p>
+          </div>
+          <div className="workspace-detail-actions">
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save Requirements"}
+            </button>
+          </div>
+        </div>
+
+        <div className="panel workspace-detail-status-strip">
+          <span className={`badge-soft ${hasUnsavedChanges ? "workspace-detail-warning" : ""}`.trim()}>{hasUnsavedChanges ? "Unsaved changes" : "Saved to project"}</span>
+          <span className="badge-soft">{readinessSummary.completionLabel}</span>
+          <span className="badge-soft">Step {currentStepIndex + 1} of {stepDefinitions.length}</span>
+          {draftSavedAt ? <span className="badge-soft">Draft {new Date(draftSavedAt).toLocaleString()}</span> : null}
+        </div>
+
+        <WorkspaceIssueBanner notice={issueNotice} />
+
+        <div className={`panel planner-step-panel planner-step-panel-frame ${issueNotice ? "workspace-focus-target active" : ""}`.trim()} style={{ display: "grid", gap: 12 }}>
+          {currentStep.panel}
+        </div>
+
+        <div className="panel workspace-detail-footer">
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {previousStep ? (
+              <Link to={`/projects/${projectId}/requirements?step=${previousStep.key}`} className="button-nav">Back: {previousStep.title}</Link>
+            ) : (
+              <span className="muted">You are at the first visible requirements card.</span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save"}
+            </button>
+            {nextStep ? (
+              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary">Next: {nextStep.title}</Link>
+            ) : (
+              <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
@@ -1409,6 +1465,8 @@ export function ProjectRequirementsPage() {
           </>
         }
       />
+
+      <WorkspaceIssueBanner notice={issueNotice} />
 
       <div className="panel save-confidence-panel">
         <div>
@@ -1578,7 +1636,9 @@ export function ProjectRequirementsPage() {
               </div>
             ) : null}
 
-            <div className="panel planner-step-panel planner-step-panel-frame" style={{ display: "grid", gap: 12 }}>
+            <WorkspaceIssueBanner notice={issueNotice} />
+
+        <div className={`panel planner-step-panel planner-step-panel-frame ${issueNotice ? "workspace-focus-target active" : ""}`.trim()} style={{ display: "grid", gap: 12 }}>
               <div className="planner-step-heading">
                 <div>
                   <h2 style={{ margin: 0 }}>{currentStep.title}</h2>

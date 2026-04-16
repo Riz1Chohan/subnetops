@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { EmptyState } from "../components/app/EmptyState";
@@ -10,6 +10,8 @@ import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -36,6 +38,7 @@ function authorityBadge(status: "strong" | "mixed" | "weak") {
 
 export function ProjectCoreModelPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -86,6 +89,12 @@ export function ProjectCoreModelPage() {
   const recovery = buildRecoveryRoadmapStatus(synthesized);
   const focusPlan = buildRecoveryFocusPlan(projectId, synthesized);
   const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
+  const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
+  const focusKey = issueNotice?.focus;
+  const focusClass = (key: string) => `panel workspace-focus-target ${focusKey === key ? "active" : ""}`.trim();
+  const focusedSectionTitle = selectedSection === "sites" ? "Per-site truth" : selectedSection === "recovery" ? "Recovery and repair" : selectedSection === "linkage" ? "Route and boundary linkage" : selectedSection === "coverage" ? "Model coverage" : "Authority ledger";
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -104,7 +113,19 @@ export function ProjectCoreModelPage() {
         }
       />
 
-      <div className="panel recovery-focus-panel">
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Design Package</p>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
+            <p className="muted" style={{ margin: 0 }}>Focused core-model view so the right pane stays on one truth-layer slice at a time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className="panel recovery-focus-panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority cleanup focus</h2>
           <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
@@ -129,7 +150,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 12 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Topology {truth.topologyLabel}</span>
           <span className="badge-soft">Breakout {truth.internetBreakout}</span>
@@ -142,8 +163,8 @@ export function ProjectCoreModelPage() {
         <p className="muted" style={{ margin: 0 }}>{truth.summary}</p>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="grid-2" style={{ display: selectedSection && !["authority", "sites"].includes(selectedSection) ? "none" : "grid", alignItems: "start" }}>
+        <div className={focusClass("authority-ledger")} style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority-source ledger</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -185,7 +206,7 @@ export function ProjectCoreModelPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div className={focusClass("site-authority")} style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Per-site truth pressure</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -220,7 +241,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "recovery" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery roadmap status</h2>
@@ -284,7 +305,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
         {summaryCard("Site nodes", truth.siteNodes.length, "Each site should now carry routing, service, boundary, and flow references.")}
         {summaryCard("Segments", truth.segments.length, "Addressing rows promoted into linked segment objects.")}
         {summaryCard("Route domains", truth.routeDomains.length, "Per-site routing intent and summary ownership.")}
@@ -293,7 +314,7 @@ export function ProjectCoreModelPage() {
         {summaryCard("Relationship edges", truth.relationshipEdges.length, "Cross-object links inside the shared model.")}
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority split</h2>
@@ -334,7 +355,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Model coverage</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -353,7 +374,7 @@ export function ProjectCoreModelPage() {
           ))}
         </div>
       </div>
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("flow-coverage")} style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Required flow coverage</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -375,7 +396,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "sites" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Site unification table</h2>
@@ -425,7 +446,7 @@ export function ProjectCoreModelPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div className={focusClass("unresolved-references")} style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Unresolved references</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -449,7 +470,7 @@ export function ProjectCoreModelPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "linkage" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Route and WAN linkage</h2>

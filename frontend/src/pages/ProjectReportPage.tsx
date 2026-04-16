@@ -3,6 +3,8 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 import { UsageBanner } from "../components/app/UsageBanner";
 import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import { ValidationList } from "../features/validation/components/ValidationList";
@@ -80,6 +82,8 @@ export function ProjectReportPage() {
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
   const synthesized = useMemo(
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
@@ -225,8 +229,45 @@ export function ProjectReportPage() {
     .sort((a, b) => (a.severity === b.severity ? a.createdAt.localeCompare(b.createdAt) : a.severity === "ERROR" ? -1 : 1))
     .slice(0, 8);
 
+  const focusedSectionTitle = selectedSection === "assumptions"
+    ? "Design assumptions and constraints"
+    : selectedSection === "naming"
+      ? "Naming standard"
+      : selectedSection === "topology"
+        ? "Topology and placement"
+        : selectedSection === "addressing"
+          ? "Addressing hierarchy"
+          : selectedSection === "services-security"
+            ? "Services and boundaries"
+            : selectedSection === "routing-flows"
+              ? "Routing and traffic flows"
+              : selectedSection === "site-lld"
+                ? "Site low-level design"
+                : selectedSection === "validation"
+                  ? "Validation findings"
+                  : selectedSection === "implementation"
+                    ? "Implementation and cutover"
+                    : selectedSection === "issues"
+                      ? "Open issues and confirmations"
+                      : "Report";
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
+      {isFocusedSectionView ? (
+        <>
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Deliver</p>
+            <h1 style={{ margin: "0 0 8px 0" }}>{focusedSectionTitle}</h1>
+            <p className="muted" style={{ margin: 0 }}>Use the left pane to move between report sections. Only the selected deliverable section is shown here.</p>
+          </div>
+          <div className="workspace-detail-actions">
+            <button type="button" onClick={() => void downloadExport("docx")}>Export DOCX</button>
+          </div>
+        </div>
+        <WorkspaceIssueBanner notice={issueNotice} />
+        </>
+      ) : (
       <header className="panel report-hero">
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -251,15 +292,18 @@ export function ProjectReportPage() {
           {exportMessage ? <div className="panel" style={{ padding: 12, background: "rgba(17,24,39,0.03)" }}><span className="muted">{exportMessage}</span></div> : null}
         </div>
       </header>
+      )}
 
-      <UsageBanner
+      {!isFocusedSectionView ? <WorkspaceIssueBanner notice={issueNotice} /> : null}
+
+      {!isFocusedSectionView ? <UsageBanner
         planTier={authQuery.data?.user.planTier}
         siteCount={sites.length}
         vlanCount={vlans.length}
-      />
+      /> : null}
 
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+      {!isFocusedSectionView ? <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Sites", synthesized.siteSummaries.length)}
         {summaryCard("Address rows", synthesized.addressingPlan.length)}
         {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
@@ -268,7 +312,7 @@ export function ProjectReportPage() {
         {summaryCard("Validation blockers", errorCount)}
         {summaryCard("Warnings", warningCount)}
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
-      </div>
+      </div> : null}
 
 
       <div data-report-section="assumptions" className="panel report-section" style={{ display: selectedSection && selectedSection !== "assumptions" ? "none" : "grid", gap: 14 }}>

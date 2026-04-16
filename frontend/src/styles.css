@@ -2703,3 +2703,88 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
+
+.project-user-identity {
+  display: grid;
+  gap: 4px;
+}
+
+.project-user-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.workspace-detail-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-detail-hero {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.workspace-detail-kicker {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.workspace-detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-detail-status-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.workspace-detail-warning {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.workspace-detail-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+
+/* v286 issue navigation + focus highlight */
+.workspace-issue-banner {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.workspace-issue-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1d4ed8;
+}
+
+.workspace-focus-target.active {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}

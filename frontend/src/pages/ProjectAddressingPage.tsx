@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { EmptyState } from "../components/app/EmptyState";
@@ -8,6 +8,8 @@ import { useProject, useProjectSites, useProjectVlans } from "../features/projec
 import { useValidationResults } from "../features/validation/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -25,6 +27,7 @@ function percentLabel(value: number) {
 
 export function ProjectAddressingPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -42,6 +45,10 @@ export function ProjectAddressingPage() {
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
+  const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
+  const focusedSectionTitle = selectedSection === "hierarchy" ? "Address hierarchy" : selectedSection === "table" ? "Full logical addressing plan" : selectedSection === "segments" ? "Segment model" : selectedSection === "handoff" ? "Addressing handoff" : "Addressing overview";
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading addressing plan" message="Composing the site hierarchy, segment model, and full logical address table." />;
@@ -80,7 +87,19 @@ export function ProjectAddressingPage() {
         }
       />
 
-      <div className="panel" style={{ display: "grid", gap: 12 }}>
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Design Package</p>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
+            <p className="muted" style={{ margin: 0 }}>Focused addressing view so the right pane stays on one design object at a time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div className="trust-note">
           <p className="muted" style={{ margin: 0 }}>
             <strong>{synthesized.designEngineFoundation.stageLabel}:</strong> {synthesized.designEngineFoundation.summary}
@@ -103,7 +122,7 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         {summaryCard("Organization capacity", synthesized.organizationHierarchy.organizationCapacity || "—", synthesized.organizationHierarchy.organizationCapacity ? `${synthesized.organizationHierarchy.allocatedSiteAddresses} addresses allocated to site blocks` : "Save a real project base range to lock the hierarchy." )}
         {summaryCard("Organization utilization", percentLabel(synthesized.organizationHierarchy.organizationUtilization), `${synthesized.organizationHierarchy.organizationHeadroom} addresses still unallocated at org level`)}
         {summaryCard("Segment rows", synthesized.addressingPlan.length, `${synthesized.stats.configuredSegments} configured • ${synthesized.stats.proposedSegments} proposed`)}
@@ -111,7 +130,7 @@ export function ProjectAddressingPage() {
         {summaryCard("Open issues", synthesized.openIssues.length, synthesized.openIssues.length > 0 ? "These are the design gaps to resolve before implementation." : "No major addressing issues are currently surfaced." )}
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1.2fr 0.8fr" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", alignItems: "start", gridTemplateColumns: "1.2fr 0.8fr" }}>
         <div className="panel" style={{ display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>What this page is supposed to answer</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -142,7 +161,7 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "hierarchy" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Organization and site hierarchy</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -185,8 +204,8 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1fr 1fr" }}>
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "hierarchy" ? "none" : "grid", alignItems: "start", gridTemplateColumns: "1fr 1fr" }}>
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "hierarchy" ? "none" : "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing and summarization handoff</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -221,7 +240,7 @@ export function ProjectAddressingPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "hierarchy" ? "none" : "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>WAN and cloud edge transit plan</h2>
             <p className="muted" style={{ margin: 0 }}>
@@ -265,7 +284,7 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "handoff" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Implementation-ready handoff actions</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -279,7 +298,7 @@ export function ProjectAddressingPage() {
         </ul>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "segments" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recommended segment model</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -322,7 +341,7 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1fr 1fr" }}>
+      <div className="grid-2" style={{ display: selectedSection && !["segments", "handoff"].includes(selectedSection) ? "none" : "grid", alignItems: "start", gridTemplateColumns: "1fr 1fr" }}>
         <div className="panel" style={{ display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Design decisions and assumptions</h2>
           <div style={{ display: "grid", gap: 10 }}>
@@ -351,7 +370,7 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "table" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Full logical addressing plan</h2>
           <p className="muted" style={{ margin: 0 }}>

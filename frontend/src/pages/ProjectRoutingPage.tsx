@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { EmptyState } from "../components/app/EmptyState";
@@ -8,6 +8,8 @@ import { useProject, useProjectSites, useProjectVlans } from "../features/projec
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -27,6 +29,7 @@ function severityBadge(severity: "critical" | "warning" | "info") {
 
 export function ProjectRoutingPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -64,6 +67,12 @@ export function ProjectRoutingPage() {
   }
 
   const recovery = buildRecoveryRoadmapStatus(synthesized);
+  const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
+  const focusKey = issueNotice?.focus;
+  const focusClass = (key: string) => `panel workspace-focus-target ${focusKey === key ? "active" : ""}`.trim();
+  const focusedSectionTitle = selectedSection === "anchors" ? "Routing anchors" : selectedSection === "flows" ? "Required flow coverage" : selectedSection === "review" ? "Routing review" : selectedSection === "intent" ? "Routing and switching intent" : "Routing overview";
 
   const criticalFindings = synthesized.routingSwitchingReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.routingSwitchingReview.filter((item) => item.severity === "warning").length;
@@ -84,7 +93,19 @@ export function ProjectRoutingPage() {
         }
       />
 
-      <div className="panel" style={{ display: "grid", gap: 12 }}>
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Design Package</p>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
+            <p className="muted" style={{ margin: 0 }}>Focused routing view so the right pane stays on one transport or path slice at a time.</p>
+          </div>
+        </div>
+      ) : null}
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Protocols {synthesized.routingProtocols.length}</span>
           <span className="badge-soft">Route policies {synthesized.routePolicies.length}</span>
@@ -98,7 +119,7 @@ export function ProjectRoutingPage() {
         </p>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing recovery status</h2>
@@ -134,7 +155,7 @@ export function ProjectRoutingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "anchors" ? "none" : "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
         {summaryCard("Protocol decisions", synthesized.routingProtocols.length, "Internal and edge routing posture for the current design.")}
         {summaryCard("Route policies", synthesized.routePolicies.length, "Summarization, defaults, redistribution, and edge filtering.")}
         {summaryCard("Switching controls", synthesized.switchingDesign.length, "Layer 2 boundaries, loop prevention, uplinks, and access templates.")}
@@ -142,7 +163,7 @@ export function ProjectRoutingPage() {
         {summaryCard("Open review findings", synthesized.routingSwitchingReview.filter((item) => item.severity !== "info").length, "Critical and warning items still needing engineering review.")}
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("route-inference")} style={{ display: selectedSection && selectedSection !== "anchors" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Shared routing anchor from the core model</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -179,7 +200,7 @@ export function ProjectRoutingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className={focusClass("flow-coverage")} style={{ display: selectedSection && selectedSection !== "flows" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Required flow coverage tied to routing</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -212,7 +233,7 @@ export function ProjectRoutingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "intent" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing protocol and transport intent</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -245,7 +266,7 @@ export function ProjectRoutingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className="grid-2" style={{ display: selectedSection && selectedSection !== "intent" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Route policy and summarization</h2>
@@ -299,7 +320,7 @@ export function ProjectRoutingPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: "start" }}>
+      <div className={focusClass("traceability")} style={{ display: selectedSection && selectedSection !== "review" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>QoS and traffic treatment</h2>

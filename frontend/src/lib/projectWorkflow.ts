@@ -88,7 +88,7 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
         ? (requirementsGapCount > 0 ? [`${requirementsGapCount} site authority row${requirementsGapCount === 1 ? " still needs" : "s still need"} stronger upstream evidence.`] : [])
         : ["Discovery-backed route and boundary anchors are still thin."],
       recommendedActionLabel: "Open Discovery",
-      recommendedActionPath: `/projects/${projectId}/discovery`,
+      recommendedActionPath: `/projects/${projectId}/discovery?section=authority`,
     },
     {
       key: "requirements",
@@ -101,7 +101,7 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
         : `Requirements still leave ${requirementsGapCount} site authority row${requirementsGapCount === 1 ? "" : "s"} weaker than the rest of the design package.`,
       blockers: ledger.siteReviews.filter((site) => site.status !== "ready").slice(0, 2).map((site) => `${site.siteName}: ${site.blockers[0] || site.detail}`),
       recommendedActionLabel: "Open Requirements",
-      recommendedActionPath: `/projects/${projectId}/requirements`,
+      recommendedActionPath: `/projects/${projectId}/requirements?step=scenario`,
     },
     {
       key: "design",
@@ -132,7 +132,7 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
         ...ledger.debtItems.slice(0, 2).map((item) => item.title),
       ].slice(0, 3),
       recommendedActionLabel: validationErrorCount > 0 ? "Run Validation" : "Open Validation",
-      recommendedActionPath: `/projects/${projectId}/validation`,
+      recommendedActionPath: `/projects/${projectId}/validation?section=focus`,
     },
     {
       key: "deliver",
@@ -147,7 +147,7 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
         ...(phaseI?.blockers.slice(0, 1) ?? []),
       ].slice(0, 3),
       recommendedActionLabel: "Open Report",
-      recommendedActionPath: `/projects/${projectId}/report`,
+      recommendedActionPath: `/projects/${projectId}/report?section=issues`,
     },
   ];
 

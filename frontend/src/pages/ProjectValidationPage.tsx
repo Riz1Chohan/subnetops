@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ValidationList } from "../features/validation/components/ValidationList";
 import { useRunValidation, useValidationResults } from "../features/validation/hooks";
 import { useCreateProjectComment, useProjectComments } from "../features/comments/hooks";
@@ -17,6 +17,8 @@ import { buildValidationReadinessSummary } from "../lib/designReadiness";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function categoryForRule(ruleCode: string) {
   if (ruleCode.includes("OVERLAP") || ruleCode.includes("SITE_BLOCK") || ruleCode.includes("NONCANONICAL")) return "Addressing";
@@ -68,6 +70,8 @@ export function ProjectValidationPage() {
 
   const items = validationQuery.data ?? [];
   const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
@@ -111,8 +115,32 @@ export function ProjectValidationPage() {
 
   const openTaskBodies = new Set<string>((commentsQuery.data ?? []).map((comment) => comment.body));
 
+  const focusedSectionTitle = selectedSection === "focus"
+    ? "Current priorities"
+    : selectedSection === "health"
+      ? "Health summary"
+      : selectedSection === "findings"
+        ? "Findings"
+        : selectedSection === "guidance"
+          ? "Review guidance"
+          : "Validation";
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Validation</p>
+            <h1 style={{ margin: "0 0 8px 0" }}>{focusedSectionTitle}</h1>
+            <p className="muted" style={{ margin: 0 }}>Open one validation card at a time from the left pane and fix exactly what is highlighted.</p>
+          </div>
+          <div className="workspace-detail-actions">
+            <button type="button" className="button-secondary" onClick={() => validationMutation.mutate()} disabled={validationMutation.isPending}>
+              {validationMutation.isPending ? "Running..." : "Run Validation"}
+            </button>
+          </div>
+        </div>
+      ) : (
       <SectionHeader
         title="Validation"
         description="Review subnetting, gateway, capacity, and design issues in a more realistic engineering review workspace."
@@ -122,6 +150,7 @@ export function ProjectValidationPage() {
           </button>
         }
       />
+      )}
 
       <div data-validation-section="focus" className="panel recovery-focus-panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid" }}>
         <div>
@@ -148,6 +177,8 @@ export function ProjectValidationPage() {
           </div>
         </div>
       </div>
+
+      <WorkspaceIssueBanner notice={issueNotice} />
 
       <div data-validation-section="focus" className="panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid", gap: 12 }}>
         <div>

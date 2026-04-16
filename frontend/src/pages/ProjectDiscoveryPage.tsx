@@ -16,6 +16,8 @@ import {
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
+import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -51,6 +53,8 @@ export function ProjectDiscoveryPage() {
 
   const project = projectQuery.data;
   const selectedSection = new URLSearchParams(location.search).get("section");
+  const isFocusedSectionView = Boolean(selectedSection);
+  const issueNotice = parseWorkspaceIssueNotice(location.search);
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
 
@@ -125,8 +129,34 @@ export function ProjectDiscoveryPage() {
     );
   }
 
+  const focusedSectionTitle = selectedSection === "summary"
+    ? "Current state summary"
+    : selectedSection === "extraction"
+      ? "Extraction preview"
+      : selectedSection === "authority"
+        ? "Authority lift"
+        : selectedSection === "inputs"
+          ? "Paste inputs"
+          : selectedSection === "coverage"
+            ? "Coverage and gaps"
+            : "Discovery";
+
   return (
     <section style={{ display: "grid", gap: 18 }}>
+      {isFocusedSectionView ? (
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Discovery</p>
+            <h1 style={{ margin: "0 0 8px 0" }}>{focusedSectionTitle}</h1>
+            <p className="muted" style={{ margin: 0 }}>Work one discovery card at a time. Use the left pane to switch between discovery sections.</p>
+          </div>
+          <div className="workspace-detail-actions">
+            <button type="button" className="button-secondary" onClick={() => void saveNow()} disabled={updateProjectMutation.isPending}>
+              {updateProjectMutation.isPending ? "Saving..." : "Save discovery notes"}
+            </button>
+          </div>
+        </div>
+      ) : (
       <SectionHeader
         title="Discovery & Current State"
         description="This workspace is the v80 foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
@@ -140,6 +170,7 @@ export function ProjectDiscoveryPage() {
           </div>
         )}
       />
+      )}
 
       <div data-discovery-section="summary" className="panel" style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -237,12 +268,12 @@ export function ProjectDiscoveryPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+      {!isFocusedSectionView ? <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Filled sections", `${summary.filledSections}/9`)}
         {summaryCard("Device references", summary.deviceMentions)}
         {summaryCard("Routing protocols", summary.routingProtocols.length)}
         {summaryCard("Gap items", summary.gaps.length)}
-      </div>
+      </div> : null}
 
       <div data-discovery-section="inputs" className="panel" style={{ display: selectedSection && selectedSection !== "inputs" ? "none" : "grid", gap: 14 }}>
         <h2 style={{ margin: 0 }}>Paste current-state inputs</h2>
@@ -357,6 +388,7 @@ export function ProjectDiscoveryPage() {
         </div>
       </div>
 
+      {!isFocusedSectionView ? (<>
       <div className="grid-2" style={{ alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Parsed signals</h2>
@@ -430,6 +462,7 @@ export function ProjectDiscoveryPage() {
           </div>
         </div>
       </div>
+      </>) : null}
     </section>
   );
 }

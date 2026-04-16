@@ -154,7 +154,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "critical" as const,
           title: "Route authority is still partly inferred",
           detail: `${routeInferred} route domain${routeInferred === 1 ? " is" : "s are"} still inferred instead of coming from stronger saved, discovery, or planner-backed truth.`,
-          fixPath: `/projects/${projectId}/routing`,
+          fixPath: `/projects/${projectId}/routing?focus=route-anchors`,
           actionLabel: "Open Routing",
         };
       case "boundary-inference":
@@ -163,7 +163,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "critical" as const,
           title: "Boundary authority is still partly inferred",
           detail: `${boundaryInferred} security boundary domain${boundaryInferred === 1 ? " is" : "s are"} still inferred, which keeps security and diagram review less trustworthy.`,
-          fixPath: `/projects/${projectId}/security`,
+          fixPath: `/projects/${projectId}/security?focus=boundary-truth`,
           actionLabel: "Open Security",
         };
       case "unresolved-refs":
@@ -172,7 +172,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "critical" as const,
           title: "Cross-model references are still unresolved",
           detail: `${truth.unresolvedReferences.length} unresolved relationship reference${truth.unresolvedReferences.length === 1 ? " is" : "s are"} still flowing into report, diagram, or validation surfaces.`,
-          fixPath: `/projects/${projectId}/core-model`,
+          fixPath: `/projects/${projectId}/core-model?focus=unresolved-references`,
           actionLabel: "Open Core Model",
         };
       case "site-authority":
@@ -181,7 +181,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: pendingSites > 0 ? "critical" : "warning",
           title: "Some sites are still authority-thin",
           detail: `${pendingSites} pending and ${partialSites} partial site authority row${pendingSites + partialSites === 1 ? " is" : "s are"} still holding back a stronger design handoff.`,
-          fixPath: `/projects/${projectId}/requirements`,
+          fixPath: `/projects/${projectId}/requirements?step=scenario`,
           actionLabel: "Open Requirements",
         };
       case "flow-coverage":
@@ -190,7 +190,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "warning" as const,
           title: "Required traffic-path coverage is incomplete",
           detail: `${requiredFlowsReady} of ${requiredFlows.length} required flow categor${requiredFlows.length === 1 ? "y is" : "ies are"} fully ready, so path and enforcement review is still incomplete.`,
-          fixPath: `/projects/${projectId}/routing`,
+          fixPath: `/projects/${projectId}/routing?focus=flow-coverage`,
           actionLabel: "Review Flows",
         };
       case "traceability":
@@ -199,7 +199,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "warning" as const,
           title: "Traceability has not been filled strongly enough",
           detail: "The report package still needs requirement-to-design traceability so the handoff can explain why design outputs exist.",
-          fixPath: `/projects/${projectId}/report`,
+          fixPath: `/projects/${projectId}/report?section=validation`,
           actionLabel: "Open Report",
         };
       case "lld":
@@ -208,7 +208,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "warning" as const,
           title: "Per-site low-level design is still too thin",
           detail: "The current design package still needs stronger site-by-site low-level design rows before it can be treated as a stronger engineering handoff.",
-          fixPath: `/projects/${projectId}/report`,
+          fixPath: `/projects/${projectId}/report?section=site-lld`,
           actionLabel: "Open Report",
         };
       default:
@@ -217,7 +217,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           severity: "info" as const,
           title: "Recovery review item",
           detail: "A recovery review item still needs another pass.",
-          fixPath: `/projects/${projectId}/core-model`,
+          fixPath: `/projects/${projectId}/core-model?focus=unresolved-references`,
           actionLabel: "Open Core Model",
         };
     }
@@ -246,7 +246,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
       debtCount,
       detail,
       blockers,
-      fixPath: `/projects/${projectId}/core-model`,
+      fixPath: `/projects/${projectId}/requirements?step=scenario&site=${site.siteId}`,
     };
   }).sort((a, b) => {
     const statusWeight = (value: SiteAuthorityReview["status"]) => value === "pending" ? 0 : value === "partial" ? 1 : 2;
