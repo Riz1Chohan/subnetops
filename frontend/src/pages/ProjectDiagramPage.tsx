@@ -145,7 +145,7 @@ export function ProjectDiagramPage() {
             {requirementsProfile.customNamingPattern ? <span className="badge-soft">Custom pattern {requirementsProfile.customNamingPattern}</span> : null}
           </div>
           <p className="muted" style={{ margin: 0 }}>
-            This cumulative build continues the diagram realism pass from the recovery roadmap by treating this stage as a device-aware topology workspace with topology-specific rendering behavior, clearer link meaning, stronger overlay review, and a more explicit object model behind the diagram itself.
+            This cumulative build continues the diagram realism pass from the recovery roadmap by treating this stage as a device-aware topology workspace with topology-specific rendering behavior, clearer link meaning, stronger overlay review, explicit layout modes, and a more explicit object model behind the diagram itself.
           </p>
         </div>
 

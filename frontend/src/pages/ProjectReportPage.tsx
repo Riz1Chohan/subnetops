@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
@@ -15,8 +15,6 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { apiBlob } from "../lib/api";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
-import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
-import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -68,6 +66,7 @@ function sectionList(items: string[], empty: string) {
 
 export function ProjectReportPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const authQuery = useCurrentUser();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
@@ -80,6 +79,7 @@ export function ProjectReportPage() {
   const vlans = vlansQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
+  const selectedSection = new URLSearchParams(location.search).get("section");
   const synthesized = useMemo(
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
@@ -151,9 +151,6 @@ export function ProjectReportPage() {
   const status = reportStatus(errorCount, warningCount, project.approvalStatus);
   const readinessSummary = planningReadinessSummary(requirementsProfile);
   const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })));
-  const recovery = buildRecoveryRoadmapStatus(synthesized);
-  const masterGate = buildRecoveryMasterRoadmapGate(recovery);
-  const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
 
   const summary = generatedSummary({
     projectName: project.name,
@@ -261,160 +258,6 @@ export function ProjectReportPage() {
         vlanCount={vlans.length}
       />
 
-      <div className="panel" style={{ display: "grid", gap: 12, borderColor: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.35)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.28)", background: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.08)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)" }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
-            {masterGate.status === "ready-for-master" ? "Recovery complete enough for master roadmap" : masterGate.status === "near-transition" ? "Recovery nearly complete" : "Recovery still active"}
-          </span>
-          <span className="badge-soft">Ready phases {recovery.completedCount}</span>
-          <span className="badge-soft">Pending {recovery.pendingCount}</span>
-        </div>
-        <p className="muted" style={{ margin: 0 }}>{masterGate.summary}</p>
-        {masterGate.blockers.length ? (
-          <div>
-            <strong style={{ display: "block", marginBottom: 8 }}>Main remaining handoff blockers</strong>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {masterGate.blockers.slice(0, 4).map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="grid-2" style={{ alignItems: "start" }}>
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
-          <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Report truth confidence</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              The report should only look polished when the authority underneath it is actually strong enough. This ledger shows whether the design package is being carried by stronger saved truth or by thinner discovery, planner, and inferred anchors.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className={authorityLedger.status === "strong" ? "badge badge-info" : authorityLedger.status === "mixed" ? "badge badge-warning" : "badge badge-error"}>{authorityLedger.confidenceLabel}</span>
-            <span className="badge-soft">Confidence {authorityLedger.confidenceScore}%</span>
-            <span className="badge-soft">Explicit core {authorityLedger.masterEvidence.explicitCoreObjects}</span>
-            <span className="badge-soft">Inferred core {authorityLedger.masterEvidence.inferredCoreObjects}</span>
-          </div>
-          <p className="muted" style={{ margin: 0 }}>{authorityLedger.summary}</p>
-          <div className="network-chip-list">
-            {authorityLedger.sourceMix.filter((item) => item.count > 0).map((item) => (
-              <span key={item.source} className="badge-soft">{item.label} {item.count}</span>
-            ))}
-          </div>
-          {authorityLedger.debtItems.length ? (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {authorityLedger.debtItems.slice(0, 4).map((item) => (
-                <li key={item.id} style={{ marginBottom: 8 }}>
-                  <strong>{item.title}</strong> — {item.detail}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
-          <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery truth for the report</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              The report should now be treated as a facts-first planning package. This scorecard keeps the report honest about whether the recovery roadmap is actually feeding it with explicit design objects instead of generic narrative.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className={recovery.overallStatus === "ready" ? "badge badge-info" : recovery.overallStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{recovery.overallStatus}</span>
-            <span className="badge-soft">ready {recovery.completedCount}</span>
-            <span className="badge-soft">partial {recovery.partialCount}</span>
-            <span className="badge-soft">pending {recovery.pendingCount}</span>
-          </div>
-          <div style={{ display: "grid", gap: 10 }}>
-            {recovery.phases.filter((phase) => ["phase-g", "phase-b", "phase-d", "phase-e", "phase-f"].includes(phase.key)).map((phase) => (
-              <div key={phase.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                  <strong>{phase.label}</strong>
-                  <span className={phase.status === "ready" ? "badge badge-info" : phase.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{phase.status}</span>
-                </div>
-                <p className="muted" style={{ margin: 0 }}>{phase.detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel" style={{ display: "grid", gap: 14 }}>
-          <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Report blockers before master-roadmap handoff</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              These are the strongest remaining recovery blockers that still affect report credibility and handoff quality.
-            </p>
-          </div>
-          {recovery.topBlockers.length === 0 ? (
-            <div className="trust-note">
-              <strong>No major recovery blocker is currently being surfaced</strong>
-              <p className="muted" style={{ margin: "8px 0 0" }}>The current report package is not flagging an obvious top blocker from the recovery scorecard.</p>
-            </div>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {recovery.topBlockers.slice(0, 6).map((item) => (
-                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
-        <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>{synthesized.designEngineFoundation.stageLabel}</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {synthesized.designEngineFoundation.summary}
-          </p>
-        </div>
-        <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-          {summaryCard("Site hierarchy", synthesized.designEngineFoundation.objectCounts.siteHierarchy)}
-          {summaryCard("Addressing rows", synthesized.designEngineFoundation.objectCounts.addressingRows)}
-          {summaryCard("Placements", synthesized.designEngineFoundation.objectCounts.topologyPlacements)}
-          {summaryCard("Flows", synthesized.designEngineFoundation.objectCounts.trafficFlows)}
-          {summaryCard("Open issues", synthesized.designEngineFoundation.objectCounts.openIssues)}
-        </div>
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Flow category</th>
-                <th>Required</th>
-                <th>Status</th>
-                <th>Covered paths</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {synthesized.flowCoverage.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.label}</td>
-                  <td>{item.required ? 'Yes' : 'No'}</td>
-                  <td>{item.status}</td>
-                  <td>{item.matchedFlowIds.length}</td>
-                  <td>{item.detail}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Coverage</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {synthesized.designEngineFoundation.coverage.map((item) => (
-                <li key={item.label} style={{ marginBottom: 8 }}>
-                  <strong>{item.label}:</strong> {item.detail}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Design-engine focus</h3>
-            <p style={{ marginTop: 0 }}>{synthesized.designEngineFoundation.strongestLayer}</p>
-            <p className="muted" style={{ marginBottom: 0 }}>{synthesized.designEngineFoundation.nextPriority}</p>
-          </div>
-        </div>
-      </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Sites", synthesized.siteSummaries.length)}
@@ -427,7 +270,8 @@ export function ProjectReportPage() {
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+
+      <div data-report-section="assumptions" className="panel report-section" style={{ display: selectedSection && selectedSection !== "assumptions" ? "none" : "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
             <h2 style={{ margin: "0 0 8px 0" }}>1. Design assumptions and constraints</h2>
@@ -456,7 +300,7 @@ export function ProjectReportPage() {
       </div>
 
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="naming" className="panel report-section" style={{ display: selectedSection && selectedSection !== "naming" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>1A. Naming and site identity standard</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -503,7 +347,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="topology" className="panel report-section" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>2. Topology and site placement</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -551,7 +395,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="addressing" className="panel report-section" style={{ display: selectedSection && selectedSection !== "addressing" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>3. Addressing hierarchy</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -594,7 +438,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="services-security" className="panel report-section" style={{ display: selectedSection && selectedSection !== "services-security" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>4. Service placement and security boundary design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -657,7 +501,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="routing-flows" className="panel report-section" style={{ display: selectedSection && selectedSection !== "routing-flows" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>5. Routing and traffic-flow design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -717,7 +561,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="site-lld" className="panel report-section" style={{ display: selectedSection && selectedSection !== "site-lld" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>6. Site-by-site low-level design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -770,7 +614,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="validation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "validation" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -786,7 +630,7 @@ export function ProjectReportPage() {
         />
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="implementation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "implementation" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -815,7 +659,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -834,7 +678,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h2>
           <p className="muted" style={{ margin: 0 }}>
