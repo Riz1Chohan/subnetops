@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
@@ -44,13 +44,11 @@ function textareaField(label: string, description: string, value: string, onChan
 
 export function ProjectDiscoveryPage() {
   const { projectId = "" } = useParams();
-  const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
 
   const project = projectQuery.data;
-  const selectedSection = new URLSearchParams(location.search).get("section");
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
 
@@ -141,7 +139,7 @@ export function ProjectDiscoveryPage() {
         )}
       />
 
-      <div data-discovery-section="summary" className="panel" style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 12 }}>
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
           <span className="badge-soft">Filled sections {summary.filledSections}/9</span>
@@ -165,7 +163,7 @@ export function ProjectDiscoveryPage() {
         </p>
       </div>
 
-      <div data-discovery-section="extraction" className="panel" style={{ display: selectedSection && selectedSection !== "extraction" ? "none" : "grid", gap: 14 }}>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: 0 }}>Discovery-to-design extraction preview</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -203,7 +201,7 @@ export function ProjectDiscoveryPage() {
         </div>
       </div>
 
-      <div data-discovery-section="authority" className="panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 14 }}>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: 0 }}>Discovery-backed authority lift</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -244,7 +242,7 @@ export function ProjectDiscoveryPage() {
         {summaryCard("Gap items", summary.gaps.length)}
       </div>
 
-      <div data-discovery-section="inputs" className="panel" style={{ display: selectedSection && selectedSection !== "inputs" ? "none" : "grid", gap: 14 }}>
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
         <h2 style={{ margin: 0 }}>Paste current-state inputs</h2>
         <p className="muted" style={{ margin: 0 }}>
           Keep entries short and operational. One line per device, issue, site, subnet, or dependency works well. This page is intentionally flexible so you can paste from audits, spreadsheets, ticket notes, or rough engineering writeups.
@@ -316,7 +314,7 @@ export function ProjectDiscoveryPage() {
         )}
       </div>
 
-      <div data-discovery-section="coverage" className="grid-2" style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", alignItems: "start" }}>
+      <div className="grid-2" style={{ alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Discovery coverage</h2>
           <div style={{ overflowX: "auto" }}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
@@ -24,8 +24,6 @@ import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../l
 
 export function ProjectRequirementsPage() {
   const { projectId = "" } = useParams();
-  const [searchParams] = useSearchParams();
-  const requestedStep = searchParams.get("step");
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -1364,13 +1362,6 @@ export function ProjectRequirementsPage() {
       setCurrentStepKey(stepDefinitions[0]?.key ?? "core");
     }
   }, [currentStepKey, stepDefinitions]);
-
-  useEffect(() => {
-    if (!requestedStep) return;
-    if (stepDefinitions.some((step) => step.key === requestedStep)) {
-      setCurrentStepKey(requestedStep);
-    }
-  }, [requestedStep, stepDefinitions]);
 
   const currentStepIndex = Math.max(0, stepDefinitions.findIndex((step) => step.key === currentStepKey));
   const currentStep = stepDefinitions[currentStepIndex] ?? stepDefinitions[0];

@@ -13,7 +13,6 @@ import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "../lib/discoveryFoundation";
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
-import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -71,7 +70,6 @@ export function ProjectOverviewPage() {
     [projectId, project, sites, vlans, requirementsProfile, synthesized],
   );
   const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
-  const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading logical design" message="Preparing the synthesized HLD, LLD, and addressing outputs." />;
@@ -175,39 +173,6 @@ export function ProjectOverviewPage() {
         siteCount={sites.length}
         vlanCount={vlans.length}
       />
-
-      <div className="panel" style={{ display: "grid", gap: 14 }}>
-        <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery completion before the master roadmap</h2>
-          <p className="muted" style={{ margin: 0 }}>{recoveryCompletion.summary}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Completion {recoveryCompletion.percentComplete}%</span>
-          <span className={recoveryCompletion.status === "ready-for-master" ? "badge badge-info" : recoveryCompletion.status === "near-transition" ? "badge badge-warning" : "badge badge-error"}>
-            {recoveryCompletion.status === "ready-for-master" ? "Ready for master roadmap" : recoveryCompletion.status === "near-transition" ? "Near transition" : "Stay on recovery"}
-          </span>
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Must finish next</h3>
-            {recoveryCompletion.mustFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major must-finish recovery items are currently surfacing.</p> : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {recoveryCompletion.mustFinish.slice(0, 3).map((task) => (
-                  <li key={task.id} style={{ marginBottom: 8 }}><strong>{task.title}:</strong> {task.detail}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence behind the gate</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {recoveryCompletion.evidence.map((item) => (
-                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>

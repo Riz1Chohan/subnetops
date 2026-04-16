@@ -16,7 +16,6 @@ import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildValidationReadinessSummary } from "../lib/designReadiness";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
-import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 
 function categoryForRule(ruleCode: string) {
   if (ruleCode.includes("OVERLAP") || ruleCode.includes("SITE_BLOCK") || ruleCode.includes("NONCANONICAL")) return "Addressing";
@@ -37,7 +36,6 @@ const severityOrder = { ERROR: 0, WARNING: 1, INFO: 2 } as const;
 
 export function ProjectValidationPage() {
   const { projectId = "" } = useParams();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const validationQuery = useValidationResults(projectId);
   const projectQuery = useProject(projectId);
@@ -67,7 +65,6 @@ export function ProjectValidationPage() {
   }, [projectId, refreshedFromFix, searchParams, setSearchParams, validationMutation]);
 
   const items = validationQuery.data ?? [];
-  const selectedSection = new URLSearchParams(location.search).get("section");
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
@@ -80,7 +77,6 @@ export function ProjectValidationPage() {
   const readinessSummary = useMemo(() => buildValidationReadinessSummary(project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount), [project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount]);
   const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesizedDesign, errorCount), [projectId, synthesizedDesign, errorCount]);
   const authorityLedger = useMemo(() => buildDesignAuthorityLedger(projectId, synthesizedDesign), [projectId, synthesizedDesign]);
-  const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesizedDesign, errorCount), [projectId, synthesizedDesign, errorCount]);
 
   const filteredItems = useMemo(() => {
     return [...items]
@@ -123,9 +119,9 @@ export function ProjectValidationPage() {
         }
       />
 
-      <div data-validation-section="focus" className="panel recovery-focus-panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid" }}>
+      <div className="panel recovery-focus-panel">
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>What needs attention first</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Validation focus for this recovery cycle</h2>
           <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
         </div>
         <div className="recovery-focus-grid">
@@ -149,43 +145,6 @@ export function ProjectValidationPage() {
         </div>
       </div>
 
-      <div data-validation-section="focus" className="panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid", gap: 12 }}>
-        <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Priority review queue</h2>
-          <p className="muted" style={{ margin: 0 }}>{recoveryCompletion.summary}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Completion {recoveryCompletion.percentComplete}%</span>
-          {recoveryCompletion.mustFinish.length > 0 ? <span className="badge-soft">Must finish {recoveryCompletion.mustFinish.length}</span> : null}
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Must finish before handoff</h3>
-            {recoveryCompletion.mustFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major must-finish recovery tasks are currently surfacing.</p> : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {recoveryCompletion.mustFinish.slice(0, 3).map((task) => (
-                  <li key={task.id} style={{ marginBottom: 8 }}>
-                    <strong>{task.title}:</strong> {task.detail} <Link to={task.path}>{task.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Should finish next</h3>
-            {recoveryCompletion.shouldFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No additional cleanup items are currently being surfaced here.</p> : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {recoveryCompletion.shouldFinish.slice(0, 3).map((task) => (
-                  <li key={task.id} style={{ marginBottom: 8 }}>
-                    <strong>{task.title}:</strong> {task.detail}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-
       {refreshedFromFix ? (
         <div className="panel" style={{ borderColor: "rgba(40,167,69,0.28)", background: "rgba(40,167,69,0.08)" }}>
           <strong style={{ display: "block", marginBottom: 6 }}>Validation refresh in progress</strong>
@@ -194,7 +153,7 @@ export function ProjectValidationPage() {
       ) : null}
 
 
-      <div data-validation-section="health" className="panel validation-trust-panel" style={{ display: selectedSection && selectedSection !== "health" ? "none" : "grid" }}>
+      <div className="panel validation-trust-panel">
         <div className="validation-trust-header">
           <div>
             <p className="eyebrow" style={{ margin: 0 }}>v110 trust and readiness</p>
@@ -336,14 +295,14 @@ export function ProjectValidationPage() {
         </div>
       </div>
 
-      <div data-validation-section="findings" className="grid-2" style={{ display: selectedSection && selectedSection !== "findings" ? "none" : "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Errors</p><h2 style={{ margin: 0 }}>{errorCount}</h2></div>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Warnings</p><h2 style={{ margin: 0 }}>{warningCount}</h2></div>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Info</p><h2 style={{ margin: 0 }}>{infoCount}</h2></div>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Health</p><h2 style={{ margin: 0 }}>{healthLabel(errorCount, warningCount)}</h2></div>
       </div>
 
-      <div data-validation-section="findings" className="grid-2" style={{ display: selectedSection && selectedSection !== "findings" ? "none" : "grid", alignItems: "start", gridTemplateColumns: "1.35fr 0.9fr" }}>
+      <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "1.35fr 0.9fr" }}>
         <div className="panel">
           <div className="toolbar-row" style={{ marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
             <input
@@ -437,7 +396,7 @@ export function ProjectValidationPage() {
         </div>
 
         <div ref={insightRef} style={{ display: "grid", gap: 12 }}>
-          <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
+          <div className="panel">
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Review guidance</h2>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li>Fix errors before treating the logical design as handoff-ready.</li>
@@ -447,7 +406,7 @@ export function ProjectValidationPage() {
             </ul>
           </div>
 
-          <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
+          <div className="panel">
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI suggest a fix</h2>
             <p className="muted" style={{ margin: 0 }}>
               Pick any validation finding and SubnetOps will explain the issue, why it matters, and the most likely fixes to try next.
@@ -455,7 +414,7 @@ export function ProjectValidationPage() {
           </div>
 
           {selectedItem ? (
-            <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
+            <div className="panel">
               <strong style={{ display: "block", marginBottom: 6 }}>Selected finding</strong>
               <p className="muted" style={{ margin: 0 }}>{selectedItem.title}</p>
             </div>
