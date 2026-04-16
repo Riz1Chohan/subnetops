@@ -40,7 +40,7 @@ export function ProjectRequirementsPage() {
   const activeTracks = useMemo(() => planningTracks(requirements), [requirements]);
   const trackStatuses = useMemo(() => planningTrackStatuses(requirements), [requirements]);
   const readinessSummary = useMemo(() => planningReadinessSummary(requirements), [requirements]);
-  const namingPreview = useMemo(() => buildNamingPreviewExamples(requirements, project?.sites?.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location })) ), [requirements, project?.sites]);
+  const namingPreview = useMemo(() => buildNamingPreviewExamples(requirements, project?.sites?.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirements.closetModel })) ), [requirements, project?.sites]);
 
   const multiSitePlanning = Number(requirements.siteCount || "0") > 1 || requirements.internetModel !== "internet at each site";
   const wirelessPlanning = requirements.wireless || requirements.guestWifi;
@@ -684,7 +684,24 @@ export function ProjectRequirementsPage() {
                   <option>prefer site code when available, otherwise derive from the location or site name</option>
                   <option>always prefer site code as the primary token</option>
                   <option>always prefer full location name as the primary token</option>
+                  <option>prefer site + building + floor tokens when available</option>
+                  <option>prefer site + building tokens when available</option>
+                  <option>prefer site + floor tokens when available</option>
                 </select>
+              </label>
+              <label>
+                <span>Naming hierarchy</span>
+                <select value={requirements.namingHierarchy} onChange={(event) => setRequirements((current) => ({ ...current, namingHierarchy: event.target.value }))}>
+                  <option>site → building → floor → role → index when available</option>
+                  <option>site → role → index only</option>
+                  <option>site → building → role → index</option>
+                  <option>site → floor → role → index</option>
+                </select>
+              </label>
+              <label style={{ gridColumn: "1 / -1" }}>
+                <span>Custom naming pattern</span>
+                <input value={requirements.customNamingPattern} onChange={(event) => setRequirements((current) => ({ ...current, customNamingPattern: event.target.value }))} placeholder="Example: {site}_{building}_{floor}_{role}_{index}" />
+                <small className="muted">Use placeholders like <code>{"{site}"}</code>, <code>{"{siteCode}"}</code>, <code>{"{siteName}"}</code>, <code>{"{building}"}</code>, <code>{"{floor}"}</code>, <code>{"{role}"}</code>, and <code>{"{index}"}</code> when custom naming is selected.</small>
               </label>
               <div className="panel" style={{ gridColumn: '1 / -1', display: 'grid', gap: 10, background: 'rgba(15,23,42,0.03)' }}>
                 <div>
@@ -697,9 +714,13 @@ export function ProjectRequirementsPage() {
                       <tr>
                         <th align="left">Site</th>
                         <th align="left">Primary token</th>
-                        <th align="left">Firewall example</th>
-                        <th align="left">Switch example</th>
-                        <th align="left">AP example</th>
+                        <th align="left">Building</th>
+                        <th align="left">Floor</th>
+                        <th align="left">Closet</th>
+                        <th align="left">FW01 / FW02</th>
+                        <th align="left">SW01 / SW02</th>
+                        <th align="left">AP01 / AP02</th>
+                        <th align="left">Other roles</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -707,9 +728,11 @@ export function ProjectRequirementsPage() {
                         <tr key={item.siteLabel}>
                           <td>{item.siteLabel}</td>
                           <td>{item.token}</td>
-                          <td><code>{item.firewall}</code></td>
-                          <td><code>{item.switchName}</code></td>
-                          <td><code>{item.accessPoint}</code></td>
+                          <td>{item.buildingLabel}</td>
+                          <td>{item.floorLabel}</td><td>{item.closetLabel}</td>
+                          <td><code>{item.firewall}</code><br /><code>{item.firewallSecondary}</code></td>
+                          <td><code>{item.switchName}</code><br /><code>{item.switchSecondary}</code></td>
+                          <td><code>{item.accessPoint}</code><br /><code>{item.accessPointSecondary}</code></td><td><code>{item.routerName}</code><br /><code>{item.controllerName}</code><br /><code>{item.serverName}</code></td>
                         </tr>
                       ))}
                     </tbody>

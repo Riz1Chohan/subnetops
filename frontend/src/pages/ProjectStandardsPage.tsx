@@ -32,7 +32,7 @@ export function ProjectStandardsPage() {
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
   );
-  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location })) );
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })) );
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading configuration standards" message="Preparing baseline standards and reusable template artifacts." />;
@@ -79,6 +79,8 @@ export function ProjectStandardsPage() {
           <span className="badge-soft">Gateway {requirementsProfile.gatewayConvention}</span>
           <span className="badge-soft">Device naming {requirementsProfile.deviceNamingConvention}</span>
           <span className="badge-soft">Primary token {requirementsProfile.namingTokenPreference}</span>
+          <span className="badge-soft">Hierarchy {requirementsProfile.namingHierarchy}</span>
+          {requirementsProfile.customNamingPattern ? <span className="badge-soft">Custom pattern {requirementsProfile.customNamingPattern}</span> : null}
           <span className="badge-soft">Monitoring {requirementsProfile.monitoringModel}</span>
           <span className="badge-soft">Backup {requirementsProfile.backupPolicy}</span>
         </div>
@@ -93,11 +95,11 @@ export function ProjectStandardsPage() {
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>
-              <tr><th align="left">Site</th><th align="left">Token</th><th align="left">Firewall</th><th align="left">Switch</th></tr>
+              <tr><th align="left">Site</th><th align="left">Token</th><th align="left">Building</th><th align="left">Floor</th><th align="left">FW01 / FW02</th><th align="left">SW01 / SW02</th><th align="left">AP01 / AP02</th></tr>
             </thead>
             <tbody>
               {namingPreview.map((item) => (
-                <tr key={item.siteLabel}><td>{item.siteLabel}</td><td><code>{item.token}</code></td><td><code>{item.firewall}</code></td><td><code>{item.switchName}</code></td></tr>
+                <tr key={item.siteLabel}><td>{item.siteLabel}</td><td><code>{item.token}</code></td><td>{item.buildingLabel}</td><td>{item.floorLabel}</td><td>{item.closetLabel}</td><td><code>{item.firewall}</code><br /><code>{item.firewallSecondary}</code></td><td><code>{item.switchName}</code><br /><code>{item.switchSecondary}</code></td><td><code>{item.accessPoint}</code><br /><code>{item.accessPointSecondary}</code></td><td><code>{item.routerName}</code><br /><code>{item.controllerName}</code><br /><code>{item.serverName}</code></td></tr>
               ))}
             </tbody>
           </table>

@@ -4,7 +4,7 @@ import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { ensureCanEditProject } from "./access.service.js";
 
-export async function createSite(userId: string, planTier: PlanTier, data: { projectId: string; name: string; location?: string; streetAddress?: string; siteCode?: string; notes?: string; defaultAddressBlock?: string }, actorLabel?: string) {
+export async function createSite(userId: string, planTier: PlanTier, data: { projectId: string; name: string; location?: string; streetAddress?: string; buildingLabel?: string; floorLabel?: string; siteCode?: string; notes?: string; defaultAddressBlock?: string }, actorLabel?: string) {
   const project = await ensureCanEditProject(userId, data.projectId);
   if (!project) throw new ApiError(404, "Project not found");
 

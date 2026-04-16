@@ -148,7 +148,7 @@ export function ProjectReportPage() {
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
   const status = reportStatus(errorCount, warningCount, project.approvalStatus);
   const readinessSummary = planningReadinessSummary(requirementsProfile);
-  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location })));
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })));
   const summary = generatedSummary({
     projectName: project.name,
     environmentType: project.environmentType,
@@ -306,7 +306,9 @@ export function ProjectReportPage() {
           {summaryCard("Naming standard", requirementsProfile.namingStandard)}
           {summaryCard("Device convention", requirementsProfile.deviceNamingConvention)}
           {summaryCard("Primary token", requirementsProfile.namingTokenPreference)}
+          {summaryCard("Naming hierarchy", requirementsProfile.namingHierarchy)}
           {summaryCard("Site identity", requirementsProfile.siteIdentityCapture)}
+          {requirementsProfile.customNamingPattern ? summaryCard("Custom pattern", requirementsProfile.customNamingPattern) : null}
         </div>
         <div className="data-table">
           <table>
@@ -314,9 +316,13 @@ export function ProjectReportPage() {
               <tr>
                 <th>Site</th>
                 <th>Primary token</th>
-                <th>Firewall example</th>
-                <th>Switch example</th>
-                <th>AP example</th>
+                <th>Building</th>
+                <th>Floor</th>
+                <th>Closet</th>
+                <th>FW01 / FW02</th>
+                <th>SW01 / SW02</th>
+                <th>AP01 / AP02</th>
+                <th>Other roles</th>
               </tr>
             </thead>
             <tbody>
@@ -324,9 +330,11 @@ export function ProjectReportPage() {
                 <tr key={item.siteLabel}>
                   <td>{item.siteLabel}</td>
                   <td><code>{item.token}</code></td>
-                  <td><code>{item.firewall}</code></td>
-                  <td><code>{item.switchName}</code></td>
-                  <td><code>{item.accessPoint}</code></td>
+                  <td>{item.buildingLabel}</td>
+                  <td>{item.floorLabel}</td><td>{item.closetLabel}</td>
+                  <td><code>{item.firewall}</code><br /><code>{item.firewallSecondary}</code></td>
+                  <td><code>{item.switchName}</code><br /><code>{item.switchSecondary}</code></td>
+                  <td><code>{item.accessPoint}</code><br /><code>{item.accessPointSecondary}</code></td><td><code>{item.routerName}</code><br /><code>{item.controllerName}</code><br /><code>{item.serverName}</code></td>
                 </tr>
               ))}
             </tbody>

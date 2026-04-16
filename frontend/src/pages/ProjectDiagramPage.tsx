@@ -55,7 +55,7 @@ export function ProjectDiagramPage() {
   const openVlanTasks = comments.filter((comment) => comment.taskStatus !== "DONE" && comment.targetType === "VLAN").length;
   const cloudContext = requirementsProfile.environmentType !== "On-prem" || requirementsProfile.cloudConnected;
   const topValidationItems = validations.filter((item) => item.severity !== "INFO").slice(0, 5);
-  const namingPreview = buildNamingPreviewExamples(requirementsProfile, enrichedProject.sites.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location })) );
+  const namingPreview = buildNamingPreviewExamples(requirementsProfile, enrichedProject.sites.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })) );
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -80,6 +80,8 @@ export function ProjectDiagramPage() {
             <span className="badge-soft">Mode-ready for export</span>
             <span className="badge-soft">Naming {requirementsProfile.deviceNamingConvention}</span>
             <span className="badge-soft">Token {requirementsProfile.namingTokenPreference}</span>
+            <span className="badge-soft">Hierarchy {requirementsProfile.namingHierarchy}</span>
+            {requirementsProfile.customNamingPattern ? <span className="badge-soft">Custom pattern {requirementsProfile.customNamingPattern}</span> : null}
           </div>
           <p className="muted" style={{ margin: 0 }}>
             The canvas below gets priority on widescreen layouts. In v100 the diagram also carries topology-specific interface labels, device-level validation emphasis, explicit zone labels on perimeter/core segments, and naming aligned more tightly with the report.
@@ -103,8 +105,13 @@ export function ProjectDiagramPage() {
               <tr>
                 <th align="left">Site</th>
                 <th align="left">Token</th>
-                <th align="left">Firewall label</th>
-                <th align="left">Switch label</th>
+                <th align="left">Building</th>
+                <th align="left">Floor</th>
+                <th align="left">Closet</th>
+                <th align="left">FW01 / FW02</th>
+                <th align="left">SW01 / SW02</th>
+                <th align="left">AP01 / AP02</th>
+                <th align="left">Other roles</th>
               </tr>
             </thead>
             <tbody>
@@ -112,8 +119,11 @@ export function ProjectDiagramPage() {
                 <tr key={item.siteLabel}>
                   <td>{item.siteLabel}</td>
                   <td><code>{item.token}</code></td>
-                  <td><code>{item.firewall}</code></td>
-                  <td><code>{item.switchName}</code></td>
+                  <td>{item.buildingLabel}</td>
+                  <td>{item.floorLabel}</td><td>{item.closetLabel}</td>
+                  <td><code>{item.firewall}</code><br /><code>{item.firewallSecondary}</code></td>
+                  <td><code>{item.switchName}</code><br /><code>{item.switchSecondary}</code></td>
+                  <td><code>{item.accessPoint}</code><br /><code>{item.accessPointSecondary}</code></td><td><code>{item.routerName}</code><br /><code>{item.controllerName}</code><br /><code>{item.serverName}</code></td>
                 </tr>
               ))}
             </tbody>

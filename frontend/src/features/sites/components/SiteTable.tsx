@@ -26,6 +26,8 @@ export function SiteTable({ sites, onEdit, onDelete, deletingSiteId }: SiteTable
             <th align="left">Name</th>
             <th align="left">Location</th>
             <th align="left">Address</th>
+            <th align="left">Building</th>
+            <th align="left">Floor</th>
             <th align="left">Code</th>
             <th align="left">Address Block</th>
             <th align="left">Actions</th>
@@ -37,6 +39,8 @@ export function SiteTable({ sites, onEdit, onDelete, deletingSiteId }: SiteTable
               <td>{site.name}</td>
               <td>{site.location || "—"}</td>
               <td>{site.streetAddress || "—"}</td>
+              <td>{(site as any).buildingLabel || "—"}</td>
+              <td>{(site as any).floorLabel || "—"}</td>
               <td>{site.siteCode || "—"}</td>
               <td>{site.defaultAddressBlock || "—"}</td>
               <td>
