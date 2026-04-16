@@ -270,6 +270,7 @@ export function NewProjectPage() {
   const guidedSummaryDescription = useMemo(() => buildProjectSummaryDescription(guided), [guided]);
   const scenario = useMemo(() => conditionalSections(guided), [guided]);
   const readinessSummary = useMemo(() => planningReadinessSummary(guided), [guided]);
+  const namingPreview = useMemo(() => buildNamingPreviewExamples(guided), [guided]);
   const multiSitePlanning = Number(guided.siteCount || "0") > 1 || guided.internetModel !== "internet at each site";
   const wirelessPlanning = guided.wireless || guided.guestWifi;
   const voicePlanning = guided.voice || Number(guided.phoneCount || "0") > 0;

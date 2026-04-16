@@ -2313,7 +2313,7 @@ function buildLowLevelDesign(input: {
 
     const notes = [
       `${site.name} currently carries ${routedRows.length} routed local segment${routedRows.length === 1 ? "" : "s"} inside ${site.siteBlockCidr || "an unconfirmed site block"}.`,
-      `Topology context is ${topology.topologyLabel.toLowerCase()}, with ${sitePlacements.filter((item) => item.siteId === site.id).length} synthesized placement object${sitePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${servicePlacements.filter((item) => item.siteId === site.id).length} service placement${servicePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${securityBoundaries.filter((item) => item.siteId === site.id).length} boundary object${securityBoundaries.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, and ${trafficFlows.filter((item) => item.involvedSiteIds.includes(site.id)).length} tracked flow${trafficFlows.filter((item) => item.involvedSiteIds.includes(site.id)).length === 1 ? "" : "s"}.`,
+      `Topology context is ${topology.topologyLabel.toLowerCase()}, with ${sitePlacements.filter((item) => item.siteId === site.id).length} synthesized placement object${sitePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${servicePlacements.filter((item) => item.siteId === site.id).length} service placement${servicePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${securityBoundaries.filter((item) => item.siteName === site.name).length} boundary object${securityBoundaries.filter((item) => item.siteName === site.name).length === 1 ? "" : "s"}, and ${trafficFlows.filter((item) => item.sourceSite === site.name || item.destinationSite === site.name).length} tracked flow${trafficFlows.filter((item) => item.sourceSite === site.name || item.destinationSite === site.name).length === 1 ? "" : "s"}.`,
       routing?.summaryAdvertisement
         ? `Use ${routing.summaryAdvertisement} as the main summary advertisement for this site once routing is implemented.`
         : "This site does not yet have a confirmed summarization boundary.",
@@ -3940,17 +3940,22 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
 
   const designReview = [
     ...buildDesignReview({
-    profile,
-    organizationBlockAssumed: organization.assumed,
-    siteHierarchy,
-    rows,
-    proposedSegments,
-    rowsOutsideSiteBlocks,
-    missingSiteBlocks,
-    wanReserveBlock,
-    wanLinks,
-    routingPlan,
-  }),
+      profile,
+      organizationBlockAssumed: organization.assumed,
+      siteHierarchy,
+      rows,
+      proposedSegments,
+      rowsOutsideSiteBlocks,
+      missingSiteBlocks,
+      wanReserveBlock,
+      wanLinks,
+      topology,
+      sitePlacements,
+      servicePlacements,
+      securityBoundaries,
+      trafficFlows,
+      routingPlan,
+    }),
     {
       kind: "decision" as const,
       title: "Security zoning and segmentation intent",
