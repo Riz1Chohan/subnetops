@@ -125,7 +125,7 @@ export function buildDiagramObjectModelPack(design: SynthesizedLogicalDesign): D
       target: link.endpointBSiteName,
       relationship: "WAN / routed adjacency",
       transport: link.transport,
-      controlPoint: `${link.endpointAInterface || link.endpointASiteName} ↔ ${link.endpointBInterface || link.endpointBSiteName}`,
+      controlPoint: `${link.endpointAInterface} ↔ ${link.endpointBInterface}`,
       expectedBehavior: `Expose ${link.subnetCidr} as explicit transit, not as an unlabeled connector.`
     })),
     ...design.securityBoundaries.slice(0, 8).map((boundary, index) => ({

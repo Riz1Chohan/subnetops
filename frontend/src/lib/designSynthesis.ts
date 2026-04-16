@@ -17,7 +17,6 @@ import {
 export interface PlannedSiteSummary {
   id: string;
   name: string;
-  siteName?: string;
   siteCode: string;
   location?: string;
   source: "configured" | "proposed";
@@ -26,10 +25,6 @@ export interface PlannedSiteSummary {
   plannedDemandAddresses: number;
   plannedDemandHosts: number;
   note?: string;
-  tier?: "primary" | "branch" | "single-site" | "cloud";
-  siteRole?: string;
-  vlans?: Array<{ name?: string; subnet?: string }>;
-  devices?: Array<{ deviceType: string; deviceRole?: string }>;
 }
 
 export interface AddressingPlanRow {
@@ -103,11 +98,9 @@ export interface WanLinkPlanRow {
   subnetCidr: string;
   endpointASiteId?: string;
   endpointASiteName: string;
-  endpointAInterface?: string;
   endpointAIp: string;
   endpointBSiteId?: string;
   endpointBSiteName: string;
-  endpointBInterface?: string;
   endpointBIp: string;
   notes: string[];
 }
@@ -320,13 +313,13 @@ export interface TopologyBlueprint {
   primarySiteName?: string;
   internetBreakout: "centralized" | "distributed";
   cloudConnected: boolean;
+  redundancyModel: string;
+  servicePlacementModel: string;
+  notes: string[];
   cloudProvider?: string;
   cloudPattern?: string;
   wanPattern?: string;
   topologyNarrative?: string;
-  redundancyModel: string;
-  servicePlacementModel: string;
-  notes: string[];
 }
 
 export interface SitePlacementDevice {
@@ -446,15 +439,15 @@ export interface SynthesizedLogicalDesign {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
-  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
-  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
-  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
-  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
+  topologyModel?: TopologyBlueprint;
+  servicePlacementModel?: ServicePlacementItem[];
+  securityBoundaryModel?: SecurityBoundaryDetail[];
+  trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
   logicalDomains: LogicalDomainIntent[];
   securityZones: SecurityZonePlan[];
@@ -2220,15 +2213,15 @@ function buildHighLevelDesign(input: {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
-  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
-  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
-  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
-  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
+  topologyModel?: TopologyBlueprint;
+  servicePlacementModel?: ServicePlacementItem[];
+  securityBoundaryModel?: SecurityBoundaryDetail[];
+  trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
 }) {
   const { profile, siteHierarchy, segmentModel, logicalDomains, wanLinks, routingPlan } = input;
@@ -2315,15 +2308,15 @@ function buildLowLevelDesign(input: {
   rows: AddressingPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
-  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
-  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
-  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
-  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
+  topologyModel?: TopologyBlueprint;
+  servicePlacementModel?: ServicePlacementItem[];
+  securityBoundaryModel?: SecurityBoundaryDetail[];
+  trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
   wanLinks: WanLinkPlanRow[];
 }) {
@@ -2590,15 +2583,15 @@ function buildDesignReview(input: {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
-  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
-  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
-  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
-  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
+  topologyModel?: TopologyBlueprint;
+  servicePlacementModel?: ServicePlacementItem[];
+  securityBoundaryModel?: SecurityBoundaryDetail[];
+  trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
 }) {
   const { profile, organizationBlockAssumed, siteHierarchy, rows, proposedSegments, rowsOutsideSiteBlocks, missingSiteBlocks, wanReserveBlock, wanLinks, routingPlan } = input;
@@ -3104,6 +3097,10 @@ function inferTopologyBlueprint(input: { profile: RequirementsProfile; siteHiera
     cloudConnected,
     redundancyModel: profile.dualIsp ? "Dual edge / resilient perimeter" : "Single active perimeter path",
     servicePlacementModel: profile.serverPlacement || "centralized servers or services",
+    cloudProvider: profile.cloudProvider || undefined,
+    cloudPattern: cloudConnected ? (profile.cloudConnectivity || "cloud edge attached") : "not attached",
+    wanPattern: siteHierarchy.length > 1 ? (centralizedBreakout ? "centralized WAN / breakout" : "distributed WAN / breakout") : "local only",
+    topologyNarrative: notes[0],
     notes: [
       ...notes,
       ...(wanLinks.length === 0 && siteHierarchy.length > 1 ? ["The scope implies multiple sites, but transport links still need to be confirmed before the design is implementation-ready."] : []),
@@ -3966,34 +3963,22 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     logicalDomains,
     wanLinks,
     topology,
-    topologyModel: topology,
     sitePlacements,
     servicePlacements,
-    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
-    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
-    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
-    routePlan: routingPlan,
-    routingIntentModel: { siteRouting: routingPlan },
   });
   const lowLevelDesign = buildLowLevelDesign({
     profile,
     siteHierarchy,
     rows,
     topology,
-    topologyModel: topology,
     sitePlacements,
     servicePlacements,
-    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
-    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
-    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
-    routePlan: routingPlan,
-    routingIntentModel: { siteRouting: routingPlan },
     wanLinks,
   });
 
@@ -4073,6 +4058,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     ...openIssues,
     ...implementationRisks.filter((item) => item.severity !== "info").map((item) => item.title),
   ]));
+
   const traceability = traceabilityItems(profile, { organizationBlockAssumed: organization.assumed, siteCount: workingSites.length, proposedSegments });
 
   const designEngineFoundation: DesignEngineFoundation = {
@@ -4198,17 +4184,11 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     segmentModel,
     wanLinks,
     topology,
-    topologyModel: topology,
     sitePlacements,
     servicePlacements,
-    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
-    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
-    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
-    routePlan: routingPlan,
-    routingIntentModel: { siteRouting: routingPlan },
     logicalDomains,
     securityZones,
     securityControls,
