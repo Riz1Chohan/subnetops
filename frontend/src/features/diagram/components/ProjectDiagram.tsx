@@ -7,24 +7,37 @@ interface SiteWithVlans extends Site {
   vlans?: Vlan[];
 }
 
+export type DiagramMode = "logical" | "physical";
+export type DiagramDensity = "guided" | "expanded";
+export type DiagramLabelMode = "essential" | "detailed";
+export type LinkAnnotationMode = "minimal" | "full";
+export type OverlayMode = "none" | "addressing" | "security" | "flows" | "services" | "redundancy";
+type DiagramReviewPresetKey = "architecture" | "site-lld" | "transport" | "boundaries" | "services" | "critical-flows";
+export type DiagramScope = "global" | "site" | "wan-cloud" | "boundaries";
+export type DeviceFocus = "all" | "edge" | "switching" | "wireless" | "services";
+export type LinkFocus = "all" | "transport" | "access" | "security" | "flows";
+export type LabelFocus = "all" | "topology" | "addressing" | "zones" | "transport" | "flows";
+
 interface ProjectDiagramProps {
   project: ProjectDetail;
   comments?: ProjectComment[];
   validations?: ValidationResult[];
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
   compact?: boolean;
+  minimalWorkspace?: boolean;
+  controls?: Partial<{
+    mode: DiagramMode;
+    overlay: OverlayMode;
+    scope: DiagramScope;
+    workspaceDensity: DiagramDensity;
+    labelMode: DiagramLabelMode;
+    linkAnnotationMode: LinkAnnotationMode;
+    labelFocus: LabelFocus;
+    deviceFocus: DeviceFocus;
+    linkFocus: LinkFocus;
+    focusedSiteId: string;
+  }>;
 }
-
-type DiagramMode = "logical" | "physical";
-type DiagramDensity = "guided" | "expanded";
-type DiagramLabelMode = "essential" | "detailed";
-type LinkAnnotationMode = "minimal" | "full";
-type OverlayMode = "none" | "addressing" | "security" | "flows" | "services" | "redundancy";
-type DiagramReviewPresetKey = "architecture" | "site-lld" | "transport" | "boundaries" | "services" | "critical-flows";
-type DiagramScope = "global" | "site" | "wan-cloud" | "boundaries";
-type DeviceFocus = "all" | "edge" | "switching" | "wireless" | "services";
-type LinkFocus = "all" | "transport" | "access" | "security" | "flows";
-type LabelFocus = "all" | "topology" | "addressing" | "zones" | "transport" | "flows";
 type SitePoint = { x: number; y: number };
 
 type DeviceKind = SitePlacementDevice["deviceType"] | "internet" | "cloud";
@@ -1869,19 +1882,39 @@ function activePresetKeyForState(mode: DiagramMode, scope: DiagramScope, overlay
   return undefined;
 }
 
-export function ProjectDiagram({ project, comments = [], validations = [], onSelectTarget, compact = false }: ProjectDiagramProps) {
+export function ProjectDiagram({ project, comments = [], validations = [], onSelectTarget, compact = false, minimalWorkspace = false, controls }: ProjectDiagramProps) {
   const sites = (project.sites ?? []) as SiteWithVlans[];
   const svgId = `diagram-${project.id}`;
-  const [mode, setMode] = useState<DiagramMode>("logical");
-  const [overlay, setOverlay] = useState<OverlayMode>("none");
-  const [scope, setScope] = useState<DiagramScope>("global");
-  const [workspaceDensity, setWorkspaceDensity] = useState<DiagramDensity>("guided");
-  const [labelMode, setLabelMode] = useState<DiagramLabelMode>("essential");
-  const [linkAnnotationMode, setLinkAnnotationMode] = useState<LinkAnnotationMode>("minimal");
-  const [labelFocus, setLabelFocus] = useState<LabelFocus>("all");
-  const [deviceFocus, setDeviceFocus] = useState<DeviceFocus>("all");
-  const [linkFocus, setLinkFocus] = useState<LinkFocus>("all");
-  const [focusedSiteId, setFocusedSiteId] = useState<string>(sites[0]?.id ?? "");
+  const [internalMode, setInternalMode] = useState<DiagramMode>("logical");
+  const [internalOverlay, setInternalOverlay] = useState<OverlayMode>("none");
+  const [internalScope, setInternalScope] = useState<DiagramScope>("global");
+  const [internalWorkspaceDensity, setInternalWorkspaceDensity] = useState<DiagramDensity>("guided");
+  const [internalLabelMode, setInternalLabelMode] = useState<DiagramLabelMode>("essential");
+  const [internalLinkAnnotationMode, setInternalLinkAnnotationMode] = useState<LinkAnnotationMode>("minimal");
+  const [internalLabelFocus, setInternalLabelFocus] = useState<LabelFocus>("all");
+  const [internalDeviceFocus, setInternalDeviceFocus] = useState<DeviceFocus>("all");
+  const [internalLinkFocus, setInternalLinkFocus] = useState<LinkFocus>("all");
+  const [internalFocusedSiteId, setInternalFocusedSiteId] = useState<string>(sites[0]?.id ?? "");
+  const mode = controls?.mode ?? internalMode;
+  const overlay = controls?.overlay ?? internalOverlay;
+  const scope = controls?.scope ?? internalScope;
+  const workspaceDensity = controls?.workspaceDensity ?? internalWorkspaceDensity;
+  const labelMode = controls?.labelMode ?? internalLabelMode;
+  const linkAnnotationMode = controls?.linkAnnotationMode ?? internalLinkAnnotationMode;
+  const labelFocus = controls?.labelFocus ?? internalLabelFocus;
+  const deviceFocus = controls?.deviceFocus ?? internalDeviceFocus;
+  const linkFocus = controls?.linkFocus ?? internalLinkFocus;
+  const focusedSiteId = controls?.focusedSiteId ?? internalFocusedSiteId;
+  const setMode = controls?.mode !== undefined ? (_next: DiagramMode) => {} : setInternalMode;
+  const setOverlay = controls?.overlay !== undefined ? (_next: OverlayMode) => {} : setInternalOverlay;
+  const setScope = controls?.scope !== undefined ? (_next: DiagramScope) => {} : setInternalScope;
+  const setWorkspaceDensity = controls?.workspaceDensity !== undefined ? (_next: DiagramDensity) => {} : setInternalWorkspaceDensity;
+  const setLabelMode = controls?.labelMode !== undefined ? (_next: DiagramLabelMode) => {} : setInternalLabelMode;
+  const setLinkAnnotationMode = controls?.linkAnnotationMode !== undefined ? (_next: LinkAnnotationMode) => {} : setInternalLinkAnnotationMode;
+  const setLabelFocus = controls?.labelFocus !== undefined ? (_next: LabelFocus) => {} : setInternalLabelFocus;
+  const setDeviceFocus = controls?.deviceFocus !== undefined ? (_next: DeviceFocus) => {} : setInternalDeviceFocus;
+  const setLinkFocus = controls?.linkFocus !== undefined ? (_next: LinkFocus) => {} : setInternalLinkFocus;
+  const setFocusedSiteId = controls?.focusedSiteId !== undefined ? (_next: string) => {} : setInternalFocusedSiteId;
   const requirements = parseRequirementsProfile(project.requirementsJson);
   const allVlans = sites.flatMap((site) => site.vlans ?? []);
   const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, allVlans, requirements), [project, sites, allVlans, requirements]);
@@ -1899,8 +1932,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const activePresetKey = useMemo(() => activePresetKeyForState(mode, scope, overlay), [mode, scope, overlay]);
   const activePreset = reviewPresets.find((preset) => preset.key === activePresetKey) || null;
   const topologyBehaviorSummary = useMemo(() => topologyScopeBehaviorSummary(scope, synthesized, focusedSite), [scope, synthesized, focusedSite]);
-  const showNarrativePanels = !compact;
-  const showSupportPanels = workspaceDensity === "expanded" && !compact;
+  const showNarrativePanels = !compact && !minimalWorkspace;
+  const showSupportPanels = workspaceDensity === "expanded" && !compact && !minimalWorkspace;
   const densityLabel = workspaceDensity === "guided" ? "Guided" : "Expanded";
 
   const applyPreset = (presetKey: DiagramReviewPresetKey) => {
@@ -1922,6 +1955,16 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
 
   if (sites.length === 0) {
     return <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
+  }
+
+  if (minimalWorkspace) {
+    return (
+      <div className="panel diagram-minimal-panel">
+        {mode === "logical"
+          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
+          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
+      </div>
+    );
   }
 
   return (

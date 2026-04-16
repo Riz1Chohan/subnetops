@@ -71,6 +71,7 @@ export function ProjectLayout() {
   const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
   const workflowReview = useMemo(() => buildProjectWorkflowReview(projectId, synthesized, validations.filter((item) => item.severity === "ERROR").length), [projectId, synthesized, validations]);
   const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesized, validations.filter((item) => item.severity === "ERROR").length), [projectId, synthesized, validations]);
+  const isDiagramWorkspace = location.pathname.includes("/diagram");
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
@@ -118,7 +119,7 @@ export function ProjectLayout() {
     },
   ];
 
-  const activeStage = stageGroups.find((group) => activeForPath(location.pathname, group.matchers))?.key ?? "discovery";
+  const activeStage = isDiagramWorkspace ? undefined : stageGroups.find((group) => activeForPath(location.pathname, group.matchers))?.key ?? "discovery";
 
   const discoveryLinks: WorkspaceLink[] = [
     { key: "summary", label: "Current state summary", path: `/projects/${projectId}/discovery?section=summary`, description: "Project baseline and saved discovery state." },
@@ -266,57 +267,65 @@ export function ProjectLayout() {
         </div>
       </section>
 
-      <section className="project-stage-workspace">
-        <aside className="panel project-stage-nav-pane">
-          <div className="project-stage-nav-header">
-            <div>
-              <strong style={{ display: "block", marginBottom: 6 }}>{stageGroups.find((group) => group.key === activeStage)?.label || "Workspace"}</strong>
-              <p className="muted" style={{ margin: 0 }}>Choose one card on the left. Only that item should take over the working pane on the right.</p>
-            </div>
-            <span className="badge-soft">{workspaceLinks.length} cards</span>
-          </div>
+      <section className={`project-stage-workspace ${isDiagramWorkspace ? "project-stage-workspace-diagram" : ""}`.trim()}>
+        {isDiagramWorkspace ? (
+          <main className="project-stage-content-pane project-stage-content-pane-wide">
+            <Outlet />
+          </main>
+        ) : (
+          <>
+            <aside className="panel project-stage-nav-pane">
+              <div className="project-stage-nav-header">
+                <div>
+                  <strong style={{ display: "block", marginBottom: 6 }}>{stageGroups.find((group) => group.key === activeStage)?.label || "Workspace"}</strong>
+                  <p className="muted" style={{ margin: 0 }}>Choose one card on the left. Only that item should take over the working pane on the right.</p>
+                </div>
+                <span className="badge-soft">{workspaceLinks.length} cards</span>
+              </div>
 
-          <div className="project-stage-nav-list">
-            {workspaceLinks.map((item) => {
-              const isExactPath = location.pathname === item.path.split("?")[0] && location.search === (item.path.includes("?") ? `?${item.path.split("?")[1]}` : "");
-              return (
-                <Link key={item.key} to={item.path} className={`project-stage-nav-link ${isExactPath ? "active" : ""}`.trim()}>
-                  <span>{item.label}</span>
-                  {item.description ? <small>{item.description}</small> : null}
-                </Link>
-              );
-            })}
-          </div>
+              <div className="project-stage-nav-list">
+                {workspaceLinks.map((item) => {
+                  const isExactPath = location.pathname === item.path.split("?")[0] && location.search === (item.path.includes("?") ? `?${item.path.split("?")[1]}` : "");
+                  return (
+                    <Link key={item.key} to={item.path} className={`project-stage-nav-link ${isExactPath ? "active" : ""}`.trim()}>
+                      <span>{item.label}</span>
+                      {item.description ? <small>{item.description}</small> : null}
+                    </Link>
+                  );
+                })}
+              </div>
 
-          <details className="project-action-center">
-            <summary>
-              <span>Action Center</span>
-              <span className="badge-soft">{workflowReview.actionQueue.length}</span>
-            </summary>
-            <div className="project-action-center-list">
-              {workflowReview.actionQueue.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>No open action items are currently being surfaced.</p>
-              ) : workflowReview.actionQueue.map((item) => {
-                const issuePath = buildWorkspaceIssuePath(item.path, { key: item.key, title: item.title, detail: item.detail });
-                return (
-                  <Link key={item.key} to={issuePath} className={`project-action-center-link ${item.severity === "primary" ? "primary" : item.severity === "warning" ? "warning" : "secondary"}`}>
-                    <strong>{item.title}</strong>
-                    <span>{item.detail}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </details>
+              <details className="project-action-center">
+                <summary>
+                  <span>Action Center</span>
+                  <span className="badge-soft">{workflowReview.actionQueue.length}</span>
+                </summary>
+                <div className="project-action-center-list">
+                  {workflowReview.actionQueue.length === 0 ? (
+                    <p className="muted" style={{ margin: 0 }}>No open action items are currently being surfaced.</p>
+                  ) : workflowReview.actionQueue.map((item) => {
+                    const issuePath = buildWorkspaceIssuePath(item.path, { key: item.key, title: item.title, detail: item.detail });
+                    return (
+                      <Link key={item.key} to={issuePath} className={`project-action-center-link ${item.severity === "primary" ? "primary" : item.severity === "warning" ? "warning" : "secondary"}`}>
+                        <strong>{item.title}</strong>
+                        <span>{item.detail}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
 
-          <div className="project-stage-nav-footer">
-            <Link to={`/projects/${projectId}/tasks`} className="link-button link-button-subtle">Tasks</Link>
-            <Link to={`/projects/${projectId}/settings`} className="link-button link-button-subtle">Settings</Link>
-          </div>
-        </aside>
+              <div className="project-stage-nav-footer">
+                <Link to={`/projects/${projectId}/tasks`} className="link-button link-button-subtle">Tasks</Link>
+                <Link to={`/projects/${projectId}/settings`} className="link-button link-button-subtle">Settings</Link>
+              </div>
+            </aside>
 
-        <main className="project-stage-content-pane">
-          <Outlet />
-        </main>
+            <main className="project-stage-content-pane">
+              <Outlet />
+            </main>
+          </>
+        )}
       </section>
     </section>
   );

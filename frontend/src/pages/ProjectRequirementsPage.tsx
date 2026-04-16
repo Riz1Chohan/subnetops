@@ -1399,6 +1399,18 @@ export function ProjectRequirementsPage() {
     return <EmptyState title="Project not found" message="The requirements workspace could not be loaded for this project." action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>} />;
   }
 
+  if (!requestedStep) {
+    return (
+      <section style={{ display: "grid", gap: 18 }}>
+        <div className="panel workspace-selection-blank">
+          <p className="workspace-detail-kicker">Requirements</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
+          <p className="muted" style={{ margin: 0 }}>Choose a requirements card from the left pane to open that focused workspace.</p>
+        </div>
+      </section>
+    );
+  }
+
   if (isFocusedStepView) {
     return (
       <section className="workspace-detail-shell">
