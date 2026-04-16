@@ -61,7 +61,7 @@ export function buildDiagramGovernancePack(design: SynthesizedLogicalDesign): Di
     const placements = design.sitePlacements.filter((item) => item.siteId === site.id);
     const services = design.servicePlacements.filter((item) => item.siteId === site.id || item.siteName === site.name);
     const boundaries = design.securityBoundaries.filter((item) => item.siteName === site.name);
-    const routePlan = design.routePlan.find((item) => item.siteId === site.id);
+    const routePlan = (design.routePlan || design.routingPlan).find((item) => item.siteId === site.id);
 
     const rows: DiagramControlDomainRow[] = [];
 

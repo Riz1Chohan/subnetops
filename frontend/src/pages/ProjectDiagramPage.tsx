@@ -113,8 +113,8 @@ export function ProjectDiagramPage() {
             <strong style={{ display: "block", marginBottom: 8 }}>Topology realism foundation</strong>
             <div className="diagram-foundation-metrics">
               <div><span>Topology</span><strong>{synthesized.topology.topologyType}</strong></div>
-              <div><span>WAN</span><strong>{synthesized.topology.wanPattern}</strong></div>
-              <div><span>Cloud</span><strong>{synthesized.topology.cloudConnected ? synthesized.topology.cloudProvider : "Not attached"}</strong></div>
+              <div><span>WAN</span><strong>{synthesized.topology.wanPattern || (synthesized.wanLinks.length ? "WAN present" : "Local only")}</strong></div>
+              <div><span>Cloud</span><strong>{synthesized.topology.cloudConnected ? (synthesized.topology.cloudProvider || "Cloud attached") : "Not attached"}</strong></div>
               <div><span>Primary site</span><strong>{synthesized.topology.primarySiteName || "Not assigned"}</strong></div>
             </div>
             <p className="muted" style={{ margin: "10px 0 0 0" }}>

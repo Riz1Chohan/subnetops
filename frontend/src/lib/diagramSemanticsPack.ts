@@ -55,7 +55,7 @@ export interface DiagramSemanticsPack {
 
 export function buildDiagramSemanticsPack(design: SynthesizedLogicalDesign): DiagramSemanticsPack {
   const routeDomains: DiagramRouteDomainReview[] = design.siteHierarchy.map((site) => {
-    const localAddressing = design.addressingPlan.filter((row) => row.siteName === site.name).slice(0, 4).map((row) => `${row.subnetCidr} • ${row.roleLabel || row.zoneName || 'segment'}`);
+    const localAddressing = design.addressingPlan.filter((row) => row.siteName === site.name).slice(0, 4).map((row) => `${row.subnetCidr} • ${row.roleLabel || row.segmentName || 'segment'}`);
     const transit = design.wanLinks.filter((link) => link.endpointASiteName === site.name || link.endpointBSiteName === site.name).slice(0, 3).map((link) => `${link.subnetCidr} • ${link.transport}`);
     const isPrimary = site.id === design.topology.primarySiteId;
     const defaultBehavior = design.topology.topologyType === 'hub-spoke'

@@ -506,6 +506,7 @@ function LogicalTopologyDiagram({
   comments,
   validations,
   overlay,
+  diagramMode = "logical",
   onSelectTarget,
 }: {
   project: ProjectDetail;
@@ -514,6 +515,7 @@ function LogicalTopologyDiagram({
   comments: ProjectComment[];
   validations: ValidationResult[];
   overlay: OverlayMode;
+  diagramMode?: DiagramMode;
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
 }) {
   const sites = (project.sites ?? []) as SiteWithVlans[];
@@ -1073,7 +1075,7 @@ function SiteDeviceLinkMatrixPanel({ synthesized }: { synthesized: SynthesizedLo
     return {
       id: site.id,
       siteName: site.name,
-      tier: site.tier,
+      tier: site.tier || site.siteRole || site.source,
       edge: edge ? `${edge.deviceName} • ${edge.deviceType}` : 'Not synthesized',
       switching: switching ? `${switching.deviceName} • ${switching.deviceType}` : 'Not synthesized',
       wireless: wireless ? `${wireless.deviceName} • ${wireless.deviceType}` : 'None / not synthesized',
@@ -1125,7 +1127,7 @@ function SiteDeviceLinkMatrixPanel({ synthesized }: { synthesized: SynthesizedLo
 
 function TopologyObjectPanel({ synthesized }: { synthesized: SynthesizedLogicalDesign }) {
   const primarySite = synthesized.topology.primarySiteName || synthesized.siteHierarchy[0]?.name || "Not assigned";
-  const serviceAnchors = Array.from(new Set(synthesized.servicePlacements.slice(0, 6).map((item) => `${item.serviceName} • ${item.locationModel}`)));
+  const serviceAnchors = Array.from(new Set(synthesized.servicePlacements.slice(0, 6).map((item) => `${item.serviceName} • ${item.placementType}`)));
   return (
     <div className="diagram-topology-object-panel">
       <div className="diagram-topology-object-card">
@@ -1137,8 +1139,8 @@ function TopologyObjectPanel({ synthesized }: { synthesized: SynthesizedLogicalD
           <div><span>Pattern</span><strong>{synthesized.topology.topologyLabel}</strong></div>
           <div><span>Primary site</span><strong>{primarySite}</strong></div>
           <div><span>Breakout</span><strong>{synthesized.topology.internetBreakout}</strong></div>
-          <div><span>Cloud posture</span><strong>{synthesized.topology.cloudPattern}</strong></div>
-          <div><span>WAN posture</span><strong>{synthesized.topology.wanPattern}</strong></div>
+          <div><span>Cloud posture</span><strong>{synthesized.topology.cloudPattern || (synthesized.topology.cloudConnected ? "Cloud-connected" : "On-prem")}</strong></div>
+          <div><span>WAN posture</span><strong>{synthesized.topology.wanPattern || (synthesized.wanLinks.length ? "WAN present" : "Local only")}</strong></div>
           <div><span>Redundancy</span><strong>{synthesized.topology.redundancyModel}</strong></div>
         </div>
       </div>
@@ -1196,10 +1198,10 @@ function TopologyFoundationPanel({ synthesized }: { synthesized: SynthesizedLogi
     <div className="diagram-foundation-grid" style={{ marginTop: 10 }}>
       <div className="diagram-foundation-card">
         <strong style={{ display: "block", marginBottom: 6 }}>Topology intent</strong>
-        <p style={{ margin: "0 0 8px 0" }}>{synthesized.topology.topologyNarrative}</p>
+        <p style={{ margin: "0 0 8px 0" }}>{synthesized.topology.topologyNarrative || synthesized.topology.topologyLabel}</p>
         <div className="network-chip-list">
           <span className="badge-soft">{synthesized.topology.topologyType}</span>
-          <span className="badge-soft">WAN {synthesized.topology.wanPattern}</span>
+          <span className="badge-soft">WAN {synthesized.topology.wanPattern || (synthesized.wanLinks.length ? "WAN present" : "Local only")}</span>
           <span className="badge-soft">Breakout {synthesized.topology.internetBreakout}</span>
           <span className="badge-soft">Redundancy {synthesized.topology.redundancyModel}</span>
         </div>
@@ -1437,7 +1439,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
       <SiteDeviceLinkMatrixPanel synthesized={synthesized} />
       {overlay === "flows" ? <FlowSummaryPanel flows={synthesized.trafficFlows} /> : null}
       {mode === "logical"
-        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} onSelectTarget={onSelectTarget} />
+        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} diagramMode={mode} onSelectTarget={onSelectTarget} />
         : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} onSelectTarget={onSelectTarget} />}
     </div>
   );

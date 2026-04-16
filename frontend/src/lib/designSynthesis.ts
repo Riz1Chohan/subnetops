@@ -17,6 +17,7 @@ import {
 export interface PlannedSiteSummary {
   id: string;
   name: string;
+  siteName?: string;
   siteCode: string;
   location?: string;
   source: "configured" | "proposed";
@@ -25,6 +26,10 @@ export interface PlannedSiteSummary {
   plannedDemandAddresses: number;
   plannedDemandHosts: number;
   note?: string;
+  tier?: "primary" | "branch" | "single-site" | "cloud";
+  siteRole?: string;
+  vlans?: Array<{ name?: string; subnet?: string }>;
+  devices?: Array<{ deviceType: string; deviceRole?: string }>;
 }
 
 export interface AddressingPlanRow {
@@ -38,6 +43,8 @@ export interface AddressingPlanRow {
   segmentName: string;
   purpose: string;
   role: SegmentRole;
+  roleLabel?: string;
+  zoneName?: string;
   subnetCidr: string;
   mask: string;
   gatewayIp: string;
@@ -96,9 +103,11 @@ export interface WanLinkPlanRow {
   subnetCidr: string;
   endpointASiteId?: string;
   endpointASiteName: string;
+  endpointAInterface?: string;
   endpointAIp: string;
   endpointBSiteId?: string;
   endpointBSiteName: string;
+  endpointBInterface?: string;
   endpointBIp: string;
   notes: string[];
 }
@@ -311,6 +320,10 @@ export interface TopologyBlueprint {
   primarySiteName?: string;
   internetBreakout: "centralized" | "distributed";
   cloudConnected: boolean;
+  cloudProvider?: string;
+  cloudPattern?: string;
+  wanPattern?: string;
+  topologyNarrative?: string;
   redundancyModel: string;
   servicePlacementModel: string;
   notes: string[];
@@ -338,6 +351,7 @@ export interface ServicePlacementItem {
   serviceName: string;
   serviceType: "shared-service" | "dmz-service" | "local-service" | "cloud-service" | "management-service";
   placementType: "local" | "centralized" | "dmz" | "cloud";
+  locationModel?: string;
   siteId?: string;
   siteName: string;
   zoneName: string;
@@ -432,10 +446,16 @@ export interface SynthesizedLogicalDesign {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
+  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
+  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
+  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
+  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
+  routePlan?: RoutePlanItem[];
+  routingIntentModel?: { siteRouting: RoutePlanItem[] };
   logicalDomains: LogicalDomainIntent[];
   securityZones: SecurityZonePlan[];
   securityControls: SecurityControlItem[];
@@ -2200,10 +2220,16 @@ function buildHighLevelDesign(input: {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
+  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
+  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
+  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
+  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
+  routePlan?: RoutePlanItem[];
+  routingIntentModel?: { siteRouting: RoutePlanItem[] };
 }) {
   const { profile, siteHierarchy, segmentModel, logicalDomains, wanLinks, routingPlan } = input;
   const siteCount = siteHierarchy.length;
@@ -2289,10 +2315,16 @@ function buildLowLevelDesign(input: {
   rows: AddressingPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
+  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
+  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
+  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
+  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
+  routePlan?: RoutePlanItem[];
+  routingIntentModel?: { siteRouting: RoutePlanItem[] };
   wanLinks: WanLinkPlanRow[];
 }) {
   const { profile, siteHierarchy, rows, topology, sitePlacements, servicePlacements, securityBoundaries, trafficFlows, routingPlan, wanLinks } = input;
@@ -2558,10 +2590,16 @@ function buildDesignReview(input: {
   wanLinks: WanLinkPlanRow[];
   topology: TopologyBlueprint;
   sitePlacements: SitePlacementDevice[];
+  topologyModel?: TopologyBlueprint;
   servicePlacements: ServicePlacementItem[];
+  servicePlacementModel?: { placements: ServicePlacementItem[] };
   securityBoundaries: SecurityBoundaryDetail[];
+  securityBoundaryModel?: { zones: SecurityBoundaryDetail[] };
   trafficFlows: TrafficFlowPath[];
+  trafficFlowModel?: { flows: TrafficFlowPath[] };
   routingPlan: RoutePlanItem[];
+  routePlan?: RoutePlanItem[];
+  routingIntentModel?: { siteRouting: RoutePlanItem[] };
 }) {
   const { profile, organizationBlockAssumed, siteHierarchy, rows, proposedSegments, rowsOutsideSiteBlocks, missingSiteBlocks, wanReserveBlock, wanLinks, routingPlan } = input;
   const items: DesignReviewItem[] = [];
@@ -3928,22 +3966,34 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     logicalDomains,
     wanLinks,
     topology,
+    topologyModel: topology,
     sitePlacements,
     servicePlacements,
+    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
+    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
+    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
+    routePlan: routingPlan,
+    routingIntentModel: { siteRouting: routingPlan },
   });
   const lowLevelDesign = buildLowLevelDesign({
     profile,
     siteHierarchy,
     rows,
     topology,
+    topologyModel: topology,
     sitePlacements,
     servicePlacements,
+    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
+    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
+    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
+    routePlan: routingPlan,
+    routingIntentModel: { siteRouting: routingPlan },
     wanLinks,
   });
 
@@ -4023,6 +4073,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     ...openIssues,
     ...implementationRisks.filter((item) => item.severity !== "info").map((item) => item.title),
   ]));
+  const traceability = traceabilityItems(profile, { organizationBlockAssumed: organization.assumed, siteCount: workingSites.length, proposedSegments });
 
   const designEngineFoundation: DesignEngineFoundation = {
     stageLabel: "v108 Design Engine Foundation",
@@ -4147,11 +4198,17 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     segmentModel,
     wanLinks,
     topology,
+    topologyModel: topology,
     sitePlacements,
     servicePlacements,
+    servicePlacementModel: { placements: servicePlacements },
     securityBoundaries,
+    securityBoundaryModel: { zones: securityBoundaries },
     trafficFlows,
+    trafficFlowModel: { flows: trafficFlows },
     routingPlan,
+    routePlan: routingPlan,
+    routingIntentModel: { siteRouting: routingPlan },
     logicalDomains,
     securityZones,
     securityControls,
@@ -4173,7 +4230,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     operationsArtifacts,
     highLevelDesign,
     lowLevelDesign,
-    traceability: traceabilityItems(profile, { organizationBlockAssumed: organization.assumed, siteCount: workingSites.length, proposedSegments }),
+    traceability,
     designSummary,
     designReview,
     openIssues,
