@@ -31,8 +31,10 @@ export function DashboardLayout() {
           <Link to="/dashboard/help">Help</Link>
           <Link to="/dashboard/faq">FAQ</Link>
           <Link to="/account/security">Account</Link>
-          <span className="muted">Notifications: {notificationSummaryQuery.data?.unread ?? 0}</span>
-          <span className="muted">{data?.user?.email || "Guest"}</span>
+          <div className="topbar-user-pill">
+            <strong>{data?.user?.fullName?.trim() || data?.user?.email?.split("@")[0] || "Guest"}</strong>
+            <span className="muted">Notifications {notificationSummaryQuery.data?.unread ?? 0}</span>
+          </div>
           <button
             type="button"
             onClick={async () => {

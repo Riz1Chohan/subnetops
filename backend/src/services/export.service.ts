@@ -751,6 +751,13 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
   const implementationNextSteps = jsonArray<unknown>(synthesized.implementationNextSteps).map((item) => String(item));
   const highLevelDesign = jsonObject(synthesized.highLevelDesign);
   const organizationHierarchy = jsonObject(synthesized.organizationHierarchy);
+  const designTruthModel = jsonObject(synthesized.designTruthModel);
+  const truthRouteDomains = jsonArray<JsonMap>(designTruthModel.routeDomains);
+  const truthBoundaryDomains = jsonArray<JsonMap>(designTruthModel.boundaryDomains);
+  const truthServiceDomains = jsonArray<JsonMap>(designTruthModel.serviceDomains);
+  const truthFlowContracts = jsonArray<JsonMap>(designTruthModel.flowContracts);
+  const truthGenerationNotes = jsonArray<unknown>(designTruthModel.generationNotes).map((item) => String(item));
+  const truthCoverage = jsonArray<JsonMap>(designTruthModel.coverage);
   const platformSummary = jsonObject(platform.platformSummary);
   const bomItems = jsonArray<JsonMap>(platform.bomItems);
   const bomAssumptions = jsonArray<unknown>(platform.bomAssumptions).map((item) => String(item));
@@ -856,6 +863,33 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     asString(item.endpointBSiteName),
     asString(item.endpointBIp),
     asString(item.subnetCidr),
+  ]);
+  const truthRouteRows = truthRouteDomains.map((item) => [
+    asString(item.siteName),
+    asString(item.sourceModel, "explicit"),
+    asString(item.summaryAdvertisement, "—"),
+    asString(item.loopbackCidr, "—"),
+    String(jsonArray<unknown>(item.localSegmentIds).length),
+    String(jsonArray<unknown>(item.transitWanAdjacencyIds).length),
+    String(jsonArray<unknown>(item.flowIds).length),
+  ]);
+  const truthBoundaryRows = truthBoundaryDomains.map((item) => [
+    asString(item.siteName),
+    asString(item.zoneName),
+    asString(item.sourceModel, "explicit"),
+    asString(item.attachedDevice, "Boundary device to confirm"),
+    String(jsonArray<unknown>(item.segmentIds).length),
+    String(jsonArray<unknown>(item.serviceIds).length),
+    String(jsonArray<unknown>(item.flowIds).length),
+  ]);
+  const truthFlowRows = truthFlowContracts.map((item) => [
+    asString(item.flowLabel),
+    asString(item.sourceSite, asString(item.source)),
+    asString(item.destinationSite, asString(item.destination)),
+    asString(item.routeModel),
+    String(jsonArray<unknown>(item.routeDomainIds).length),
+    String(jsonArray<unknown>(item.boundaryIds).length),
+    String(jsonArray<unknown>(item.wanAdjacencyIds).length),
   ]);
   const switchingRows = switchingDesign.map((item) => [
     asString(item.topic),
@@ -969,7 +1003,30 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "4. Logical Domains, Security Architecture, and Segmentation Model",
+      title: "4. Core Design Truth Model",
+      paragraphs: [
+        "This section reflects the shared internal model now linking topology, routing anchors, security boundaries, service placement, and traffic flows. It is intended to reduce drift between workspaces by giving the package one connected engineering truth layer.",
+        `The current shared model resolves ${truthRouteDomains.length} route domain${truthRouteDomains.length === 1 ? "" : "s"}, ${truthBoundaryDomains.length} boundary domain${truthBoundaryDomains.length === 1 ? "" : "s"}, ${truthServiceDomains.length} service domain${truthServiceDomains.length === 1 ? "" : "s"}, and ${truthFlowContracts.length} flow contract${truthFlowContracts.length === 1 ? "" : "s"}. ${asString(designTruthModel.summary) || ""}`,
+      ],
+      bullets: [
+        ...truthGenerationNotes,
+        ...truthCoverage.slice(0, 5).map((item) => `${asString(item.label)}: ${asString(item.detail)}`),
+      ].slice(0, 12),
+      tables: [
+        {
+          title: "Route-Domain Authority",
+          headers: ["Site", "Source", "Summary", "Loopback", "Segments", "WAN", "Flows"],
+          rows: truthRouteRows.length > 0 ? truthRouteRows : [["No route-domain objects generated", "—", "—", "—", "—", "—", "—"]],
+        },
+        {
+          title: "Boundary-Domain Authority",
+          headers: ["Site", "Zone", "Source", "Device", "Segments", "Services", "Flows"],
+          rows: truthBoundaryRows.length > 0 ? truthBoundaryRows : [["No boundary-domain objects generated", "—", "—", "—", "—", "—", "—"]],
+        },
+      ],
+    },
+    {
+      title: "5. Logical Domains, Security Architecture, and Segmentation Model",
       paragraphs: [
         "Security in this package is treated as a structural design layer that shapes how segments, trust boundaries, routing edges, and implementation controls should be interpreted. The outputs below do not replace final firewall engineering, but they do define the zones, default behaviors, and policy boundaries that implementation must preserve.",
         "The combination of logical domains, mapped zones, control recommendations, and inter-zone access expectations should be reviewed together. This is the point where segmentation becomes an implementation-ready security model rather than a list of definitions.",
@@ -989,7 +1046,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "5. Logical Design and Addressing Plan",
+      title: "6. Logical Design and Addressing Plan",
       paragraphs: [
         `The logical design currently contains ${rowCount} addressing row${rowCount === 1 ? "" : "s"}. These rows represent the actual generated planning result and should be treated as the primary implementation artifact for subnet ownership, gateway placement, DHCP posture, host sizing, and site-level segmentation.`,
         "Configured rows and proposed rows should both be reviewed. Configured rows reflect explicit saved records, while proposed rows show where the synthesis engine is carrying the design beyond what has already been manually recorded.",
@@ -1008,7 +1065,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "6. Routing, Switching, and Transport Intent",
+      title: "7. Routing, Switching, and Transport Intent",
       paragraphs: [
         "Routing and switching outputs should be read together with the security and addressing sections. Gateway ownership, summaries, route boundaries, WAN or cloud edge links, switching fault domains, and QoS posture should all reinforce the same logical hierarchy rather than competing with it.",
         `The current design package contains ${routingProtocols.length} protocol or transport posture item${routingProtocols.length === 1 ? "" : "s"}, ${routePolicies.length} route-policy item${routePolicies.length === 1 ? "" : "s"}, ${switchingDesign.length} switching design control${switchingDesign.length === 1 ? "" : "s"}, and ${wanLinks.length} synthesized WAN or cloud link${wanLinks.length === 1 ? "" : "s"}.`,
@@ -1036,7 +1093,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "7. Implementation, Testing, and Validation Strategy",
+      title: "8. Implementation, Testing, and Validation Strategy",
       paragraphs: [
         `Implementation should follow ${asString(jsonObject(synthesized.implementationPlan).rolloutStrategy, "a phased sequence")}, with ${implementationPhases.length} explicit phase${implementationPhases.length === 1 ? "" : "s"}, ${cutoverChecklist.length} cutover or pre/post-check item${cutoverChecklist.length === 1 ? "" : "s"}, ${rollbackPlan.length} rollback trigger${rollbackPlan.length === 1 ? "" : "s"}, and ${validationPlan.length} validation test${validationPlan.length === 1 ? "" : "s"} currently captured in the package.`,
         counts.errors > 0
@@ -1061,7 +1118,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "8. Platform Profile and Bill of Materials Foundation",
+      title: "9. Platform Profile and Bill of Materials Foundation",
       paragraphs: [
         "The platform profile and BOM should be treated as a role-based engineering and procurement foundation. It is intended to keep the design grounded in deployment reality before exact model selection, licensing, optics, and commercial review are finalized.",
         `The current BOM foundation includes ${bomItems.length} line item${bomItems.length === 1 ? "" : "s"}. These quantities and categories are derived from the current synthesized design and saved platform posture, not from final SKU-level procurement choices.`,
@@ -1084,7 +1141,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "9. Assumptions, Risks, and Open Review Items",
+      title: "10. Assumptions, Risks, and Open Review Items",
       paragraphs: [
         "Professional design packages should make uncertainty visible instead of hiding it. The following items are assumptions, risks, and open review points that still matter before the package is treated as final implementation truth.",
       ],
@@ -1097,7 +1154,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ].slice(0, 24),
     },
     {
-      title: "10. Conclusion and Handoff Notes",
+      title: "11. Conclusion and Handoff Notes",
       paragraphs: [
         `${projectName} now has a structured professional network plan covering discovery context, project requirements, high-level architecture, logical design, security boundaries, routing posture, implementation planning, validation review, and platform foundations. The export is intended to function as a real review package for approvals and technical discussion, not just as a shallow application summary.`,
         `The next priority should be to confirm any remaining open assumptions, align the design with final platform choices, and carry the approved logical package into implementation artifacts, diagrams, change controls, and evidence collection.`,
@@ -1141,7 +1198,16 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       ],
     },
     {
-      title: "Appendix D. Validation Detail",
+      title: "Appendix D. Core Truth-Model Flow Detail",
+      paragraphs: ["This appendix shows how flow contracts currently tie back to route domains, boundary domains, and WAN adjacencies inside the shared engineering model."],
+      tables: [{
+        title: "Flow Contracts",
+        headers: ["Flow", "Source", "Destination", "Route Model", "Route Domains", "Boundaries", "WAN"],
+        rows: truthFlowRows.length > 0 ? truthFlowRows : [["No flow-contract objects generated", "—", "—", "—", "—", "—", "—"]],
+      }],
+    },
+    {
+      title: "Appendix E. Validation Detail",
       paragraphs: ["The following findings reflect the latest validation state carried into the export package."],
       tables: [{
         title: "Validation Findings",
@@ -1150,7 +1216,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
       }],
     },
     {
-      title: "Appendix E. Bill of Materials Detail",
+      title: "Appendix F. Bill of Materials Detail",
       paragraphs: ["The role-based BOM detail below remains review-oriented rather than quote-ready, but it captures the deployment categories and quantities implied by the current design package."],
       tables: [{
         title: "BOM Detail",
@@ -1213,6 +1279,10 @@ function getCsvRowsFromSnapshot(snapshot: ExportSnapshot): Array<Record<string, 
   const siteHierarchy = jsonArray<JsonMap>(synthesized.siteHierarchy);
   const securityZones = jsonArray<JsonMap>(synthesized.securityZones);
   const securityPolicyMatrix = jsonArray<JsonMap>(synthesized.securityPolicyMatrix);
+  const designTruthModel = jsonObject(synthesized.designTruthModel);
+  const truthRouteDomains = jsonArray<JsonMap>(designTruthModel.routeDomains);
+  const truthBoundaryDomains = jsonArray<JsonMap>(designTruthModel.boundaryDomains);
+  const truthFlowContracts = jsonArray<JsonMap>(designTruthModel.flowContracts);
   const routePolicies = jsonArray<JsonMap>(synthesized.routePolicies);
   const wanLinks = jsonArray<JsonMap>(synthesized.wanLinks);
   const implementationPhases = jsonArray<JsonMap>(synthesized.implementationPhases);
@@ -1239,6 +1309,15 @@ function getCsvRowsFromSnapshot(snapshot: ExportSnapshot): Array<Record<string, 
   }
   for (const row of securityPolicyMatrix) {
     rows.push({ Section: "Security Policy", Scope: asString(row.sourceZone), Name: asString(row.targetZone), Key: asString(row.defaultAction), Value: asString(row.allowedFlows), Notes: asString(row.controlPoint) });
+  }
+  for (const row of truthRouteDomains) {
+    rows.push({ Section: "Core Model Route Domain", Scope: asString(row.siteName), Name: asString(row.sourceModel, "explicit"), Key: asString(row.summaryAdvertisement, "—"), Value: asString(row.loopbackCidr, "—"), Notes: `Segments ${jsonArray<unknown>(row.localSegmentIds).length} | WAN ${jsonArray<unknown>(row.transitWanAdjacencyIds).length} | Flows ${jsonArray<unknown>(row.flowIds).length}` });
+  }
+  for (const row of truthBoundaryDomains) {
+    rows.push({ Section: "Core Model Boundary", Scope: asString(row.siteName), Name: asString(row.zoneName), Key: asString(row.sourceModel, "explicit"), Value: asString(row.attachedDevice, "Boundary device to confirm"), Notes: `Segments ${jsonArray<unknown>(row.segmentIds).length} | Services ${jsonArray<unknown>(row.serviceIds).length} | Flows ${jsonArray<unknown>(row.flowIds).length}` });
+  }
+  for (const row of truthFlowContracts) {
+    rows.push({ Section: "Core Model Flow", Scope: asString(row.flowLabel), Name: asString(row.sourceSite, asString(row.source)), Key: asString(row.destinationSite, asString(row.destination)), Value: asString(row.routeModel), Notes: `Route domains ${jsonArray<unknown>(row.routeDomainIds).length} | Boundaries ${jsonArray<unknown>(row.boundaryIds).length} | WAN ${jsonArray<unknown>(row.wanAdjacencyIds).length}` });
   }
   for (const row of routePolicies) {
     rows.push({ Section: "Routing", Scope: asString(row.scope), Name: asString(row.policyName), Key: asString(row.intent), Value: asString(row.recommendation), Notes: "" });

@@ -12,6 +12,8 @@ import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requi
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "../lib/discoveryFoundation";
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
+import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
+import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -68,6 +70,8 @@ export function ProjectOverviewPage() {
     () => synthesizePlatformBomFoundation({ project, sites, vlans, profile: requirementsProfile, synthesized, state: resolvePlatformProfileState(projectId, project) }),
     [projectId, project, sites, vlans, requirementsProfile, synthesized],
   );
+  const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
+  const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading logical design" message="Preparing the synthesized HLD, LLD, and addressing outputs." />;
@@ -104,25 +108,52 @@ export function ProjectOverviewPage() {
         actions={
           <div className="overview-actions-shell">
             <div className="overview-primary-actions">
-              <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing</Link>
-              <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
-              <Link to={`/projects/${projectId}/routing`} className="link-button">Routing</Link>
-              <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 2).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
             </div>
             <details className="overview-more-actions">
-              <summary>More workspace links</summary>
+              <summary>Supporting workspace links</summary>
               <div className="overview-more-actions-grid">
-                <Link to={`/projects/${projectId}/implementation`} className="link-button link-button-subtle">Implementation</Link>
-                <Link to={`/projects/${projectId}/standards`} className="link-button link-button-subtle">Config Standards</Link>
-                <Link to={`/projects/${projectId}/platform`} className="link-button link-button-subtle">Platform & BOM</Link>
-                <Link to={`/projects/${projectId}/discovery`} className="link-button link-button-subtle">Discovery</Link>
-                <Link to={`/projects/${projectId}/validation`} className="link-button link-button-subtle">Validation</Link>
+                <Link to={`/projects/${projectId}/core-model`} className="link-button link-button-subtle">Core Model</Link>
+                <Link to={`/projects/${projectId}/addressing`} className="link-button link-button-subtle">Addressing</Link>
+                <Link to={`/projects/${projectId}/security`} className="link-button link-button-subtle">Security</Link>
+                <Link to={`/projects/${projectId}/routing`} className="link-button link-button-subtle">Routing</Link>
                 <Link to={`/projects/${projectId}/diagram`} className="link-button link-button-subtle">Diagram</Link>
+                <Link to={`/projects/${projectId}/report`} className="link-button link-button-subtle">Report</Link>
+                <Link to={`/projects/${projectId}/validation`} className="link-button link-button-subtle">Validation</Link>
               </div>
             </details>
           </div>
         }
       />
+
+      <div className="panel recovery-focus-panel">
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Current recovery focus</h2>
+          <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
+        </div>
+        <div className="recovery-focus-grid">
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>{focusPlan.headline}</strong>
+            <div className="form-actions">
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 2).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>Why this is still the right focus</strong>
+            <ul className="recovery-focus-signal-list" style={{ margin: 0 }}>
+              {focusPlan.focusSignals.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -147,9 +178,42 @@ export function ProjectOverviewPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery completion before the master roadmap</h2>
+          <p className="muted" style={{ margin: 0 }}>{recoveryCompletion.summary}</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className="badge-soft">Completion {recoveryCompletion.percentComplete}%</span>
+          <span className={recoveryCompletion.status === "ready-for-master" ? "badge badge-info" : recoveryCompletion.status === "near-transition" ? "badge badge-warning" : "badge badge-error"}>
+            {recoveryCompletion.status === "ready-for-master" ? "Ready for master roadmap" : recoveryCompletion.status === "near-transition" ? "Near transition" : "Stay on recovery"}
+          </span>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Must finish next</h3>
+            {recoveryCompletion.mustFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major must-finish recovery items are currently surfacing.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {recoveryCompletion.mustFinish.slice(0, 3).map((task) => (
+                  <li key={task.id} style={{ marginBottom: 8 }}><strong>{task.title}:</strong> {task.detail}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence behind the gate</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {recoveryCompletion.evidence.map((item) => (
+                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            v93 starts turning requirements into explicit placement, path, and boundary objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine.
+            v108 turns requirements into explicit placement, path, boundary, and addressing objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine foundation.
           </p>
         </div>
         <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
@@ -179,6 +243,40 @@ export function ProjectOverviewPage() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Unified design truth layer</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This recovery pass adds a shared model that links site topology, route domains, service placement, security boundaries, WAN adjacencies, and flow contracts so later workspaces can read from one connected engineering layer.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
+          {summaryCard("Site nodes", synthesized.designTruthModel.siteNodes.length)}
+          {summaryCard("Route domains", synthesized.designTruthModel.routeDomains.length)}
+          {summaryCard("Boundary domains", synthesized.designTruthModel.boundaryDomains.length)}
+          {summaryCard("Flow contracts", synthesized.designTruthModel.flowContracts.length)}
+          {summaryCard("Unresolved refs", synthesized.designTruthModel.unresolvedReferences.length)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Why this matters</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <li style={{ marginBottom: 8 }}>Diagram, routing, security, and report work can now point to the same linked design objects.</li>
+              <li style={{ marginBottom: 8 }}>Site, zone, and service drift become easier to detect before implementation details are written.</li>
+              <li style={{ marginBottom: 0 }}>The next roadmap step can focus on strengthening this model instead of stacking more disconnected review helpers.</li>
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Current model status</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {synthesized.designTruthModel.coverage.map((item) => (
+                <li key={item.label} style={{ marginBottom: 8 }}><strong>{item.label}:</strong> {item.status} — {item.detail}</li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -220,6 +318,39 @@ export function ProjectOverviewPage() {
         </div>
         <div>
           <Link to={`/projects/${projectId}/discovery`} className="link-button">Open Discovery & Current State</Link>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>{synthesized.designEngineFoundation.stageLabel}</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            {synthesized.designEngineFoundation.summary}
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Addressing rows", synthesized.designEngineFoundation.objectCounts.addressingRows)}
+          {summaryCard("Placement objects", synthesized.designEngineFoundation.objectCounts.topologyPlacements)}
+          {summaryCard("Security boundaries", synthesized.designEngineFoundation.objectCounts.securityBoundaries)}
+          {summaryCard("Traffic flows", synthesized.designEngineFoundation.objectCounts.trafficFlows)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Coverage snapshot</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {synthesized.designEngineFoundation.coverage.map((item) => (
+                <li key={item.label} style={{ marginBottom: 8 }}>
+                  <strong>{item.label}:</strong> {item.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Current strongest layer</h3>
+            <p style={{ marginTop: 0 }}>{synthesized.designEngineFoundation.strongestLayer}</p>
+            <h3 style={{ marginBottom: 8 }}>Next priority</h3>
+            <p className="muted" style={{ margin: 0 }}>{synthesized.designEngineFoundation.nextPriority}</p>
+          </div>
         </div>
       </div>
 

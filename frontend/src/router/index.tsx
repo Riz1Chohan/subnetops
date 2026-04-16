@@ -23,6 +23,7 @@ import { ProjectValidationPage } from "../pages/ProjectValidationPage";
 import { ProjectDiagramPage } from "../pages/ProjectDiagramPage";
 import { ProjectTasksPage } from "../pages/ProjectTasksPage";
 import { ProjectAddressingPage } from "../pages/ProjectAddressingPage";
+import { ProjectCoreModelPage } from "../pages/ProjectCoreModelPage";
 import { ProjectSecurityPage } from "../pages/ProjectSecurityPage";
 import { ProjectRoutingPage } from "../pages/ProjectRoutingPage";
 import { ProjectImplementationPage } from "../pages/ProjectImplementationPage";
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
           { path: "requirements", element: <ProjectRequirementsPage /> },
           { path: "logical-design", element: <ProjectOverviewPage /> },
           { path: "overview", element: <ProjectOverviewPage /> },
+          { path: "core-model", element: <ProjectCoreModelPage /> },
           { path: "addressing", element: <ProjectAddressingPage /> },
           { path: "security", element: <ProjectSecurityPage /> },
           { path: "routing", element: <ProjectRoutingPage /> },

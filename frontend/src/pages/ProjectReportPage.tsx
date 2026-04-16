@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
@@ -66,6 +66,7 @@ function sectionList(items: string[], empty: string) {
 
 export function ProjectReportPage() {
   const { projectId = "" } = useParams();
+  const location = useLocation();
   const authQuery = useCurrentUser();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
@@ -78,6 +79,7 @@ export function ProjectReportPage() {
   const vlans = vlansQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
+  const selectedSection = new URLSearchParams(location.search).get("section");
   const synthesized = useMemo(
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
@@ -149,6 +151,7 @@ export function ProjectReportPage() {
   const status = reportStatus(errorCount, warningCount, project.approvalStatus);
   const readinessSummary = planningReadinessSummary(requirementsProfile);
   const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })));
+
   const summary = generatedSummary({
     projectName: project.name,
     environmentType: project.environmentType,
@@ -255,6 +258,7 @@ export function ProjectReportPage() {
         vlanCount={vlans.length}
       />
 
+
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Sites", synthesized.siteSummaries.length)}
         {summaryCard("Address rows", synthesized.addressingPlan.length)}
@@ -266,7 +270,8 @@ export function ProjectReportPage() {
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+
+      <div data-report-section="assumptions" className="panel report-section" style={{ display: selectedSection && selectedSection !== "assumptions" ? "none" : "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
             <h2 style={{ margin: "0 0 8px 0" }}>1. Design assumptions and constraints</h2>
@@ -295,7 +300,7 @@ export function ProjectReportPage() {
       </div>
 
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="naming" className="panel report-section" style={{ display: selectedSection && selectedSection !== "naming" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>1A. Naming and site identity standard</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -342,7 +347,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="topology" className="panel report-section" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>2. Topology and site placement</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -390,7 +395,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="addressing" className="panel report-section" style={{ display: selectedSection && selectedSection !== "addressing" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>3. Addressing hierarchy</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -433,7 +438,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="services-security" className="panel report-section" style={{ display: selectedSection && selectedSection !== "services-security" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>4. Service placement and security boundary design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -483,6 +488,9 @@ export function ProjectReportPage() {
                   <p style={{ margin: "0 0 8px 0" }}><strong>Subnets:</strong> {item.subnetCidrs.join(", ") || "TBD"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Attachment:</strong> {item.attachedInterface || item.attachedDevice} → {item.upstreamInterface || item.upstreamBoundary}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Peers:</strong> {item.permittedPeers.join(", ") || "Restricted"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Inside relationships:</strong> {item.insideRelationships.join(", ") || "—"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Outside relationships:</strong> {item.outsideRelationships.join(", ") || "—"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Published services:</strong> {item.publishedServices.join(", ") || "—"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Inbound policy:</strong> {item.inboundPolicy}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>East-west policy:</strong> {item.eastWestPolicy}</p>
                   <p style={{ margin: 0 }}><strong>Management source:</strong> {item.managementSource}</p>
@@ -493,7 +501,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="routing-flows" className="panel report-section" style={{ display: selectedSection && selectedSection !== "routing-flows" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>5. Routing and traffic-flow design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -507,12 +515,14 @@ export function ProjectReportPage() {
               {synthesized.trafficFlows.map((item) => (
                 <div key={item.id} className="panel" style={{ padding: 14 }}>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <span className="badge-soft">{item.flowCategory}</span>
                     <span className="badge-soft">{item.sourceZone}</span>
                     <span className="badge-soft">{item.destinationZone}</span>
                   </div>
                   <h4 style={{ margin: "0 0 8px 0" }}>{item.flowLabel}</h4>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Path:</strong> {item.path.join(" → ")}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Named flow:</strong> {item.flowName}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Subnets:</strong> {item.sourceSubnetCidr || '—'} → {item.destinationSubnetCidr || '—'}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Control points:</strong> {item.controlPoints.join(", ")}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Route model:</strong> {item.routeModel}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>NAT:</strong> {item.natBehavior}</p>
@@ -551,7 +561,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="site-lld" className="panel report-section" style={{ display: selectedSection && selectedSection !== "site-lld" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>6. Site-by-site low-level design</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -560,16 +570,22 @@ export function ProjectReportPage() {
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           {synthesized.lowLevelDesign.map((site) => (
-            <div key={site.siteId} className="panel" style={{ padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <div key={site.siteId} className="panel" style={{ padding: 14, display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 2 }}>
                 <div>
                   <h3 style={{ margin: 0 }}>{site.siteName}</h3>
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>{site.siteRole} · {site.layerModel}</p>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className="badge-soft">Routing {site.routingRole}</span>
-                  <span className="badge-soft">Security {site.securityBoundary}</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span className={site.authorityStatus === "ready" ? "badge badge-info" : site.authorityStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{site.authorityLabel}</span>
+                  <span className="badge-soft">{site.strongestAuthoritySourceLabel}</span>
                 </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span className="badge-soft">Routing {site.routingRole}</span>
+                <span className="badge-soft">Security {site.securityBoundary}</span>
+                <span className="badge-soft">Flows {site.flowNames.length}</span>
+                <span className="badge-soft">Boundaries {site.boundaryNames.length}</span>
               </div>
               <div className="grid-2" style={{ alignItems: "start" }}>
                 <div>
@@ -583,12 +599,22 @@ export function ProjectReportPage() {
                   <p style={{ margin: 0 }}><strong>Segments:</strong> {site.localSegments.join(", ") || "—"}</p>
                 </div>
               </div>
+              <div className="grid-2" style={{ alignItems: "start" }}>
+                <div>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Named boundaries:</strong> {site.boundaryNames.join(", ") || "—"}</p>
+                  <p style={{ margin: 0 }}><strong>Named services:</strong> {site.serviceNames.join(", ") || "—"}</p>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Tracked flows:</strong> {site.flowNames.join(", ") || "—"}</p>
+                  <p style={{ margin: 0 }}><strong>Trust debt:</strong> {site.trustDebt.join(" · ") || "No major site-specific trust debt currently surfaced."}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="validation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "validation" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -604,7 +630,7 @@ export function ProjectReportPage() {
         />
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="implementation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "implementation" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -633,7 +659,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -652,7 +678,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div className="panel report-section" style={{ display: "grid", gap: 14 }}>
+      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h2>
           <p className="muted" style={{ margin: 0 }}>

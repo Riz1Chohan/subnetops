@@ -7,6 +7,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -62,6 +63,8 @@ export function ProjectRoutingPage() {
     );
   }
 
+  const recovery = buildRecoveryRoadmapStatus(synthesized);
+
   const criticalFindings = synthesized.routingSwitchingReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.routingSwitchingReview.filter((item) => item.severity === "warning").length;
 
@@ -73,6 +76,7 @@ export function ProjectRoutingPage() {
         actions={
           <>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
+            <Link to={`/projects/${projectId}/core-model`} className="link-button">Core Model</Link>
             <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Plan</Link>
             <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
             <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
@@ -94,12 +98,118 @@ export function ProjectRoutingPage() {
         </p>
       </div>
 
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Routing recovery status</h2>
+            <p className="muted" style={{ margin: 0 }}>This keeps the routing workspace tied to the recovery roadmap so transport, summaries, and traffic paths stay grounded in the shared model.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className={recovery.overallStatus === "ready" ? "badge badge-info" : recovery.overallStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{recovery.overallStatus}</span>
+            <span className="badge-soft">ready {recovery.completedCount}</span>
+            <span className="badge-soft">partial {recovery.partialCount}</span>
+            <span className="badge-soft">pending {recovery.pendingCount}</span>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {recovery.phases.filter((phase) => phase.key === "phase-e" || phase.key === "phase-c" || phase.key === "phase-d").map((phase) => (
+              <div key={phase.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                  <strong>{phase.label}</strong>
+                  <span className={phase.status === "ready" ? "badge badge-info" : phase.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{phase.status}</span>
+                </div>
+                <p className="muted" style={{ margin: 0 }}>{phase.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Top remaining blocker</h2>
+            <p className="muted" style={{ margin: 0 }}>This is the strongest currently visible recovery blocker affecting this workspace.</p>
+          </div>
+          <div className="trust-note">
+            <strong>{recovery.topBlockers[0] || "No major blocker currently surfaced"}</strong>
+          </div>
+        </div>
+      </div>
+
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
         {summaryCard("Protocol decisions", synthesized.routingProtocols.length, "Internal and edge routing posture for the current design.")}
         {summaryCard("Route policies", synthesized.routePolicies.length, "Summarization, defaults, redistribution, and edge filtering.")}
         {summaryCard("Switching controls", synthesized.switchingDesign.length, "Layer 2 boundaries, loop prevention, uplinks, and access templates.")}
         {summaryCard("QoS classes", synthesized.qosPlan.length, "Traffic classes that deserve explicit treatment.")}
         {summaryCard("Open review findings", synthesized.routingSwitchingReview.filter((item) => item.severity !== "info").length, "Critical and warning items still needing engineering review.")}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Shared routing anchor from the core model</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This table shows whether the routing workspace is now being anchored by the shared model rather than by review text alone. The goal is to make each site carry a route domain, WAN linkage, and flow ownership even before the final implementation details are written.
+          </p>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Site</th>
+                <th align="left">Source</th>
+                <th align="left">Summary</th>
+                <th align="left">Loopback</th>
+                <th align="left">Segments</th>
+                <th align="left">WAN</th>
+                <th align="left">Flows</th>
+              </tr>
+            </thead>
+            <tbody>
+              {synthesized.designTruthModel.routeDomains.map((route) => (
+                <tr key={route.id}>
+                  <td>{route.siteName}</td>
+                  <td>{route.sourceModel}</td>
+                  <td>{route.summaryAdvertisement || "—"}</td>
+                  <td>{route.loopbackCidr || "—"}</td>
+                  <td>{route.localSegmentIds.length}</td>
+                  <td>{route.transitWanAdjacencyIds.length}</td>
+                  <td>{route.flowIds.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Required flow coverage tied to routing</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            These path checks show whether the routing model is actually carrying the scenario traffic the project depends on. This keeps the routing workspace tied to real flow behavior instead of only protocol commentary.
+          </p>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Flow category</th>
+                <th align="left">Required</th>
+                <th align="left">Status</th>
+                <th align="left">Covered paths</th>
+                <th align="left">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {synthesized.flowCoverage.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.label}</td>
+                  <td>{item.required ? 'Yes' : 'No'}</td>
+                  <td>{item.status}</td>
+                  <td>{item.matchedFlowIds.length}</td>
+                  <td>{item.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>

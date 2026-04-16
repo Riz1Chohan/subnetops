@@ -81,6 +81,11 @@ export function ProjectAddressingPage() {
       />
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div className="trust-note">
+          <p className="muted" style={{ margin: 0 }}>
+            <strong>{synthesized.designEngineFoundation.stageLabel}:</strong> {synthesized.designEngineFoundation.summary}
+          </p>
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
