@@ -71,6 +71,9 @@ export interface Site {
   projectId: string;
   name: string;
   location?: string;
+  streetAddress?: string;
+  buildingLabel?: string;
+  floorLabel?: string;
   siteCode?: string;
   notes?: string;
   defaultAddressBlock?: string;

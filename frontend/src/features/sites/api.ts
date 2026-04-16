@@ -5,6 +5,7 @@ export function createSite(input: {
   projectId: string;
   name: string;
   location?: string;
+  streetAddress?: string;
   siteCode?: string;
   notes?: string;
   defaultAddressBlock?: string;
@@ -18,6 +19,7 @@ export function createSite(input: {
 export function updateSite(siteId: string, input: {
   name?: string;
   location?: string;
+  streetAddress?: string;
   siteCode?: string;
   notes?: string;
   defaultAddressBlock?: string;

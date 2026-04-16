@@ -89,6 +89,24 @@ export interface ReportSection {
   tables?: ReportTable[];
 }
 
+export interface ReportMetadata {
+  organizationName: string;
+  environment: string;
+  reportVersion: string;
+  revisionStatus: string;
+  documentOwner: string;
+  approvalStatus: string;
+  projectPhase?: string;
+  planningFocus?: string;
+  primaryObjective?: string;
+  generatedFrom: string;
+}
+
+export interface ReportVisualSnapshot {
+  metrics: Array<[string, string]>;
+  topologyRows: string[][];
+}
+
 export interface ProfessionalReport {
   title: string;
   subtitle: string;
@@ -96,6 +114,8 @@ export interface ProfessionalReport {
   executiveSummary: string[];
   sections: ReportSection[];
   appendices?: ReportSection[];
+  metadata?: ReportMetadata;
+  visualSnapshot?: ReportVisualSnapshot;
 }
 export interface ExportSnapshot {
   generatedAt?: string;
@@ -519,6 +539,36 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     },
   ];
 
+  const reportMetadata: ReportMetadata = {
+    organizationName: asString(ctx.project.organizationName, "To be confirmed"),
+    environment: projectEnvironment,
+    reportVersion: "Version 0.92",
+    revisionStatus: ctx.errors.length > 0 ? "Draft - blockers present" : ctx.warnings.length > 0 ? "Review draft" : "Review-ready draft",
+    documentOwner: asString(ctx.project.ownerName, "SubnetOps project owner"),
+    approvalStatus: ctx.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
+    projectPhase: asString(ctx.requirements.projectPhase, "To be confirmed"),
+    planningFocus: asString(ctx.planningFor, "To be confirmed"),
+    primaryObjective: asString(ctx.primaryGoal, "To be confirmed"),
+    generatedFrom: "Saved project records and synthesized planning outputs",
+  };
+
+  const visualSnapshot: ReportVisualSnapshot = {
+    metrics: [
+      ["Sites in scope", String(ctx.siteCount)],
+      ["Addressing rows", String(ctx.vlanCount)],
+      ["Security zones", String(ctx.securityZones.length)],
+      ["Validation blockers", String(ctx.errors.length)],
+      ["Validation warnings", String(ctx.warnings.length)],
+      ["Base range", asString(ctx.project.basePrivateRange, "Working range pending confirmation")],
+    ],
+    topologyRows: [
+      ["Edge / Internet", ctx.internetModel || "Single internet edge pending refinement", ctx.siteCount > 1 ? "Prefer explicit WAN summaries between sites" : "Keep the routed edge intentionally simple"],
+      ["Core / Distribution", ctx.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
+      ["Services", ctx.serverPlacement || "Small centralized service block", "Keep shared services separated from users and guest access"],
+      ["Security", humanJoin(ctx.securityZones) || "Users and services", "Apply default-deny principles between unlike trust boundaries"],
+    ],
+  };
+
   return {
     title: ctx.project.reportHeader || `${ctx.project.name} Technical Design Report`,
     subtitle: `${ctx.project.name} — Professional Network Planning Package`,
@@ -526,6 +576,8 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     executiveSummary,
     sections: [introSection, discoverySection, hldSection, securitySection, addressingSection, routingSection, implementationSection, platformSection, risksSection, conclusionSection],
     appendices,
+    metadata: reportMetadata,
+    visualSnapshot,
   } satisfies ProfessionalReport;
 }
 
@@ -592,9 +644,73 @@ function boolLabel(value: unknown, yes = "Yes", no = "No") {
   return truthy(value) ? yes : no;
 }
 
+function printableValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return asString(value);
+}
+
 function valueOrDash(value: unknown) {
-  const text = asString(value);
+  const text = printableValue(value);
   return text || "—";
+}
+
+function parseIpv4CidrCapacity(cidr: string) {
+  const match = cidr.match(/\/(\d{1,2})$/);
+  if (!match) return null;
+  const prefix = Number(match[1]);
+  if (!Number.isFinite(prefix) || prefix < 0 || prefix > 32) return null;
+  return 2 ** (32 - prefix);
+}
+
+function parseIpv4UsableHosts(cidr: string) {
+  const capacity = parseIpv4CidrCapacity(cidr);
+  if (capacity === null) return null;
+  if (capacity <= 2) return capacity;
+  return Math.max(0, capacity - 2);
+}
+
+function inferVlanId(row: JsonMap) {
+  const explicit = asNumber(row.vlanId);
+  if (explicit !== null) return explicit;
+  const role = asString(row.role).toUpperCase();
+  const segment = `${asString(row.segmentName)} ${asString(row.purpose)}`.toLowerCase();
+  if (role === "USER" || segment.includes("user")) return 10;
+  if (role === "SERVICES" || segment.includes("service") || segment.includes("server")) return 20;
+  if (role === "GUEST" || segment.includes("guest")) return 40;
+  if (role === "PRINTERS" || segment.includes("printer")) return 50;
+  if (role === "VOICE" || segment.includes("voice")) return 60;
+  if (role === "SPECIALTY" || segment.includes("iot") || segment.includes("camera") || segment.includes("specialty")) return 70;
+  if (role === "MANAGEMENT" || segment.includes("management")) return 90;
+  return null;
+}
+
+function deriveOrganizationHierarchyValues(
+  organizationBlock: string,
+  hierarchy: JsonMap,
+  siteHierarchy: JsonMap[],
+  addressingPlan: JsonMap[],
+) {
+  const organizationCapacity = asNumber(hierarchy.organizationCapacity) ?? parseIpv4CidrCapacity(organizationBlock) ?? 0;
+  const allocatedSiteAddresses = asNumber(hierarchy.allocatedSiteAddresses)
+    ?? siteHierarchy.reduce((sum, site) => sum + (parseIpv4CidrCapacity(asString(site.siteBlockCidr)) ?? 0), 0);
+  const plannedSiteDemandAddresses = asNumber(hierarchy.plannedSiteDemandAddresses)
+    ?? addressingPlan.reduce((sum, row) => sum + (parseIpv4CidrCapacity(asString(row.subnetCidr)) ?? 0), 0);
+  const organizationHeadroom = asNumber(hierarchy.organizationHeadroom)
+    ?? Math.max(0, organizationCapacity - allocatedSiteAddresses);
+  const organizationUtilization = asNumber(hierarchy.organizationUtilization)
+    ?? (organizationCapacity > 0 ? allocatedSiteAddresses / organizationCapacity : 0);
+
+  return {
+    organizationCapacity,
+    allocatedSiteAddresses,
+    plannedSiteDemandAddresses,
+    organizationHeadroom,
+    organizationUtilization,
+  };
 }
 
 function severityCounts(validations: ValidationItem[]) {
@@ -650,10 +766,14 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
   const projectName = asString(project.name, "SubnetOps Project");
   const organizationName = asString(project.organizationName, "To be confirmed");
   const environment = titleCase(asString(project.environmentType, "Custom"));
-  const siteCount = siteSummaries.length;
+  const siteCount = Math.max(siteSummaries.length, siteHierarchy.length, asNumber(profile.siteCount) ?? 0);
   const rowCount = addressingPlan.length;
   const zonesInScope = securityZones.length > 0 ? securityZones.map((zone) => asString(zone.zoneName)).filter(Boolean) : sortUnique(logicalDomains.map((domain) => asString(domain.name)).filter(Boolean));
-  const architecturePattern = asString(highLevelDesign.architecturePattern, siteCount > 1 ? "a multi-site architecture with per-site addressing boundaries and summarized routing" : "a compact single-site architecture with segmented trust boundaries");
+  const architectureFallback = siteCount > 1 ? "a multi-site architecture with per-site addressing boundaries and summarized routing" : "a compact single-site architecture with segmented trust boundaries";
+  const rawArchitecturePattern = asString(highLevelDesign.architecturePattern);
+  const architecturePattern = rawArchitecturePattern && !(siteCount > 1 && /single-site/i.test(rawArchitecturePattern)) ? rawArchitecturePattern : architectureFallback;
+  const organizationBlock = asString(synthesized.organizationBlock, asString(project.basePrivateRange, "working range still needs explicit confirmation"));
+  const organizationNumbers = deriveOrganizationHierarchyValues(organizationBlock, organizationHierarchy, siteHierarchy, addressingPlan);
   const introBullets = [
     `Environment: ${environment}`,
     `Planning focus: ${asString(profile.planningFor, "To be confirmed")}`,
@@ -674,7 +794,7 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     `The report pulls from the active synthesized design package, including discovery context, high-level design, logical topology, addressing hierarchy, security boundaries, routing intent, implementation planning, and platform foundations, so the exported file reflects the same planning result visible in the application workspace.`,
   ];
 
-  const siteSummaryRows = siteHierarchy.map((site) => [
+  const siteSummaryRows = (siteHierarchy.length > 0 ? siteHierarchy : siteSummaries).map((site) => [
     asString(site.name),
     asString(site.siteCode, "—"),
     asString(site.location, "Location not set"),
@@ -699,17 +819,22 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     asString(zone.northSouthPolicy),
   ]);
 
-  const addressingRows = addressingPlan.map((row) => [
-    asString(row.siteName),
-    valueOrDash(row.vlanId),
-    asString(row.segmentName),
-    asString(row.source),
-    asString(row.subnetCidr),
-    asString(row.gatewayIp),
-    boolLabel(row.dhcpEnabled, "Enabled", "No"),
-    valueOrDash(row.estimatedHosts),
-    valueOrDash(row.headroom),
-  ]);
+  const addressingRows = addressingPlan.map((row) => {
+    const usableHosts = asNumber(row.usableHosts) ?? parseIpv4UsableHosts(asString(row.subnetCidr)) ?? null;
+    const estimatedHosts = asNumber(row.estimatedHosts) ?? null;
+    const headroom = asNumber(row.headroom) ?? (usableHosts !== null && estimatedHosts !== null ? Math.max(0, usableHosts - estimatedHosts) : null);
+    return [
+      asString(row.siteName),
+      valueOrDash(inferVlanId(row)),
+      asString(row.segmentName),
+      asString(row.source),
+      asString(row.subnetCidr),
+      asString(row.gatewayIp),
+      boolLabel(row.dhcpEnabled, "Enabled", "No"),
+      valueOrDash(estimatedHosts),
+      valueOrDash(headroom),
+    ];
+  });
 
   const routingProtocolRows = routingProtocols.map((item) => [
     asString(item.protocol),
@@ -823,8 +948,8 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     {
       title: "3. High-Level Design Overview",
       paragraphs: [
-        `The proposed high-level design follows ${architecturePattern}. The package uses an organizational address hierarchy of ${asString(synthesized.organizationBlock, asString(project.basePrivateRange, "a working parent range"))}, with ${siteCount} site${siteCount === 1 ? "" : "s"} currently represented in the generated design and ${rowCount} total logical addressing row${rowCount === 1 ? "" : "s"}.`,
-        `At the organizational level, approximately ${valueOrDash(organizationHierarchy.allocatedSiteAddresses)} addresses are allocated into site blocks out of ${valueOrDash(organizationHierarchy.organizationCapacity)} available, leaving ${valueOrDash(organizationHierarchy.organizationHeadroom)} addresses of remaining org-level headroom.`,
+        `The proposed high-level design follows ${architecturePattern}. The package uses an organizational address hierarchy of ${organizationBlock}, with ${siteCount} site${siteCount === 1 ? "" : "s"} currently represented in the generated design and ${rowCount} total logical addressing row${rowCount === 1 ? "" : "s"}.`,
+        `At the organizational level, approximately ${valueOrDash(organizationNumbers.allocatedSiteAddresses)} addresses are allocated into site blocks out of ${valueOrDash(organizationNumbers.organizationCapacity)} available, leaving ${valueOrDash(organizationNumbers.organizationHeadroom)} addresses of remaining org-level headroom.`,
       ],
       bullets: [
         `Architecture pattern: ${asString(highLevelDesign.architecturePattern, architecturePattern)}`,
@@ -1035,6 +1160,36 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     },
   ];
 
+  const reportMetadata: ReportMetadata = {
+    organizationName,
+    environment,
+    reportVersion: "Version 0.92",
+    revisionStatus: counts.errors > 0 ? "Draft - blockers present" : counts.warnings > 0 ? "Review draft" : "Review-ready draft",
+    documentOwner: asString(project.ownerName, "SubnetOps project owner"),
+    approvalStatus: counts.errors > 0 ? "Not ready for approval" : "Ready for technical review",
+    projectPhase: asString(profile.projectPhase, "To be confirmed"),
+    planningFocus: asString(profile.planningFor, "To be confirmed"),
+    primaryObjective: asString(profile.primaryGoal, "To be confirmed"),
+    generatedFrom: "Active synthesized design snapshot from Deliver / Report",
+  };
+
+  const visualSnapshot: ReportVisualSnapshot = {
+    metrics: [
+      ["Sites in scope", String(siteCount)],
+      ["Addressing rows", String(rowCount)],
+      ["Security zones", String(securityZones.length || logicalDomains.length)],
+      ["Validation blockers", String(counts.errors)],
+      ["Validation warnings", String(counts.warnings)],
+      ["Base range", organizationBlock],
+    ],
+    topologyRows: [
+      ["Edge / Internet", asString(profile.internetModel, asString(highLevelDesign.wanArchitecture, "Edge model to be confirmed")), siteCount > 1 ? "Keep site-to-site transport summarized and review cloud/provider boundaries carefully" : "Keep north-south routing ownership explicit at the edge"],
+      ["Core / Distribution", asString(highLevelDesign.layerModel, "Layering still requires confirmation"), siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed edge should still preserve segmentation and fault boundaries"],
+      ["Services", asString(profile.serverPlacement, asString(highLevelDesign.dataCenterArchitecture, "Service placement to be confirmed")), "Keep service zones separated from users, guest access, and management"],
+      ["Security", zonesInScope.join(", ") || "To be confirmed", "Treat the zone model as a structural boundary plan for later enforcement"],
+    ],
+  };
+
   return {
     title: asString(project.reportHeader, `${projectName} Technical Design Report`),
     subtitle: `${projectName} — Professional Network Planning Package`,
@@ -1042,6 +1197,8 @@ function composeProfessionalReportFromSnapshot(snapshot: ExportSnapshot): Profes
     executiveSummary,
     sections,
     appendices,
+    metadata: reportMetadata,
+    visualSnapshot,
   } satisfies ProfessionalReport;
 }
 

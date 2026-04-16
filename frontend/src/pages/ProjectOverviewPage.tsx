@@ -102,18 +102,25 @@ export function ProjectOverviewPage() {
         title="Logical Design"
         description="This workspace should read like an engineer's HLD/LLD package: architecture intent, logical domains, per-site low-level design, and the addressing model that supports implementation later."
         actions={
-          <>
-            <Link to={`/projects/${projectId}/addressing`} className="link-button">Open Addressing Plan</Link>
-            <Link to={`/projects/${projectId}/security`} className="link-button">Open Security</Link>
-            <Link to={`/projects/${projectId}/routing`} className="link-button">Open Routing & Switching</Link>
-            <Link to={`/projects/${projectId}/implementation`} className="link-button">Open Implementation</Link>
-            <Link to={`/projects/${projectId}/standards`} className="link-button">Open Config Standards</Link>
-            <Link to={`/projects/${projectId}/platform`} className="link-button">Open Platform & BOM</Link>
-            <Link to={`/projects/${projectId}/discovery`} className="link-button">Open Discovery</Link>
-            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
-            <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Open Report</Link>
-          </>
+          <div className="overview-actions-shell">
+            <div className="overview-primary-actions">
+              <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing</Link>
+              <Link to={`/projects/${projectId}/security`} className="link-button">Security</Link>
+              <Link to={`/projects/${projectId}/routing`} className="link-button">Routing</Link>
+              <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
+            </div>
+            <details className="overview-more-actions">
+              <summary>More workspace links</summary>
+              <div className="overview-more-actions-grid">
+                <Link to={`/projects/${projectId}/implementation`} className="link-button link-button-subtle">Implementation</Link>
+                <Link to={`/projects/${projectId}/standards`} className="link-button link-button-subtle">Config Standards</Link>
+                <Link to={`/projects/${projectId}/platform`} className="link-button link-button-subtle">Platform & BOM</Link>
+                <Link to={`/projects/${projectId}/discovery`} className="link-button link-button-subtle">Discovery</Link>
+                <Link to={`/projects/${projectId}/validation`} className="link-button link-button-subtle">Validation</Link>
+                <Link to={`/projects/${projectId}/diagram`} className="link-button link-button-subtle">Diagram</Link>
+              </div>
+            </details>
+          </div>
         }
       />
 
@@ -137,6 +144,44 @@ export function ProjectOverviewPage() {
         siteCount={sites.length}
         vlanCount={vlans.length}
       />
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            v108 turns requirements into explicit placement, path, boundary, and addressing objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine foundation.
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Topology", synthesized.topology.topologyLabel)}
+          {summaryCard("Breakout", synthesized.topology.internetBreakout)}
+          {summaryCard("Primary site", synthesized.topology.primarySiteName || "TBD")}
+          {summaryCard("Redundancy", synthesized.topology.redundancyModel)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Placement highlights</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {synthesized.sitePlacements.slice(0, 6).map((item) => (
+                <li key={item.id} style={{ marginBottom: 8 }}><strong>{item.siteName}:</strong> {item.role} — {item.placement}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Critical flow paths</h3>
+            {synthesized.trafficFlows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No explicit flow paths resolved yet.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {synthesized.trafficFlows.slice(0, 5).map((item) => (
+                  <li key={item.id} style={{ marginBottom: 8 }}>
+                    <strong>{item.flowName}:</strong> {item.path.join(" → ")}
+                    <div className="muted" style={{ marginTop: 4 }}>{item.routeModel}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
@@ -178,6 +223,39 @@ export function ProjectOverviewPage() {
         </div>
       </div>
 
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>{synthesized.designEngineFoundation.stageLabel}</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            {synthesized.designEngineFoundation.summary}
+          </p>
+        </div>
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          {summaryCard("Addressing rows", synthesized.designEngineFoundation.objectCounts.addressingRows)}
+          {summaryCard("Placement objects", synthesized.designEngineFoundation.objectCounts.topologyPlacements)}
+          {summaryCard("Security boundaries", synthesized.designEngineFoundation.objectCounts.securityBoundaries)}
+          {summaryCard("Traffic flows", synthesized.designEngineFoundation.objectCounts.trafficFlows)}
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Coverage snapshot</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {synthesized.designEngineFoundation.coverage.map((item) => (
+                <li key={item.label} style={{ marginBottom: 8 }}>
+                  <strong>{item.label}:</strong> {item.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Current strongest layer</h3>
+            <p style={{ marginTop: 0 }}>{synthesized.designEngineFoundation.strongestLayer}</p>
+            <h3 style={{ marginBottom: 8 }}>Next priority</h3>
+            <p className="muted" style={{ margin: 0 }}>{synthesized.designEngineFoundation.nextPriority}</p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
         {summaryCard("Sites in design", synthesized.siteSummaries.length)}
         {summaryCard("Logical domains", synthesized.logicalDomains.length)}
@@ -185,8 +263,12 @@ export function ProjectOverviewPage() {
         {summaryCard("Configured segments", synthesized.stats.configuredSegments)}
         {summaryCard("Transit links", synthesized.wanLinks.length)}
         {summaryCard("Security zones", synthesized.securityZones.length)}
+        {summaryCard("Placement objects", synthesized.sitePlacements.length)}
+        {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
         {summaryCard("Routing policies", synthesized.routePolicies.length)}
         {summaryCard("Routing identities", synthesized.routingPlan.filter((item) => item.loopbackCidr).length)}
+        {summaryCard("Service placements", synthesized.servicePlacements.length)}
+        {summaryCard("Boundary rows", synthesized.securityBoundaries.length)}
         {summaryCard("Config templates", synthesized.configurationTemplates.length)}
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div>

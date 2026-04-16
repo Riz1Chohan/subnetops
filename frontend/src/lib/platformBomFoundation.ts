@@ -131,6 +131,15 @@ function primarySiteName(sites: Site[]) {
   return sites[0]?.name || "Primary site";
 }
 
+function normalizePerSiteCount(raw: string | number | undefined, fallbackPerSite: number, siteCount: number, maxReasonablePerSite: number) {
+  const parsed = toNumber(raw, fallbackPerSite);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallbackPerSite;
+  if (parsed <= maxReasonablePerSite) return parsed;
+  const spreadAcrossSites = Math.ceil(parsed / Math.max(1, siteCount));
+  if (spreadAcrossSites <= maxReasonablePerSite) return spreadAcrossSites;
+  return maxReasonablePerSite;
+}
+
 function wiredUserFactor(mix: string) {
   if (/mostly wireless/i.test(mix)) return 0.45;
   if (/balanced/i.test(mix)) return 0.65;
@@ -149,12 +158,12 @@ export function synthesizePlatformBomFoundation(input: {
   const { sites, vlans, profile, synthesized, state } = input;
   const siteCount = countSites(profile, sites);
   const usersPerSite = Math.max(1, toNumber(profile.usersPerSite, 50));
-  const printersPerSite = profile.printers ? Math.max(1, toNumber(profile.printerCount, 3)) : 0;
-  const phonesPerSite = profile.voice ? Math.max(1, toNumber(profile.phoneCount, Math.ceil(usersPerSite * 0.3))) : 0;
-  const apsPerSite = profile.wireless || profile.guestWifi ? Math.max(1, toNumber(profile.apCount, Math.ceil(usersPerSite / 25))) : 0;
-  const camerasPerSite = profile.cameras ? Math.max(1, toNumber(profile.cameraCount, 4)) : 0;
-  const iotPerSite = profile.iot ? Math.max(1, toNumber(profile.iotDeviceCount, 6)) : 0;
-  const serversPerSite = /distributed|local/i.test(profile.serverPlacement) ? Math.max(0, toNumber(profile.serverCount, 2)) : 0;
+  const printersPerSite = profile.printers ? Math.max(1, normalizePerSiteCount(profile.printerCount, 3, siteCount, Math.max(10, Math.ceil(usersPerSite / 15)))) : 0;
+  const phonesPerSite = profile.voice ? Math.max(1, normalizePerSiteCount(profile.phoneCount, Math.ceil(usersPerSite * 0.3), siteCount, Math.max(20, usersPerSite))) : 0;
+  const apsPerSite = profile.wireless || profile.guestWifi ? Math.max(1, normalizePerSiteCount(profile.apCount, Math.ceil(usersPerSite / 25), siteCount, Math.max(4, Math.ceil(usersPerSite / 8)))) : 0;
+  const camerasPerSite = profile.cameras ? Math.max(1, normalizePerSiteCount(profile.cameraCount, 4, siteCount, Math.max(8, Math.ceil(usersPerSite / 10)))) : 0;
+  const iotPerSite = profile.iot ? Math.max(1, normalizePerSiteCount(profile.iotDeviceCount, 6, siteCount, Math.max(10, usersPerSite * 2))) : 0;
+  const serversPerSite = /distributed|local/i.test(profile.serverPlacement) ? Math.max(0, normalizePerSiteCount(profile.serverCount, 2, siteCount, Math.max(2, Math.ceil(usersPerSite / 50)))) : 0;
   const localEdgePortDemand = Math.ceil(usersPerSite * wiredUserFactor(profile.wiredWirelessMix)) + printersPerSite + phonesPerSite + apsPerSite + camerasPerSite + iotPerSite + Math.min(serversPerSite, 4) + 4;
   const accessSwitchesPerSite = Math.max(1, Math.ceil(localEdgePortDemand / 48));
   const multiSite = siteCount > 1;

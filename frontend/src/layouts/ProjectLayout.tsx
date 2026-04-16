@@ -129,8 +129,17 @@ export function ProjectLayout() {
     },
   ];
 
+  const workflowStages = groups.map((group) => ({
+    key: group.key,
+    label: group.label,
+    path: group.path,
+  }));
+
   const activeGroup = groups.find((group) => activeForPath(location.pathname, group.matchers))?.key
     ?? (activeForPath(location.pathname, ["/tasks", "/settings"]) ? "support" : "discovery");
+  const activeStageIndex = workflowStages.findIndex((stage) => stage.key === activeGroup);
+  const previousStage = activeStageIndex > 0 ? workflowStages[activeStageIndex - 1] : null;
+  const nextStageLink = activeStageIndex >= 0 && activeStageIndex < workflowStages.length - 1 ? workflowStages[activeStageIndex + 1] : null;
 
   const tabSet = activeGroup === "design"
     ? designTabs
@@ -217,63 +226,68 @@ export function ProjectLayout() {
 
       <section className="project-workspace-shell">
         <aside className="panel project-sidebar project-sidebar-grouped">
-          <div>
-            <h2 style={{ margin: "0 0 6px 0" }}>Project workspace</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              The app is regrouped into fewer major stages so you can see where to start, where the design lives, and where delivery happens.
-            </p>
+          <div className="project-sidebar-header">
+            <div>
+              <h2 style={{ margin: "0 0 6px 0" }}>Project workspace</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                The app is regrouped into fewer major stages so you can see where to start, where the design lives, and where delivery happens. v109 also keeps the current stage and previous/next movement more obvious.
+              </p>
+            </div>
+            <span className="badge-soft">Scroll this menu independently</span>
           </div>
 
-          <nav className="project-group-nav">
-            {groups.map((group) => {
-              const isActive = activeGroup === group.key;
-              return (
-                <div key={group.key} className="project-group-block">
-                  <NavLink
-                    to={group.path}
-                    className={({ isActive: routeActive }) => (
-                      isActive || routeActive ? "project-group-link active" : "project-group-link"
-                    )}
-                  >
-                    <span>{group.label}</span>
-                    <small>{group.summary}</small>
-                  </NavLink>
+          <div className="project-sidebar-scroll">
+            <nav className="project-group-nav">
+              {groups.map((group) => {
+                const isActive = activeGroup === group.key;
+                return (
+                  <div key={group.key} className="project-group-block">
+                    <NavLink
+                      to={group.path}
+                      className={({ isActive: routeActive }) => (
+                        isActive || routeActive ? "project-group-link active" : "project-group-link"
+                      )}
+                    >
+                      <span>{group.label}</span>
+                      <small>{group.summary}</small>
+                    </NavLink>
 
-                  {isActive && group.children ? (
-                    <div className="project-subnav-list">
-                      {group.children.map((tab) => (
-                        <NavLink
-                          key={tab.key}
-                          to={tab.path}
-                          className={({ isActive: routeActive }) => (routeActive ? "project-subnav-link active" : "project-subnav-link")}
-                        >
-                          <span>{tab.label}</span>
-                          {tab.description ? <small>{tab.description}</small> : null}
-                        </NavLink>
-                      ))}
-                    </div>
-                  ) : null}
+                    {isActive && group.children ? (
+                      <div className="project-subnav-list">
+                        {group.children.map((tab) => (
+                          <NavLink
+                            key={tab.key}
+                            to={tab.path}
+                            className={({ isActive: routeActive }) => (routeActive ? "project-subnav-link active" : "project-subnav-link")}
+                          >
+                            <span>{tab.label}</span>
+                            {tab.description ? <small>{tab.description}</small> : null}
+                          </NavLink>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+              <details className="project-support-group" open={activeGroup === "support"}>
+                <summary>Support</summary>
+                <div className="project-subnav-list" style={{ marginTop: 10 }}>
+                  {supportTabs.map((tab) => (
+                    <NavLink
+                      key={tab.key}
+                      to={tab.path}
+                      className={({ isActive }) => (isActive ? "project-subnav-link active" : "project-subnav-link")}
+                    >
+                      <span>{tab.label}</span>
+                    </NavLink>
+                  ))}
                 </div>
-              );
-            })}
+              </details>
+            </nav>
+          </div>
 
-            <details className="project-support-group" open={activeGroup === "support"}>
-              <summary>Support</summary>
-              <div className="project-subnav-list" style={{ marginTop: 10 }}>
-                {supportTabs.map((tab) => (
-                  <NavLink
-                    key={tab.key}
-                    to={tab.path}
-                    className={({ isActive }) => (isActive ? "project-subnav-link active" : "project-subnav-link")}
-                  >
-                    <span>{tab.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </details>
-          </nav>
-
-          <div className="trust-note">
+          <div className="trust-note project-sidebar-footer">
             <strong style={{ display: "block", marginBottom: 6 }}>Recommended next move</strong>
             <p className="muted" style={{ margin: 0 }}>
               Keep the workflow simple: Discovery → Requirements → Design Package → Validation → Deliver.
@@ -285,6 +299,28 @@ export function ProjectLayout() {
         </aside>
 
         <main className="project-main-shell">
+          <section className="panel project-stage-strip">
+            <div>
+              <strong style={{ display: "block", marginBottom: 4 }}>Workflow stages</strong>
+              <p className="muted" style={{ margin: 0 }}>Stay oriented without hunting around the page. Each stage now has stronger visual hierarchy, direct navigation, and clearer previous/next movement.</p>
+            </div>
+            <div className="project-stage-strip-links">
+              {workflowStages.map((stage, index) => (
+                <NavLink
+                  key={stage.key}
+                  to={stage.path}
+                  className={({ isActive }) => (isActive || activeGroup === stage.key ? "project-stage-link active" : "project-stage-link")}
+                >
+                  <span className="project-stage-index">{index + 1}</span>
+                  <span>{stage.label}</span>
+                </NavLink>
+              ))}
+            </div>
+            <div className="project-stage-actions">
+              {previousStage ? <Link to={previousStage.path} className="link-button link-button-subtle">Previous stage</Link> : <span className="muted">You are at the first stage.</span>}
+              {nextStageLink ? <Link to={nextStageLink.path} className="link-button">Next stage</Link> : <span className="muted">You are at the final delivery stage.</span>}
+            </div>
+          </section>
           {tabSet.length > 0 ? (
             <section className="panel project-tab-strip">
               <div>

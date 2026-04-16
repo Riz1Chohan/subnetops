@@ -303,6 +303,116 @@ export interface OperationsArtifactItem {
   timing: string;
 }
 
+
+export interface TopologyBlueprint {
+  topologyType: "collapsed-core" | "hub-spoke" | "multi-site" | "hybrid-cloud";
+  topologyLabel: string;
+  primarySiteId?: string;
+  primarySiteName?: string;
+  internetBreakout: "centralized" | "distributed";
+  cloudConnected: boolean;
+  redundancyModel: string;
+  servicePlacementModel: string;
+  notes: string[];
+}
+
+export interface SitePlacementDevice {
+  id: string;
+  siteId: string;
+  siteName: string;
+  deviceName: string;
+  siteTier: "primary" | "branch" | "single-site" | "cloud";
+  uplinkTarget?: string;
+  deviceType: "firewall" | "router" | "core-switch" | "distribution-switch" | "access-switch" | "wireless-controller" | "access-point" | "server" | "cloud-edge";
+  role: string;
+  quantity: number;
+  placement: string;
+  connectedZones: string[];
+  connectedSubnets: string[];
+  interfaceLabels: string[];
+  notes: string[];
+}
+
+export interface ServicePlacementItem {
+  id: string;
+  serviceName: string;
+  serviceType: "shared-service" | "dmz-service" | "local-service" | "cloud-service" | "management-service";
+  placementType: "local" | "centralized" | "dmz" | "cloud";
+  siteId?: string;
+  siteName: string;
+  zoneName: string;
+  subnetCidr?: string;
+  dependsOn: string[];
+  consumers: string[];
+  publishedExternally?: boolean;
+  ingressPath?: string[];
+  attachedDevice?: string;
+  upstreamDevice?: string;
+  ingressInterface?: string;
+  notes: string[];
+}
+
+export interface SecurityBoundaryDetail {
+  zoneName: string;
+  siteName: string;
+  boundaryName: string;
+  subnetCidrs: string[];
+  attachedDevice: string;
+  attachedInterface?: string;
+  upstreamBoundary: string;
+  upstreamInterface?: string;
+  downstreamAssets: string[];
+  permittedPeers: string[];
+  controlPoint: string;
+  inboundPolicy: string;
+  eastWestPolicy: string;
+  managementSource: string;
+  natPolicy: string;
+  notes: string[];
+}
+
+export interface TrafficFlowPath {
+  id: string;
+  flowName: string;
+  flowLabel: string;
+  source: string;
+  destination: string;
+  sourceSite?: string;
+  destinationSite?: string;
+  sourceZone: string;
+  destinationZone: string;
+  path: string[];
+  controlPoints: string[];
+  routeModel: string;
+  natBehavior: string;
+  enforcementPolicy: string;
+  policyNotes: string[];
+}
+
+export interface DesignEngineFoundation {
+  stageLabel: string;
+  summary: string;
+  objectCounts: {
+    siteHierarchy: number;
+    addressingRows: number;
+    topologyPlacements: number;
+    servicePlacements: number;
+    securityBoundaries: number;
+    trafficFlows: number;
+    routingIdentities: number;
+    wanLinks: number;
+    traceabilityItems: number;
+    openIssues: number;
+  };
+  strongestLayer: string;
+  nextPriority: string;
+  coverage: Array<{
+    label: string;
+    status: "ready" | "partial" | "pending";
+    detail: string;
+  }>;
+}
+
 export interface SynthesizedLogicalDesign {
   organizationBlock: string;
   organizationBlockAssumed: boolean;
@@ -320,6 +430,11 @@ export interface SynthesizedLogicalDesign {
   recommendedSegments: Array<{ role: SegmentRole; label: string; vlanId?: number; purpose: string }>;
   segmentModel: SegmentModelItem[];
   wanLinks: WanLinkPlanRow[];
+  topology: TopologyBlueprint;
+  sitePlacements: SitePlacementDevice[];
+  servicePlacements: ServicePlacementItem[];
+  securityBoundaries: SecurityBoundaryDetail[];
+  trafficFlows: TrafficFlowPath[];
   routingPlan: RoutePlanItem[];
   logicalDomains: LogicalDomainIntent[];
   securityZones: SecurityZonePlan[];
@@ -347,6 +462,7 @@ export interface SynthesizedLogicalDesign {
   designReview: DesignReviewItem[];
   openIssues: string[];
   implementationNextSteps: string[];
+  designEngineFoundation: DesignEngineFoundation;
   stats: {
     configuredSites: number;
     proposedSites: number;
@@ -2082,6 +2198,11 @@ function buildHighLevelDesign(input: {
   segmentModel: SegmentModelItem[];
   logicalDomains: LogicalDomainIntent[];
   wanLinks: WanLinkPlanRow[];
+  topology: TopologyBlueprint;
+  sitePlacements: SitePlacementDevice[];
+  servicePlacements: ServicePlacementItem[];
+  securityBoundaries: SecurityBoundaryDetail[];
+  trafficFlows: TrafficFlowPath[];
   routingPlan: RoutePlanItem[];
 }) {
   const { profile, siteHierarchy, segmentModel, logicalDomains, wanLinks, routingPlan } = input;
@@ -2166,10 +2287,15 @@ function buildLowLevelDesign(input: {
   profile: RequirementsProfile;
   siteHierarchy: SiteHierarchyItem[];
   rows: AddressingPlanRow[];
+  topology: TopologyBlueprint;
+  sitePlacements: SitePlacementDevice[];
+  servicePlacements: ServicePlacementItem[];
+  securityBoundaries: SecurityBoundaryDetail[];
+  trafficFlows: TrafficFlowPath[];
   routingPlan: RoutePlanItem[];
   wanLinks: WanLinkPlanRow[];
 }) {
-  const { profile, siteHierarchy, rows, routingPlan, wanLinks } = input;
+  const { profile, siteHierarchy, rows, topology, sitePlacements, servicePlacements, securityBoundaries, trafficFlows, routingPlan, wanLinks } = input;
   return siteHierarchy.map((site, index) => {
     const siteRows = rows.filter((row) => row.siteId === site.id);
     const routedRows = siteRows.filter((row) => !["WAN_TRANSIT", "LOOPBACK"].includes(row.role));
@@ -2212,6 +2338,7 @@ function buildLowLevelDesign(input: {
 
     const notes = [
       `${site.name} currently carries ${routedRows.length} routed local segment${routedRows.length === 1 ? "" : "s"} inside ${site.siteBlockCidr || "an unconfirmed site block"}.`,
+      `Topology context is ${topology.topologyLabel.toLowerCase()}, with ${sitePlacements.filter((item) => item.siteId === site.id).length} synthesized placement object${sitePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${servicePlacements.filter((item) => item.siteId === site.id).length} service placement${servicePlacements.filter((item) => item.siteId === site.id).length === 1 ? "" : "s"}, ${securityBoundaries.filter((item) => item.siteName === site.name).length} boundary object${securityBoundaries.filter((item) => item.siteName === site.name).length === 1 ? "" : "s"}, and ${trafficFlows.filter((item) => item.sourceSite === site.name || item.destinationSite === site.name).length} tracked flow${trafficFlows.filter((item) => item.sourceSite === site.name || item.destinationSite === site.name).length === 1 ? "" : "s"}.`,
       routing?.summaryAdvertisement
         ? `Use ${routing.summaryAdvertisement} as the main summary advertisement for this site once routing is implemented.`
         : "This site does not yet have a confirmed summarization boundary.",
@@ -2429,6 +2556,11 @@ function buildDesignReview(input: {
   missingSiteBlocks: number;
   wanReserveBlock?: string;
   wanLinks: WanLinkPlanRow[];
+  topology: TopologyBlueprint;
+  sitePlacements: SitePlacementDevice[];
+  servicePlacements: ServicePlacementItem[];
+  securityBoundaries: SecurityBoundaryDetail[];
+  trafficFlows: TrafficFlowPath[];
   routingPlan: RoutePlanItem[];
 }) {
   const { profile, organizationBlockAssumed, siteHierarchy, rows, proposedSegments, rowsOutsideSiteBlocks, missingSiteBlocks, wanReserveBlock, wanLinks, routingPlan } = input;
@@ -2897,6 +3029,644 @@ function buildOperationsArtifacts(input: {
   ] satisfies OperationsArtifactItem[];
 }
 
+
+function inferTopologyBlueprint(input: { profile: RequirementsProfile; siteHierarchy: SiteHierarchyItem[]; wanLinks: WanLinkPlanRow[]; rows: AddressingPlanRow[]; }) {
+  const { profile, siteHierarchy, wanLinks, rows } = input;
+  const cloudConnected = profile.cloudConnected || profile.environmentType !== "On-prem";
+  const centralizedBreakout = /central/i.test(profile.internetModel || "") || /central/i.test(profile.serverPlacement || "");
+  const primarySite = siteHierarchy[0];
+  let topologyType: TopologyBlueprint["topologyType"] = "collapsed-core";
+  if (cloudConnected) topologyType = "hybrid-cloud";
+  else if (siteHierarchy.length > 1 && centralizedBreakout) topologyType = "hub-spoke";
+  else if (siteHierarchy.length > 1) topologyType = "multi-site";
+
+  const topologyLabel = topologyType === "collapsed-core"
+    ? "Single-site collapsed core / edge"
+    : topologyType === "hub-spoke"
+      ? "Hub-and-spoke WAN with centralized services"
+      : topologyType === "hybrid-cloud"
+        ? "Hybrid multi-site with cloud edge"
+        : "Distributed multi-site logical design";
+
+  const notes = [
+    topologyType === "collapsed-core"
+      ? "The design keeps routing, switching, and perimeter policy anchored at one site rather than pretending a WAN exists when it does not."
+      : topologyType === "hub-spoke"
+        ? "Branch sites are treated as dependent spoke locations and should normally reach shared services and controlled internet breakout through the primary site."
+        : topologyType === "hybrid-cloud"
+          ? "Cloud connectivity is treated as a first-class edge, so service placement and traffic paths must distinguish on-prem, DMZ, and cloud-hosted assets."
+          : "Sites should be evaluated as peer locations with explicit transport and route-domain boundaries rather than one generic site template repeated everywhere.",
+  ];
+  return {
+    topologyType,
+    topologyLabel,
+    primarySiteId: primarySite?.id,
+    primarySiteName: primarySite?.name,
+    internetBreakout: centralizedBreakout ? "centralized" : "distributed",
+    cloudConnected,
+    redundancyModel: profile.dualIsp ? "Dual edge / resilient perimeter" : "Single active perimeter path",
+    servicePlacementModel: profile.serverPlacement || "centralized servers or services",
+    notes: [
+      ...notes,
+      ...(wanLinks.length === 0 && siteHierarchy.length > 1 ? ["The scope implies multiple sites, but transport links still need to be confirmed before the design is implementation-ready."] : []),
+    ],
+  } satisfies TopologyBlueprint;
+}
+
+function zoneNameForRole(role: SegmentRole) {
+  switch (role) {
+    case "USER": return "User zone";
+    case "SERVER": return "Server zone";
+    case "GUEST": return "Guest zone";
+    case "PRINTER": return "Printer / peripheral zone";
+    case "VOICE": return "Voice zone";
+    case "IOT": return "IoT / OT zone";
+    case "CAMERA": return "Camera / security zone";
+    case "MANAGEMENT": return "Management zone";
+    case "WAN_TRANSIT": return "WAN transit zone";
+    case "LOOPBACK": return "Routing identity";
+    default: return "General service zone";
+  }
+}
+
+function firstSubnetForRole(rows: AddressingPlanRow[], role: SegmentRole) {
+  return rows.find((row) => row.role === role && row.subnetCidr !== "Unassigned");
+}
+
+function findDmzServerRow(rows: AddressingPlanRow[], siteId?: string) {
+  const scoped = siteId ? rows.filter((row) => row.siteId === siteId) : rows;
+  return scoped.find((row) => row.subnetCidr !== "Unassigned" && /dmz/i.test(`${row.segmentName} ${row.purpose}`))
+    || scoped.find((row) => row.role === "SERVER" && row.subnetCidr !== "Unassigned");
+}
+
+function routeBehaviorForTopology(topology: TopologyBlueprint, sourceSite?: string, destinationSite?: string) {
+  if (topology.topologyType === "collapsed-core") return "Local routed core to perimeter edge";
+  if (topology.topologyType === "hub-spoke") {
+    if (sourceSite && destinationSite && sourceSite !== destinationSite) {
+      return sourceSite === topology.primarySiteName || destinationSite === topology.primarySiteName
+        ? `Spoke-to-hub routed path through ${topology.primarySiteName}`
+        : `Spoke-to-spoke traffic should traverse ${topology.primarySiteName} rather than bypass the hub`;
+    }
+    return `Site traffic follows a hub-and-spoke path through ${topology.primarySiteName}`;
+  }
+  if (topology.topologyType === "hybrid-cloud") return "On-prem routing domain with controlled cloud-edge advertisement and filtering";
+  return "Peer multi-site routing with explicit transport boundaries and site summaries";
+}
+
+function buildInterfaceLabels(deviceType: SitePlacementDevice["deviceType"], siteRows: AddressingPlanRow[], options?: { isPrimary?: boolean; distributedBreakout?: boolean; topologyType?: TopologyBlueprint["topologyType"] }) {
+  const zoneRows = (role: SegmentRole) => siteRows.filter((row) => row.role === role).map((row) => row.subnetCidr);
+  const topologyType = options?.topologyType;
+  const labels: string[] = [];
+  if (deviceType === "firewall") {
+    labels.push(`Gi0/0 outside${options?.distributedBreakout ? ' / local internet' : topologyType === 'hub-spoke' && options?.isPrimary ? ' / central internet' : ''}`);
+    labels.push(topologyType === 'collapsed-core' ? 'Gi0/1 inside / collapsed core handoff' : 'Gi0/1 inside / trusted core');
+    if (zoneRows('SERVER').length > 0 || siteRows.some((row) => /dmz/i.test(`${row.segmentName} ${row.purpose}`))) labels.push('Gi0/2 dmz / published services');
+    if (zoneRows('MANAGEMENT').length > 0) labels.push('Gi0/3 management / admin');
+    if (topologyType === 'hybrid-cloud' && options?.isPrimary) labels.push('Gi0/4 cloud edge transit');
+  } else if (deviceType === "router") {
+    labels.push(topologyType === 'hub-spoke' ? 'Gi0/0 wan / hub transport' : 'Gi0/0 wan / provider');
+    labels.push('Gi0/1 lan handoff');
+    if (options?.isPrimary || topologyType !== 'collapsed-core') labels.push('Lo0 routing identity');
+    if (siteRows.some((row) => row.role === 'WAN_TRANSIT') || topologyType === 'hybrid-cloud') labels.push(topologyType === 'hybrid-cloud' ? 'Tunnel0 / cloud transport' : 'Tunnel0 / routed transport');
+  } else if (deviceType === "core-switch") {
+    labels.push(topologyType === 'collapsed-core' ? 'Po1 / campus uplink' : 'Po1 / upstream core');
+    labels.push('SVI gateway set');
+    zoneRows('USER').slice(0,1).forEach(() => labels.push('Vlan10 user gateway'));
+    zoneRows('GUEST').slice(0,1).forEach(() => labels.push('Vlan30 guest gateway'));
+    zoneRows('SERVER').slice(0,1).forEach(() => labels.push('Vlan20 server gateway'));
+    zoneRows('MANAGEMENT').slice(0,1).forEach(() => labels.push('Vlan90 management gateway'));
+  } else if (deviceType === "access-switch") {
+    labels.push(topologyType === 'hub-spoke' ? 'Gi1/0/48 edge uplink trunk' : 'Gi1/0/48 uplink trunk');
+    labels.push('Gi1/0/1-24 user access');
+    if (zoneRows('GUEST').length > 0) labels.push('Gi1/0/25-32 guest / AP edge');
+  } else if (deviceType === "access-point") {
+    labels.push('Eth0 trunk / PoE');
+    labels.push('SSID corp');
+    if (zoneRows('GUEST').length > 0) labels.push('SSID guest');
+  } else if (deviceType === "server") {
+    labels.push('Eth0 service / app');
+    if (siteRows.some((row) => /dmz/i.test(`${row.segmentName} ${row.purpose}`))) labels.push('Eth1 dmz / published');
+    if (topologyType === 'hybrid-cloud') labels.push('Eth2 sync / cloud peer');
+  } else if (deviceType === "cloud-edge") {
+    labels.push('VPN gateway / transit');
+    labels.push('VNet / subnet association');
+    labels.push('Route table / cloud boundary');
+  }
+  return labels.slice(0, 5);
+}
+
+function siteToken(input: { siteName: string; siteCode?: string; namingTokenPreference?: string; buildingLabel?: string; floorLabel?: string }) {
+  const cleanedCode = (input.siteCode || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const preference = (input.namingTokenPreference || '').toLowerCase();
+  const fullName = input.siteName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const abbreviatedName = input.siteName.toUpperCase().replace(/[^A-Z0-9 ]+/g, '').split(/\s+/).filter(Boolean).map((part) => part.slice(0, 3)).join('_');
+  const buildingToken = (input.buildingLabel || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const floorToken = (input.floorLabel || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const base = (cleanedCode || abbreviatedName || fullName || 'SITE').slice(0, 18);
+  if (preference.includes('full location') || preference.includes('full site name')) return (fullName || cleanedCode || 'SITE').slice(0, 18);
+  if (preference.includes('building') && preference.includes('floor')) return [base, buildingToken || 'BLDG', floorToken || 'FLR'].filter(Boolean).join('_').slice(0, 28);
+  if (preference.includes('building')) return [base, buildingToken || 'BLDG'].filter(Boolean).join('_').slice(0, 24);
+  if (preference.includes('floor')) return [base, floorToken || 'FLR'].filter(Boolean).join('_').slice(0, 24);
+  if (preference.includes('site code')) return (cleanedCode || abbreviatedName || 'SITE').slice(0, 12);
+  if (cleanedCode) return cleanedCode;
+  return (abbreviatedName || fullName || 'SITE').slice(0, 18);
+}
+
+function devicePrefix(deviceType: SitePlacementDevice["deviceType"]) {
+  switch (deviceType) {
+    case 'firewall': return 'FW';
+    case 'router': return 'RTR';
+    case 'core-switch': return 'SW';
+    case 'distribution-switch': return 'DSW';
+    case 'access-switch': return 'SW';
+    case 'access-point': return 'AP';
+    case 'wireless-controller': return 'WLC';
+    case 'server': return 'SRV';
+    case 'cloud-edge': return 'CLD';
+    default: return 'DEV';
+  }
+}
+
+function readableDeviceLabel(deviceType: SitePlacementDevice["deviceType"], input: { isPrimary: boolean; topologyType: TopologyBlueprint["topologyType"] }) {
+  switch (deviceType) {
+    case 'firewall': return input.isPrimary ? 'perimeter firewall' : 'branch firewall';
+    case 'router': return input.topologyType === 'hub-spoke' ? 'spoke WAN router' : 'WAN edge router';
+    case 'core-switch': return input.topologyType === 'collapsed-core' ? 'collapsed core switch' : 'core switch';
+    case 'access-switch': return 'access switch';
+    case 'distribution-switch': return 'distribution switch';
+    case 'access-point': return 'wireless access point';
+    case 'wireless-controller': return 'wireless controller';
+    case 'server': return 'service stack';
+    case 'cloud-edge': return 'cloud edge';
+    default: return deviceType;
+  }
+}
+
+function deviceNameForPlacement(input: { siteName: string; siteCode?: string; buildingLabel?: string; floorLabel?: string; deviceType: SitePlacementDevice["deviceType"]; isPrimary: boolean; topologyType: TopologyBlueprint["topologyType"]; namingConvention?: string; namingTokenPreference?: string; customNamingPattern?: string; sequence?: number; }) {
+  const { siteName, siteCode, buildingLabel, floorLabel, deviceType, isPrimary, topologyType, namingConvention, namingTokenPreference, customNamingPattern, sequence = 1 } = input;
+  const convention = (namingConvention || '').toLowerCase();
+  const token = siteToken({ siteName, siteCode, namingTokenPreference, buildingLabel, floorLabel });
+  const prefix = devicePrefix(deviceType);
+  const readable = readableDeviceLabel(deviceType, { isPrimary, topologyType });
+  if (/custom/.test(convention) && (customNamingPattern || '').trim()) {
+    const replacements: Record<string, string> = {
+      '{site}': token,
+      '{siteCode}': (siteCode || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_') || token,
+      '{siteName}': siteName.toUpperCase().replace(/[^A-Z0-9]+/g, '_'),
+      '{building}': (buildingLabel || 'BLDG').toUpperCase().replace(/[^A-Z0-9]+/g, '_'),
+      '{floor}': (floorLabel || 'FLR').toUpperCase().replace(/[^A-Z0-9]+/g, '_'),
+      '{role}': prefix,
+      '{index}': String(sequence).padStart(2, '0'),
+    };
+    let output = (customNamingPattern || '').trim();
+    Object.entries(replacements).forEach(([key, value]) => {
+      output = output.split(key).join(value);
+    });
+    return output.replace(/[^A-Z0-9_-]+/gi, '_').replace(/__+/g, '_').replace(/^_+|_+$/g, '') || `${prefix}_${token}_${String(sequence).padStart(2, '0')}`;
+  }
+  if (/short-code/.test(convention)) return `${prefix}_${token}_${String(sequence).padStart(2, '0')}`;
+  if (/location-role-index/.test(convention)) return `${token}-${prefix}-${String(sequence).padStart(2, '0')}`;
+  if (/readable/.test(convention)) return `${siteName}-${prefix}${sequence}`;
+  return `${siteName} ${readable}`;
+}
+
+function buildSitePlacements(input: { profile: RequirementsProfile; topology: TopologyBlueprint; siteHierarchy: SiteHierarchyItem[]; rows: AddressingPlanRow[]; }) {
+  const { profile, topology, siteHierarchy, rows } = input;
+  const devices: SitePlacementDevice[] = [];
+  siteHierarchy.forEach((site, index) => {
+    const siteRows = rows.filter((row) => row.siteId === site.id && row.subnetCidr !== "Unassigned");
+    const zoneSet = Array.from(new Set(siteRows.map((row) => zoneNameForRole(row.role))));
+    const subnetSet = siteRows.map((row) => row.subnetCidr);
+    const isPrimary = site.id === topology.primarySiteId || index === 0;
+    const branchOrRemote = topology.topologyType !== "collapsed-core" && !isPrimary;
+
+    const edgeDeviceType = branchOrRemote && topology.internetBreakout === "distributed" ? "router" : "firewall";
+    devices.push({
+      id: `${site.id}-edge-firewall`,
+      siteId: site.id,
+      siteName: site.name,
+      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, deviceType: edgeDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
+      uplinkTarget: isPrimary ? (topology.cloudConnected ? `${profile.cloudProvider || "Cloud"} edge` : "Internet edge") : (topology.primarySiteName || "Primary site"),
+      deviceType: edgeDeviceType,
+      role: branchOrRemote ? (topology.internetBreakout === "distributed" ? "Branch WAN / internet edge" : "Branch trusted edge") : "Perimeter edge",
+      quantity: profile.dualIsp && isPrimary ? 2 : 1,
+      placement: isPrimary ? `Perimeter edge at ${site.name}` : `WAN edge at ${site.name}`,
+      connectedZones: zoneSet.filter((item) => item !== "Routing identity"),
+      connectedSubnets: subnetSet.filter((item) => item !== "Unassigned").slice(0, 6),
+      interfaceLabels: buildInterfaceLabels(branchOrRemote && topology.internetBreakout === "distributed" ? "router" : "firewall", siteRows, { isPrimary, distributedBreakout: topology.internetBreakout === "distributed", topologyType: topology.topologyType }),
+      notes: [
+        isPrimary && topology.internetBreakout === "centralized" ? "This edge is the main north-south control point for trusted, guest, and DMZ traffic." : "This edge enforces site ingress/egress and hands traffic to the routed transport domain.",
+      ],
+    });
+
+    const switchingDeviceType = isPrimary || topology.topologyType === "collapsed-core" ? "core-switch" : "access-switch";
+    devices.push({
+      id: `${site.id}-core-switch`,
+      siteId: site.id,
+      siteName: site.name,
+      deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, deviceType: switchingDeviceType, isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
+      uplinkTarget: edgeDeviceType === "router" ? `${site.name} branch edge` : `${site.name} perimeter edge`,
+      deviceType: switchingDeviceType,
+      role: isPrimary || topology.topologyType === "collapsed-core" ? "Primary VLAN gateway / aggregation" : "Local access aggregation",
+      quantity: 1,
+      placement: isPrimary || topology.topologyType === "collapsed-core" ? `Main routed switching layer at ${site.name}` : `Branch access aggregation at ${site.name}`,
+      connectedZones: zoneSet.filter((item) => !["WAN transit zone", "Routing identity"].includes(item)),
+      connectedSubnets: subnetSet.filter((item) => item !== "Unassigned").slice(0, 8),
+      interfaceLabels: buildInterfaceLabels(isPrimary || topology.topologyType === "collapsed-core" ? "core-switch" : "access-switch", siteRows, { isPrimary, distributedBreakout: topology.internetBreakout === "distributed", topologyType: topology.topologyType }),
+      notes: [
+        "Use this placement object to understand which VLANs and local service segments terminate at this site.",
+      ],
+    });
+
+    if (profile.wireless || profile.guestWifi) {
+      devices.push({
+        id: `${site.id}-wireless`,
+        siteId: site.id,
+        siteName: site.name,
+        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, deviceType: "access-point", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+        siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
+        uplinkTarget: switchingDeviceType === "core-switch" ? `${site.name} core switch` : `${site.name} access switch`,
+        deviceType: "access-point",
+        role: profile.guestWifi ? "Staff and guest wireless access" : "Wireless access",
+        quantity: Math.max(1, toNumber(profile.apCount, 4)),
+        placement: `User access layer at ${site.name}`,
+        connectedZones: profile.guestWifi ? ["User zone", "Guest zone"] : ["User zone"],
+        connectedSubnets: siteRows.filter((row) => row.role === "USER" || row.role === "GUEST").map((row) => row.subnetCidr),
+        interfaceLabels: buildInterfaceLabels("access-point", siteRows, { isPrimary, distributedBreakout: topology.internetBreakout === "distributed", topologyType: topology.topologyType }),
+        notes: [profile.wirelessModel || "Wireless model not yet specified"],
+      });
+    }
+
+    const serverRows = siteRows.filter((row) => row.role === "SERVER");
+    if (serverRows.length > 0) {
+      devices.push({
+        id: `${site.id}-server-stack`,
+        siteId: site.id,
+        siteName: site.name,
+        deviceName: deviceNameForPlacement({ siteName: site.name, siteCode: site.siteCode, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, deviceType: "server", isPrimary, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+        siteTier: isPrimary ? (topology.topologyType === "collapsed-core" ? "single-site" : "primary") : "branch",
+        uplinkTarget: switchingDeviceType === "core-switch" ? `${site.name} core switch` : `${site.name} access switch`,
+        deviceType: "server",
+        role: isPrimary && /central/i.test(profile.serverPlacement || "") ? "Centralized shared services" : "Local application or support services",
+        quantity: Math.max(1, serverRows.length),
+        placement: `Server/service zone at ${site.name}`,
+        connectedZones: ["Server zone"],
+        connectedSubnets: serverRows.map((row) => row.subnetCidr),
+        interfaceLabels: buildInterfaceLabels("server", siteRows, { isPrimary, distributedBreakout: topology.internetBreakout === "distributed", topologyType: topology.topologyType }),
+        notes: [
+          isPrimary && /central/i.test(profile.serverPlacement || "") ? "Shared services, identity, and platform dependencies should normally live here for spoke sites." : "This site keeps local server workloads or support services inside its server zone.",
+        ],
+      });
+    }
+  });
+
+  if (topology.cloudConnected) {
+    devices.push({
+      id: `cloud-edge`,
+      siteId: `cloud-edge`,
+      siteName: `${profile.cloudProvider || "Cloud"} edge`,
+      deviceName: `${profile.cloudProvider || "Cloud"} cloud edge`,
+      siteTier: "cloud",
+      uplinkTarget: topology.primarySiteName || "Primary site",
+      deviceType: "cloud-edge",
+      role: "Provider VNet/VPC boundary",
+      quantity: 1,
+      placement: `${profile.cloudProvider || "Cloud"} tenant / virtual network edge`,
+      connectedZones: ["Cloud service boundary"],
+      connectedSubnets: [],
+      interfaceLabels: buildInterfaceLabels("cloud-edge", [], { isPrimary: false, distributedBreakout: false }),
+      notes: [profile.cloudConnectivity || "Cloud connectivity to be confirmed"],
+    });
+  }
+  return devices;
+}
+
+function buildServicePlacements(input: { profile: RequirementsProfile; topology: TopologyBlueprint; siteHierarchy: SiteHierarchyItem[]; rows: AddressingPlanRow[]; }) {
+  const { profile, topology, siteHierarchy, rows } = input;
+  const primarySite = siteHierarchy.find((site) => site.id === topology.primarySiteId) || siteHierarchy[0];
+  const items: ServicePlacementItem[] = [];
+  const siteName = primarySite?.name || "Primary site";
+  const centralServerRow = rows.find((row) => row.siteId === primarySite?.id && row.role === "SERVER" && row.subnetCidr !== "Unassigned");
+  const managementRow = rows.find((row) => row.siteId === primarySite?.id && row.role === "MANAGEMENT" && row.subnetCidr !== "Unassigned");
+  const dmzRow = findDmzServerRow(rows, primarySite?.id);
+
+  if (centralServerRow) {
+    items.push({
+      id: 'svc-shared-services',
+      serviceName: 'Shared internal service stack',
+      serviceType: 'shared-service',
+      placementType: topology.topologyType === 'collapsed-core' ? 'local' : 'centralized',
+      siteId: primarySite?.id,
+      siteName,
+      zoneName: 'Server zone',
+      subnetCidr: centralServerRow.subnetCidr,
+      dependsOn: ['Routing identity', 'Trusted internal routing', 'Directory/DNS/DHCP reachability'],
+      consumers: topology.topologyType === 'collapsed-core' ? ['Local user and management segments'] : ['Primary site users', 'Branch users', 'Management zone'],
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      ingressInterface: 'Vlan20 / server gateway',
+      notes: ['This placement object names where shared internal services are expected to live instead of leaving them as generic report language.'],
+    });
+  }
+  if (managementRow) {
+    items.push({
+      id: 'svc-management',
+      serviceName: 'Management and monitoring plane',
+      serviceType: 'management-service',
+      placementType: 'centralized',
+      siteId: primarySite?.id,
+      siteName,
+      zoneName: 'Management zone',
+      subnetCidr: managementRow.subnetCidr,
+      dependsOn: ['Privileged access boundary', 'Logging', 'Monitoring'],
+      consumers: ['Network operations', 'Security / admin operators'],
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'core-switch', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      upstreamDevice: `${siteName} management boundary`,
+      ingressInterface: 'Vlan90 / management gateway',
+      notes: [profile.managementAccess || 'Management access assumptions not yet set'],
+    });
+  }
+  if (dmzRow && (topology.internetBreakout === 'centralized' || profile.remoteAccess || /dmz/i.test(`${dmzRow.segmentName} ${dmzRow.purpose}`))) {
+    items.push({
+      id: 'svc-dmz-boundary',
+      serviceName: 'Published edge / DMZ service boundary',
+      serviceType: 'dmz-service',
+      placementType: 'dmz',
+      siteId: primarySite?.id,
+      siteName,
+      zoneName: 'DMZ / edge service zone',
+      subnetCidr: dmzRow.subnetCidr,
+      dependsOn: ['Perimeter firewall', 'North-south security policy', 'Optional NAT / reverse proxy'],
+      consumers: ['Internet users for published services', 'Trusted management zone for administration'],
+      publishedExternally: true,
+      ingressPath: ['Internet', `${siteName} perimeter edge`, `${siteName} DMZ subnet`, `${siteName} DMZ host`],
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      ingressInterface: 'Gi0/2 dmz / published services',
+      notes: ['DMZ placement is now explicit: this subnet sits behind the perimeter edge and should not be treated as a generic internal server segment.'],
+    });
+  }
+  if (profile.cloudConnected || profile.environmentType !== 'On-prem') {
+    items.push({
+      id: 'svc-cloud-apps',
+      serviceName: `${profile.cloudProvider || 'Cloud'} application boundary`,
+      serviceType: 'cloud-service',
+      placementType: 'cloud',
+      siteName: `${profile.cloudProvider || 'Cloud'} edge`,
+      zoneName: 'Cloud service boundary',
+      dependsOn: [profile.cloudConnectivity || 'Cloud connectivity', profile.cloudRoutingModel || 'Cloud routing'],
+      consumers: ['Selected internal users', 'Remote access users', 'Inter-site application flows'],
+      notes: [profile.cloudHostingModel || 'Cloud hosting model not specified'],
+    });
+  }
+  if (profile.remoteAccess) {
+    items.push({
+      id: 'svc-remote-access',
+      serviceName: 'Remote access gateway',
+      serviceType: 'dmz-service',
+      placementType: topology.internetBreakout === 'centralized' ? 'dmz' : 'local',
+      siteId: primarySite?.id,
+      siteName,
+      zoneName: 'DMZ / edge service zone',
+      subnetCidr: dmzRow?.subnetCidr,
+      dependsOn: ['Perimeter firewall', 'Identity service', 'Management plane'],
+      consumers: ['Remote staff', 'Administrators'],
+      publishedExternally: true,
+      ingressPath: ['Internet', `${siteName} perimeter edge`, `${siteName} remote access boundary`],
+      attachedDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      upstreamDevice: deviceNameForPlacement({ siteName, siteCode: primarySite?.siteCode, buildingLabel: (primarySite as any)?.buildingLabel, floorLabel: (primarySite as any)?.floorLabel, deviceType: 'firewall', isPrimary: true, topologyType: topology.topologyType, namingConvention: profile.deviceNamingConvention, namingTokenPreference: profile.namingTokenPreference, customNamingPattern: (profile as any).customNamingPattern, sequence: 1 }),
+      ingressInterface: 'Gi0/0 outside → Gi0/2 dmz',
+      notes: [profile.remoteAccessMethod || 'Remote access method not set'],
+    });
+  }
+  return items;
+}
+
+function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlacements: SitePlacementDevice[]; rows: AddressingPlanRow[]; }) {
+  const { topology, sitePlacements, rows } = input;
+  const boundaries: SecurityBoundaryDetail[] = [];
+  const siteNames = Array.from(new Set(rows.map((row) => row.siteName)));
+  siteNames.forEach((siteName) => {
+    const siteRows = rows.filter((row) => row.siteName === siteName && row.subnetCidr !== 'Unassigned');
+    const edge = sitePlacements.find((item) => item.siteName === siteName && (item.deviceType === 'firewall' || item.deviceType === 'router'));
+    const grouped = new Map<string, AddressingPlanRow[]>();
+    siteRows.forEach((row) => {
+      const key = zoneNameForRole(row.role);
+      const bucket = grouped.get(key) || [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    });
+    grouped.forEach((zoneRows, zoneName) => {
+      const isGuest = /guest/i.test(zoneName);
+      const isMgmt = /management/i.test(zoneName);
+      const isTransit = /transit/i.test(zoneName);
+      const hasDmzSignal = zoneRows.some((row) => /dmz/i.test(`${row.segmentName} ${row.purpose}`));
+      const isServer = /server/i.test(zoneName) || hasDmzSignal;
+      const isDmz = hasDmzSignal || (isServer && siteName === topology.primarySiteName && topology.internetBreakout === 'centralized');
+      const attachedDevice = edge ? edge.deviceName : `${siteName} routed edge`;
+      const boundaryName = `${siteName} ${isDmz ? 'DMZ boundary' : zoneName}`;
+      const permittedPeers = isGuest
+        ? ['Internet only via perimeter policy']
+        : isMgmt
+          ? ['Management plane', 'Approved infrastructure endpoints']
+          : isDmz
+            ? ['Internet via published policy', 'Management zone for administration']
+            : isServer
+              ? ['Trusted user zone', 'Management zone', topology.topologyType !== 'collapsed-core' ? 'Branch routed domains via policy' : '']
+              : ['Trusted internal zones subject to policy'];
+      boundaries.push({
+        zoneName: isDmz ? 'DMZ / edge service zone' : zoneName,
+        siteName,
+        boundaryName,
+        subnetCidrs: zoneRows.map((row) => row.subnetCidr),
+        attachedDevice,
+        attachedInterface: isDmz ? 'Gi0/2 dmz / published services' : isGuest ? 'Gi0/1 inside / guest handoff' : isMgmt ? 'Vlan90 / management gateway' : isTransit ? 'Transit routed handoff' : 'Inside routed handoff',
+        upstreamBoundary: isGuest ? 'Internet edge' : isTransit ? 'WAN / cloud transport boundary' : isDmz ? 'Published perimeter edge' : 'Trusted routed core',
+        upstreamInterface: isDmz ? 'Gi0/0 outside' : isGuest ? 'Outside NAT boundary' : isTransit ? 'WAN transport' : 'Trusted routed core',
+        downstreamAssets: zoneRows.map((row) => row.segmentName),
+        permittedPeers: permittedPeers.filter(Boolean),
+        controlPoint: isGuest ? 'Guest firewall / internet breakout policy' : isMgmt ? 'Privileged management ACL / firewall policy' : isDmz ? 'Firewall DMZ/service policy' : isTransit ? 'Routing / transport policy' : 'Internal segmentation policy',
+        inboundPolicy: isDmz ? 'Inbound internet allowed only to explicitly published services and ports.' : isGuest ? 'No inbound from trusted or internet into guest clients.' : 'Inbound allowed only from approved zones and management paths.',
+        eastWestPolicy: isMgmt ? 'Management initiates to infrastructure; reverse access should be tightly restricted.' : isDmz ? 'DMZ does not initiate east-west trust into internal zones except explicit back-end dependencies.' : isGuest ? 'Guest east-west denied by default.' : 'Same-trust communication should still be limited to documented service dependencies.',
+        managementSource: isMgmt ? 'Privileged admin workstations / management VPN' : 'Management zone only',
+        natPolicy: isGuest ? 'Source NAT at internet edge for guest egress.' : isDmz ? 'Static NAT / reverse proxy only for published services; no blanket inbound NAT.' : 'No special NAT expected inside the trust boundary.',
+        notes: [
+          `This boundary is attached to ${attachedDevice} and is no longer described only in generic terms.`,
+          topology.topologyType === 'hub-spoke' && siteName !== topology.primarySiteName && !isTransit ? `Traffic leaving ${siteName} should normally traverse ${topology.primarySiteName} for shared policy enforcement.` : 'Boundary stays local to the site routing and policy edge.',
+        ],
+      });
+    });
+  });
+  return boundaries;
+}
+
+function buildTrafficFlows(input: { profile: RequirementsProfile; topology: TopologyBlueprint; siteHierarchy: SiteHierarchyItem[]; rows: AddressingPlanRow[]; wanLinks: WanLinkPlanRow[]; servicePlacements: ServicePlacementItem[]; }) {
+  const { profile, topology, siteHierarchy, rows, wanLinks, servicePlacements } = input;
+  const flows: TrafficFlowPath[] = [];
+  const primarySite = siteHierarchy.find((site) => site.id === topology.primarySiteId) || siteHierarchy[0];
+  const primaryUser = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'USER');
+  const primaryServer = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'SERVER');
+  const primaryGuest = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'GUEST');
+  const primaryMgmt = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'MANAGEMENT');
+  const branchSite = siteHierarchy.find((site) => site.id !== primarySite?.id);
+  const branchUser = firstSubnetForRole(rows.filter((row) => row.siteId === branchSite?.id), 'USER');
+  const dmzPlacement = servicePlacements.find((item) => item.serviceType === 'dmz-service');
+  const cloudPlacement = servicePlacements.find((item) => item.serviceType === 'cloud-service');
+  const wanLinkLabel = wanLinks.find((link) => link.endpointBSiteName === branchSite?.name || link.endpointASiteName === branchSite?.name)?.linkName || 'Inter-site transport';
+  const breakoutPoint = topology.internetBreakout === 'centralized' ? `${primarySite?.name} perimeter edge` : 'Local site perimeter edge';
+
+  if (primaryUser) {
+    flows.push({
+      id: 'flow-user-internet',
+      flowName: 'Trusted user to internet',
+      flowLabel: `${primarySite?.name || 'Primary site'} user → internet via ${breakoutPoint}`,
+      source: `${primarySite?.name} user segment ${primaryUser.subnetCidr}`,
+      destination: 'Internet',
+      sourceSite: primarySite?.name,
+      sourceZone: 'User zone',
+      destinationZone: 'Untrusted / internet',
+      path: [`${primarySite?.name} access`, `${primarySite?.name} routed core`, breakoutPoint, 'Internet'],
+      controlPoints: [`${primarySite?.name} edge firewall`, 'North-south policy / NAT'],
+      routeModel: routeBehaviorForTopology(topology, primarySite?.name),
+      natBehavior: 'Source NAT / PAT at the active internet edge.',
+      enforcementPolicy: 'Trusted users should reach the internet only after perimeter policy inspection and logging.',
+      policyNotes: [profile.securityPosture || 'Security posture not specified'],
+    });
+  }
+  if (primaryGuest) {
+    flows.push({
+      id: 'flow-guest-internet',
+      flowName: 'Guest to internet',
+      flowLabel: `${primarySite?.name || 'Primary site'} guest → internet via ${breakoutPoint}`,
+      source: `${primarySite?.name} guest segment ${primaryGuest.subnetCidr}`,
+      destination: 'Internet',
+      sourceSite: primarySite?.name,
+      sourceZone: 'Guest zone',
+      destinationZone: 'Untrusted / internet',
+      path: [`${primarySite?.name} guest VLAN`, breakoutPoint, 'Internet'],
+      controlPoints: [`${primarySite?.name} guest egress policy`],
+      routeModel: topology.internetBreakout === 'centralized' ? `Guest traffic is anchored to ${primarySite?.name} for breakout and should not enter trusted east-west paths.` : 'Guest traffic exits locally without access to trusted internal zones.',
+      natBehavior: 'Source NAT at the guest internet edge.',
+      enforcementPolicy: 'Guest access should not traverse into trusted internal zones.',
+      policyNotes: [profile.guestPolicy || 'Guest policy not set'],
+    });
+  }
+  if (primaryUser && primaryServer) {
+    flows.push({
+      id: 'flow-user-shared-service',
+      flowName: 'User to shared internal service',
+      flowLabel: `${primarySite?.name || 'Primary site'} user → ${primarySite?.name || 'Primary site'} service zone`,
+      source: `${primarySite?.name} user segment ${primaryUser.subnetCidr}`,
+      destination: `${primarySite?.name} server segment ${primaryServer.subnetCidr}`,
+      sourceSite: primarySite?.name,
+      destinationSite: primarySite?.name,
+      sourceZone: 'User zone',
+      destinationZone: dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'DMZ / edge service zone' : 'Server zone',
+      path: [`${primarySite?.name} access`, `${primarySite?.name} routed core`, dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? `${primarySite?.name} perimeter edge` : `${primarySite?.name} server zone`],
+      controlPoints: ['Inter-zone ACL / firewall policy', 'Server access policy'],
+      routeModel: routeBehaviorForTopology(topology, primarySite?.name, primarySite?.name),
+      natBehavior: dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'No inbound NAT on this internal path; use explicit policy only.' : 'No NAT expected on internal east-west communication.',
+      enforcementPolicy: 'Only approved application and identity flows should cross from users into server services.',
+      policyNotes: [dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'Server subnet is acting as a DMZ or published boundary in this design.' : 'Server access remains an internal routed service dependency.'],
+    });
+  }
+  if (primaryMgmt) {
+    flows.push({
+      id: 'flow-mgmt-infra',
+      flowName: 'Management to infrastructure',
+      flowLabel: `${primarySite?.name || 'Primary site'} management → infrastructure control plane`,
+      source: `${primarySite?.name} management segment ${primaryMgmt.subnetCidr}`,
+      destination: 'Network devices and infrastructure services',
+      sourceSite: primarySite?.name,
+      sourceZone: 'Management zone',
+      destinationZone: 'Infrastructure control plane',
+      path: [`${primarySite?.name} management zone`, 'Routed core / control plane', 'Device management interfaces'],
+      controlPoints: ['Privileged access controls', 'AAA / logging'],
+      routeModel: 'Management path should stay in the control plane and not hairpin through user zones.',
+      natBehavior: 'No NAT expected; this is a privileged internal path.',
+      enforcementPolicy: 'Management traffic should originate only from dedicated admin zones and be fully logged.',
+      policyNotes: [profile.managementAccess || 'Management access assumptions not yet set'],
+    });
+  }
+  if (branchUser && primaryServer && (topology.topologyType === 'hub-spoke' || topology.topologyType === 'hybrid-cloud' || topology.topologyType === 'multi-site')) {
+    flows.push({
+      id: 'flow-branch-to-shared',
+      flowName: 'Branch user to centralized service',
+      flowLabel: `${branchSite?.name || 'Branch'} user → ${primarySite?.name || 'Primary'} shared services via ${wanLinkLabel}`,
+      source: `${branchSite?.name} user segment ${branchUser.subnetCidr}`,
+      destination: `${primarySite?.name} shared services ${primaryServer.subnetCidr}`,
+      sourceSite: branchSite?.name,
+      destinationSite: primarySite?.name,
+      sourceZone: 'User zone',
+      destinationZone: 'Server zone',
+      path: [`${branchSite?.name} access`, `${branchSite?.name} WAN edge`, wanLinkLabel, `${primarySite?.name} perimeter / core`, `${primarySite?.name} server zone`],
+      controlPoints: [`${branchSite?.name} WAN edge`, `${primarySite?.name} inter-zone controls`],
+      routeModel: routeBehaviorForTopology(topology, branchSite?.name, primarySite?.name),
+      natBehavior: 'No internet NAT on the inter-site path; keep this as routed private transport.',
+      enforcementPolicy: 'This flow makes the hub/spoke or centralized service model explicit instead of leaving branch service consumption as generic wording.',
+      policyNotes: [topology.internetBreakout === 'centralized' ? `Shared-service traffic should follow ${primarySite?.name} as the policy hub.` : 'Service traffic should stay in the private routed domain across sites.'],
+    });
+  }
+  if (dmzPlacement?.publishedExternally) {
+    flows.push({
+      id: 'flow-internet-to-dmz',
+      flowName: 'Internet to published DMZ service',
+      flowLabel: `Internet → ${dmzPlacement.siteName} published DMZ service`,
+      source: 'Internet user',
+      destination: dmzPlacement.subnetCidr ? `${dmzPlacement.siteName} DMZ service ${dmzPlacement.subnetCidr}` : `${dmzPlacement.siteName} DMZ service boundary`,
+      destinationSite: dmzPlacement.siteName,
+      sourceZone: 'Untrusted / internet',
+      destinationZone: 'DMZ / edge service zone',
+      path: dmzPlacement.ingressPath || ['Internet', `${dmzPlacement.siteName} perimeter edge`, `${dmzPlacement.siteName} DMZ service boundary`],
+      controlPoints: [`${dmzPlacement.siteName} perimeter firewall`, 'Published-service policy / reverse proxy'],
+      routeModel: 'Inbound path terminates at the public edge and should not route directly into trusted internal zones.',
+      natBehavior: 'Static NAT, reverse proxy, or load-balanced publication only for approved services.',
+      enforcementPolicy: 'Only explicitly published DMZ services should be reachable from the internet; all other inbound traffic is denied.',
+      policyNotes: [dmzPlacement.notes[0] || 'DMZ publication rules not yet refined'],
+    });
+  }
+  if (cloudPlacement) {
+    flows.push({
+      id: 'flow-site-to-cloud',
+      flowName: 'Site to cloud-hosted service',
+      flowLabel: `${primarySite?.name || 'Primary site'} trusted zones → ${profile.cloudProvider || 'Cloud'} service boundary`,
+      source: `${primarySite?.name} trusted internal users`,
+      destination: `${profile.cloudProvider || 'Cloud'} service boundary`,
+      sourceSite: primarySite?.name,
+      destinationSite: `${profile.cloudProvider || 'Cloud'} edge`,
+      sourceZone: 'User / server zones',
+      destinationZone: 'Cloud service boundary',
+      path: [`${primarySite?.name} routed core`, `${primarySite?.name} perimeter edge`, profile.cloudConnectivity || 'Cloud edge transport', `${profile.cloudProvider || 'Cloud'} service boundary`],
+      controlPoints: ['Cloud edge routing policy', 'Cloud identity / trust boundary'],
+      routeModel: routeBehaviorForTopology(topology, primarySite?.name, `${profile.cloudProvider || 'Cloud'} edge`),
+      natBehavior: 'Prefer private routed connectivity; avoid unnecessary internet-style NAT inside the cloud boundary.',
+      enforcementPolicy: 'Cloud traffic should remain separated from general internet browsing and follow the declared cloud trust boundary.',
+      policyNotes: [profile.cloudTrafficBoundary || 'Cloud traffic boundary not specified'],
+    });
+  }
+  if (profile.remoteAccess) {
+    flows.push({
+      id: 'flow-remote-access',
+      flowName: 'Remote user to internal service',
+      flowLabel: `Remote user → ${primarySite?.name || 'Primary site'} internal service via remote access edge`,
+      source: 'Remote user / VPN client',
+      destination: primaryServer ? `${primarySite?.name} shared services ${primaryServer.subnetCidr}` : 'Approved internal service',
+      destinationSite: primarySite?.name,
+      sourceZone: 'External remote-access zone',
+      destinationZone: primaryServer ? 'Server zone' : 'Trusted internal zone',
+      path: ['Remote user', `${primarySite?.name} remote access gateway`, `${primarySite?.name} perimeter policy`, primaryServer ? `${primarySite?.name} server zone` : `${primarySite?.name} trusted zone`],
+      controlPoints: ['VPN / remote access gateway', 'Identity policy', 'Post-auth access control'],
+      routeModel: 'Remote access must terminate at the controlled edge before entering the internal route domain.',
+      natBehavior: 'No general-purpose NAT after tunnel termination; rely on identity and route-based access control.',
+      enforcementPolicy: 'Remote access should terminate in a controlled edge/DMZ context and then be filtered toward approved internal services.',
+      policyNotes: [profile.remoteAccessMethod || 'Remote access method not set'],
+    });
+  }
+  return flows;
+}
+
 export function synthesizeLogicalDesign(project: Project | undefined, sites: Site[], vlans: Vlan[], profile: RequirementsProfile): SynthesizedLogicalDesign {
   const plannedSiteCount = Math.max(1, Math.max(sites.length, toNumber(profile.siteCount, 1)));
   const organization = inferWorkingOrganizationBlock(project, plannedSiteCount, toNumber(profile.usersPerSite, 50));
@@ -3053,6 +3823,12 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
   const organizationUtilization = organizationCapacity > 0 ? allocatedSiteAddresses / organizationCapacity : 0;
   const organizationHeadroom = Math.max(0, organizationCapacity - allocatedSiteAddresses);
 
+  const topology = inferTopologyBlueprint({ profile, siteHierarchy, wanLinks, rows });
+  const sitePlacements = buildSitePlacements({ profile, topology, siteHierarchy, rows });
+  const servicePlacements = buildServicePlacements({ profile, topology, siteHierarchy, rows });
+  const securityBoundaries = buildSecurityBoundaries({ topology, sitePlacements, rows });
+  const trafficFlows = buildTrafficFlows({ profile, topology, siteHierarchy, rows, wanLinks, servicePlacements });
+
   const routingPlan = buildRoutingPlan(siteHierarchy, rows, wanLinks, profile);
   const routingProtocols = buildRoutingProtocols({
     profile,
@@ -3151,12 +3927,22 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     segmentModel,
     logicalDomains,
     wanLinks,
+    topology,
+    sitePlacements,
+    servicePlacements,
+    securityBoundaries,
+    trafficFlows,
     routingPlan,
   });
   const lowLevelDesign = buildLowLevelDesign({
     profile,
     siteHierarchy,
     rows,
+    topology,
+    sitePlacements,
+    servicePlacements,
+    securityBoundaries,
+    trafficFlows,
     routingPlan,
     wanLinks,
   });
@@ -3164,6 +3950,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
   const designSummary = [
     `SubnetOps is using ${organization.cidr}${organization.assumed ? " as a temporary working organization block" : " as the saved organization block"} to shape a real logical addressing plan before implementation.`,
     `The current architecture direction is ${highLevelDesign.architecturePattern.toLowerCase()}, with ${highLevelDesign.layerModel.toLowerCase()}.`,
+    `Topology resolution for v108 is ${topology.topologyLabel.toLowerCase()}, with ${topology.internetBreakout} internet breakout and ${topology.servicePlacementModel.toLowerCase()}.`,
     `The design currently covers ${workingSites.length} site${workingSites.length === 1 ? "" : "s"} with ${rows.length} address plan row${rows.length === 1 ? "" : "s"}, including ${configuredSegments} configured row${configuredSegments === 1 ? "" : "s"} and ${proposedSegments} still-proposed row${proposedSegments === 1 ? "" : "s"}.`,
     `Each site is given a summary block, then per-segment child subnets are placed inside that site block so conflicts, headroom, and trust boundaries can be reviewed before any device configuration is attempted.`,
     `The organization hierarchy is currently consuming ${allocatedSiteAddresses} addresses out of ${organizationCapacity || 0} available in the organization block, which is about ${Math.round(organizationUtilization * 100)}% of the parent range.`,
@@ -3178,21 +3965,31 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
 
   const designReview = [
     ...buildDesignReview({
-    profile,
-    organizationBlockAssumed: organization.assumed,
-    siteHierarchy,
-    rows,
-    proposedSegments,
-    rowsOutsideSiteBlocks,
-    missingSiteBlocks,
-    wanReserveBlock,
-    wanLinks,
-    routingPlan,
-  }),
+      profile,
+      organizationBlockAssumed: organization.assumed,
+      siteHierarchy,
+      rows,
+      proposedSegments,
+      rowsOutsideSiteBlocks,
+      missingSiteBlocks,
+      wanReserveBlock,
+      wanLinks,
+      topology,
+      sitePlacements,
+      servicePlacements,
+      securityBoundaries,
+      trafficFlows,
+      routingPlan,
+    }),
     {
       kind: "decision" as const,
       title: "Security zoning and segmentation intent",
-      detail: `The logical design now carries ${securityZones.length} explicit security zone${securityZones.length === 1 ? "" : "s"} and ${securityPolicyMatrix.length} policy-intent flow${securityPolicyMatrix.length === 1 ? "" : "s"} so trust boundaries stay visible before implementation.` ,
+      detail: `The logical design now carries ${securityZones.length} explicit security zone${securityZones.length === 1 ? "" : "s"}, ${securityBoundaries.length} site-aware boundary mapping row${securityBoundaries.length === 1 ? "" : "s"}, and ${securityPolicyMatrix.length} policy-intent flow${securityPolicyMatrix.length === 1 ? "" : "s"} so trust boundaries stay visible before implementation.` ,
+    },
+    {
+      kind: "decision" as const,
+      title: "Topology-aware placement and flow model",
+      detail: `SubnetOps v108 now resolves ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, and ${trafficFlows.length} explicit traffic flow path${trafficFlows.length === 1 ? "" : "s"} from the saved topology, addressing, and service assumptions.`,
     },
     ...(segmentationReview.filter((item) => item.severity !== "info").map((item) => ({
       kind: item.severity === "critical" ? "risk" as const : "assumption" as const,
@@ -3226,6 +4023,66 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     ...openIssues,
     ...implementationRisks.filter((item) => item.severity !== "info").map((item) => item.title),
   ]));
+
+  const designEngineFoundation: DesignEngineFoundation = {
+    stageLabel: "v108 Design Engine Foundation",
+    summary: `SubnetOps is now resolving explicit design objects from requirements: ${siteHierarchy.length} site hierarchy row${siteHierarchy.length === 1 ? "" : "s"}, ${rows.length} addressing row${rows.length === 1 ? "" : "s"}, ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, ${securityBoundaries.length} security boundary row${securityBoundaries.length === 1 ? "" : "s"}, and ${trafficFlows.length} traffic flow path${trafficFlows.length === 1 ? "" : "s"}.`,
+    objectCounts: {
+      siteHierarchy: siteHierarchy.length,
+      addressingRows: rows.length,
+      topologyPlacements: sitePlacements.length,
+      servicePlacements: servicePlacements.length,
+      securityBoundaries: securityBoundaries.length,
+      trafficFlows: trafficFlows.length,
+      routingIdentities: routingPlan.filter((item) => item.loopbackCidr || item.summaryAdvertisement).length,
+      wanLinks: wanLinks.length,
+      traceabilityItems: traceability.length,
+      openIssues: openIssues.length,
+    },
+    strongestLayer: rows.length > 0 ? "Addressing hierarchy and site block synthesis" : "Requirements intake still needs real addressing anchors",
+    nextPriority: trafficFlows.length > 0
+      ? "Continue into planner UX reset and diagram rebuild using these generated objects as the source of truth."
+      : "Expand traffic-flow and topology-specific synthesis so every major path is explicit before implementation.",
+    coverage: [
+      {
+        label: "Addressing hierarchy",
+        status: rows.length > 0 ? "ready" : "pending",
+        detail: rows.length > 0
+          ? `Organization, site, VLAN, gateway, DHCP, and headroom outputs are now being generated from the working design model.`
+          : "No synthesized addressing rows exist yet.",
+      },
+      {
+        label: "Topology and placement",
+        status: sitePlacements.length > 0 ? "ready" : "partial",
+        detail: sitePlacements.length > 0
+          ? `Site roles, breakout posture, and placement objects are now explicit instead of being left to report narrative.`
+          : "Topology choices exist, but placement objects are still thin.",
+      },
+      {
+        label: "Security boundaries",
+        status: securityBoundaries.length > 0 ? "ready" : "partial",
+        detail: securityBoundaries.length > 0
+          ? `Zone-to-subnet and control-point mapping is visible for review.`
+          : "Security language is present, but boundary mapping still needs more explicit objects.",
+      },
+      {
+        label: "Traffic-flow model",
+        status: trafficFlows.length >= 5 ? "ready" : trafficFlows.length > 0 ? "partial" : "pending",
+        detail: trafficFlows.length >= 5
+          ? `Critical paths such as user-to-internet, branch-to-shared-service, and edge publishing are being synthesized.`
+          : trafficFlows.length > 0
+            ? `Some explicit flows exist, but the minimum critical-path set is not complete yet.`
+            : "No explicit traffic-flow paths have been generated yet.",
+      },
+      {
+        label: "Traceability and open issues",
+        status: traceability.length > 0 ? "ready" : "partial",
+        detail: traceability.length > 0
+          ? `Requirements-to-design reasoning and open design issues are now reviewable before implementation.`
+          : "Design decisions are present, but direct requirement traceability needs more coverage.",
+      },
+    ],
+  };
 
   const implementationNextSteps = [
     "Review the new HLD and LLD outputs first so the architecture, site roles, trust boundaries, and routing model are agreed before anyone starts writing production configs.",
@@ -3289,6 +4146,11 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     recommendedSegments,
     segmentModel,
     wanLinks,
+    topology,
+    sitePlacements,
+    servicePlacements,
+    securityBoundaries,
+    trafficFlows,
     routingPlan,
     logicalDomains,
     securityZones,
@@ -3316,6 +4178,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     designReview,
     openIssues,
     implementationNextSteps,
+    designEngineFoundation,
     stats: {
       configuredSites: workingSites.filter((site) => site.source === "configured").length,
       proposedSites: workingSites.filter((site) => site.source === "proposed").length,

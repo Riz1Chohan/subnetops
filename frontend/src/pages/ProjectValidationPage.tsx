@@ -4,12 +4,16 @@ import { ValidationList } from "../features/validation/components/ValidationList
 import { useRunValidation, useValidationResults } from "../features/validation/hooks";
 import { useCreateProjectComment, useProjectComments } from "../features/comments/hooks";
 import { useExplainValidationFinding } from "../features/ai/hooks";
+import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import type { ValidationResult } from "../lib/types";
 import { AIValidationInsight } from "../features/ai/components/AIValidationInsight";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
+import { parseRequirementsProfile } from "../lib/requirementsProfile";
+import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { buildValidationReadinessSummary } from "../lib/designReadiness";
 
 function categoryForRule(ruleCode: string) {
   if (ruleCode.includes("OVERLAP") || ruleCode.includes("SITE_BLOCK") || ruleCode.includes("NONCANONICAL")) return "Addressing";
@@ -32,6 +36,9 @@ export function ProjectValidationPage() {
   const { projectId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const validationQuery = useValidationResults(projectId);
+  const projectQuery = useProject(projectId);
+  const sitesQuery = useProjectSites(projectId);
+  const vlansQuery = useProjectVlans(projectId);
   const validationMutation = useRunValidation(projectId);
   const commentsQuery = useProjectComments(projectId);
   const createCommentMutation = useCreateProjectComment(projectId);
@@ -56,10 +63,16 @@ export function ProjectValidationPage() {
   }, [projectId, refreshedFromFix, searchParams, setSearchParams, validationMutation]);
 
   const items = validationQuery.data ?? [];
+  const project = projectQuery.data;
+  const sites = sitesQuery.data ?? [];
+  const vlans = vlansQuery.data ?? [];
+  const requirementsProfile = useMemo(() => parseRequirementsProfile(project?.requirementsJson), [project?.requirementsJson]);
+  const synthesizedDesign = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
   const errorCount = items.filter((item) => item.severity === "ERROR").length;
   const warningCount = items.filter((item) => item.severity === "WARNING").length;
   const infoCount = items.filter((item) => item.severity === "INFO").length;
   const categories = Array.from(new Set(items.map((item) => categoryForRule(item.ruleCode)))).sort();
+  const readinessSummary = useMemo(() => buildValidationReadinessSummary(project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount), [project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount]);
 
   const filteredItems = useMemo(() => {
     return [...items]
@@ -108,6 +121,103 @@ export function ProjectValidationPage() {
           <p className="muted" style={{ margin: 0 }}>SubnetOps is re-running validation after your latest fix so resolved findings can drop out of the review list.</p>
         </div>
       ) : null}
+
+
+      <div className="panel validation-trust-panel">
+        <div className="validation-trust-header">
+          <div>
+            <p className="eyebrow" style={{ margin: 0 }}>v110 trust and readiness</p>
+            <h2 style={{ margin: "4px 0 8px 0" }}>{readinessSummary.label}</h2>
+            <p className="muted" style={{ margin: 0 }}>{readinessSummary.summary}</p>
+          </div>
+          <div className={`validation-confidence-pill ${readinessSummary.status}`}>
+            <strong>{readinessSummary.score}%</strong>
+            <span>design trust</span>
+          </div>
+        </div>
+
+        <div className="validation-trust-meter" aria-hidden="true">
+          <span className={readinessSummary.status} style={{ width: `${readinessSummary.score}%` }} />
+        </div>
+
+        <div className="validation-trust-grid">
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Missing or weak inputs</h3>
+              <span className="badge-soft">{readinessSummary.missingInfo.length}</span>
+            </div>
+            {readinessSummary.missingInfo.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No major missing-input signals were detected in this review pass.</p>
+            ) : (
+              <div className="validation-signal-list">
+                {readinessSummary.missingInfo.map((item) => (
+                  <div key={item.id} className={`validation-signal-card ${item.level}`}>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <strong>{item.title}</strong>
+                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                    </div>
+                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Contradictions and trust drops</h3>
+              <span className="badge-soft">{readinessSummary.contradictions.length}</span>
+            </div>
+            {readinessSummary.contradictions.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No major requirement contradictions were detected in this pass.</p>
+            ) : (
+              <div className="validation-signal-list">
+                {readinessSummary.contradictions.map((item) => (
+                  <div key={item.id} className={`validation-signal-card ${item.level}`}>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <strong>{item.title}</strong>
+                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                    </div>
+                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="validation-next-actions">
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Strong signals</h3>
+              <span className="badge-soft">{readinessSummary.strengths.length}</span>
+            </div>
+            {readinessSummary.strengths.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>SubnetOps has not detected strong trust anchors yet.</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {readinessSummary.strengths.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            )}
+          </div>
+
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Recommended next fixes</h3>
+              <span className="badge-soft">{readinessSummary.nextActions.length}</span>
+            </div>
+            {readinessSummary.nextActions.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No immediate jump suggestions are available right now.</p>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {readinessSummary.nextActions.map((item) => (
+                  <Link key={`${item.label}-${item.path}`} to={item.path} className="link-button-subtle">{item.label}</Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Errors</p><h2 style={{ margin: 0 }}>{errorCount}</h2></div>

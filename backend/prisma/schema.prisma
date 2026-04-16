@@ -97,6 +97,9 @@ model Site {
   projectId           String
   name                String
   location            String?
+  streetAddress       String?
+  buildingLabel       String?
+  floorLabel          String?
   siteCode            String?
   notes               String?
   defaultAddressBlock String?

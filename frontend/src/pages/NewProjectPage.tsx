@@ -11,6 +11,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { runValidation } from "../features/validation/api";
 import { HelpTip } from "../components/app/HelpTip";
 import {
+  buildNamingPreviewExamples,
   buildProjectSummaryDescription,
   buildGuidedDescription,
   conditionalSections,
@@ -107,6 +108,7 @@ function PlanSidebar({
   const activeTracks = planningTracks(guided);
   const trackStatuses = planningTrackStatuses(guided);
   const readinessSummary = planningReadinessSummary(guided);
+  const namingPreview = buildNamingPreviewExamples(guided);
   const snapshotItems = [
     { label: "Planning for", value: guided.planningFor },
     { label: "Environment", value: guided.environmentType },
@@ -268,6 +270,7 @@ export function NewProjectPage() {
   const guidedSummaryDescription = useMemo(() => buildProjectSummaryDescription(guided), [guided]);
   const scenario = useMemo(() => conditionalSections(guided), [guided]);
   const readinessSummary = useMemo(() => planningReadinessSummary(guided), [guided]);
+  const namingPreview = useMemo(() => buildNamingPreviewExamples(guided), [guided]);
   const multiSitePlanning = Number(guided.siteCount || "0") > 1 || guided.internetModel !== "internet at each site";
   const wirelessPlanning = guided.wireless || guided.guestWifi;
   const voicePlanning = guided.voice || Number(guided.phoneCount || "0") > 0;
@@ -696,6 +699,16 @@ export function NewProjectPage() {
                 </select>
               </label>
               <label>
+                <span>Site identity capture</span>
+                <select value={guided.siteIdentityCapture} onChange={(event) => setGuided((current) => ({ ...current, siteIdentityCapture: event.target.value }))}>
+                  <option>capture site name, city or location label, and optional street address for each site</option>
+                  <option>capture formal branch or campus name plus concise location label</option>
+                  <option>capture real street address for implementation and shipping context</option>
+                  <option value="Not applicable / none">N/A / none</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+              <label>
                 <span>Naming standard</span>
                 <select value={guided.namingStandard} onChange={(event) => setGuided((current) => ({ ...current, namingStandard: event.target.value }))}>
                   <option>site-role-device naming with consistent short codes</option>
@@ -705,6 +718,77 @@ export function NewProjectPage() {
                   <option value="Custom">Custom</option>
                 </select>
               </label>
+              <label>
+                <span>Device naming convention</span>
+                <select value={guided.deviceNamingConvention} onChange={(event) => setGuided((current) => ({ ...current, deviceNamingConvention: event.target.value }))}>
+                  <option>automatic short-code standard (SW_TOR_01 / FW_TOR_01)</option>
+                  <option>automatic readable standard (Toronto-SW1 / Toronto-FW1)</option>
+                  <option>automatic location-role-index standard (TOR-SW-01 / TOR-FW-01)</option>
+                  <option>no preference - generate automatically from site names and roles</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </label>
+              <label>
+                <span>Naming token preference</span>
+                <select value={guided.namingTokenPreference} onChange={(event) => setGuided((current) => ({ ...current, namingTokenPreference: event.target.value }))}>
+                  <option>prefer site code when available, otherwise derive from the location or site name</option>
+                  <option>always prefer site code as the primary token</option>
+                  <option>always prefer full location name as the primary token</option>
+                  <option>prefer site + building + floor tokens when available</option>
+                  <option>prefer site + building tokens when available</option>
+                  <option>prefer site + floor tokens when available</option>
+                </select>
+              </label>
+              <label>
+                <span>Naming hierarchy</span>
+                <select value={guided.namingHierarchy} onChange={(event) => setGuided((current) => ({ ...current, namingHierarchy: event.target.value }))}>
+                  <option>site → building → floor → role → index when available</option>
+                  <option>site → role → index only</option>
+                  <option>site → building → role → index</option>
+                  <option>site → floor → role → index</option>
+                </select>
+              </label>
+              <label style={{ gridColumn: "1 / -1" }}>
+                <span>Custom naming pattern</span>
+                <input value={guided.customNamingPattern} onChange={(event) => setGuided((current) => ({ ...current, customNamingPattern: event.target.value }))} placeholder="Example: {site}_{building}_{floor}_{role}_{index}" />
+                <small className="muted">Use placeholders like <code>{"{site}"}</code>, <code>{"{siteCode}"}</code>, <code>{"{siteName}"}</code>, <code>{"{building}"}</code>, <code>{"{floor}"}</code>, <code>{"{role}"}</code>, and <code>{"{index}"}</code> when custom naming is selected.</small>
+              </label>
+              <div className="panel" style={{ gridColumn: '1 / -1', display: 'grid', gap: 10, background: 'rgba(15,23,42,0.03)' }}>
+                <div>
+                  <strong style={{ display: 'block', marginBottom: 6 }}>Naming preview</strong>
+                  <p className="muted" style={{ margin: 0 }}>These examples update immediately so users can see whether site code or full location naming will read better before saving the plan.</p>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Site</th>
+                        <th align="left">Primary token</th>
+                        <th align="left">Building</th>
+                        <th align="left">Floor</th>
+                        <th align="left">Closet</th>
+                        <th align="left">FW01 / FW02</th>
+                        <th align="left">SW01 / SW02</th>
+                        <th align="left">AP01 / AP02</th>
+                        <th align="left">Other roles</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {namingPreview.map((item) => (
+                        <tr key={item.siteLabel}>
+                          <td>{item.siteLabel}</td>
+                          <td>{item.token}</td>
+                          <td>{item.buildingLabel}</td>
+                          <td>{item.floorLabel}</td><td>{item.closetLabel}</td>
+                          <td><code>{item.firewall}</code><br /><code>{item.firewallSecondary}</code></td>
+                          <td><code>{item.switchName}</code><br /><code>{item.switchSecondary}</code></td>
+                          <td><code>{item.accessPoint}</code><br /><code>{item.accessPointSecondary}</code></td><td><code>{item.routerName}</code><br /><code>{item.controllerName}</code><br /><code>{item.serverName}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               <label>
                 <span>Monitoring model</span>
                 <select value={guided.monitoringModel} onChange={(event) => setGuided((current) => ({ ...current, monitoringModel: event.target.value }))}>
