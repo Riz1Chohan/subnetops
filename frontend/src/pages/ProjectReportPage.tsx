@@ -229,6 +229,18 @@ export function ProjectReportPage() {
     .sort((a, b) => (a.severity === b.severity ? a.createdAt.localeCompare(b.createdAt) : a.severity === "ERROR" ? -1 : 1))
     .slice(0, 8);
 
+  if (!selectedSection) {
+    return (
+      <section style={{ display: "grid", gap: 18 }}>
+        <div className="panel workspace-selection-blank">
+          <p className="workspace-detail-kicker">Deliver</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
+          <p className="muted" style={{ margin: 0 }}>Choose a deliverable card from the left pane to open that report section only.</p>
+        </div>
+      </section>
+    );
+  }
+
   const focusedSectionTitle = selectedSection === "assumptions"
     ? "Design assumptions and constraints"
     : selectedSection === "naming"
@@ -255,11 +267,10 @@ export function ProjectReportPage() {
     <section style={{ display: "grid", gap: 18 }}>
       {isFocusedSectionView ? (
         <>
-        <div className="panel workspace-detail-hero">
+        <div className="panel workspace-detail-toolbar">
           <div>
             <p className="workspace-detail-kicker">Deliver</p>
-            <h1 style={{ margin: "0 0 8px 0" }}>{focusedSectionTitle}</h1>
-            <p className="muted" style={{ margin: 0 }}>Use the left pane to move between report sections. Only the selected deliverable section is shown here.</p>
+            <strong>{focusedSectionTitle}</strong>
           </div>
           <div className="workspace-detail-actions">
             <button type="button" onClick={() => void downloadExport("docx")}>Export DOCX</button>
@@ -346,7 +357,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="naming" className="panel report-section" style={{ display: selectedSection && selectedSection !== "naming" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>1A. Naming and site identity standard</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>{isFocusedSectionView ? "1A. Naming and site identity standard" : "1A. Naming and site identity standard"}</h3>
           <p className="muted" style={{ margin: 0 }}>
             Device labels, report references, and diagram labels should all follow the same naming pattern. This section makes the chosen naming standard explicit before the report starts referencing device objects deeper in the design.
           </p>
@@ -393,7 +404,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="topology" className="panel report-section" style={{ display: selectedSection && selectedSection !== "topology" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>2. Topology and site placement</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>2. Topology and site placement</h3>
           <p className="muted" style={{ margin: 0 }}>
             This section states the selected topology and where key devices and boundaries are placed. The goal is to stop the report from speaking in generic architecture language without naming the actual site roles and placements.
           </p>
@@ -441,7 +452,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="addressing" className="panel report-section" style={{ display: selectedSection && selectedSection !== "addressing" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>3. Addressing hierarchy</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>3. Addressing hierarchy</h3>
           <p className="muted" style={{ margin: 0 }}>
             This is the addressing backbone for the design. Every row should tie back to a site, a role, a gateway, and eventually a policy and traffic path.
           </p>
@@ -484,7 +495,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="services-security" className="panel report-section" style={{ display: selectedSection && selectedSection !== "services-security" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>4. Service placement and security boundary design</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>4. Service placement and security boundary design</h3>
           <p className="muted" style={{ margin: 0 }}>
             Instead of saying only that a DMZ or service zone exists, this section shows where services are placed, how they are reached, and what boundary or control point sits in front of them.
           </p>
@@ -547,7 +558,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="routing-flows" className="panel report-section" style={{ display: selectedSection && selectedSection !== "routing-flows" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>5. Routing and traffic-flow design</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>5. Routing and traffic-flow design</h3>
           <p className="muted" style={{ margin: 0 }}>
             This section answers exactly how traffic should move, which named devices and interfaces it traverses, where policy is enforced, and whether NAT or edge treatment changes the path.
           </p>
@@ -607,7 +618,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="site-lld" className="panel report-section" style={{ display: selectedSection && selectedSection !== "site-lld" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>6. Site-by-site low-level design</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>6. Site-by-site low-level design</h3>
           <p className="muted" style={{ margin: 0 }}>
             Each site should have a clear role, local service posture, routing role, and segment picture. This is the place where the report needs to feel like a real site design, not generic architecture commentary.
           </p>
@@ -660,7 +671,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="validation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "validation" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h3>
           <p className="muted" style={{ margin: 0 }}>
             Validation should remain actionable. Keep the list focused on what must be corrected before implementation or export.
           </p>
@@ -676,7 +687,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="implementation" className="panel report-section" style={{ display: selectedSection && selectedSection !== "implementation" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h3>
           <p className="muted" style={{ margin: 0 }}>
             This section keeps the execution picture visible: rollout model, validation approach, rollback posture, cutover checkpoints, and the interfaces and boundary attachments that matter during review.
           </p>
@@ -705,7 +716,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h3>
           <p className="muted" style={{ margin: 0 }}>
             The product should stay honest about unresolved assumptions and next actions. This is where the handoff package should clearly say what still needs confirmation.
           </p>
@@ -724,7 +735,7 @@ export function ProjectReportPage() {
 
       <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h2>
+          <h3 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h3>
           <p className="muted" style={{ margin: 0 }}>
             The diagram preview is no longer only decorative. It should be used to cross-check section 2 placement, section 3 addressing, section 4 boundaries, and section 5 traffic paths against the generated topology views.
           </p>

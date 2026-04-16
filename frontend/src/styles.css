@@ -2457,7 +2457,7 @@ tr:last-child td {
 
 .project-header-main {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr) minmax(180px, 0.55fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
   gap: 16px;
   align-items: start;
 }
@@ -2694,6 +2694,7 @@ tr:last-child td {
 
   .project-stage-nav-pane {
     position: static;
+    max-height: none;
   }
 }
 
@@ -2787,4 +2788,56 @@ tr:last-child td {
 .workspace-focus-target.active {
   border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+
+.workspace-selection-blank {
+  min-height: 260px;
+  align-content: start;
+  padding: 22px;
+}
+
+.workspace-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-stage-nav-pane {
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.project-stage-nav-list {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+
+.topbar-notification-menu {
+  position: relative;
+}
+
+.topbar-notification-menu summary {
+  list-style: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.topbar-notification-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.topbar-notification-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(420px, 92vw);
+  z-index: 30;
+}
+
+.topbar-notification-popover .panel {
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
 }

@@ -94,6 +94,18 @@ export function ProjectOverviewPage() {
     );
   }
 
+  if (!selectedSection) {
+    return (
+      <section style={{ display: "grid", gap: 18 }}>
+        <div className="panel workspace-selection-blank">
+          <p className="workspace-detail-kicker">Design Package</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
+          <p className="muted" style={{ margin: 0 }}>Choose a design-package card from the left pane to open that focused engineering slice.</p>
+        </div>
+      </section>
+    );
+  }
+
   if (!project) {
     return (
       <EmptyState

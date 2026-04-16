@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useLogout, useCurrentUser } from "../features/auth/hooks";
 import { useAssignedTasks } from "../features/comments/hooks";
 import { useNotificationSummary } from "../features/notifications/hooks";
+import { NotificationPanel } from "../features/notifications/components/NotificationPanel";
 import { Brand } from "../components/app/Brand";
 
 export function DashboardLayout() {
@@ -31,9 +32,15 @@ export function DashboardLayout() {
           <Link to="/dashboard/help">Help</Link>
           <Link to="/dashboard/faq">FAQ</Link>
           <Link to="/account/security">Account</Link>
+          <details className="topbar-notification-menu">
+            <summary>Notifications {notificationSummaryQuery.data?.unread ?? 0}</summary>
+            <div className="topbar-notification-popover">
+              <NotificationPanel />
+            </div>
+          </details>
           <div className="topbar-user-pill">
             <strong>{data?.user?.fullName?.trim() || data?.user?.email?.split("@")[0] || "Guest"}</strong>
-            <span className="muted">Notifications {notificationSummaryQuery.data?.unread ?? 0}</span>
+            <span className="muted">Logged in</span>
           </div>
           <button
             type="button"

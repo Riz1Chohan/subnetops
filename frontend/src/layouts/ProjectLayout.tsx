@@ -3,8 +3,6 @@ import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom"
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useProjectComments } from "../features/comments/hooks";
-import { useCurrentUser } from "../features/auth/hooks";
-import { useNotificationSummary } from "../features/notifications/hooks";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
@@ -54,17 +52,9 @@ function metricPill(label: string, value: number | string) {
   );
 }
 
-function displayName(fullName: string | undefined, email: string | undefined) {
-  if (fullName && fullName.trim().length > 0) return fullName.trim();
-  if (email && email.includes("@")) return email.split("@")[0];
-  return email || "Guest";
-}
-
 export function ProjectLayout() {
   const { projectId = "" } = useParams();
   const location = useLocation();
-  const authQuery = useCurrentUser();
-  const notificationSummaryQuery = useNotificationSummary();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
@@ -89,21 +79,19 @@ export function ProjectLayout() {
   const vlanCount = Math.max(vlans.length, synthesized.addressingPlan.length);
   const blockerCount = Math.max(errorCount, recoveryCompletion.mustFinish.length, workflowReview.actionQueue.filter((item) => item.severity !== "secondary").length);
   const openTaskCount = Math.max(unresolvedTaskCount, workflowReview.actionQueue.length);
-  const notificationCount = notificationSummaryQuery.data?.unread ?? 0;
-  const userLabel = displayName(authQuery.data?.user?.fullName, authQuery.data?.user?.email);
 
   const stageGroups: StageGroup[] = [
     {
       key: "discovery",
       label: "Discovery",
-      path: `/projects/${projectId}/discovery?section=summary`,
+      path: `/projects/${projectId}/discovery`,
       summary: "Current-state capture and baseline evidence.",
       matchers: ["/discovery"],
     },
     {
       key: "requirements",
       label: "Requirements",
-      path: `/projects/${projectId}/requirements?step=core`,
+      path: `/projects/${projectId}/requirements`,
       summary: "Planning brief, constraints, and scenario inputs.",
       matchers: ["/requirements"],
     },
@@ -117,14 +105,14 @@ export function ProjectLayout() {
     {
       key: "validation",
       label: "Validation",
-      path: `/projects/${projectId}/validation?section=focus`,
+      path: `/projects/${projectId}/validation`,
       summary: "Findings, blockers, and review corrections.",
       matchers: ["/validation"],
     },
     {
       key: "deliver",
       label: "Deliver",
-      path: `/projects/${projectId}/report?section=assumptions`,
+      path: `/projects/${projectId}/report`,
       summary: "Report, diagram, and handoff outputs.",
       matchers: ["/report", "/diagram"],
     },
@@ -179,7 +167,7 @@ export function ProjectLayout() {
   ];
 
   const deliverLinks: WorkspaceLink[] = [
-    { key: "diagram", label: "Diagram workspace", path: `/projects/${projectId}/diagram`, description: "Topology workspace and overlays." },
+    { key: "diagram", label: "Diagram workspace", path: `/projects/${projectId}/diagram?section=canvas`, description: "Topology workspace and overlays." },
     { key: "assumptions", label: "Assumptions & constraints", path: `/projects/${projectId}/report?section=assumptions`, description: "Section 1 report content only." },
     { key: "naming", label: "Naming standard", path: `/projects/${projectId}/report?section=naming`, description: "Section 1A naming and site identity." },
     { key: "topology", label: "Topology & placement", path: `/projects/${projectId}/report?section=topology`, description: "Section 2 report content only." },
@@ -252,18 +240,8 @@ export function ProjectLayout() {
               {metricPill("Open tasks", openTaskCount)}
             </div>
             <div className="project-header-actions">
-              <Link to={`/projects/${projectId}/diagram`} className={location.pathname.includes("/diagram") ? "project-quick-link active" : "project-quick-link"}>Diagram</Link>
+              <Link to={`/projects/${projectId}/diagram?section=canvas`} className={location.pathname.includes("/diagram") ? "project-quick-link active" : "project-quick-link"}>Diagram</Link>
               <Link to={`/projects/${projectId}/report`} className={location.pathname.includes("/report") ? "project-quick-link active" : "project-quick-link"}>Reports</Link>
-            </div>
-          </div>
-          <div className="project-user-card">
-            <div className="project-user-meta">
-              <span className="badge-soft">Notifications {notificationCount}</span>
-              {blockerCount > 0 ? <span className="badge-soft">Needs review {blockerCount}</span> : null}
-            </div>
-            <div className="project-user-identity">
-              <span className="project-user-label">Logged in</span>
-              <strong>{userLabel}</strong>
             </div>
           </div>
         </div>
@@ -321,7 +299,7 @@ export function ProjectLayout() {
               ) : workflowReview.actionQueue.map((item) => {
                 const issuePath = buildWorkspaceIssuePath(item.path, { key: item.key, title: item.title, detail: item.detail });
                 return (
-                  <Link key={item.key} to={issuePath} className={`project-action-center-link ${item.severity === "primary" ? "primary" : item.severity === "warning" ? "warning" : "next"}`}>
+                  <Link key={item.key} to={issuePath} className={`project-action-center-link ${item.severity === "primary" ? "primary" : item.severity === "warning" ? "warning" : "secondary"}`}>
                     <strong>{item.title}</strong>
                     <span>{item.detail}</span>
                   </Link>

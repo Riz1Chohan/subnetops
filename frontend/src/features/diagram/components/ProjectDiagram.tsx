@@ -12,6 +12,7 @@ interface ProjectDiagramProps {
   comments?: ProjectComment[];
   validations?: ValidationResult[];
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
+  compact?: boolean;
 }
 
 type DiagramMode = "logical" | "physical";
@@ -894,6 +895,7 @@ function LogicalTopologyDiagram({
   deviceFocus: DeviceFocus;
   linkFocus: LinkFocus;
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
+  compact?: boolean;
 }) {
   const sites = sitesForDiagramScope((project.sites ?? []) as SiteWithVlans[], synthesized, scope, focusedSiteId);
   const cardWidth = 290;
@@ -1050,6 +1052,7 @@ function PhysicalTopologyDiagram({
   deviceFocus: DeviceFocus;
   linkFocus: LinkFocus;
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
+  compact?: boolean;
 }) {
   const sites = sitesForDiagramScope((project.sites ?? []) as SiteWithVlans[], synthesized, scope, focusedSiteId);
   const requirements = parseRequirementsProfile(project.requirementsJson);
@@ -1866,7 +1869,7 @@ function activePresetKeyForState(mode: DiagramMode, scope: DiagramScope, overlay
   return undefined;
 }
 
-export function ProjectDiagram({ project, comments = [], validations = [], onSelectTarget }: ProjectDiagramProps) {
+export function ProjectDiagram({ project, comments = [], validations = [], onSelectTarget, compact = false }: ProjectDiagramProps) {
   const sites = (project.sites ?? []) as SiteWithVlans[];
   const svgId = `diagram-${project.id}`;
   const [mode, setMode] = useState<DiagramMode>("logical");
@@ -1896,7 +1899,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const activePresetKey = useMemo(() => activePresetKeyForState(mode, scope, overlay), [mode, scope, overlay]);
   const activePreset = reviewPresets.find((preset) => preset.key === activePresetKey) || null;
   const topologyBehaviorSummary = useMemo(() => topologyScopeBehaviorSummary(scope, synthesized, focusedSite), [scope, synthesized, focusedSite]);
-  const showSupportPanels = workspaceDensity === "expanded";
+  const showNarrativePanels = !compact;
+  const showSupportPanels = workspaceDensity === "expanded" && !compact;
   const densityLabel = workspaceDensity === "guided" ? "Guided" : "Expanded";
 
   const applyPreset = (presetKey: DiagramReviewPresetKey) => {
@@ -1924,8 +1928,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
     <div className="panel">
       <div className="diagram-toolbar" style={{ marginBottom: 12 }}>
         <div>
-          <h2 style={{ marginBottom: 6 }}>Generated Topology Diagram</h2>
-          <p className="muted" style={{ margin: 0 }}>This recovery pass keeps the diagram work tied to the roadmap: real layout modes, guided-vs-expanded density control, stronger link semantics, and clearer label discipline so the workspace behaves more like a real topology review surface.</p>
+          <h2 style={{ marginBottom: 6 }}>{compact ? "Topology canvas" : "Generated Topology Diagram"}</h2>
+          <p className="muted" style={{ margin: 0 }}>{compact ? "Use the canvas as the main workspace. Switch view, overlay, scope, and focus from the control strip, then review the supporting details from the diagram navigator." : "This recovery pass keeps the diagram work tied to the roadmap: real layout modes, guided-vs-expanded density control, stronger link semantics, and clearer label discipline so the workspace behaves more like a real topology review surface."}</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div className="diagram-toggle">
@@ -1995,69 +1999,92 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
         </div>
       </div>
 
-      <div className="diagram-note-grid" style={{ marginBottom: 12 }}>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Guided review presets</strong>
-          <p style={{ margin: "0 0 10px 0", color: "#61758f" }}>{activePreset ? `${activePreset.label} is currently active.` : "Choose a preset to move the workspace into a stronger engineering review posture without manually toggling each control."}</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {reviewPresets.map((preset) => (
-              <button key={preset.key} type="button" className={activePresetKey === preset.key ? "active" : ""} onClick={() => applyPreset(preset.key)}>{preset.label}</button>
-            ))}
+      {showNarrativePanels ? (
+        <div className="diagram-note-grid" style={{ marginBottom: 12 }}>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Guided review presets</strong>
+            <p style={{ margin: "0 0 10px 0", color: "#61758f" }}>{activePreset ? `${activePreset.label} is currently active.` : "Choose a preset to move the workspace into a stronger engineering review posture without manually toggling each control."}</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {reviewPresets.map((preset) => (
+                <button key={preset.key} type="button" className={activePresetKey === preset.key ? "active" : ""} onClick={() => applyPreset(preset.key)}>{preset.label}</button>
+              ))}
+            </div>
+            <p style={{ margin: "10px 0 0 0", color: "#61758f" }}>{activePreset?.detail || "Review presets align scope, overlay, and mode around the main engineering checks that still matter most in the recovery roadmap."}</p>
           </div>
-          <p style={{ margin: "10px 0 0 0", color: "#61758f" }}>{activePreset?.detail || "Review presets align scope, overlay, and mode around the main engineering checks that still matter most in the recovery roadmap."}</p>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>{scopeMeta.title}</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{scopeMeta.detail}</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Current evidence in scope</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{scopedSites.length} site{scopedSites.length === 1 ? "" : "s"}, {scopedPlacementCount} placement object{scopedPlacementCount === 1 ? "" : "s"}, {scopedServiceCount} service anchor{scopedServiceCount === 1 ? "" : "s"}, {scopedBoundaryCount} boundary object{scopedBoundaryCount === 1 ? "" : "s"}, and {scopedFlows.length} flow path{scopedFlows.length === 1 ? "" : "s"} are currently active in this view.</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Recovery direction</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>Use global for overall architecture, per-site for local LLD review, WAN / cloud for transport posture, and boundaries for trust enforcement. This keeps the diagram stage closer to the roadmap’s real topology-engine target.</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Topology-specific rendering check</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{topologyBehaviorSummary}</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Current workspace discipline</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{densityLabel} density • {labelMode === "detailed" ? "Detailed device + link labels" : "Essential labels only"} • {linkAnnotationMode === "full" ? "Full link annotations" : "Minimal link annotations"} • {labelFocusTitle(labelFocus)}. Guided mode keeps critical review cards first; Expanded mode exposes the deeper support panels.</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Engineering focus controls</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{deviceFocusTitle(deviceFocus)} + {linkFocusTitle(linkFocus)} + {labelFocusTitle(labelFocus)} are now emphasized. Non-matching device roles and link types remain visible but muted so the workspace can isolate the review you are doing without losing topology context.</p>
+          </div>
+          <LabelFocusPanel labelFocus={labelFocus} />
         </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>{scopeMeta.title}</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>{scopeMeta.detail}</p>
+      ) : (
+        <div className="diagram-note-grid" style={{ marginBottom: 12 }}>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Current review posture</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{activePreset ? `${activePreset.label} • ${activePreset.detail}` : "Choose a preset from the control strip to move quickly between architecture, site, transport, boundary, service, and flow reviews."}</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Scope summary</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{scopeMeta.title}: {scopeMeta.detail}</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Evidence in this view</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{scopedSites.length} site{scopedSites.length === 1 ? "" : "s"}, {scopedPlacementCount} placement object{scopedPlacementCount === 1 ? "" : "s"}, {scopedServiceCount} service anchor{scopedServiceCount === 1 ? "" : "s"}, {scopedBoundaryCount} boundary object{scopedBoundaryCount === 1 ? "" : "s"}, and {scopedFlows.length} flow path{scopedFlows.length === 1 ? "" : "s"} are active.</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Focus controls</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>{deviceFocusTitle(deviceFocus)} • {linkFocusTitle(linkFocus)} • {labelFocusTitle(labelFocus)} • {labelMode === "detailed" ? "Detailed labels" : "Essential labels"}</p>
+          </div>
         </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Current evidence in scope</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>{scopedSites.length} site{scopedSites.length === 1 ? "" : "s"}, {scopedPlacementCount} placement object{scopedPlacementCount === 1 ? "" : "s"}, {scopedServiceCount} service anchor{scopedServiceCount === 1 ? "" : "s"}, {scopedBoundaryCount} boundary object{scopedBoundaryCount === 1 ? "" : "s"}, and {scopedFlows.length} flow path{scopedFlows.length === 1 ? "" : "s"} are currently active in this view.</p>
-        </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Recovery direction</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>Use global for overall architecture, per-site for local LLD review, WAN / cloud for transport posture, and boundaries for trust enforcement. This keeps the diagram stage closer to the roadmap’s real topology-engine target.</p>
-        </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Topology-specific rendering check</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>{topologyBehaviorSummary}</p>
-        </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Current workspace discipline</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>{densityLabel} density • {labelMode === "detailed" ? "Detailed device + link labels" : "Essential labels only"} • {linkAnnotationMode === "full" ? "Full link annotations" : "Minimal link annotations"} • {labelFocusTitle(labelFocus)}. Guided mode keeps critical review cards first; Expanded mode exposes the deeper support panels.</p>
-        </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Engineering focus controls</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>{deviceFocusTitle(deviceFocus)} + {linkFocusTitle(linkFocus)} + {labelFocusTitle(labelFocus)} are now emphasized. Non-matching device roles and link types remain visible but muted so the workspace can isolate the review you are doing without losing topology context.</p>
-        </div>
-        <LabelFocusPanel labelFocus={labelFocus} />
-      </div>
+      )}
 
-      <DeviceRealismDirectionPanel />
-      <ArchitectureSignals synthesized={synthesized} />
-      <TopologyFoundationPanel synthesized={synthesized} />
+      {showNarrativePanels ? <DeviceRealismDirectionPanel /> : null}
+      {showNarrativePanels ? <ArchitectureSignals synthesized={synthesized} /> : null}
+      {showNarrativePanels ? <TopologyFoundationPanel synthesized={synthesized} /> : null}
       {showSupportPanels && scope !== "site" ? <TopologyObjectPanel synthesized={synthesized} /> : null}
       {showSupportPanels && (scope !== "site" || mode === "physical") ? <Legend /> : null}
       {showSupportPanels && scope === "global" ? <DeviceSymbolLibraryPanel /> : null}
-      <OverlayReviewPanel overlay={overlay} />
-      <OverlayBehaviorPanel overlay={overlay} />
-      {(showSupportPanels || overlay === "security" || overlay === "flows") && scope !== "site" && (overlay === "security" || overlay === "flows" || overlay === "redundancy") ? <ConnectionSemanticsPanel /> : null}
-      <LinkTypeRenderingPanel synthesized={synthesized} />
-      <OverlayEvidencePanel overlay={overlay} synthesized={synthesized} />
-      <TopologySpecificRenderingPanel synthesized={synthesized} />
-      <TopologyPostureLedgerPanel synthesized={synthesized} sites={scopedSites} />
+      {showNarrativePanels ? <OverlayReviewPanel overlay={overlay} /> : null}
+      {showNarrativePanels ? <OverlayBehaviorPanel overlay={overlay} /> : null}
+      {(showSupportPanels || (showNarrativePanels && (overlay === "security" || overlay === "flows"))) && scope !== "site" && (overlay === "security" || overlay === "flows" || overlay === "redundancy") ? <ConnectionSemanticsPanel /> : null}
+      {showNarrativePanels ? <LinkTypeRenderingPanel synthesized={synthesized} /> : null}
+      {showNarrativePanels ? <OverlayEvidencePanel overlay={overlay} synthesized={synthesized} /> : null}
+      {showNarrativePanels ? <TopologySpecificRenderingPanel synthesized={synthesized} /> : null}
+      {showNarrativePanels ? <TopologyPostureLedgerPanel synthesized={synthesized} sites={scopedSites} /> : null}
       {showSupportPanels && scope !== "site" && (overlay === "none" || overlay === "redundancy" || overlay === "flows") ? <TopologyBehaviorMatrixPanel synthesized={synthesized} /> : null}
-      <DiagramReviewSequencePanel overlay={overlay} />
-      <div className="diagram-note-grid" style={{ marginTop: 10 }}>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Report cross-check</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>Use Placement with report section 3, Addressing with section 4, Services with section 5, Security with section 6, Redundancy with section 7, and Flows with section 7 so the device, service, subnet, and boundary names match the written package exactly.</p>
+      {showNarrativePanels ? <DiagramReviewSequencePanel overlay={overlay} /> : null}
+      {showNarrativePanels ? (
+        <div className="diagram-note-grid" style={{ marginTop: 10 }}>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Report cross-check</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>Use Placement with report section 3, Addressing with section 4, Services with section 5, Security with section 6, Redundancy with section 7, and Flows with section 7 so the device, service, subnet, and boundary names match the written package exactly.</p>
+          </div>
+          <div className="diagram-note-card">
+            <strong style={{ display: "block", marginBottom: 6 }}>Validation cross-check</strong>
+            <p style={{ margin: 0, color: "#61758f" }}>If labels, paths, interfaces, DMZ chains, or primary-versus-branch behavior look wrong here, review the same mismatch in validation and then correct it in addressing, security, routing, or service-placement workspaces.</p>
+          </div>
         </div>
-        <div className="diagram-note-card">
-          <strong style={{ display: "block", marginBottom: 6 }}>Validation cross-check</strong>
-          <p style={{ margin: 0, color: "#61758f" }}>If labels, paths, interfaces, DMZ chains, or primary-versus-branch behavior look wrong here, review the same mismatch in validation and then correct it in addressing, security, routing, or service-placement workspaces.</p>
-        </div>
-      </div>
+      ) : null}
       {showSupportPanels ? <SiteDeviceLinkMatrixPanel synthesized={synthesized} siteIds={scopedSites.map((site) => site.id)} /> : null}
       {overlay === "flows" ? <FlowSummaryPanel flows={scopedFlows} /> : null}
       {mode === "logical"

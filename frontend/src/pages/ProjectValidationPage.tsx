@@ -115,6 +115,18 @@ export function ProjectValidationPage() {
 
   const openTaskBodies = new Set<string>((commentsQuery.data ?? []).map((comment) => comment.body));
 
+  if (!selectedSection) {
+    return (
+      <section style={{ display: "grid", gap: 18 }}>
+        <div className="panel workspace-selection-blank">
+          <p className="workspace-detail-kicker">Validation</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
+          <p className="muted" style={{ margin: 0 }}>Choose a validation card from the left pane to open that focused review view.</p>
+        </div>
+      </section>
+    );
+  }
+
   const focusedSectionTitle = selectedSection === "focus"
     ? "Current priorities"
     : selectedSection === "health"
@@ -128,11 +140,10 @@ export function ProjectValidationPage() {
   return (
     <section style={{ display: "grid", gap: 18 }}>
       {isFocusedSectionView ? (
-        <div className="panel workspace-detail-hero">
+        <div className="panel workspace-detail-toolbar">
           <div>
             <p className="workspace-detail-kicker">Validation</p>
-            <h1 style={{ margin: "0 0 8px 0" }}>{focusedSectionTitle}</h1>
-            <p className="muted" style={{ margin: 0 }}>Open one validation card at a time from the left pane and fix exactly what is highlighted.</p>
+            <strong>{focusedSectionTitle}</strong>
           </div>
           <div className="workspace-detail-actions">
             <button type="button" className="button-secondary" onClick={() => validationMutation.mutate()} disabled={validationMutation.isPending}>
