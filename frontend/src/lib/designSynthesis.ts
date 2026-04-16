@@ -1,5 +1,7 @@
 import type { Project, Site, Vlan } from "./types";
 import type { RequirementsProfile } from "./requirementsProfile";
+import { buildUnifiedDesignTruthModel, type UnifiedDesignTruthModel } from "./designTruthModel";
+import { parseDiscoveryWorkspaceState } from "./discoveryFoundation";
 import {
   canonicalizeCidr,
   cidrOverlap,
@@ -375,6 +377,10 @@ export interface SecurityBoundaryDetail {
   eastWestPolicy: string;
   managementSource: string;
   natPolicy: string;
+  routeDomain?: string;
+  insideRelationships: string[];
+  outsideRelationships: string[];
+  publishedServices: string[];
   notes: string[];
 }
 
@@ -382,18 +388,39 @@ export interface TrafficFlowPath {
   id: string;
   flowName: string;
   flowLabel: string;
+  flowCategory:
+    | "user-local-gateway"
+    | "user-local-service"
+    | "user-internet"
+    | "guest-internet"
+    | "management-infrastructure"
+    | "site-centralized-service"
+    | "site-cloud-service"
+    | "internet-dmz"
+    | "remote-user-internal";
   source: string;
   destination: string;
   sourceSite?: string;
   destinationSite?: string;
   sourceZone: string;
   destinationZone: string;
+  sourceSubnetCidr?: string;
+  destinationSubnetCidr?: string;
   path: string[];
   controlPoints: string[];
   routeModel: string;
   natBehavior: string;
   enforcementPolicy: string;
   policyNotes: string[];
+}
+
+export interface FlowCoverageItem {
+  id: string;
+  label: string;
+  required: boolean;
+  status: "ready" | "partial" | "pending";
+  detail: string;
+  matchedFlowIds: string[];
 }
 
 export interface DesignEngineFoundation {
@@ -442,6 +469,7 @@ export interface SynthesizedLogicalDesign {
   servicePlacements: ServicePlacementItem[];
   securityBoundaries: SecurityBoundaryDetail[];
   trafficFlows: TrafficFlowPath[];
+  flowCoverage: FlowCoverageItem[];
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
   topologyModel?: TopologyBlueprint;
@@ -449,6 +477,7 @@ export interface SynthesizedLogicalDesign {
   securityBoundaryModel?: SecurityBoundaryDetail[];
   trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
+  designTruthModel: UnifiedDesignTruthModel;
   logicalDomains: LogicalDomainIntent[];
   securityZones: SecurityZonePlan[];
   securityControls: SecurityControlItem[];
@@ -2216,6 +2245,7 @@ function buildHighLevelDesign(input: {
   servicePlacements: ServicePlacementItem[];
   securityBoundaries: SecurityBoundaryDetail[];
   trafficFlows: TrafficFlowPath[];
+  flowCoverage: FlowCoverageItem[];
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
   topologyModel?: TopologyBlueprint;
@@ -2311,6 +2341,7 @@ function buildLowLevelDesign(input: {
   servicePlacements: ServicePlacementItem[];
   securityBoundaries: SecurityBoundaryDetail[];
   trafficFlows: TrafficFlowPath[];
+  flowCoverage: FlowCoverageItem[];
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
   topologyModel?: TopologyBlueprint;
@@ -2586,6 +2617,7 @@ function buildDesignReview(input: {
   servicePlacements: ServicePlacementItem[];
   securityBoundaries: SecurityBoundaryDetail[];
   trafficFlows: TrafficFlowPath[];
+  flowCoverage: FlowCoverageItem[];
   routingPlan: RoutePlanItem[];
   routePlan?: RoutePlanItem[];
   topologyModel?: TopologyBlueprint;
@@ -3479,13 +3511,15 @@ function buildServicePlacements(input: { profile: RequirementsProfile; topology:
   return items;
 }
 
-function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlacements: SitePlacementDevice[]; rows: AddressingPlanRow[]; }) {
-  const { topology, sitePlacements, rows } = input;
+function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlacements: SitePlacementDevice[]; rows: AddressingPlanRow[]; servicePlacements: ServicePlacementItem[]; routingPlan: RoutePlanItem[]; }) {
+  const { topology, sitePlacements, rows, servicePlacements, routingPlan } = input;
   const boundaries: SecurityBoundaryDetail[] = [];
   const siteNames = Array.from(new Set(rows.map((row) => row.siteName)));
+
   siteNames.forEach((siteName) => {
     const siteRows = rows.filter((row) => row.siteName === siteName && row.subnetCidr !== 'Unassigned');
     const edge = sitePlacements.find((item) => item.siteName === siteName && (item.deviceType === 'firewall' || item.deviceType === 'router'));
+    const siteRoute = routingPlan.find((item) => item.siteName === siteName);
     const grouped = new Map<string, AddressingPlanRow[]>();
     siteRows.forEach((row) => {
       const key = zoneNameForRole(row.role);
@@ -3493,6 +3527,7 @@ function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlace
       bucket.push(row);
       grouped.set(key, bucket);
     });
+
     grouped.forEach((zoneRows, zoneName) => {
       const isGuest = /guest/i.test(zoneName);
       const isMgmt = /management/i.test(zoneName);
@@ -3500,6 +3535,7 @@ function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlace
       const hasDmzSignal = zoneRows.some((row) => /dmz/i.test(`${row.segmentName} ${row.purpose}`));
       const isServer = /server/i.test(zoneName) || hasDmzSignal;
       const isDmz = hasDmzSignal || (isServer && siteName === topology.primarySiteName && topology.internetBreakout === 'centralized');
+      const resolvedZoneName = isDmz ? 'DMZ / edge service zone' : zoneName;
       const attachedDevice = edge ? edge.deviceName : `${siteName} routed edge`;
       const boundaryName = `${siteName} ${isDmz ? 'DMZ boundary' : zoneName}`;
       const permittedPeers = isGuest
@@ -3511,8 +3547,32 @@ function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlace
             : isServer
               ? ['Trusted user zone', 'Management zone', topology.topologyType !== 'collapsed-core' ? 'Branch routed domains via policy' : '']
               : ['Trusted internal zones subject to policy'];
+      const publishedServices = servicePlacements
+        .filter((service) => service.siteName === siteName && service.zoneName === resolvedZoneName && service.publishedExternally)
+        .map((service) => service.serviceName);
+      const insideRelationships = isGuest
+        ? []
+        : isMgmt
+          ? ['Management initiates toward infrastructure control plane only']
+          : isTransit
+            ? ['Local route domain and edge identity']
+            : isDmz
+              ? ['Approved back-end service dependencies', 'Management administration path']
+              : isServer
+                ? ['Trusted user zone', 'Management zone', topology.topologyType !== 'collapsed-core' ? 'Remote site summaries via routed policy' : '']
+                : ['Local routed core and approved inter-zone services'];
+      const outsideRelationships = isGuest
+        ? ['Internet edge only']
+        : isTransit
+          ? [topology.cloudConnected ? 'Cloud / WAN transport' : 'WAN transport']
+          : isDmz
+            ? ['Published internet edge', 'External consumers through reverse proxy or static NAT']
+            : isMgmt
+              ? ['No general outside peer; privileged admin entry only']
+              : [topology.internetBreakout === 'centralized' && siteName !== topology.primarySiteName ? `${topology.primarySiteName} perimeter policy hub` : 'Perimeter edge or adjacent routed domains'];
+
       boundaries.push({
-        zoneName: isDmz ? 'DMZ / edge service zone' : zoneName,
+        zoneName: resolvedZoneName,
         siteName,
         boundaryName,
         subnetCidrs: zoneRows.map((row) => row.subnetCidr),
@@ -3527,6 +3587,10 @@ function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlace
         eastWestPolicy: isMgmt ? 'Management initiates to infrastructure; reverse access should be tightly restricted.' : isDmz ? 'DMZ does not initiate east-west trust into internal zones except explicit back-end dependencies.' : isGuest ? 'Guest east-west denied by default.' : 'Same-trust communication should still be limited to documented service dependencies.',
         managementSource: isMgmt ? 'Privileged admin workstations / management VPN' : 'Management zone only',
         natPolicy: isGuest ? 'Source NAT at internet edge for guest egress.' : isDmz ? 'Static NAT / reverse proxy only for published services; no blanket inbound NAT.' : 'No special NAT expected inside the trust boundary.',
+        routeDomain: siteRoute?.summaryAdvertisement || siteRoute?.loopbackCidr,
+        insideRelationships: insideRelationships.filter(Boolean),
+        outsideRelationships: outsideRelationships.filter(Boolean),
+        publishedServices,
         notes: [
           `This boundary is attached to ${attachedDevice} and is no longer described only in generic terms.`,
           topology.topologyType === 'hub-spoke' && siteName !== topology.primarySiteName && !isTransit ? `Traffic leaving ${siteName} should normally traverse ${topology.primarySiteName} for shared policy enforcement.` : 'Boundary stays local to the site routing and policy edge.',
@@ -3534,126 +3598,226 @@ function buildSecurityBoundaries(input: { topology: TopologyBlueprint; sitePlace
       });
     });
   });
+
   return boundaries;
+}
+
+function addUniqueFlow(target: TrafficFlowPath[], flow: TrafficFlowPath) {
+  if (target.some((item) => item.id === flow.id || item.flowLabel === flow.flowLabel)) return;
+  target.push(flow);
+}
+
+function wanLinkNameForSite(wanLinks: WanLinkPlanRow[], siteName?: string) {
+  if (!siteName) return 'Inter-site transport';
+  return wanLinks.find((link) => link.endpointASiteName === siteName || link.endpointBSiteName === siteName)?.linkName || 'Inter-site transport';
 }
 
 function buildTrafficFlows(input: { profile: RequirementsProfile; topology: TopologyBlueprint; siteHierarchy: SiteHierarchyItem[]; rows: AddressingPlanRow[]; wanLinks: WanLinkPlanRow[]; servicePlacements: ServicePlacementItem[]; }) {
   const { profile, topology, siteHierarchy, rows, wanLinks, servicePlacements } = input;
   const flows: TrafficFlowPath[] = [];
   const primarySite = siteHierarchy.find((site) => site.id === topology.primarySiteId) || siteHierarchy[0];
-  const primaryUser = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'USER');
   const primaryServer = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'SERVER');
-  const primaryGuest = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'GUEST');
-  const primaryMgmt = firstSubnetForRole(rows.filter((row) => row.siteId === primarySite?.id), 'MANAGEMENT');
-  const branchSite = siteHierarchy.find((site) => site.id !== primarySite?.id);
-  const branchUser = firstSubnetForRole(rows.filter((row) => row.siteId === branchSite?.id), 'USER');
   const dmzPlacement = servicePlacements.find((item) => item.serviceType === 'dmz-service');
   const cloudPlacement = servicePlacements.find((item) => item.serviceType === 'cloud-service');
-  const wanLinkLabel = wanLinks.find((link) => link.endpointBSiteName === branchSite?.name || link.endpointASiteName === branchSite?.name)?.linkName || 'Inter-site transport';
-  const breakoutPoint = topology.internetBreakout === 'centralized' ? `${primarySite?.name} perimeter edge` : 'Local site perimeter edge';
 
-  if (primaryUser) {
-    flows.push({
-      id: 'flow-user-internet',
-      flowName: 'Trusted user to internet',
-      flowLabel: `${primarySite?.name || 'Primary site'} user → internet via ${breakoutPoint}`,
-      source: `${primarySite?.name} user segment ${primaryUser.subnetCidr}`,
-      destination: 'Internet',
-      sourceSite: primarySite?.name,
-      sourceZone: 'User zone',
-      destinationZone: 'Untrusted / internet',
-      path: [`${primarySite?.name} access`, `${primarySite?.name} routed core`, breakoutPoint, 'Internet'],
-      controlPoints: [`${primarySite?.name} edge firewall`, 'North-south policy / NAT'],
-      routeModel: routeBehaviorForTopology(topology, primarySite?.name),
-      natBehavior: 'Source NAT / PAT at the active internet edge.',
-      enforcementPolicy: 'Trusted users should reach the internet only after perimeter policy inspection and logging.',
-      policyNotes: [profile.securityPosture || 'Security posture not specified'],
-    });
-  }
-  if (primaryGuest) {
-    flows.push({
-      id: 'flow-guest-internet',
-      flowName: 'Guest to internet',
-      flowLabel: `${primarySite?.name || 'Primary site'} guest → internet via ${breakoutPoint}`,
-      source: `${primarySite?.name} guest segment ${primaryGuest.subnetCidr}`,
-      destination: 'Internet',
-      sourceSite: primarySite?.name,
-      sourceZone: 'Guest zone',
-      destinationZone: 'Untrusted / internet',
-      path: [`${primarySite?.name} guest VLAN`, breakoutPoint, 'Internet'],
-      controlPoints: [`${primarySite?.name} guest egress policy`],
-      routeModel: topology.internetBreakout === 'centralized' ? `Guest traffic is anchored to ${primarySite?.name} for breakout and should not enter trusted east-west paths.` : 'Guest traffic exits locally without access to trusted internal zones.',
-      natBehavior: 'Source NAT at the guest internet edge.',
-      enforcementPolicy: 'Guest access should not traverse into trusted internal zones.',
-      policyNotes: [profile.guestPolicy || 'Guest policy not set'],
-    });
-  }
-  if (primaryUser && primaryServer) {
-    flows.push({
-      id: 'flow-user-shared-service',
-      flowName: 'User to shared internal service',
-      flowLabel: `${primarySite?.name || 'Primary site'} user → ${primarySite?.name || 'Primary site'} service zone`,
-      source: `${primarySite?.name} user segment ${primaryUser.subnetCidr}`,
-      destination: `${primarySite?.name} server segment ${primaryServer.subnetCidr}`,
-      sourceSite: primarySite?.name,
-      destinationSite: primarySite?.name,
-      sourceZone: 'User zone',
-      destinationZone: dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'DMZ / edge service zone' : 'Server zone',
-      path: [`${primarySite?.name} access`, `${primarySite?.name} routed core`, dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? `${primarySite?.name} perimeter edge` : `${primarySite?.name} server zone`],
-      controlPoints: ['Inter-zone ACL / firewall policy', 'Server access policy'],
-      routeModel: routeBehaviorForTopology(topology, primarySite?.name, primarySite?.name),
-      natBehavior: dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'No inbound NAT on this internal path; use explicit policy only.' : 'No NAT expected on internal east-west communication.',
-      enforcementPolicy: 'Only approved application and identity flows should cross from users into server services.',
-      policyNotes: [dmzPlacement?.subnetCidr === primaryServer.subnetCidr ? 'Server subnet is acting as a DMZ or published boundary in this design.' : 'Server access remains an internal routed service dependency.'],
-    });
-  }
-  if (primaryMgmt) {
-    flows.push({
-      id: 'flow-mgmt-infra',
-      flowName: 'Management to infrastructure',
-      flowLabel: `${primarySite?.name || 'Primary site'} management → infrastructure control plane`,
-      source: `${primarySite?.name} management segment ${primaryMgmt.subnetCidr}`,
-      destination: 'Network devices and infrastructure services',
-      sourceSite: primarySite?.name,
-      sourceZone: 'Management zone',
-      destinationZone: 'Infrastructure control plane',
-      path: [`${primarySite?.name} management zone`, 'Routed core / control plane', 'Device management interfaces'],
-      controlPoints: ['Privileged access controls', 'AAA / logging'],
-      routeModel: 'Management path should stay in the control plane and not hairpin through user zones.',
-      natBehavior: 'No NAT expected; this is a privileged internal path.',
-      enforcementPolicy: 'Management traffic should originate only from dedicated admin zones and be fully logged.',
-      policyNotes: [profile.managementAccess || 'Management access assumptions not yet set'],
-    });
-  }
-  if (branchUser && primaryServer && (topology.topologyType === 'hub-spoke' || topology.topologyType === 'hybrid-cloud' || topology.topologyType === 'multi-site')) {
-    flows.push({
-      id: 'flow-branch-to-shared',
-      flowName: 'Branch user to centralized service',
-      flowLabel: `${branchSite?.name || 'Branch'} user → ${primarySite?.name || 'Primary'} shared services via ${wanLinkLabel}`,
-      source: `${branchSite?.name} user segment ${branchUser.subnetCidr}`,
-      destination: `${primarySite?.name} shared services ${primaryServer.subnetCidr}`,
-      sourceSite: branchSite?.name,
-      destinationSite: primarySite?.name,
-      sourceZone: 'User zone',
-      destinationZone: 'Server zone',
-      path: [`${branchSite?.name} access`, `${branchSite?.name} WAN edge`, wanLinkLabel, `${primarySite?.name} perimeter / core`, `${primarySite?.name} server zone`],
-      controlPoints: [`${branchSite?.name} WAN edge`, `${primarySite?.name} inter-zone controls`],
-      routeModel: routeBehaviorForTopology(topology, branchSite?.name, primarySite?.name),
-      natBehavior: 'No internet NAT on the inter-site path; keep this as routed private transport.',
-      enforcementPolicy: 'This flow makes the hub/spoke or centralized service model explicit instead of leaving branch service consumption as generic wording.',
-      policyNotes: [topology.internetBreakout === 'centralized' ? `Shared-service traffic should follow ${primarySite?.name} as the policy hub.` : 'Service traffic should stay in the private routed domain across sites.'],
-    });
-  }
+  siteHierarchy.forEach((site) => {
+    const siteRows = rows.filter((row) => row.siteId === site.id);
+    const userRow = firstSubnetForRole(siteRows, 'USER');
+    const guestRow = firstSubnetForRole(siteRows, 'GUEST');
+    const managementRow = firstSubnetForRole(siteRows, 'MANAGEMENT');
+    const localServerRow = firstSubnetForRole(siteRows, 'SERVER');
+    const isPrimary = site.id === primarySite?.id;
+    const breakoutPoint = topology.internetBreakout === 'centralized' && !isPrimary
+      ? `${primarySite?.name || 'Primary site'} perimeter edge`
+      : `${site.name} perimeter edge`;
+    const breakoutPolicy = topology.internetBreakout === 'centralized' && !isPrimary
+      ? `${site.name} reaches the internet through ${primarySite?.name || 'the primary site'} so branch browsing still crosses the shared north-south policy point.`
+      : `${site.name} exits through its own perimeter edge after local north-south policy inspection.`;
+
+    if (userRow) {
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-user-gateway`,
+        flowName: 'User to local gateway',
+        flowLabel: `${site.name} user → local gateway ${userRow.gatewayIp}`,
+        flowCategory: 'user-local-gateway',
+        source: `${site.name} user segment ${userRow.subnetCidr}`,
+        destination: `${site.name} gateway ${userRow.gatewayIp}`,
+        sourceSite: site.name,
+        destinationSite: site.name,
+        sourceZone: 'User zone',
+        destinationZone: 'Routing identity',
+        sourceSubnetCidr: userRow.subnetCidr,
+        destinationSubnetCidr: userRow.subnetCidr,
+        path: [`${site.name} access edge`, `${site.name} VLAN gateway ${userRow.gatewayIp}`],
+        controlPoints: [`${site.name} first-hop gateway`, `${site.name} local inter-VLAN control`],
+        routeModel: 'Local first-hop routing decision at the site gateway.',
+        natBehavior: 'No NAT expected; this is an internal first-hop path.',
+        enforcementPolicy: 'User traffic must hit the correct local gateway before any east-west or north-south policy can apply.',
+        policyNotes: ['This flow makes the local gateway role explicit rather than assuming it is understood.'],
+      });
+
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-user-internet`,
+        flowName: 'Trusted user to internet',
+        flowLabel: `${site.name} user → internet via ${breakoutPoint}`,
+        flowCategory: 'user-internet',
+        source: `${site.name} user segment ${userRow.subnetCidr}`,
+        destination: 'Internet',
+        sourceSite: site.name,
+        destinationSite: topology.internetBreakout === 'centralized' && !isPrimary ? primarySite?.name : site.name,
+        sourceZone: 'User zone',
+        destinationZone: 'Untrusted / internet',
+        sourceSubnetCidr: userRow.subnetCidr,
+        path: topology.internetBreakout === 'centralized' && !isPrimary
+          ? [`${site.name} access`, `${site.name} WAN edge`, wanLinkNameForSite(wanLinks, site.name), `${primarySite?.name || 'Primary site'} perimeter edge`, 'Internet']
+          : [`${site.name} access`, `${site.name} routed core`, breakoutPoint, 'Internet'],
+        controlPoints: topology.internetBreakout === 'centralized' && !isPrimary
+          ? [`${site.name} WAN edge`, `${primarySite?.name || 'Primary site'} north-south firewall`, 'NAT / egress policy']
+          : [`${site.name} edge firewall`, 'North-south policy / NAT'],
+        routeModel: topology.internetBreakout === 'centralized' && !isPrimary
+          ? routeBehaviorForTopology(topology, site.name, primarySite?.name)
+          : routeBehaviorForTopology(topology, site.name),
+        natBehavior: 'Source NAT / PAT at the active internet edge.',
+        enforcementPolicy: 'Trusted users should reach the internet only after perimeter policy inspection and logging.',
+        policyNotes: [breakoutPolicy, profile.securityPosture || 'Security posture not specified'],
+      });
+    }
+
+    if (guestRow) {
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-guest-internet`,
+        flowName: 'Guest to internet',
+        flowLabel: `${site.name} guest → internet via ${breakoutPoint}`,
+        flowCategory: 'guest-internet',
+        source: `${site.name} guest segment ${guestRow.subnetCidr}`,
+        destination: 'Internet',
+        sourceSite: site.name,
+        destinationSite: topology.internetBreakout === 'centralized' && !isPrimary ? primarySite?.name : site.name,
+        sourceZone: 'Guest zone',
+        destinationZone: 'Untrusted / internet',
+        sourceSubnetCidr: guestRow.subnetCidr,
+        path: topology.internetBreakout === 'centralized' && !isPrimary
+          ? [`${site.name} guest VLAN`, `${site.name} WAN edge`, wanLinkNameForSite(wanLinks, site.name), `${primarySite?.name || 'Primary site'} guest egress`, 'Internet']
+          : [`${site.name} guest VLAN`, breakoutPoint, 'Internet'],
+        controlPoints: topology.internetBreakout === 'centralized' && !isPrimary
+          ? [`${site.name} WAN edge`, `${primarySite?.name || 'Primary site'} guest egress policy`]
+          : [`${site.name} guest egress policy`],
+        routeModel: topology.internetBreakout === 'centralized' && !isPrimary
+          ? `Guest traffic from ${site.name} is anchored to ${primarySite?.name || 'the primary site'} for breakout and should not enter trusted east-west paths.`
+          : 'Guest traffic exits locally without access to trusted internal zones.',
+        natBehavior: 'Source NAT at the guest internet edge.',
+        enforcementPolicy: 'Guest access should not traverse into trusted internal zones.',
+        policyNotes: [profile.guestPolicy || 'Guest policy not set'],
+      });
+    }
+
+    if (userRow && localServerRow) {
+      const localServerActsAsDmz = Boolean(dmzPlacement?.subnetCidr && dmzPlacement.subnetCidr === localServerRow.subnetCidr);
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-user-local-service`,
+        flowName: 'User to local service',
+        flowLabel: `${site.name} user → ${site.name} ${localServerActsAsDmz ? 'DMZ/service boundary' : 'local service zone'}`,
+        flowCategory: 'user-local-service',
+        source: `${site.name} user segment ${userRow.subnetCidr}`,
+        destination: `${site.name} server segment ${localServerRow.subnetCidr}`,
+        sourceSite: site.name,
+        destinationSite: site.name,
+        sourceZone: 'User zone',
+        destinationZone: localServerActsAsDmz ? 'DMZ / edge service zone' : 'Server zone',
+        sourceSubnetCidr: userRow.subnetCidr,
+        destinationSubnetCidr: localServerRow.subnetCidr,
+        path: [`${site.name} access`, `${site.name} routed core`, localServerActsAsDmz ? `${site.name} perimeter edge` : `${site.name} server zone`],
+        controlPoints: ['Inter-zone ACL / firewall policy', 'Server access policy'],
+        routeModel: routeBehaviorForTopology(topology, site.name, site.name),
+        natBehavior: localServerActsAsDmz ? 'No inbound NAT on this internal path; use explicit policy only.' : 'No NAT expected on internal east-west communication.',
+        enforcementPolicy: 'Only approved application and identity flows should cross from users into local services.',
+        policyNotes: [localServerActsAsDmz ? 'This service subnet is acting as a DMZ or published boundary in the design.' : 'This path stays local to the site routing and service domain.'],
+      });
+    }
+
+    if (managementRow) {
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-management-infrastructure`,
+        flowName: 'Management to infrastructure',
+        flowLabel: `${site.name} management → infrastructure control plane`,
+        flowCategory: 'management-infrastructure',
+        source: `${site.name} management segment ${managementRow.subnetCidr}`,
+        destination: 'Network devices and infrastructure services',
+        sourceSite: site.name,
+        destinationSite: site.name,
+        sourceZone: 'Management zone',
+        destinationZone: 'Infrastructure control plane',
+        sourceSubnetCidr: managementRow.subnetCidr,
+        path: [`${site.name} management zone`, 'Routed core / control plane', 'Device management interfaces'],
+        controlPoints: ['Privileged access controls', 'AAA / logging'],
+        routeModel: 'Management path should stay in the control plane and not hairpin through user zones.',
+        natBehavior: 'No NAT expected; this is a privileged internal path.',
+        enforcementPolicy: 'Management traffic should originate only from dedicated admin zones and be fully logged.',
+        policyNotes: [profile.managementAccess || 'Management access assumptions not yet set'],
+      });
+    }
+
+    if (!isPrimary && userRow && primaryServer && (topology.topologyType === 'hub-spoke' || topology.topologyType === 'hybrid-cloud' || topology.topologyType === 'multi-site')) {
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-centralized-service`,
+        flowName: 'Site user to centralized service',
+        flowLabel: `${site.name} user → ${primarySite?.name || 'Primary'} shared services via ${wanLinkNameForSite(wanLinks, site.name)}`,
+        flowCategory: 'site-centralized-service',
+        source: `${site.name} user segment ${userRow.subnetCidr}`,
+        destination: `${primarySite?.name || 'Primary'} shared services ${primaryServer.subnetCidr}`,
+        sourceSite: site.name,
+        destinationSite: primarySite?.name,
+        sourceZone: 'User zone',
+        destinationZone: 'Server zone',
+        sourceSubnetCidr: userRow.subnetCidr,
+        destinationSubnetCidr: primaryServer.subnetCidr,
+        path: [`${site.name} access`, `${site.name} WAN edge`, wanLinkNameForSite(wanLinks, site.name), `${primarySite?.name || 'Primary'} perimeter / core`, `${primarySite?.name || 'Primary'} server zone`],
+        controlPoints: [`${site.name} WAN edge`, `${primarySite?.name || 'Primary'} inter-zone controls`],
+        routeModel: routeBehaviorForTopology(topology, site.name, primarySite?.name),
+        natBehavior: 'No internet NAT on the inter-site path; keep this as routed private transport.',
+        enforcementPolicy: 'Centralized-service traffic should follow the declared private transport and shared policy model.',
+        policyNotes: [topology.internetBreakout === 'centralized' ? `Shared-service traffic should follow ${primarySite?.name || 'the primary site'} as the policy hub.` : 'Service traffic should stay in the private routed domain across sites.'],
+      });
+    }
+
+    if (cloudPlacement && userRow) {
+      addUniqueFlow(flows, {
+        id: `flow-${site.id}-cloud-service`,
+        flowName: 'Site to cloud-hosted service',
+        flowLabel: `${site.name} trusted zones → ${profile.cloudProvider || 'Cloud'} service boundary`,
+        flowCategory: 'site-cloud-service',
+        source: `${site.name} trusted internal users`,
+        destination: `${profile.cloudProvider || 'Cloud'} service boundary`,
+        sourceSite: site.name,
+        destinationSite: `${profile.cloudProvider || 'Cloud'} edge`,
+        sourceZone: 'User / server zones',
+        destinationZone: 'Cloud service boundary',
+        sourceSubnetCidr: userRow.subnetCidr,
+        destinationSubnetCidr: cloudPlacement.subnetCidr,
+        path: topology.internetBreakout === 'centralized' && !isPrimary
+          ? [`${site.name} routed core`, `${site.name} WAN edge`, wanLinkNameForSite(wanLinks, site.name), `${primarySite?.name || 'Primary site'} cloud edge`, profile.cloudConnectivity || 'Cloud edge transport', `${profile.cloudProvider || 'Cloud'} service boundary`]
+          : [`${site.name} routed core`, `${site.name} perimeter edge`, profile.cloudConnectivity || 'Cloud edge transport', `${profile.cloudProvider || 'Cloud'} service boundary`],
+        controlPoints: ['Cloud edge routing policy', 'Cloud identity / trust boundary'],
+        routeModel: routeBehaviorForTopology(topology, site.name, `${profile.cloudProvider || 'Cloud'} edge`),
+        natBehavior: 'Prefer private routed connectivity; avoid unnecessary internet-style NAT inside the cloud boundary.',
+        enforcementPolicy: 'Cloud traffic should remain separated from general internet browsing and follow the declared cloud trust boundary.',
+        policyNotes: [profile.cloudTrafficBoundary || 'Cloud traffic boundary not specified'],
+      });
+    }
+  });
+
   if (dmzPlacement?.publishedExternally) {
-    flows.push({
+    addUniqueFlow(flows, {
       id: 'flow-internet-to-dmz',
       flowName: 'Internet to published DMZ service',
       flowLabel: `Internet → ${dmzPlacement.siteName} published DMZ service`,
+      flowCategory: 'internet-dmz',
       source: 'Internet user',
       destination: dmzPlacement.subnetCidr ? `${dmzPlacement.siteName} DMZ service ${dmzPlacement.subnetCidr}` : `${dmzPlacement.siteName} DMZ service boundary`,
       destinationSite: dmzPlacement.siteName,
       sourceZone: 'Untrusted / internet',
       destinationZone: 'DMZ / edge service zone',
+      destinationSubnetCidr: dmzPlacement.subnetCidr,
       path: dmzPlacement.ingressPath || ['Internet', `${dmzPlacement.siteName} perimeter edge`, `${dmzPlacement.siteName} DMZ service boundary`],
       controlPoints: [`${dmzPlacement.siteName} perimeter firewall`, 'Published-service policy / reverse proxy'],
       routeModel: 'Inbound path terminates at the public edge and should not route directly into trusted internal zones.',
@@ -3662,36 +3826,20 @@ function buildTrafficFlows(input: { profile: RequirementsProfile; topology: Topo
       policyNotes: [dmzPlacement.notes[0] || 'DMZ publication rules not yet refined'],
     });
   }
-  if (cloudPlacement) {
-    flows.push({
-      id: 'flow-site-to-cloud',
-      flowName: 'Site to cloud-hosted service',
-      flowLabel: `${primarySite?.name || 'Primary site'} trusted zones → ${profile.cloudProvider || 'Cloud'} service boundary`,
-      source: `${primarySite?.name} trusted internal users`,
-      destination: `${profile.cloudProvider || 'Cloud'} service boundary`,
-      sourceSite: primarySite?.name,
-      destinationSite: `${profile.cloudProvider || 'Cloud'} edge`,
-      sourceZone: 'User / server zones',
-      destinationZone: 'Cloud service boundary',
-      path: [`${primarySite?.name} routed core`, `${primarySite?.name} perimeter edge`, profile.cloudConnectivity || 'Cloud edge transport', `${profile.cloudProvider || 'Cloud'} service boundary`],
-      controlPoints: ['Cloud edge routing policy', 'Cloud identity / trust boundary'],
-      routeModel: routeBehaviorForTopology(topology, primarySite?.name, `${profile.cloudProvider || 'Cloud'} edge`),
-      natBehavior: 'Prefer private routed connectivity; avoid unnecessary internet-style NAT inside the cloud boundary.',
-      enforcementPolicy: 'Cloud traffic should remain separated from general internet browsing and follow the declared cloud trust boundary.',
-      policyNotes: [profile.cloudTrafficBoundary || 'Cloud traffic boundary not specified'],
-    });
-  }
+
   if (profile.remoteAccess) {
-    flows.push({
+    addUniqueFlow(flows, {
       id: 'flow-remote-access',
       flowName: 'Remote user to internal service',
       flowLabel: `Remote user → ${primarySite?.name || 'Primary site'} internal service via remote access edge`,
+      flowCategory: 'remote-user-internal',
       source: 'Remote user / VPN client',
-      destination: primaryServer ? `${primarySite?.name} shared services ${primaryServer.subnetCidr}` : 'Approved internal service',
+      destination: primaryServer ? `${primarySite?.name || 'Primary site'} shared services ${primaryServer.subnetCidr}` : 'Approved internal service',
       destinationSite: primarySite?.name,
       sourceZone: 'External remote-access zone',
       destinationZone: primaryServer ? 'Server zone' : 'Trusted internal zone',
-      path: ['Remote user', `${primarySite?.name} remote access gateway`, `${primarySite?.name} perimeter policy`, primaryServer ? `${primarySite?.name} server zone` : `${primarySite?.name} trusted zone`],
+      destinationSubnetCidr: primaryServer?.subnetCidr,
+      path: ['Remote user', `${primarySite?.name || 'Primary site'} remote access gateway`, `${primarySite?.name || 'Primary site'} perimeter policy`, primaryServer ? `${primarySite?.name || 'Primary site'} server zone` : `${primarySite?.name || 'Primary site'} trusted zone`],
       controlPoints: ['VPN / remote access gateway', 'Identity policy', 'Post-auth access control'],
       routeModel: 'Remote access must terminate at the controlled edge before entering the internal route domain.',
       natBehavior: 'No general-purpose NAT after tunnel termination; rely on identity and route-based access control.',
@@ -3699,7 +3847,90 @@ function buildTrafficFlows(input: { profile: RequirementsProfile; topology: Topo
       policyNotes: [profile.remoteAccessMethod || 'Remote access method not set'],
     });
   }
+
   return flows;
+}
+
+function buildFlowCoverage(input: { profile: RequirementsProfile; topology: TopologyBlueprint; siteHierarchy: SiteHierarchyItem[]; rows: AddressingPlanRow[]; trafficFlows: TrafficFlowPath[]; servicePlacements: ServicePlacementItem[]; }) {
+  const { profile, topology, siteHierarchy, rows, trafficFlows, servicePlacements } = input;
+  const hasRole = (role: SegmentRole) => rows.some((row) => row.role === role && row.subnetCidr !== 'Unassigned');
+  const multiSite = siteHierarchy.length > 1;
+  const requiredChecks = [
+    {
+      id: 'user-local-gateway',
+      label: 'User to local gateway',
+      required: hasRole('USER'),
+      detail: 'Every user segment should show its first-hop path to the local gateway.',
+    },
+    {
+      id: 'user-local-service',
+      label: 'User to local service',
+      required: siteHierarchy.some((site) => {
+        const siteRows = rows.filter((row) => row.siteId === site.id);
+        return Boolean(firstSubnetForRole(siteRows, 'USER') && firstSubnetForRole(siteRows, 'SERVER'));
+      }),
+      detail: 'At least one site with both users and local services should show the east-west service path explicitly.',
+    },
+    {
+      id: 'user-internet',
+      label: 'Trusted user to internet',
+      required: hasRole('USER'),
+      detail: 'North-south browsing should be explicit for trusted users.',
+    },
+    {
+      id: 'guest-internet',
+      label: 'Guest to internet',
+      required: profile.guestWifi || hasRole('GUEST'),
+      detail: 'Guest breakout should be explicit whenever guest access is in scope.',
+    },
+    {
+      id: 'management-infrastructure',
+      label: 'Management to infrastructure',
+      required: profile.management || hasRole('MANAGEMENT'),
+      detail: 'The control-plane path for administrators should be explicit when management is in scope.',
+    },
+    {
+      id: 'site-centralized-service',
+      label: 'Site to centralized service',
+      required: multiSite && Boolean(firstSubnetForRole(rows.filter((row) => row.siteId === (siteHierarchy.find((site) => site.id === topology.primarySiteId) || siteHierarchy[0])?.id), 'SERVER')),
+      detail: 'Multi-site designs with shared services should show the inter-site service path.',
+    },
+    {
+      id: 'site-cloud-service',
+      label: 'Site to cloud service',
+      required: topology.cloudConnected || servicePlacements.some((item) => item.placementType === 'cloud'),
+      detail: 'Cloud-connected designs should show which traffic crosses the cloud boundary.',
+    },
+    {
+      id: 'internet-dmz',
+      label: 'Internet to DMZ service',
+      required: servicePlacements.some((item) => item.publishedExternally),
+      detail: 'Published services should show the controlled inbound edge path.',
+    },
+    {
+      id: 'remote-user-internal',
+      label: 'Remote user to internal service',
+      required: profile.remoteAccess,
+      detail: 'Remote-access designs should show the controlled entry path into internal services.',
+    },
+  ] as const;
+
+  return requiredChecks.map((check) => {
+    const matchedFlowIds = trafficFlows.filter((flow) => flow.flowCategory === check.id).map((flow) => flow.id);
+    const status = check.required ? (matchedFlowIds.length > 0 ? 'ready' : 'pending') : 'ready';
+    return {
+      id: check.id,
+      label: check.label,
+      required: check.required,
+      status,
+      detail: check.required
+        ? matchedFlowIds.length > 0
+          ? `${check.detail} ${matchedFlowIds.length} flow path${matchedFlowIds.length === 1 ? '' : 's'} currently cover this scenario.`
+          : `${check.detail} This required path is still missing from the generated flow model.`
+        : `${check.detail} It is not required by the current scenario.`,
+      matchedFlowIds,
+    } satisfies FlowCoverageItem;
+  });
 }
 
 export function synthesizeLogicalDesign(project: Project | undefined, sites: Site[], vlans: Vlan[], profile: RequirementsProfile): SynthesizedLogicalDesign {
@@ -3861,10 +4092,11 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
   const topology = inferTopologyBlueprint({ profile, siteHierarchy, wanLinks, rows });
   const sitePlacements = buildSitePlacements({ profile, topology, siteHierarchy, rows });
   const servicePlacements = buildServicePlacements({ profile, topology, siteHierarchy, rows });
-  const securityBoundaries = buildSecurityBoundaries({ topology, sitePlacements, rows });
-  const trafficFlows = buildTrafficFlows({ profile, topology, siteHierarchy, rows, wanLinks, servicePlacements });
-
   const routingPlan = buildRoutingPlan(siteHierarchy, rows, wanLinks, profile);
+  const securityBoundaries = buildSecurityBoundaries({ topology, sitePlacements, rows, servicePlacements, routingPlan });
+  const trafficFlows = buildTrafficFlows({ profile, topology, siteHierarchy, rows, wanLinks, servicePlacements });
+  const flowCoverage = buildFlowCoverage({ profile, topology, siteHierarchy, rows, trafficFlows, servicePlacements });
+
   const routingProtocols = buildRoutingProtocols({
     profile,
     siteHierarchy,
@@ -3967,6 +4199,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     servicePlacements,
     securityBoundaries,
     trafficFlows,
+    flowCoverage,
     routingPlan,
   });
   const lowLevelDesign = buildLowLevelDesign({
@@ -3978,7 +4211,22 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     servicePlacements,
     securityBoundaries,
     trafficFlows,
+    flowCoverage,
     routingPlan,
+    wanLinks,
+  });
+
+  const designTruthModel = buildUnifiedDesignTruthModel({
+    discoveryState: parseDiscoveryWorkspaceState(project?.discoveryJson),
+    profile,
+    topology,
+    siteHierarchy,
+    addressingPlan: rows,
+    sitePlacements,
+    routingPlan,
+    securityBoundaries,
+    servicePlacements,
+    trafficFlows,
     wanLinks,
   });
 
@@ -3990,7 +4238,9 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     `Each site is given a summary block, then per-segment child subnets are placed inside that site block so conflicts, headroom, and trust boundaries can be reviewed before any device configuration is attempted.`,
     `The organization hierarchy is currently consuming ${allocatedSiteAddresses} addresses out of ${organizationCapacity || 0} available in the organization block, which is about ${Math.round(organizationUtilization * 100)}% of the parent range.`,
     `The security model currently defines ${securityZones.length} zone${securityZones.length === 1 ? "" : "s"} with ${securityControls.length} explicit control recommendation${securityControls.length === 1 ? "" : "s"}, so segmentation and policy intent are reviewable before implementation.`,
+    `The flow engine currently covers ${flowCoverage.filter((item) => item.required && item.status === "ready").length} required traffic pattern${flowCoverage.filter((item) => item.required && item.status === "ready").length === 1 ? "" : "s"} out of ${flowCoverage.filter((item) => item.required).length}, so path coverage is being tracked against the recovery roadmap instead of only listing arbitrary example flows.`,
     `The routing and switching package now carries ${routingProtocols.length} protocol or transport decision${routingProtocols.length === 1 ? "" : "s"}, ${routePolicies.length} route-policy decision${routePolicies.length === 1 ? "" : "s"}, and ${switchingDesign.length} switching design control${switchingDesign.length === 1 ? "" : "s"}.`,
+    designTruthModel.summary,
     `The implementation package currently includes ${implementationPhases.length} phased step${implementationPhases.length === 1 ? "" : "s"}, ${cutoverChecklist.length} cutover checklist item${cutoverChecklist.length === 1 ? "" : "s"}, ${rollbackPlan.length} rollback trigger${rollbackPlan.length === 1 ? "" : "s"}, and ${validationPlan.length} validation test${validationPlan.length === 1 ? "" : "s"}.`,
     `SubnetOps now carries ${configurationStandards.length} configuration standard${configurationStandards.length === 1 ? "" : "s"}, ${configurationTemplates.length} reusable template artifact${configurationTemplates.length === 1 ? "" : "s"}, and ${operationsArtifacts.length} operations handoff item${operationsArtifacts.length === 1 ? "" : "s"} so the design can move toward real implementation baselines.`,
     wanLinks.length > 0
@@ -4014,6 +4264,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
       servicePlacements,
       securityBoundaries,
       trafficFlows,
+      flowCoverage,
       routingPlan,
     }),
     {
@@ -4024,7 +4275,12 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     {
       kind: "decision" as const,
       title: "Topology-aware placement and flow model",
-      detail: `SubnetOps v108 now resolves ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, and ${trafficFlows.length} explicit traffic flow path${trafficFlows.length === 1 ? "" : "s"} from the saved topology, addressing, and service assumptions.`,
+      detail: `SubnetOps v108 now resolves ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, ${trafficFlows.length} explicit traffic flow path${trafficFlows.length === 1 ? "" : "s"}, and ${flowCoverage.filter((item) => item.required && item.status === "ready").length} covered required flow category${flowCoverage.filter((item) => item.required && item.status === "ready").length === 1 ? "" : "ies"} from the saved topology, addressing, and service assumptions.`,
+    },
+    {
+      kind: "decision" as const,
+      title: "Unified design truth model",
+      detail: designTruthModel.summary,
     },
     ...(segmentationReview.filter((item) => item.severity !== "info").map((item) => ({
       kind: item.severity === "critical" ? "risk" as const : "assumption" as const,
@@ -4057,13 +4313,14 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
   openIssues = Array.from(new Set([
     ...openIssues,
     ...implementationRisks.filter((item) => item.severity !== "info").map((item) => item.title),
+    ...designTruthModel.unresolvedReferences,
   ]));
 
   const traceability = traceabilityItems(profile, { organizationBlockAssumed: organization.assumed, siteCount: workingSites.length, proposedSegments });
 
   const designEngineFoundation: DesignEngineFoundation = {
-    stageLabel: "v108 Design Engine Foundation",
-    summary: `SubnetOps is now resolving explicit design objects from requirements: ${siteHierarchy.length} site hierarchy row${siteHierarchy.length === 1 ? "" : "s"}, ${rows.length} addressing row${rows.length === 1 ? "" : "s"}, ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, ${securityBoundaries.length} security boundary row${securityBoundaries.length === 1 ? "" : "s"}, and ${trafficFlows.length} traffic flow path${trafficFlows.length === 1 ? "" : "s"}.`,
+    stageLabel: "v185 Unified Design Foundation",
+    summary: `SubnetOps is now resolving explicit design objects from requirements: ${siteHierarchy.length} site hierarchy row${siteHierarchy.length === 1 ? "" : "s"}, ${rows.length} addressing row${rows.length === 1 ? "" : "s"}, ${sitePlacements.length} placement object${sitePlacements.length === 1 ? "" : "s"}, ${servicePlacements.length} service placement${servicePlacements.length === 1 ? "" : "s"}, ${securityBoundaries.length} security boundary row${securityBoundaries.length === 1 ? "" : "s"}, ${trafficFlows.length} traffic flow path${trafficFlows.length === 1 ? "" : "s"}, and ${designTruthModel.siteNodes.length} unified site node${designTruthModel.siteNodes.length === 1 ? "" : "s"}.`,
     objectCounts: {
       siteHierarchy: siteHierarchy.length,
       addressingRows: rows.length,
@@ -4077,9 +4334,9 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
       openIssues: openIssues.length,
     },
     strongestLayer: rows.length > 0 ? "Addressing hierarchy and site block synthesis" : "Requirements intake still needs real addressing anchors",
-    nextPriority: trafficFlows.length > 0
-      ? "Continue into planner UX reset and diagram rebuild using these generated objects as the source of truth."
-      : "Expand traffic-flow and topology-specific synthesis so every major path is explicit before implementation.",
+    nextPriority: designTruthModel.unresolvedReferences.length === 0
+      ? "Use the unified truth model as the backbone for diagram, routing, security, and report work so future builds stop drifting into helper-only layers."
+      : "Reduce unresolved truth-model references so topology, routing, service placement, security boundaries, and flows all resolve cleanly from one shared model.",
     coverage: [
       {
         label: "Addressing hierarchy",
@@ -4188,6 +4445,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     servicePlacements,
     securityBoundaries,
     trafficFlows,
+    flowCoverage,
     routingPlan,
     logicalDomains,
     securityZones,
@@ -4216,6 +4474,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     openIssues,
     implementationNextSteps,
     designEngineFoundation,
+    designTruthModel,
     stats: {
       configuredSites: workingSites.filter((site) => site.source === "configured").length,
       proposedSites: workingSites.filter((site) => site.source === "proposed").length,

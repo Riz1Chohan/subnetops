@@ -14,6 +14,8 @@ import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildValidationReadinessSummary } from "../lib/designReadiness";
+import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
+import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 
 function categoryForRule(ruleCode: string) {
   if (ruleCode.includes("OVERLAP") || ruleCode.includes("SITE_BLOCK") || ruleCode.includes("NONCANONICAL")) return "Addressing";
@@ -73,6 +75,8 @@ export function ProjectValidationPage() {
   const infoCount = items.filter((item) => item.severity === "INFO").length;
   const categories = Array.from(new Set(items.map((item) => categoryForRule(item.ruleCode)))).sort();
   const readinessSummary = useMemo(() => buildValidationReadinessSummary(project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount), [project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount]);
+  const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesizedDesign, errorCount), [projectId, synthesizedDesign, errorCount]);
+  const authorityLedger = useMemo(() => buildDesignAuthorityLedger(projectId, synthesizedDesign), [projectId, synthesizedDesign]);
 
   const filteredItems = useMemo(() => {
     return [...items]
@@ -114,6 +118,32 @@ export function ProjectValidationPage() {
           </button>
         }
       />
+
+      <div className="panel recovery-focus-panel">
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Validation focus for this recovery cycle</h2>
+          <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
+        </div>
+        <div className="recovery-focus-grid">
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>{focusPlan.headline}</strong>
+            <div className="form-actions">
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 2).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>Signals still dragging trust down</strong>
+            <ul className="recovery-focus-signal-list" style={{ margin: 0 }}>
+              {focusPlan.focusSignals.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {refreshedFromFix ? (
         <div className="panel" style={{ borderColor: "rgba(40,167,69,0.28)", background: "rgba(40,167,69,0.08)" }}>
@@ -179,6 +209,52 @@ export function ProjectValidationPage() {
                       <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
                     </div>
                     <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Authority debt affecting validation</h3>
+              <span className="badge-soft">{authorityLedger.debtItems.length}</span>
+            </div>
+            {authorityLedger.debtItems.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No major authority debt is currently being surfaced into validation review.</p>
+            ) : (
+              <div className="validation-signal-list">
+                {authorityLedger.debtItems.slice(0, 4).map((item) => (
+                  <div key={item.id} className={`validation-signal-card ${item.severity === "critical" ? "critical" : item.severity === "warning" ? "warning" : "info"}`}>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <strong>{item.title}</strong>
+                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                    </div>
+                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="panel validation-subpanel">
+            <div className="validation-subpanel-header">
+              <h3 style={{ margin: 0 }}>Weakest site authority right now</h3>
+              <span className="badge-soft">{authorityLedger.siteReviews.filter((item) => item.status !== "ready").length}</span>
+            </div>
+            {authorityLedger.siteReviews.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>No site authority rows are available yet.</p>
+            ) : (
+              <div className="validation-signal-list">
+                {authorityLedger.siteReviews.slice(0, 3).map((item) => (
+                  <div key={item.siteId} className={`validation-signal-card ${item.status === "pending" ? "critical" : item.status === "partial" ? "warning" : "info"}`}>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <strong>{item.siteName}</strong>
+                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                    </div>
+                    <Link to={item.fixPath} className="link-button-subtle">Open Core Model</Link>
                   </div>
                 ))}
               </div>

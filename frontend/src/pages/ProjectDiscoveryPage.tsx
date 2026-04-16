@@ -13,6 +13,9 @@ import {
   saveDiscoveryWorkspaceState,
   type DiscoveryWorkspaceState,
 } from "../lib/discoveryFoundation";
+import { parseRequirementsProfile } from "../lib/requirementsProfile";
+import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -65,6 +68,14 @@ export function ProjectDiscoveryPage() {
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state }),
     [project, sites, vlans, state],
   );
+  const requirementsProfile = useMemo(() => parseRequirementsProfile(project?.requirementsJson), [project?.requirementsJson]);
+  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const recovery = useMemo(() => buildRecoveryRoadmapStatus(synthesized), [synthesized]);
+  const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recovery), [recovery]);
+  const discoveryRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived");
+  const discoveryBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived");
+  const plannerRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview");
+  const plannerBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview");
 
   const updateState = (patch: Partial<DiscoveryWorkspaceState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -117,14 +128,15 @@ export function ProjectDiscoveryPage() {
       <SectionHeader
         title="Discovery & Current State"
         description="This workspace is the v80 foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
-        actions={
-          <>
-            <Link to={`/projects/${projectId}/requirements`} className="link-button">Requirements</Link>
-            <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
-            <Link to={`/projects/${projectId}/implementation`} className="link-button">Implementation</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
-          </>
-        }
+        actions={(
+          <div className="overview-actions-shell">
+            <div className="overview-primary-actions">
+              <Link to={`/projects/${projectId}/requirements`} className="link-button">Requirements</Link>
+              <Link to={`/projects/${projectId}/implementation`} className="link-button link-button-subtle">Implementation</Link>
+              <Link to={`/projects/${projectId}/report`} className="link-button link-button-subtle">Report</Link>
+            </div>
+          </div>
+        )}
       />
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
@@ -149,6 +161,78 @@ export function ProjectDiscoveryPage() {
         <p className="muted" style={{ margin: 0 }}>
           {saveNotice || (state.lastSavedAt ? `Last saved to project data: ${new Date(state.lastSavedAt).toLocaleString()}` : "No shared discovery save yet for this project.")}
         </p>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Discovery-to-design extraction preview</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Discovery should not stay as pasted notes only. This preview shows what the current-state capture is already doing to strengthen the design engine, route/boundary truth, and recovery handoff decision.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
+            {masterGate.status === "ready-for-master" ? "Recovery-ready" : masterGate.status === "near-transition" ? "Recovery close" : "Recovery still active"}
+          </span>
+          <span className="badge-soft">Route domains {synthesized.designTruthModel.routeDomains.length}</span>
+          <span className="badge-soft">Boundary domains {synthesized.designTruthModel.boundaryDomains.length}</span>
+          <span className="badge-soft">Unresolved refs {synthesized.designTruthModel.unresolvedReferences.length}</span>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <strong style={{ display: "block", marginBottom: 8 }}>What discovery is already reinforcing</strong>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <li style={{ marginBottom: 8 }}>Topology preview: <strong>{synthesized.topology.topologyLabel}</strong></li>
+              <li style={{ marginBottom: 8 }}>Current required flow coverage ready: <strong>{synthesized.flowCoverage.filter((item) => item.required && item.status === "ready").length}</strong> / {synthesized.flowCoverage.filter((item) => item.required).length}</li>
+              <li style={{ marginBottom: 8 }}>Recovery status: <strong>{recovery.overallStatus}</strong></li>
+              <li style={{ marginBottom: 0 }}>{masterGate.summary}</li>
+            </ul>
+          </div>
+          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <strong style={{ display: "block", marginBottom: 8 }}>Main remaining blockers</strong>
+            {masterGate.blockers.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {masterGate.blockers.slice(0, 4).map((item) => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
+              </ul>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>No major recovery blocker is currently surfacing from this preview.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Discovery-backed authority lift</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Discovery is now allowed to strengthen the shared model instead of staying as passive notes only. These counts show where current-state evidence is already promoting route and boundary anchors ahead of later saved design detail.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className="badge-soft">Discovery route anchors {discoveryRouteAnchors.length}</span>
+          <span className="badge-soft">Discovery boundary anchors {discoveryBoundaryAnchors.length}</span>
+          <span className="badge-soft">Planner route anchors {plannerRouteAnchors.length}</span>
+          <span className="badge-soft">Planner boundary anchors {plannerBoundaryAnchors.length}</span>
+        </div>
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <strong style={{ display: "block", marginBottom: 8 }}>Discovery-promoted anchors</strong>
+            {discoveryRouteAnchors.length === 0 && discoveryBoundaryAnchors.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>Current discovery notes are still too thin to promote route or boundary anchors directly.</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {discoveryRouteAnchors.slice(0, 3).map((item) => <li key={item.id} style={{ marginBottom: 8 }}>{item.siteName} route anchor — {item.notes[0] || "Discovery-backed route evidence."}</li>)}
+                {discoveryBoundaryAnchors.slice(0, 3).map((item) => <li key={item.id} style={{ marginBottom: 8 }}>{item.siteName} / {item.zoneName} boundary — {item.notes[0] || "Discovery-backed boundary evidence."}</li>)}
+              </ul>
+            )}
+          </div>
+          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <strong style={{ display: "block", marginBottom: 8 }}>Still held by planner-preview truth</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              Planner-preview anchors are useful, but the stronger recovery direction is to replace as many of them as possible with discovery-backed or saved design records.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>

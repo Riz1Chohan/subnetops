@@ -15,6 +15,8 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { apiBlob } from "../lib/api";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
+import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -149,6 +151,10 @@ export function ProjectReportPage() {
   const status = reportStatus(errorCount, warningCount, project.approvalStatus);
   const readinessSummary = planningReadinessSummary(requirementsProfile);
   const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })));
+  const recovery = buildRecoveryRoadmapStatus(synthesized);
+  const masterGate = buildRecoveryMasterRoadmapGate(recovery);
+  const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
+
   const summary = generatedSummary({
     projectName: project.name,
     environmentType: project.environmentType,
@@ -255,6 +261,104 @@ export function ProjectReportPage() {
         vlanCount={vlans.length}
       />
 
+      <div className="panel" style={{ display: "grid", gap: 12, borderColor: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.35)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.28)", background: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.08)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
+            {masterGate.status === "ready-for-master" ? "Recovery complete enough for master roadmap" : masterGate.status === "near-transition" ? "Recovery nearly complete" : "Recovery still active"}
+          </span>
+          <span className="badge-soft">Ready phases {recovery.completedCount}</span>
+          <span className="badge-soft">Pending {recovery.pendingCount}</span>
+        </div>
+        <p className="muted" style={{ margin: 0 }}>{masterGate.summary}</p>
+        {masterGate.blockers.length ? (
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>Main remaining handoff blockers</strong>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {masterGate.blockers.slice(0, 4).map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Report truth confidence</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              The report should only look polished when the authority underneath it is actually strong enough. This ledger shows whether the design package is being carried by stronger saved truth or by thinner discovery, planner, and inferred anchors.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className={authorityLedger.status === "strong" ? "badge badge-info" : authorityLedger.status === "mixed" ? "badge badge-warning" : "badge badge-error"}>{authorityLedger.confidenceLabel}</span>
+            <span className="badge-soft">Confidence {authorityLedger.confidenceScore}%</span>
+            <span className="badge-soft">Explicit core {authorityLedger.masterEvidence.explicitCoreObjects}</span>
+            <span className="badge-soft">Inferred core {authorityLedger.masterEvidence.inferredCoreObjects}</span>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>{authorityLedger.summary}</p>
+          <div className="network-chip-list">
+            {authorityLedger.sourceMix.filter((item) => item.count > 0).map((item) => (
+              <span key={item.source} className="badge-soft">{item.label} {item.count}</span>
+            ))}
+          </div>
+          {authorityLedger.debtItems.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {authorityLedger.debtItems.slice(0, 4).map((item) => (
+                <li key={item.id} style={{ marginBottom: 8 }}>
+                  <strong>{item.title}</strong> — {item.detail}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery truth for the report</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              The report should now be treated as a facts-first planning package. This scorecard keeps the report honest about whether the recovery roadmap is actually feeding it with explicit design objects instead of generic narrative.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className={recovery.overallStatus === "ready" ? "badge badge-info" : recovery.overallStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{recovery.overallStatus}</span>
+            <span className="badge-soft">ready {recovery.completedCount}</span>
+            <span className="badge-soft">partial {recovery.partialCount}</span>
+            <span className="badge-soft">pending {recovery.pendingCount}</span>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {recovery.phases.filter((phase) => ["phase-g", "phase-b", "phase-d", "phase-e", "phase-f"].includes(phase.key)).map((phase) => (
+              <div key={phase.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                  <strong>{phase.label}</strong>
+                  <span className={phase.status === "ready" ? "badge badge-info" : phase.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{phase.status}</span>
+                </div>
+                <p className="muted" style={{ margin: 0 }}>{phase.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Report blockers before master-roadmap handoff</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              These are the strongest remaining recovery blockers that still affect report credibility and handoff quality.
+            </p>
+          </div>
+          {recovery.topBlockers.length === 0 ? (
+            <div className="trust-note">
+              <strong>No major recovery blocker is currently being surfaced</strong>
+              <p className="muted" style={{ margin: "8px 0 0" }}>The current report package is not flagging an obvious top blocker from the recovery scorecard.</p>
+            </div>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {recovery.topBlockers.slice(0, 6).map((item) => (
+                <li key={item} style={{ marginBottom: 8 }}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{synthesized.designEngineFoundation.stageLabel}</h2>
@@ -268,6 +372,30 @@ export function ProjectReportPage() {
           {summaryCard("Placements", synthesized.designEngineFoundation.objectCounts.topologyPlacements)}
           {summaryCard("Flows", synthesized.designEngineFoundation.objectCounts.trafficFlows)}
           {summaryCard("Open issues", synthesized.designEngineFoundation.objectCounts.openIssues)}
+        </div>
+        <div className="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Flow category</th>
+                <th>Required</th>
+                <th>Status</th>
+                <th>Covered paths</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {synthesized.flowCoverage.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.label}</td>
+                  <td>{item.required ? 'Yes' : 'No'}</td>
+                  <td>{item.status}</td>
+                  <td>{item.matchedFlowIds.length}</td>
+                  <td>{item.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div>
@@ -516,6 +644,9 @@ export function ProjectReportPage() {
                   <p style={{ margin: "0 0 8px 0" }}><strong>Subnets:</strong> {item.subnetCidrs.join(", ") || "TBD"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Attachment:</strong> {item.attachedInterface || item.attachedDevice} → {item.upstreamInterface || item.upstreamBoundary}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Peers:</strong> {item.permittedPeers.join(", ") || "Restricted"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Inside relationships:</strong> {item.insideRelationships.join(", ") || "—"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Outside relationships:</strong> {item.outsideRelationships.join(", ") || "—"}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Published services:</strong> {item.publishedServices.join(", ") || "—"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Inbound policy:</strong> {item.inboundPolicy}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>East-west policy:</strong> {item.eastWestPolicy}</p>
                   <p style={{ margin: 0 }}><strong>Management source:</strong> {item.managementSource}</p>
@@ -540,12 +671,14 @@ export function ProjectReportPage() {
               {synthesized.trafficFlows.map((item) => (
                 <div key={item.id} className="panel" style={{ padding: 14 }}>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <span className="badge-soft">{item.flowCategory}</span>
                     <span className="badge-soft">{item.sourceZone}</span>
                     <span className="badge-soft">{item.destinationZone}</span>
                   </div>
                   <h4 style={{ margin: "0 0 8px 0" }}>{item.flowLabel}</h4>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Path:</strong> {item.path.join(" → ")}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Named flow:</strong> {item.flowName}</p>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Subnets:</strong> {item.sourceSubnetCidr || '—'} → {item.destinationSubnetCidr || '—'}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Control points:</strong> {item.controlPoints.join(", ")}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Route model:</strong> {item.routeModel}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>NAT:</strong> {item.natBehavior}</p>

@@ -232,6 +232,46 @@ export function buildValidationReadinessSummary(
   if (design.routingPlan.length > 0) {
     strengths.push(`Routing intent exists for ${design.routingPlan.length} site routing row(s).`);
   }
+  const requiredFlowCoverage = design.flowCoverage.filter((item) => item.required);
+  const missingRequiredFlowCoverage = requiredFlowCoverage.filter((item) => item.status !== 'ready');
+  if (missingRequiredFlowCoverage.length > 0) {
+    contradictions.push({
+      id: 'required-flow-coverage-gap',
+      level: missingRequiredFlowCoverage.length >= 2 ? 'critical' : 'warning',
+      title: 'Required traffic-path coverage is still incomplete',
+      detail: `${missingRequiredFlowCoverage.length} required flow category${missingRequiredFlowCoverage.length === 1 ? ' is' : 'ies are'} still missing from the current generated flow model.`,
+      fixPath: `/projects/${project?.id ?? ''}/routing`,
+      actionLabel: 'Review flow coverage',
+    });
+  } else if (requiredFlowCoverage.length > 0) {
+    strengths.push(`Required flow coverage is complete for ${requiredFlowCoverage.length} scenario path type(s).`);
+  }
+
+  const inferredRouteDomains = design.designTruthModel.routeDomains.filter((item) => item.sourceModel === 'inferred').length;
+  const inferredBoundaryDomains = design.designTruthModel.boundaryDomains.filter((item) => item.sourceModel === 'inferred').length;
+  if (inferredRouteDomains + inferredBoundaryDomains > 0) {
+    contradictions.push({
+      id: 'inferred-core-objects',
+      level: inferredRouteDomains + inferredBoundaryDomains >= 4 ? 'warning' : 'info',
+      title: 'Core model still depends on inferred route or boundary objects',
+      detail: `${inferredRouteDomains} route domain(s) and ${inferredBoundaryDomains} boundary domain(s) are still inferred instead of generated from stronger explicit design records.`,
+      fixPath: `/projects/${project?.id ?? ''}/core-model`,
+      actionLabel: 'Review core model authority',
+    });
+  } else {
+    strengths.push('Core route and boundary objects are explicit instead of inferred.');
+  }
+
+  if (design.designTruthModel.unresolvedReferences.length > 0) {
+    contradictions.push({
+      id: 'unresolved-truth-links',
+      level: design.designTruthModel.unresolvedReferences.length > 4 ? 'critical' : 'warning',
+      title: 'The unified model still has unresolved cross-object references',
+      detail: `${design.designTruthModel.unresolvedReferences.length} unresolved reference(s) still exist between placements, routes, services, boundaries, or flows.`,
+      fixPath: `/projects/${project?.id ?? ''}/core-model`,
+      actionLabel: 'Inspect unresolved references',
+    });
+  }
 
   const penalties = missingInfo.reduce((total, item) => total + (item.level === 'critical' ? 18 : 8), 0)
     + contradictions.reduce((total, item) => total + (item.level === 'critical' ? 20 : 10), 0)

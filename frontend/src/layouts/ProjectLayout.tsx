@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -6,6 +7,9 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
+import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
+import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 
 type TabLink = {
   key: string;
@@ -67,10 +71,15 @@ export function ProjectLayout() {
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const readiness = planningReadinessSummary(requirementsProfile);
+  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
+  const recoveryReview = useMemo(() => buildRecoveryRoadmapStatus(synthesized), [synthesized]);
+  const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recoveryReview), [recoveryReview]);
   const createdFromWizard = new URLSearchParams(location.search).get("created") === "1";
 
   const designTabs: TabLink[] = [
     { key: "logical-design", label: "Overview", path: `/projects/${projectId}/logical-design`, description: "Architecture and design summary" },
+    { key: "core-model", label: "Core Model", path: `/projects/${projectId}/core-model`, description: "Unified engineering truth layer" },
     { key: "addressing", label: "Addressing", path: `/projects/${projectId}/addressing`, description: "Subnets, gateways, ranges" },
     { key: "security", label: "Security", path: `/projects/${projectId}/security`, description: "Zones and boundary model" },
     { key: "routing", label: "Routing", path: `/projects/${projectId}/routing`, description: "Routing and switching intent" },
@@ -109,7 +118,7 @@ export function ProjectLayout() {
       label: "Design Package",
       path: `/projects/${projectId}/logical-design`,
       summary: "Review the generated design in focused tabs.",
-      matchers: ["/logical-design", "/overview", "/addressing", "/security", "/routing", "/implementation", "/standards", "/platform"],
+      matchers: ["/logical-design", "/overview", "/core-model", "/addressing", "/security", "/routing", "/implementation", "/standards", "/platform"],
       children: designTabs,
     },
     {
@@ -149,17 +158,7 @@ export function ProjectLayout() {
         ? supportTabs
         : [];
 
-  const nextAction = errorCount > 0
-    ? { label: `Resolve ${errorCount} validation blocker${errorCount === 1 ? "" : "s"}`, path: `/projects/${projectId}/validation` }
-    : activeGroup === "discovery"
-      ? { label: "Move into requirements", path: `/projects/${projectId}/requirements` }
-      : activeGroup === "requirements"
-        ? { label: "Open the design package", path: `/projects/${projectId}/logical-design` }
-        : activeGroup === "design"
-          ? { label: "Review validation findings", path: `/projects/${projectId}/validation` }
-          : activeGroup === "validation"
-            ? { label: "Open the deliver area", path: `/projects/${projectId}/report` }
-            : { label: "Review the report package", path: `/projects/${projectId}/report` };
+
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading project workspace" message="Preparing the project shell and navigation." />;
@@ -200,6 +199,25 @@ export function ProjectLayout() {
           </div>
         </div>
       ) : null}
+
+      <div className="panel" style={{ display: "grid", gap: 10, borderColor: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.35)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.35)" : "rgba(59,130,246,0.28)", background: masterGate.status === "ready-for-master" ? "rgba(34,197,94,0.08)" : masterGate.status === "near-transition" ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
+            {masterGate.status === "ready-for-master" ? "Ready for master roadmap" : masterGate.status === "near-transition" ? "Near master-roadmap handoff" : "Stay on recovery roadmap"}
+          </span>
+          <span className="badge-soft">Recovery ready {recoveryReview.completedCount}</span>
+          <span className="badge-soft">Partial {recoveryReview.partialCount}</span>
+          <span className="badge-soft">Pending {recoveryReview.pendingCount}</span>
+        </div>
+        <p className="muted" style={{ margin: 0 }}>{masterGate.summary}</p>
+        {masterGate.blockers.length ? (
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {masterGate.blockers.slice(0, 2).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
       <header className="panel project-shell-header project-shell-header-compact">
         <div style={{ display: "grid", gap: 10 }}>
@@ -287,22 +305,34 @@ export function ProjectLayout() {
             </nav>
           </div>
 
-          <div className="trust-note project-sidebar-footer">
-            <strong style={{ display: "block", marginBottom: 6 }}>Recommended next move</strong>
-            <p className="muted" style={{ margin: 0 }}>
-              Keep the workflow simple: Discovery → Requirements → Design Package → Validation → Deliver.
-            </p>
+          <div className="trust-note project-sidebar-footer recovery-focus-footer">
+            <strong style={{ display: "block", marginBottom: 6 }}>Recovery focus</strong>
+            <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
             <div className="form-actions" style={{ marginTop: 10 }}>
-              <Link to={nextAction.path} className="link-button">{nextAction.label}</Link>
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 1).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
             </div>
+            <ul className="recovery-focus-signal-list">
+              {focusPlan.focusSignals.slice(0, 3).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
         </aside>
 
         <main className="project-main-shell">
           <section className="panel project-stage-strip">
-            <div>
-              <strong style={{ display: "block", marginBottom: 4 }}>Workflow stages</strong>
-              <p className="muted" style={{ margin: 0 }}>Stay oriented without hunting around the page. Each stage now has stronger visual hierarchy, direct navigation, and clearer previous/next movement.</p>
+            <div className="project-stage-strip-top">
+              <div>
+                <strong style={{ display: "block", marginBottom: 4 }}>Workflow stages</strong>
+                <p className="muted" style={{ margin: 0 }}>Stay oriented without hunting around the page. The current recovery pass now keeps one primary engineering move visible instead of letting every control compete equally.</p>
+              </div>
+              <div className="project-stage-focus-summary">
+                <strong>{focusPlan.headline}</strong>
+                <p className="muted" style={{ margin: "6px 0 0" }}>{focusPlan.summary}</p>
+              </div>
             </div>
             <div className="project-stage-strip-links">
               {workflowStages.map((stage, index) => (
@@ -318,7 +348,8 @@ export function ProjectLayout() {
             </div>
             <div className="project-stage-actions">
               {previousStage ? <Link to={previousStage.path} className="link-button link-button-subtle">Previous stage</Link> : <span className="muted">You are at the first stage.</span>}
-              {nextStageLink ? <Link to={nextStageLink.path} className="link-button">Next stage</Link> : <span className="muted">You are at the final delivery stage.</span>}
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {nextStageLink ? <Link to={nextStageLink.path} className="link-button link-button-subtle">Next stage</Link> : <span className="muted">You are at the final delivery stage.</span>}
             </div>
           </section>
           {tabSet.length > 0 ? (

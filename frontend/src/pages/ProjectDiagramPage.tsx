@@ -18,6 +18,9 @@ import { buildDiagramBehaviorPack } from "../lib/diagramBehaviorPack";
 import { buildDiagramScenarioPack } from "../lib/diagramScenarioPack";
 import { buildDiagramProofPack } from "../lib/diagramProofPack";
 import { buildDiagramReviewLedger } from "../lib/diagramReviewLedger";
+import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
+import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
@@ -74,6 +77,13 @@ export function ProjectDiagramPage() {
   const scenarioPack = buildDiagramScenarioPack(synthesized);
   const proofPack = buildDiagramProofPack(synthesized);
   const reviewLedger = buildDiagramReviewLedger(synthesized);
+  const recovery = buildRecoveryRoadmapStatus(synthesized);
+  const focusPlan = buildRecoveryFocusPlan(projectId, synthesized, topValidationItems.filter((item) => item.severity === "ERROR").length);
+  const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
+  const savedAuthorityObjects = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "saved-design").length + synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "saved-design").length;
+  const discoveryAuthorityObjects = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived").length + synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived").length;
+  const plannerAuthorityObjects = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview").length + synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview").length;
+  const inferredAuthorityObjects = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "inferred").length + synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "inferred").length;
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -81,12 +91,42 @@ export function ProjectDiagramPage() {
         title="Diagram workspace"
         description="The diagram is now treated like a main artifact, not a squeezed side card. Use this stage for design review, report cross-checking, validation comparison, and export."
         actions={(
-          <div className="form-actions">
-            <Link to={`/projects/${projectId}/validation`} className="link-button">Open Validation</Link>
-            <Link to={`/projects/${projectId}/report`} className="link-button">Open Deliver Area</Link>
+          <div className="overview-actions-shell">
+            <div className="overview-primary-actions">
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 2).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
+            </div>
           </div>
         )}
       />
+
+      <div className="panel recovery-focus-panel">
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Diagram recovery focus</h2>
+          <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
+        </div>
+        <div className="recovery-focus-grid">
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>{focusPlan.headline}</strong>
+            <div className="form-actions">
+              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+              {focusPlan.supportActions.slice(0, 2).map((action) => (
+                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <strong style={{ display: "block", marginBottom: 8 }}>Signals still keeping topology trust down</strong>
+            <ul className="recovery-focus-signal-list" style={{ margin: 0 }}>
+              {focusPlan.focusSignals.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
 
       <div className="panel diagram-stage-shell">
         <div className="diagram-stage-meta">
@@ -96,6 +136,7 @@ export function ProjectDiagramPage() {
             <span className="badge-soft">Placements {synthesized.sitePlacements.length}</span>
             <span className="badge-soft">Flows {synthesized.trafficFlows.length}</span>
             <span className="badge-soft">Boundaries {synthesized.securityBoundaries.length}</span>
+            <span className="badge-soft">Core model refs {synthesized.designTruthModel.relationshipEdges.length}</span>
             <span className="badge-soft">Site tasks {openSiteTasks}</span>
             <span className="badge-soft">VLAN tasks {openVlanTasks}</span>
             <span className="badge-soft">Naming {requirementsProfile.deviceNamingConvention}</span>
@@ -135,6 +176,61 @@ export function ProjectDiagramPage() {
 
         <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
           <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Topology authority mix</strong>
+            <div className="network-chip-list">
+              <span className="badge-soft">Saved anchors {savedAuthorityObjects}</span>
+              <span className="badge-soft">Discovery anchors {discoveryAuthorityObjects}</span>
+              <span className="badge-soft">Planner anchors {plannerAuthorityObjects}</span>
+              <span className="badge-soft">Still inferred {inferredAuthorityObjects}</span>
+              <span className="badge-soft">Authority confidence {authorityLedger.confidenceScore}%</span>
+            </div>
+            <p className="muted" style={{ margin: "10px 0 0 0" }}>
+              The diagram is now reading from a truth layer that distinguishes saved design objects from discovery-backed and planner-preview anchors. That makes topology realism more honest while the recovery roadmap is still active.
+            </p>
+          </div>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Per-site authority pressure</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              {synthesized.designTruthModel.siteNodes.filter((site) => site.authorityStatus !== "ready").length === 0
+                ? "Every site currently looks review-ready from a topology-authority perspective."
+                : `${synthesized.designTruthModel.siteNodes.filter((site) => site.authorityStatus !== "ready").length} site authority row${synthesized.designTruthModel.siteNodes.filter((site) => site.authorityStatus !== "ready").length === 1 ? " still needs" : "s still need"} more cleanup before the diagram can be treated as fully authoritative.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Diagram convergence debt</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              Diagram realism should only rise when the same truth layer is strong enough underneath it. This debt list keeps the topology workspace from looking more certain than the actual engineering model.
+            </p>
+            <ul style={{ margin: "10px 0 0", paddingLeft: 18 }}>
+              {authorityLedger.debtItems.slice(0, 4).map((item) => (
+                <li key={item.id} style={{ marginBottom: 8 }}>
+                  <strong>{item.title}</strong> — {item.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Weakest site signals right now</strong>
+            <div style={{ display: "grid", gap: 10 }}>
+              {authorityLedger.siteReviews.slice(0, 3).map((site) => (
+                <div key={site.siteId} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                    <strong>{site.siteName}</strong>
+                    <span className={site.status === "ready" ? "badge badge-info" : site.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{site.status}</span>
+                    <span className="badge-soft">{site.strongestSourceLabel}</span>
+                  </div>
+                  <p className="muted" style={{ margin: 0 }}>{site.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+          <div className="panel diagram-foundation-card">
             <strong style={{ display: "block", marginBottom: 8 }}>Symbol direction</strong>
             <p className="muted" style={{ margin: 0 }}>
               Device visuals are now being pushed toward real-looking network symbols: firewall, router, stacked switch, wireless, server, cloud edge, and internet edge. The target is a diagram that feels closer to a professional network drawing than a generic node map.
@@ -144,6 +240,21 @@ export function ProjectDiagramPage() {
             <strong style={{ display: "block", marginBottom: 8 }}>Overlay review direction</strong>
             <p className="muted" style={{ margin: 0 }}>
               Use placement first, then addressing, then security, then flows. That sequence keeps the diagram readable while still letting you verify subnets, trust boundaries, and traffic paths against the rest of the design package.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Shared truth-model direction</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              This stage now has a linked core model underneath it. Site anchors, route domains, services, boundaries, and flow contracts can be checked from one relationship graph instead of only from separate overlay packs.
+            </p>
+          </div>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Truth-model pressure points</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              Current unresolved cross-object references: {synthesized.designTruthModel.unresolvedReferences.length}. Use the Core Model view when you want to see which site, boundary, or service link is still thin.
             </p>
           </div>
         </div>
@@ -160,6 +271,58 @@ export function ProjectDiagramPage() {
             <p className="muted" style={{ margin: 0 }}>
               Link styles should now be reviewed as explicit rendering types: routed handoff, trunk/switched carriage, internet/public edge, tunnel/VPN, HA or restricted-control movement, and highlighted traffic-flow review paths.
             </p>
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Recovery and convergence status</strong>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <span className={recovery.overallStatus === "ready" ? "badge badge-info" : recovery.overallStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{recovery.overallStatus}</span>
+              <span className="badge-soft">ready {recovery.completedCount}</span>
+              <span className="badge-soft">partial {recovery.partialCount}</span>
+              <span className="badge-soft">pending {recovery.pendingCount}</span>
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              The diagram should now be reviewed as part of the recovery roadmap, not as a decorative output. These signals show whether the topology, security, addressing, and traffic overlays are converging on the same truth layer.
+            </p>
+            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+              {objectModelPack.overlaySignals.map((item) => (
+                <div key={item.id} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                    <strong>{item.label}</strong>
+                    <span className={item.status === "ready" ? "badge badge-info" : item.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{item.status}</span>
+                  </div>
+                  <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="panel diagram-foundation-card">
+            <strong style={{ display: "block", marginBottom: 8 }}>Topology views and authority gaps</strong>
+            <div style={{ display: "grid", gap: 10 }}>
+              {objectModelPack.topologyViews.map((item) => (
+                <div key={item.id} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                    <strong>{item.label}</strong>
+                    <span className={item.status === "ready" ? "badge badge-info" : item.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{item.status}</span>
+                  </div>
+                  <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                </div>
+              ))}
+            </div>
+            {objectModelPack.authorityGaps.length ? (
+              <div style={{ marginTop: 12 }}>
+                <strong style={{ display: "block", marginBottom: 8 }}>Main diagram trust gaps</strong>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {objectModelPack.authorityGaps.slice(0, 4).map((item) => (
+                    <li key={item.id} style={{ marginBottom: 8 }}>
+                      <strong>{item.title}:</strong> {item.detail}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
 

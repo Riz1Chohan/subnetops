@@ -7,6 +7,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -68,6 +69,8 @@ export function ProjectSecurityPage() {
     );
   }
 
+  const recovery = buildRecoveryRoadmapStatus(synthesized);
+
   const criticalFindings = synthesized.segmentationReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.segmentationReview.filter((item) => item.severity === "warning").length;
 
@@ -79,6 +82,7 @@ export function ProjectSecurityPage() {
         actions={
           <>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
+            <Link to={`/projects/${projectId}/core-model`} className="link-button">Core Model</Link>
             <Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Plan</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link>
             <Link to={`/projects/${projectId}/report`} className="link-button">Report</Link>
@@ -99,11 +103,84 @@ export function ProjectSecurityPage() {
         </p>
       </div>
 
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security recovery status</h2>
+            <p className="muted" style={{ margin: 0 }}>This keeps the security workspace tied to the recovery roadmap so zones, boundaries, and policy paths stay grounded in explicit design objects.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className={recovery.overallStatus === "ready" ? "badge badge-info" : recovery.overallStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{recovery.overallStatus}</span>
+            <span className="badge-soft">ready {recovery.completedCount}</span>
+            <span className="badge-soft">partial {recovery.partialCount}</span>
+            <span className="badge-soft">pending {recovery.pendingCount}</span>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {recovery.phases.filter((phase) => phase.key === "phase-f" || phase.key === "phase-b" || phase.key === "phase-e").map((phase) => (
+              <div key={phase.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                  <strong>{phase.label}</strong>
+                  <span className={phase.status === "ready" ? "badge badge-info" : phase.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{phase.status}</span>
+                </div>
+                <p className="muted" style={{ margin: 0 }}>{phase.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel" style={{ display: "grid", gap: 14 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Top remaining blocker</h2>
+            <p className="muted" style={{ margin: 0 }}>This is the strongest currently visible recovery blocker affecting this workspace.</p>
+          </div>
+          <div className="trust-note">
+            <strong>{recovery.topBlockers[0] || "No major blocker currently surfaced"}</strong>
+          </div>
+        </div>
+      </div>
+
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Security zones", synthesized.securityZones.length, "Distinct trust boundaries carried in the logical design.")}
         {summaryCard("Required controls", synthesized.securityControls.filter((item) => item.status === "required").length, "Controls that should not be skipped for the saved scope.")}
         {summaryCard("Policy-intent flows", synthesized.securityPolicyMatrix.length, "Reviewed inter-zone flow expectations before implementation.")}
         {summaryCard("Open security findings", synthesized.segmentationReview.filter((item) => item.severity !== "info").length, "Critical and warning findings that still need engineering review.")}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Boundary truth layer from the core model</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            The security workspace is now being tied back to explicit or inferred boundary domains. This helps keep segmentation, service placement, and flow enforcement inside one model instead of leaving them as separate review layers.
+          </p>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Boundary</th>
+                <th align="left">Source</th>
+                <th align="left">Route domain</th>
+                <th align="left">Device</th>
+                <th align="left">Inside relationships</th>
+                <th align="left">Outside relationships</th>
+                <th align="left">Published services</th>
+              </tr>
+            </thead>
+            <tbody>
+              {synthesized.securityBoundaries.map((boundary) => (
+                <tr key={`${boundary.siteName}-${boundary.zoneName}`}>
+                  <td>{boundary.siteName} / {boundary.zoneName}</td>
+                  <td>{synthesized.designTruthModel.boundaryDomains.find((item) => item.siteName === boundary.siteName && item.zoneName === boundary.zoneName)?.sourceModel || 'explicit'}</td>
+                  <td>{boundary.routeDomain || 'TBD'}</td>
+                  <td>{boundary.attachedDevice}</td>
+                  <td>{boundary.insideRelationships.join(', ') || '—'}</td>
+                  <td>{boundary.outsideRelationships.join(', ') || '—'}</td>
+                  <td>{boundary.publishedServices.join(', ') || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
