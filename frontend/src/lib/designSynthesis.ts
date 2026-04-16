@@ -197,6 +197,13 @@ export interface LowLevelSiteDesign {
   transitAdjacencyCount: number;
   localSegmentCount: number;
   localSegments: string[];
+  authorityStatus: "ready" | "partial" | "pending";
+  authorityLabel: string;
+  strongestAuthoritySourceLabel: string;
+  boundaryNames: string[];
+  serviceNames: string[];
+  flowNames: string[];
+  trustDebt: string[];
   implementationFocus: string[];
   notes: string[];
 }
@@ -2420,8 +2427,79 @@ function buildLowLevelDesign(input: {
       transitAdjacencyCount: routing?.transitAdjacencyCount || 0,
       localSegmentCount: routedRows.length,
       localSegments: routedRows.map((row) => row.vlanId ? `VLAN ${row.vlanId} ${row.segmentName}` : row.segmentName),
+      authorityStatus: "pending",
+      authorityLabel: "Authority still needs stronger anchors",
+      strongestAuthoritySourceLabel: "No strong anchor yet",
+      boundaryNames: [],
+      serviceNames: [],
+      flowNames: [],
+      trustDebt: [],
       implementationFocus,
       notes,
+    } satisfies LowLevelSiteDesign;
+  });
+}
+
+function enrichLowLevelDesignWithTruth(input: {
+  lowLevelDesign: LowLevelSiteDesign[];
+  designTruthModel: UnifiedDesignTruthModel;
+}) {
+  const { lowLevelDesign, designTruthModel } = input;
+  const sourceLabel = (source: "saved-design" | "discovery-derived" | "planner-preview" | "inferred") => {
+    switch (source) {
+      case "saved-design":
+        return "Saved design";
+      case "discovery-derived":
+        return "Discovery-backed";
+      case "planner-preview":
+        return "Planner preview";
+      default:
+        return "Still inferred";
+    }
+  };
+
+  return lowLevelDesign.map((site) => {
+    const siteNode = designTruthModel.siteNodes.find((item) => item.siteId === site.siteId || item.siteName === site.siteName);
+    const routeSources = designTruthModel.routeDomains.filter((item) => item.siteId === site.siteId || item.siteName === site.siteName).map((item) => item.authoritySource);
+    const boundarySources = designTruthModel.boundaryDomains.filter((item) => item.siteId === site.siteId || item.siteName === site.siteName).map((item) => item.authoritySource);
+    const sourcePriority = ["saved-design", "discovery-derived", "planner-preview", "inferred"] as const;
+    const strongestSource = sourcePriority.find((source) => routeSources.includes(source) || boundarySources.includes(source));
+    const boundaryNames = Array.from(new Set(
+      designTruthModel.boundaryDomains
+        .filter((item) => item.siteId === site.siteId || item.siteName === site.siteName)
+        .map((item) => item.boundaryName),
+    )).slice(0, 6);
+    const serviceNames = Array.from(new Set(
+      designTruthModel.serviceDomains
+        .filter((item) => item.siteId === site.siteId || item.siteName === site.siteName || item.consumerSites.includes(site.siteName))
+        .map((item) => item.serviceName),
+    )).slice(0, 6);
+    const flowNames = Array.from(new Set(
+      designTruthModel.flowContracts
+        .filter((item) => item.sourceSite === site.siteName || item.destinationSite === site.siteName || item.path.some((hop) => hop.includes(site.siteName)))
+        .map((item) => item.flowLabel),
+    )).slice(0, 6);
+    const trustDebt = Array.from(new Set([
+      ...(siteNode?.authorityNotes || []),
+      ...(siteNode?.notes || []),
+      ...designTruthModel.unresolvedReferences.filter((item) => item.toLowerCase().includes(site.siteName.toLowerCase())),
+    ])).slice(0, 4);
+    const authorityStatus = siteNode?.authorityStatus || site.authorityStatus;
+    const authorityLabel = authorityStatus === "ready"
+      ? "Site reads as review-ready"
+      : authorityStatus === "partial"
+        ? "Site truth is improving but still mixed"
+        : "Site is still authority-thin";
+
+    return {
+      ...site,
+      authorityStatus,
+      authorityLabel,
+      strongestAuthoritySourceLabel: strongestSource ? sourceLabel(strongestSource) : site.strongestAuthoritySourceLabel,
+      boundaryNames,
+      serviceNames,
+      flowNames,
+      trustDebt,
     } satisfies LowLevelSiteDesign;
   });
 }
@@ -4202,7 +4280,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     flowCoverage,
     routingPlan,
   });
-  const lowLevelDesign = buildLowLevelDesign({
+  let lowLevelDesign = buildLowLevelDesign({
     profile,
     siteHierarchy,
     rows,
@@ -4228,6 +4306,11 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     servicePlacements,
     trafficFlows,
     wanLinks,
+  });
+
+  lowLevelDesign = enrichLowLevelDesignWithTruth({
+    lowLevelDesign,
+    designTruthModel,
   });
 
   const designSummary = [

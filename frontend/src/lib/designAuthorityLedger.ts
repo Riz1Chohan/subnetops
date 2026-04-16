@@ -85,7 +85,7 @@ function sourceRank(source: DesignTruthAuthoritySource | "none") {
       return 3;
     case "planner-preview":
       return 2;
-    case inferred:
+    case "inferred":
       return 1;
     default:
       return 0;

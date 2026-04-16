@@ -10,6 +10,7 @@ import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requi
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
+import { buildProjectWorkflowReview } from "../lib/projectWorkflow";
 
 type TabLink = {
   key: string;
@@ -75,6 +76,7 @@ export function ProjectLayout() {
   const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
   const recoveryReview = useMemo(() => buildRecoveryRoadmapStatus(synthesized), [synthesized]);
   const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recoveryReview), [recoveryReview]);
+  const workflowReview = useMemo(() => buildProjectWorkflowReview(projectId, synthesized, errorCount), [projectId, synthesized, errorCount]);
   const createdFromWizard = new URLSearchParams(location.search).get("created") === "1";
 
   const designTabs: TabLink[] = [
@@ -323,33 +325,66 @@ export function ProjectLayout() {
         </aside>
 
         <main className="project-main-shell">
-          <section className="panel project-stage-strip">
+          <section className="panel workflow-panel" style={{ display: "grid", gap: 14 }}>
             <div className="project-stage-strip-top">
               <div>
                 <strong style={{ display: "block", marginBottom: 4 }}>Workflow stages</strong>
-                <p className="muted" style={{ margin: 0 }}>Stay oriented without hunting around the page. The current recovery pass now keeps one primary engineering move visible instead of letting every control compete equally.</p>
+                <p className="muted" style={{ margin: 0 }}>Keep the recovery work honest by showing stage status, not just navigation. The app should make the next engineering move clearer than the surrounding controls.</p>
               </div>
               <div className="project-stage-focus-summary">
                 <strong>{focusPlan.headline}</strong>
                 <p className="muted" style={{ margin: "6px 0 0" }}>{focusPlan.summary}</p>
               </div>
             </div>
-            <div className="project-stage-strip-links">
-              {workflowStages.map((stage, index) => (
-                <NavLink
-                  key={stage.key}
-                  to={stage.path}
-                  className={({ isActive }) => (isActive || activeGroup === stage.key ? "project-stage-link active" : "project-stage-link")}
-                >
-                  <span className="project-stage-index">{index + 1}</span>
-                  <span>{stage.label}</span>
-                </NavLink>
-              ))}
+            <div className="workflow-stage-grid">
+              {workflowReview.stages.map((stage, index) => {
+                const isCurrent = activeGroup === stage.key;
+                return (
+                  <NavLink
+                    key={stage.key}
+                    to={stage.path}
+                    className={() => `workflow-stage-card ${stage.status === "ready" ? "complete" : ""} ${isCurrent ? "current" : ""}`.trim()}
+                  >
+                    <div className="workflow-stage-topline">
+                      <span className="workflow-stage-step">Step {index + 1}</span>
+                      <span className="workflow-stage-status">{stage.statusLabel}</span>
+                    </div>
+                    <strong>{stage.label}</strong>
+                    <p className="muted" style={{ margin: 0 }}>{stage.summary}</p>
+                    {stage.blockers[0] ? <small className="muted">{stage.blockers[0]}</small> : null}
+                  </NavLink>
+                );
+              })}
             </div>
-            <div className="project-stage-actions">
-              {previousStage ? <Link to={previousStage.path} className="link-button link-button-subtle">Previous stage</Link> : <span className="muted">You are at the first stage.</span>}
-              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
-              {nextStageLink ? <Link to={nextStageLink.path} className="link-button link-button-subtle">Next stage</Link> : <span className="muted">You are at the final delivery stage.</span>}
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="panel" style={{ padding: 14 }}>
+                <strong style={{ display: "block", marginBottom: 8 }}>Current action queue</strong>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {workflowReview.actionQueue.map((item) => (
+                    <div key={item.key} style={{ display: "grid", gap: 6, borderBottom: "1px solid #edf1f7", paddingBottom: 10 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span className={item.severity === "primary" ? "badge badge-info" : item.severity === "warning" ? "badge badge-warning" : "badge-soft"}>
+                          {item.severity === "primary" ? "Primary" : item.severity === "warning" ? "Watch" : "Next"}
+                        </span>
+                        <strong>{item.title}</strong>
+                      </div>
+                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
+                      <div>
+                        <Link to={item.path} className={item.severity === "primary" ? "link-button" : "link-button link-button-subtle"}>{item.label}</Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="panel" style={{ padding: 14, display: "grid", gap: 10 }}>
+                <strong style={{ display: "block", marginBottom: 2 }}>Stage movement</strong>
+                <p className="muted" style={{ margin: 0 }}>Keep previous, current, and next movement obvious, but do not let it outrank the stronger recovery action.</p>
+                <div className="project-stage-actions">
+                  {previousStage ? <Link to={previousStage.path} className="link-button link-button-subtle">Previous stage</Link> : <span className="muted">You are at the first stage.</span>}
+                  <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
+                  {nextStageLink ? <Link to={nextStageLink.path} className="link-button link-button-subtle">Next stage</Link> : <span className="muted">You are at the final delivery stage.</span>}
+                </div>
+              </div>
             </div>
           </section>
           {tabSet.length > 0 ? (

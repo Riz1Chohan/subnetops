@@ -726,16 +726,22 @@ export function ProjectReportPage() {
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           {synthesized.lowLevelDesign.map((site) => (
-            <div key={site.siteId} className="panel" style={{ padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <div key={site.siteId} className="panel" style={{ padding: 14, display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 2 }}>
                 <div>
                   <h3 style={{ margin: 0 }}>{site.siteName}</h3>
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>{site.siteRole} · {site.layerModel}</p>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className="badge-soft">Routing {site.routingRole}</span>
-                  <span className="badge-soft">Security {site.securityBoundary}</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span className={site.authorityStatus === "ready" ? "badge badge-info" : site.authorityStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{site.authorityLabel}</span>
+                  <span className="badge-soft">{site.strongestAuthoritySourceLabel}</span>
                 </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span className="badge-soft">Routing {site.routingRole}</span>
+                <span className="badge-soft">Security {site.securityBoundary}</span>
+                <span className="badge-soft">Flows {site.flowNames.length}</span>
+                <span className="badge-soft">Boundaries {site.boundaryNames.length}</span>
               </div>
               <div className="grid-2" style={{ alignItems: "start" }}>
                 <div>
@@ -747,6 +753,16 @@ export function ProjectReportPage() {
                   <p style={{ margin: "0 0 8px 0" }}><strong>Summary route:</strong> {site.summaryRoute || "—"}</p>
                   <p style={{ margin: "0 0 8px 0" }}><strong>Loopback:</strong> {site.loopbackCidr || "—"}</p>
                   <p style={{ margin: 0 }}><strong>Segments:</strong> {site.localSegments.join(", ") || "—"}</p>
+                </div>
+              </div>
+              <div className="grid-2" style={{ alignItems: "start" }}>
+                <div>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Named boundaries:</strong> {site.boundaryNames.join(", ") || "—"}</p>
+                  <p style={{ margin: 0 }}><strong>Named services:</strong> {site.serviceNames.join(", ") || "—"}</p>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 8px 0" }}><strong>Tracked flows:</strong> {site.flowNames.join(", ") || "—"}</p>
+                  <p style={{ margin: 0 }}><strong>Trust debt:</strong> {site.trustDebt.join(" · ") || "No major site-specific trust debt currently surfaced."}</p>
                 </div>
               </div>
             </div>
