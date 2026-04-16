@@ -537,7 +537,7 @@ function LogicalTopologyDiagram({
         <text x={64} y={118} fontSize="12" fill="#637998">Topology: {synthesized.topology.topologyLabel} • Breakout: {synthesized.topology.internetBreakout} • Redundancy: {synthesized.topology.redundancyModel}</text>
         <text x={64} y={136} fontSize="11" fill="#6c819b">Legend intent: firewall / router / switching / wireless / server / cloud edge should read as real network roles, not generic boxes.</text>
         {chip(width - 286, 58, 210, diagramLegend(overlay).title, overlayTone(overlay))}
-        {chip(width - 286, 86, 210, mode === "physical" ? "Physical posture review" : "Logical posture review", "green")}
+        {chip(width - 286, 86, 210, "Logical posture review", "green")}
 
         {sites.map((site, index) => {
           const sitePoint = sitePositions[site.id] || { x: startX + index * (cardWidth + gap), y: 178 };
