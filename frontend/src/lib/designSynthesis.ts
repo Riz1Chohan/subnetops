@@ -2357,7 +2357,7 @@ function buildLowLevelDesign(input: {
   trafficFlowModel?: TrafficFlowPath[];
   routingIntentModel?: { siteRouting: RoutePlanItem[] };
   wanLinks: WanLinkPlanRow[];
-}) {
+}): LowLevelSiteDesign[] {
   const { profile, siteHierarchy, rows, topology, sitePlacements, servicePlacements, securityBoundaries, trafficFlows, routingPlan, wanLinks } = input;
   return siteHierarchy.map((site, index) => {
     const siteRows = rows.filter((row) => row.siteId === site.id);
@@ -2443,7 +2443,7 @@ function buildLowLevelDesign(input: {
 function enrichLowLevelDesignWithTruth(input: {
   lowLevelDesign: LowLevelSiteDesign[];
   designTruthModel: UnifiedDesignTruthModel;
-}) {
+}): LowLevelSiteDesign[] {
   const { lowLevelDesign, designTruthModel } = input;
   const sourceLabel = (source: "saved-design" | "discovery-derived" | "planner-preview" | "inferred") => {
     switch (source) {
@@ -4280,7 +4280,7 @@ export function synthesizeLogicalDesign(project: Project | undefined, sites: Sit
     flowCoverage,
     routingPlan,
   });
-  let lowLevelDesign = buildLowLevelDesign({
+  let lowLevelDesign: LowLevelSiteDesign[] = buildLowLevelDesign({
     profile,
     siteHierarchy,
     rows,
