@@ -19,7 +19,6 @@ import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { useValidationResults } from "../features/validation/hooks";
-import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 
 const overlayItems: Array<{ key: ActiveOverlayMode; label: string }> = [
   { key: "addressing", label: "IP addresses" },
@@ -42,12 +41,6 @@ const detailItems = [
 ] as const;
 
 
-const diagramWorkspacePresets = [
-  { key: "architecture", label: "Architecture", detail: "Global physical baseline", mode: "physical" as const, scope: "global" as const, overlays: [] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
-  { key: "transport", label: "WAN / Cloud", detail: "Transport and hybrid edge", mode: "physical" as const, scope: "wan-cloud" as const, overlays: ["redundancy", "flows"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
-  { key: "boundaries", label: "Boundaries", detail: "Zones, DMZ, and control points", mode: "physical" as const, scope: "boundaries" as const, overlays: ["security", "services"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
-  { key: "site", label: "Site detail", detail: "Focused local topology", mode: "physical" as const, scope: "site" as const, overlays: ["addressing", "security"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
-] as const;
 
 const diagramFocusPresets: Array<{ key: string; label: string; detail: string; deviceFocus: DeviceFocus; linkFocus: LinkFocus }> = [
   { key: "all", label: "Blueprint", detail: "Balanced engineering view", deviceFocus: "all", linkFocus: "all" },
@@ -169,9 +162,7 @@ export function ProjectDiagramPage() {
   };
 
   const synthesized = synthesizeLogicalDesign(enrichedProject, enrichedProject.sites, vlans, requirementsProfile);
-  const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
   const activeSiteId = focusedSiteId || enrichedProject.sites[0]?.id || "";
-  const openIssues = validations.filter((item) => item.severity !== "INFO").length;
   const overlayFocus: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? "none";
   const overlayCount = activeOverlays.length;
   const activeSiteName = enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "site";
@@ -268,41 +259,7 @@ export function ProjectDiagramPage() {
     setLinkFocus("all");
   };
 
-  const enableReviewLayer = () => {
-    setMode("physical");
-    setScope("global");
-    setActiveOverlays(["addressing", "security", "services", "flows"]);
-    setLabelMode("detailed");
-    setLinkAnnotationMode("full");
-    setDeviceFocus("all");
-    setLinkFocus("security");
-  };
 
-  const applyWorkspacePreset = (presetKey: (typeof diagramWorkspacePresets)[number]["key"]) => {
-    const preset = diagramWorkspacePresets.find((item) => item.key === presetKey);
-    if (!preset) return;
-    setMode(preset.mode);
-    setScope(preset.scope);
-    setActiveOverlays([...preset.overlays]);
-    setLabelMode(preset.labelMode);
-    setLinkAnnotationMode(preset.linkAnnotationMode);
-    if (preset.scope === "site") {
-      setFocusedSiteId(enrichedProject.sites[0]?.id || "");
-    }
-    if (preset.key === "transport") {
-      setDeviceFocus("edge");
-      setLinkFocus("transport");
-    } else if (preset.key === "boundaries") {
-      setDeviceFocus("edge");
-      setLinkFocus("security");
-    } else if (preset.key === "site") {
-      setDeviceFocus("switching");
-      setLinkFocus("access");
-    } else {
-      setDeviceFocus("all");
-      setLinkFocus("all");
-    }
-  };
 
   const applyDiagramFocusPreset = (presetKey: (typeof diagramFocusPresets)[number]["key"]) => {
     const preset = diagramFocusPresets.find((item) => item.key === presetKey);
@@ -345,20 +302,7 @@ export function ProjectDiagramPage() {
     <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">
       <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
         <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
-          <div className="diagram-control-section diagram-control-section-hero">
-            <div>
-              <span className="diagram-kicker">Diagram controls</span>
-              <strong>Simple by default</strong>
-              <p className="muted" style={{ margin: 0 }}>Start with the base topology. Turn on only the layers you need.</p>
-            </div>
-            <div className="diagram-quick-actions">
-              <button type="button" className="diagram-utility-button" onClick={resetToBaseline}>Reset</button>
-              <button type="button" className="diagram-utility-button" onClick={enableReviewLayer}>Review</button>
-              <button type="button" className="diagram-utility-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
-            </div>
-          </div>
-
-          <div className="diagram-control-card diagram-control-card-compact">
+          <div className="diagram-control-card diagram-control-card-compact diagram-control-card-top">
             <div className="diagram-control-section">
               <span className="diagram-control-label">View</span>
               <div className="diagram-toggle-grid">
@@ -387,9 +331,7 @@ export function ProjectDiagramPage() {
                 </label>
               ) : null}
             </div>
-          </div>
 
-          <div className="diagram-control-card diagram-control-card-compact">
             <div className="diagram-control-section">
               <div className="diagram-control-row-head">
                 <span className="diagram-control-label">Layers</span>
@@ -464,50 +406,10 @@ export function ProjectDiagramPage() {
             </div>
           </details>
 
-          <div className="diagram-control-metrics diagram-control-metrics-pro diagram-control-metrics-streamlined">
-            <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
-            <div><span>VLANs</span><strong>{vlans.length}</strong></div>
-            <div><span>Flows</span><strong>{synthesized.trafficFlows.length}</strong></div>
-            <div><span>Issues</span><strong>{openIssues}</strong></div>
-          </div>
         </aside>
 
         <div className="diagram-display-pane diagram-display-pane-professional">
           <div className="panel diagram-display-shell diagram-display-shell-streamlined">
-            <div className="diagram-display-header diagram-display-header-tight diagram-display-header-streamlined">
-              <div>
-                <span className="diagram-kicker">Diagram</span>
-                <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} topology` : "Topology diagram"}</h3>
-                <p className="muted" style={{ margin: 0 }}>The diagram is the main workspace. Supporting controls stay off to the side.</p>
-              </div>
-              <div className="diagram-display-summary">
-                <span className="diagram-display-summary-chip">{mode === "logical" ? "Logical" : "Physical"}</span>
-                <span className="diagram-display-summary-chip">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
-                <span className="diagram-display-summary-chip">{enrichedProject.sites.length} sites</span>
-              </div>
-            </div>
-
-            <div className="diagram-preset-row diagram-preset-row-streamlined">
-              {diagramWorkspacePresets.map((preset) => {
-                const isActive =
-                  mode === preset.mode &&
-                  scope === preset.scope &&
-                  preset.overlays.every((overlay) => activeOverlays.includes(overlay)) &&
-                  activeOverlays.every((overlay) => preset.overlays.includes(overlay));
-                return (
-                  <button
-                    key={preset.key}
-                    type="button"
-                    className={isActive ? "diagram-preset-chip active" : "diagram-preset-chip"}
-                    onClick={() => applyWorkspacePreset(preset.key)}
-                  >
-                    <strong>{preset.label}</strong>
-                    <span>{preset.detail}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             <div className="diagram-stage-surface-pro diagram-stage-surface-pro-streamlined" ref={canvasStageRef}>
               <div className="diagram-stage-toolbar-pro diagram-stage-toolbar-pro-streamlined">
                 <div className="diagram-stage-toolbar-group">
@@ -566,6 +468,7 @@ export function ProjectDiagramPage() {
                       ? (activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all")
                       : linkFocus,
                     focusedSiteId: activeSiteId,
+                  bareCanvas: true,
                   }}
                 />
               </div>

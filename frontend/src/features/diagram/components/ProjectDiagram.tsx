@@ -39,6 +39,7 @@ interface ProjectDiagramProps {
     deviceFocus: DeviceFocus;
     linkFocus: LinkFocus;
     focusedSiteId: string;
+    bareCanvas: boolean;
   }>;
 }
 type SitePoint = { x: number; y: number };
@@ -177,17 +178,19 @@ function DiagramCanvasDefs() {
   );
 }
 
-function DiagramCanvasBackdrop({ width, height, title, subtitle, summary, chipLabel, chipTone }: { width: number; height: number; title: string; subtitle: string; summary: string; chipLabel: string; chipTone: ChipTone; }) {
+function DiagramCanvasBackdrop({ width, height, title, subtitle, summary, chipLabel, chipTone, minimal = false }: { width: number; height: number; title: string; subtitle: string; summary: string; chipLabel: string; chipTone: ChipTone; minimal?: boolean; }) {
   return (
     <>
       <DiagramCanvasDefs />
       <rect x={0} y={0} width={width} height={height} rx={30} fill="url(#diagram-canvas-bg)" />
       <rect x={0} y={0} width={width} height={height} rx={30} fill="url(#diagram-grid-major)" opacity="0.72" />
-      <rect x={34} y={30} width={width - 68} height={96} rx={24} fill="rgba(255,255,255,0.84)" stroke="#d8e3f2" filter="url(#diagram-soft-shadow)" />
-      <text x={58} y={64} fontSize="20" fontWeight="700" fill="#142742">{title}</text>
-      <text x={58} y={86} fontSize="12" fill="#5f748f">{subtitle}</text>
-      <text x={58} y={106} fontSize="11" fill="#6d819a">{summary}</text>
-      {chip(width - 282, 52, 206, chipLabel, chipTone)}
+      {minimal ? null : (<>
+        <rect x={34} y={30} width={width - 68} height={96} rx={24} fill="rgba(255,255,255,0.84)" stroke="#d8e3f2" filter="url(#diagram-soft-shadow)" />
+        <text x={58} y={64} fontSize="20" fontWeight="700" fill="#142742">{title}</text>
+        <text x={58} y={86} fontSize="12" fill="#5f748f">{subtitle}</text>
+        <text x={58} y={106} fontSize="11" fill="#6d819a">{summary}</text>
+        {chip(width - 282, 52, 206, chipLabel, chipTone)}
+      </>)}
     </>
   );
 }
@@ -996,6 +999,7 @@ function LogicalTopologyDiagram({
   deviceFocus,
   linkFocus,
   onSelectTarget,
+  bareCanvas = false,
 }: {
   project: ProjectDetail;
   synthesized: SynthesizedLogicalDesign;
@@ -1013,6 +1017,7 @@ function LogicalTopologyDiagram({
   linkFocus: LinkFocus;
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
   compact?: boolean;
+  bareCanvas?: boolean;
 }) {
   const sites = sitesForDiagramScope((project.sites ?? []) as SiteWithVlans[], synthesized, scope, focusedSiteId);
   const cardWidth = 290;
@@ -1036,6 +1041,7 @@ function LogicalTopologyDiagram({
   const globalInternetY = 146;
   const cloudX = width - 250;
   const cloudY = 154;
+  const layoutShiftY = bareCanvas ? -112 : 0;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1048,14 +1054,16 @@ function LogicalTopologyDiagram({
           summary={`Topology: ${synthesized.topology.topologyLabel} • Breakout: ${synthesized.topology.internetBreakout} • Redundancy: ${synthesized.topology.redundancyModel}`}
           chipLabel={overlaySummaryLabel(enabledOverlays)}
           chipTone={enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green"}
+          minimal={bareCanvas}
         />
-        {chip(width - 286, 82, 210, "Logical posture review", "green")}
-        <rect x={36} y={136} width={width - 72} height={110} rx={34} fill="rgba(238,245,255,0.8)" stroke="#c9d9f1" strokeDasharray="10 7" />
-        <text x={60} y={164} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN / cloud zone</text>
-        <text x={60} y={184} fontSize="11" fill="#607791">Internet, perimeter controls, hybrid edge, and inter-site transport anchors stay grouped here so the logical view reads more like an actual architecture map.</text>
-        <rect x={36} y={266} width={width - 72} height={height - 322} rx={34} fill="rgba(255,255,255,0.5)" stroke="#d7e2f1" strokeDasharray="10 8" />
-        <text x={60} y={294} fontSize="12.5" fontWeight="700" fill="#284b78">Site fabric domains</text>
-        <text x={60} y={314} fontSize="11" fill="#607791">Each site card shows edge, switching, service, wireless, and boundary clues so the topology reads like a real multi-site estate instead of a generic card grid.</text>
+        <g transform={layoutShiftY ? `translate(0 ${layoutShiftY})` : undefined}>
+        {!bareCanvas ? chip(width - 286, 82, 210, "Logical posture review", "green") : null}
+        {!bareCanvas ? <rect x={36} y={136} width={width - 72} height={110} rx={34} fill="rgba(238,245,255,0.8)" stroke="#c9d9f1" strokeDasharray="10 7" /> : null}
+        {!bareCanvas ? <text x={60} y={164} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN / cloud zone</text> : null}
+        {!bareCanvas ? <text x={60} y={184} fontSize="11" fill="#607791">Internet, perimeter controls, hybrid edge, and inter-site transport anchors stay grouped here so the logical view reads more like an actual architecture map.</text> : null}
+        {!bareCanvas ? <rect x={36} y={266} width={width - 72} height={height - 322} rx={34} fill="rgba(255,255,255,0.5)" stroke="#d7e2f1" strokeDasharray="10 8" /> : null}
+        {!bareCanvas ? <text x={60} y={294} fontSize="12.5" fontWeight="700" fill="#284b78">Site fabric domains</text> : null}
+        {!bareCanvas ? <text x={60} y={314} fontSize="11" fill="#607791">Each site card shows edge, switching, service, wireless, and boundary clues so the topology reads like a real multi-site estate instead of a generic card grid.</text> : null}
 
         {sites.map((site, index) => {
           const sitePoint = sitePositions[site.id] || { x: startX + index * (cardWidth + gap), y: 178 };
@@ -1118,7 +1126,7 @@ function LogicalTopologyDiagram({
           );
         })}
 
-        {sites.length > 1 ? (
+{!bareCanvas && sites.length > 1 ? (
           <g>
             <rect x={84} y={height - 184} width={width - 168} height={78} rx={28} fill="rgba(238,245,255,0.74)" stroke="#c9d9f1" strokeDasharray="8 6" />
             <text x={112} y={height - 152} fontSize="12.5" fontWeight="700" fill="#284b78">Inter-site transport posture</text>
@@ -1159,6 +1167,7 @@ function LogicalTopologyDiagram({
                 );
               })
         ) : null}
+        </g>
       </svg>
     </div>
   );
@@ -1180,6 +1189,7 @@ function PhysicalTopologyDiagram({
   deviceFocus,
   linkFocus,
   onSelectTarget,
+  bareCanvas = false,
 }: {
   project: ProjectDetail;
   synthesized: SynthesizedLogicalDesign;
@@ -1197,6 +1207,7 @@ function PhysicalTopologyDiagram({
   linkFocus: LinkFocus;
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
   compact?: boolean;
+  bareCanvas?: boolean;
 }) {
   const sites = sitesForDiagramScope((project.sites ?? []) as SiteWithVlans[], synthesized, scope, focusedSiteId);
   const requirements = parseRequirementsProfile(project.requirementsJson);
@@ -1249,6 +1260,7 @@ function PhysicalTopologyDiagram({
   const transportCapsuleVisibleSites = transportCapsuleSites.slice(0, transportCapsuleCount);
   const transportCapsuleTotalWidth = transportCapsuleVisibleSites.length * transportCapsuleWidth + Math.max(0, transportCapsuleVisibleSites.length - 1) * transportCapsuleGap;
   const transportCapsuleStartX = centerX - transportCapsuleTotalWidth / 2;
+  const layoutShiftY = bareCanvas ? -124 : 0;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1261,30 +1273,32 @@ function PhysicalTopologyDiagram({
           summary="Connection semantics: routed = blue, trunk = purple, VPN/WAN = green dashed, internet = blue dashed, management/control = slate, critical flow = orange."
           chipLabel={overlaySummaryLabel(enabledOverlays)}
           chipTone={legendTone}
+          minimal={bareCanvas}
         />
-        {(enabledOverlays.length ? enabledOverlays : ["none"]).flatMap((mode) => diagramLegend(mode as OverlayMode).details).slice(0, 3).map((detail, index) => <text key={`${detail}-${index}`} x={width - 300} y={100 + index * 18} fontSize="11" fill="#607791">• {detail}</text>)}
-        <rect x={48} y={148} width={width - 96} height={170} rx={46} fill="rgba(238,245,255,0.76)" stroke="#c6d9f5" strokeDasharray="10 8" />
-        <text x={78} y={178} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN transport domain</text>
-        <text x={78} y={198} fontSize="11" fill="#607791">Internet, firewall, DMZ, hybrid edge, and upstream transport stay grouped here so the physical view immediately reads as a real network diagram.</text>
-        <rect x={48} y={336} width={width - 96} height={Math.max(388, fabricSectionBottom - 336)} rx={40} fill="rgba(255,255,255,0.48)" stroke="#d5e1f2" strokeDasharray="10 8" />
-        <text x={78} y={366} fontSize="12.5" fontWeight="700" fill="#284b78">Primary and branch site fabrics</text>
-        <text x={78} y={386} fontSize="11" fill="#607791">Site containers expose edge, switching, service, wireless, and boundary elements in a more diagram-like blueprint layout rather than isolated cards.</text>
-        {chip(78, 410, 118, `Sites ${sites.length}`, "blue")}
-        {chip(208, 410, 122, `VLANs ${totalVlanCount}`, "green")}
-        {chip(342, 410, 166, `Topology ${synthesized.topology.topologyLabel}`, "purple")}
-        {chip(520, 410, 128, `Services ${synthesized.servicePlacements.length}`, "orange")}
+        <g transform={layoutShiftY ? `translate(0 ${layoutShiftY})` : undefined}>
+        {!bareCanvas ? (enabledOverlays.length ? enabledOverlays : ["none"]).flatMap((mode) => diagramLegend(mode as OverlayMode).details).slice(0, 3).map((detail, index) => <text key={`${detail}-${index}`} x={width - 300} y={100 + index * 18} fontSize="11" fill="#607791">• {detail}</text>) : null}
+        {!bareCanvas ? <rect x={48} y={148} width={width - 96} height={170} rx={46} fill="rgba(238,245,255,0.76)" stroke="#c6d9f5" strokeDasharray="10 8" /> : null}
+        {!bareCanvas ? <text x={78} y={178} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN transport domain</text> : null}
+        {!bareCanvas ? <text x={78} y={198} fontSize="11" fill="#607791">Internet, firewall, DMZ, hybrid edge, and upstream transport stay grouped here so the physical view immediately reads as a real network diagram.</text> : null}
+        {!bareCanvas ? <rect x={48} y={336} width={width - 96} height={Math.max(388, fabricSectionBottom - 336)} rx={40} fill="rgba(255,255,255,0.48)" stroke="#d5e1f2" strokeDasharray="10 8" /> : null}
+        {!bareCanvas ? <text x={78} y={366} fontSize="12.5" fontWeight="700" fill="#284b78">Primary and branch site fabrics</text> : null}
+        {!bareCanvas ? <text x={78} y={386} fontSize="11" fill="#607791">Site containers expose edge, switching, service, wireless, and boundary elements in a more diagram-like blueprint layout rather than isolated cards.</text> : null}
+        {!bareCanvas ? chip(78, 410, 118, `Sites ${sites.length}`, "blue") : null}
+        {!bareCanvas ? chip(208, 410, 122, `VLANs ${totalVlanCount}`, "green") : null}
+        {!bareCanvas ? chip(342, 410, 166, `Topology ${synthesized.topology.topologyLabel}`, "purple") : null}
+        {!bareCanvas ? chip(520, 410, 128, `Services ${synthesized.servicePlacements.length}`, "orange") : null}
 
-        <rect x={centerX - 196} y={98} width={392} height={92} rx={26} fill="rgba(245,249,255,0.78)" stroke="#cad9f2" strokeDasharray="8 6" />
-        <text x={centerX} y={122} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Internet / northbound exchange</text>
-        <text x={centerX} y={140} textAnchor="middle" fontSize="10.5" fill="#607791">Public edge, provider handoff, and upstream routing entry stay centered before the perimeter stack.</text>
-        <rect x={centerX - 188} y={214} width={376} height={88} rx={24} fill="rgba(249,252,255,0.74)" stroke="#d3e0f4" strokeDasharray="8 6" />
-        <text x={centerX} y={238} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Perimeter control stack</text>
-        <text x={centerX} y={256} textAnchor="middle" fontSize="10.5" fill="#607791">Firewall, DMZ publication, and routed handoff into the internal fabric.</text>
+        {!bareCanvas ? <rect x={centerX - 196} y={98} width={392} height={92} rx={26} fill="rgba(245,249,255,0.78)" stroke="#cad9f2" strokeDasharray="8 6" /> : null}
+        {!bareCanvas ? <text x={centerX} y={122} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Internet / northbound exchange</text> : null}
+        {!bareCanvas ? <text x={centerX} y={140} textAnchor="middle" fontSize="10.5" fill="#607791">Public edge, provider handoff, and upstream routing entry stay centered before the perimeter stack.</text> : null}
+        {!bareCanvas ? <rect x={centerX - 188} y={214} width={376} height={88} rx={24} fill="rgba(249,252,255,0.74)" stroke="#d3e0f4" strokeDasharray="8 6" /> : null}
+        {!bareCanvas ? <text x={centerX} y={238} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Perimeter control stack</text> : null}
+        {!bareCanvas ? <text x={centerX} y={256} textAnchor="middle" fontSize="10.5" fill="#607791">Firewall, DMZ publication, and routed handoff into the internal fabric.</text> : null}
 
-        <rect x={centerX - 316} y={332} width={632} height={384} rx={34} fill="rgba(242,247,255,0.58)" stroke="#cad9f2" strokeDasharray="8 6" />
-        <text x={centerX} y={356} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Primary hub backbone zone</text>
-        <text x={centerX} y={374} textAnchor="middle" fontSize="10.5" fill="#607791">Core routing, campus switching, shared services, and user access stay visually grouped in one central engineering zone.</text>
-        {branchSites.length ? Array.from({ length: branchRows }).map((_, rowIndex) => {
+        {!bareCanvas ? <rect x={centerX - 316} y={332} width={632} height={384} rx={34} fill="rgba(242,247,255,0.58)" stroke="#cad9f2" strokeDasharray="8 6" /> : null}
+        {!bareCanvas ? <text x={centerX} y={356} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Primary hub backbone zone</text> : null}
+        {!bareCanvas ? <text x={centerX} y={374} textAnchor="middle" fontSize="10.5" fill="#607791">Core routing, campus switching, shared services, and user access stay visually grouped in one central engineering zone.</text> : null}
+        {!bareCanvas && branchSites.length ? Array.from({ length: branchRows }).map((_, rowIndex) => {
           const rowY = siteRowStartY + rowIndex * siteRowGap;
           return (
             <g key={`branch-corridor-${rowIndex}`}>
@@ -1294,14 +1308,14 @@ function PhysicalTopologyDiagram({
           );
         }) : null}
 
-        <g opacity="0.9">
+        {!bareCanvas ? <g opacity="0.9">
           <rect x={sectionRailX} y={160} width="8" height={Math.max(520, fabricSectionBottom - 130)} rx="4" fill="#d9e7fb" />
           <rect x={sectionRailX - 12} y={168} width="118" height="24" rx="12" fill="#eef5ff" stroke="#bfd2f3" />
           <text x={sectionRailX + 47} y={184} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">TRANSPORT</text>
           <rect x={sectionRailX - 12} y={352} width="118" height="24" rx="12" fill="#f4f8ff" stroke="#ccd8ed" />
           <text x={sectionRailX + 47} y={368} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">SITE FABRIC</text>
           {flowOverlays.length ? <><rect x={sectionRailX - 12} y={flowLaneStartY - 28} width="118" height="24" rx="12" fill="#fff4e8" stroke="#ffc98e" /><text x={sectionRailX + 47} y={flowLaneStartY - 12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#9a3412">FLOW LANE</text></> : null}
-        </g>
+        </g> : null}
 
         <g>
           <path d={`M ${Math.max(120, centerX - 430)} ${transportSpineY} L ${Math.min(width - 120, centerX + 430)} ${transportSpineY}`} stroke="#8fb0eb" strokeWidth="5" strokeLinecap="round" opacity="0.9" />
@@ -1314,7 +1328,7 @@ function PhysicalTopologyDiagram({
               <text x={entry.anchorX} y={transportSpineY - 16} textAnchor="middle" fontSize="10" fill="#5e7691">{entry.site.name}</text>
             </g>
           ))}
-          {transportCapsuleVisibleSites.map((site, index) => {
+          {!bareCanvas ? transportCapsuleVisibleSites.map((site, index) => {
             const x = transportCapsuleStartX + index * (transportCapsuleWidth + transportCapsuleGap);
             const isPrimaryTransportSite = site.id === primarySite?.id;
             return (
@@ -1324,10 +1338,10 @@ function PhysicalTopologyDiagram({
                 <text x={x + transportCapsuleWidth / 2} y={transportSpineY + 48} textAnchor="middle" fontSize="9.8" fill="#607791">{isPrimaryTransportSite ? "Primary hub" : "Attached site"} • VLANs {siteVlanCount(site)} • Services {siteServiceCount(site.name)}</text>
               </g>
             );
-          })}
+          }) : null}
         </g>
 
-        {Array.from({ length: branchRows }).map((_, rowIndex) => {
+        {!bareCanvas ? Array.from({ length: branchRows }).map((_, rowIndex) => {
           const rowY = siteRowStartY + rowIndex * siteRowGap;
           return (
             <g key={`branch-row-${rowIndex}`}>
@@ -1335,7 +1349,7 @@ function PhysicalTopologyDiagram({
               <text x={193} y={rowY - 12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">Branch fabric row {rowIndex + 1}</text>
             </g>
           );
-        })}
+        }) : null}
 
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
@@ -1490,29 +1504,33 @@ function PhysicalTopologyDiagram({
         }) : null}
 
 
-        <g>
-          <rect x={48} y={legendDockY} width="316" height="122" rx="20" fill="rgba(255,255,255,0.92)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
-          <text x={72} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Site index</text>
-          <text x={72} y={legendDockY + 42} fontSize="10.8" fill="#607791">Primary plus the first attached sites visible on this canvas.</text>
-          {siteIndexItems.map((site, index) => (
-            <g key={`${site.id}-site-index`}>
-              <circle cx={74} cy={legendDockY + 64 + index * 14} r="3.6" fill={index === 0 ? "#1d7f4c" : "#4d6fa8"} />
-              <text x={84} y={legendDockY + 68 + index * 14} fontSize="10.6" fill="#34506f">{site.name}</text>
-              <text x={186} y={legendDockY + 68 + index * 14} fontSize="10.2" fill="#607791">{site.defaultAddressBlock || "No summary block"}</text>
+        {!bareCanvas ? (
+          <>
+            <g>
+              <rect x={48} y={legendDockY} width="316" height="122" rx="20" fill="rgba(255,255,255,0.92)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
+              <text x={72} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Site index</text>
+              <text x={72} y={legendDockY + 42} fontSize="10.8" fill="#607791">Primary plus the first attached sites visible on this canvas.</text>
+              {siteIndexItems.map((site, index) => (
+                <g key={`${site.id}-site-index`}>
+                  <circle cx={74} cy={legendDockY + 64 + index * 14} r="3.6" fill={index === 0 ? "#1d7f4c" : "#4d6fa8"} />
+                  <text x={84} y={legendDockY + 68 + index * 14} fontSize="10.6" fill="#34506f">{site.name}</text>
+                  <text x={186} y={legendDockY + 68 + index * 14} fontSize="10.2" fill="#607791">{site.defaultAddressBlock || "No summary block"}</text>
+                </g>
+              ))}
             </g>
-          ))}
-        </g>
-
-        <g>
-          <rect x={width - 322} y={legendDockY} width="274" height="122" rx="20" fill="rgba(255,255,255,0.9)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
-          <text x={width - 298} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Physical legend</text>
-          <text x={width - 298} y={legendDockY + 42} fontSize="10.8" fill="#607791">Read top-down: transport → primary hub → branches → flows.</text>
-          <line x1={width - 292} y1={legendDockY + 66} x2={width - 228} y2={legendDockY + 66} stroke="#85a7e6" strokeWidth="3" />
-          <text x={width - 220} y={legendDockY + 70} fontSize="10.5" fill="#4d6280">Routed / inside</text>
-          <line x1={width - 292} y1={legendDockY + 88} x2={width - 228} y2={legendDockY + 88} stroke="#1d7f4c" strokeWidth="3" strokeDasharray="10 5" />
-          <text x={width - 220} y={legendDockY + 92} fontSize="10.5" fill="#4d6280">VPN / WAN overlay</text>
-          <line x1={width - 292} y1={legendDockY + 110} x2={width - 228} y2={legendDockY + 110} stroke="#ff7a59" strokeWidth="3" />
-          <text x={width - 220} y={legendDockY + 114} fontSize="10.5" fill="#4d6280">Critical flow</text>
+            <g>
+              <rect x={width - 322} y={legendDockY} width="274" height="122" rx="20" fill="rgba(255,255,255,0.9)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
+              <text x={width - 298} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Physical legend</text>
+              <text x={width - 298} y={legendDockY + 42} fontSize="10.8" fill="#607791">Read top-down: transport → primary hub → branches → flows.</text>
+              <line x1={width - 292} y1={legendDockY + 66} x2={width - 228} y2={legendDockY + 66} stroke="#85a7e6" strokeWidth="3" />
+              <text x={width - 220} y={legendDockY + 70} fontSize="10.5" fill="#4d6280">Routed / inside</text>
+              <line x1={width - 292} y1={legendDockY + 88} x2={width - 228} y2={legendDockY + 88} stroke="#1d7f4c" strokeWidth="3" strokeDasharray="10 5" />
+              <text x={width - 220} y={legendDockY + 92} fontSize="10.5" fill="#4d6280">VPN / WAN overlay</text>
+              <line x1={width - 292} y1={legendDockY + 110} x2={width - 228} y2={legendDockY + 110} stroke="#ff7a59" strokeWidth="3" />
+              <text x={width - 220} y={legendDockY + 114} fontSize="10.5" fill="#4d6280">Critical flow</text>
+            </g>
+          </>
+        ) : null}
         </g>
       </svg>
     </div>
@@ -2203,6 +2221,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const deviceFocus = controls?.deviceFocus ?? internalDeviceFocus;
   const linkFocus = controls?.linkFocus ?? internalLinkFocus;
   const focusedSiteId = controls?.focusedSiteId ?? internalFocusedSiteId;
+  const bareCanvas = controls?.bareCanvas ?? minimalWorkspace;
   const setMode = controls?.mode !== undefined ? (_next: DiagramMode) => {} : setInternalMode;
   const setOverlay = controls?.overlay !== undefined ? (_next: OverlayMode) => {} : setInternalOverlay;
   const setScope = controls?.scope !== undefined ? (_next: DiagramScope) => {} : setInternalScope;
@@ -2259,8 +2278,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
     return (
       <div className="panel diagram-minimal-panel">
         {mode === "logical"
-          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
-          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
+          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />
+          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />}
       </div>
     );
   }
@@ -2429,8 +2448,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
       {showSupportPanels ? <SiteDeviceLinkMatrixPanel synthesized={synthesized} siteIds={scopedSites.map((site) => site.id)} /> : null}
       {overlay === "flows" ? <FlowSummaryPanel flows={scopedFlows} /> : null}
       {mode === "logical"
-        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
-        : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
+        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />
+        : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />}
     </div>
   );
 }
