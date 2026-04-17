@@ -1226,6 +1226,18 @@ function PhysicalTopologyDiagram({
   const emphasizeDevice = (kind: DeviceKind) => deviceFocusMatchesKind(deviceFocus, kind);
   const legendTone = enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green";
   const totalVlanCount = sites.reduce((sum, site) => sum + (site.vlans?.length ?? 0), 0);
+  const transportSpineY = 308;
+  const sectionRailX = 56;
+  const branchAnchorBlueprint = branchSites.map((site, index) => {
+    const left = index % 2 === 0;
+    const row = Math.floor(index / 2);
+    const boxWidth = 320;
+    const x = left ? 72 : width - 392;
+    const y = siteRowStartY + row * siteRowGap;
+    return { site, index, row, left, x, y, anchorX: left ? x + boxWidth : x, anchorY: y + 92 };
+  });
+  const legendDockY = height - 168;
+  const siteIndexItems = (primarySite ? [primarySite, ...branchSites] : branchSites).slice(0, 4);
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1251,6 +1263,38 @@ function PhysicalTopologyDiagram({
         {chip(342, 410, 166, `Topology ${synthesized.topology.topologyLabel}`, "purple")}
         {chip(520, 410, 128, `Services ${synthesized.servicePlacements.length}`, "orange")}
 
+        <g opacity="0.9">
+          <rect x={sectionRailX} y={160} width="8" height={Math.max(520, fabricSectionBottom - 130)} rx="4" fill="#d9e7fb" />
+          <rect x={sectionRailX - 12} y={168} width="118" height="24" rx="12" fill="#eef5ff" stroke="#bfd2f3" />
+          <text x={sectionRailX + 47} y={184} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">TRANSPORT</text>
+          <rect x={sectionRailX - 12} y={352} width="118" height="24" rx="12" fill="#f4f8ff" stroke="#ccd8ed" />
+          <text x={sectionRailX + 47} y={368} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">SITE FABRIC</text>
+          {flowOverlays.length ? <><rect x={sectionRailX - 12} y={flowLaneStartY - 28} width="118" height="24" rx="12" fill="#fff4e8" stroke="#ffc98e" /><text x={sectionRailX + 47} y={flowLaneStartY - 12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#9a3412">FLOW LANE</text></> : null}
+        </g>
+
+        <g>
+          <path d={`M ${Math.max(120, centerX - 430)} ${transportSpineY} L ${Math.min(width - 120, centerX + 430)} ${transportSpineY}`} stroke="#8fb0eb" strokeWidth="5" strokeLinecap="round" opacity="0.9" />
+          <path d={`M ${Math.max(120, centerX - 430)} ${transportSpineY} L ${Math.min(width - 120, centerX + 430)} ${transportSpineY}`} stroke="#ffffff" strokeWidth="1.4" strokeDasharray="8 10" opacity="0.9" />
+          <text x={centerX} y={transportSpineY - 12} textAnchor="middle" fontSize="11" fontWeight="700" fill="#365d93">WAN / transport spine</text>
+          {branchAnchorBlueprint.map((entry) => (
+            <g key={`${entry.site.id}-spine-node`}>
+              <line x1={entry.anchorX} y1={transportSpineY} x2={entry.anchorX} y2={entry.anchorY - 18} stroke="#d0ddf2" strokeWidth="2.4" strokeDasharray="7 7" />
+              <circle cx={entry.anchorX} cy={transportSpineY} r="8" fill="#ffffff" stroke="#7ea3e1" strokeWidth="3" />
+              <text x={entry.anchorX} y={transportSpineY - 16} textAnchor="middle" fontSize="10" fill="#5e7691">{entry.site.name}</text>
+            </g>
+          ))}
+        </g>
+
+        {Array.from({ length: branchRows }).map((_, rowIndex) => {
+          const rowY = siteRowStartY + rowIndex * siteRowGap;
+          return (
+            <g key={`branch-row-${rowIndex}`}>
+              <rect x={116} y={rowY - 26} width={154} height="20" rx="10" fill="#eef5ff" stroke="#bfd2f3" />
+              <text x={193} y={rowY - 12} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">Branch fabric row {rowIndex + 1}</text>
+            </g>
+          );
+        })}
+
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
         <DeviceIcon x={centerX - 60} y={226} kind="firewall" label="Perimeter Firewall" sublabel={synthesized.topology.redundancyModel} emphasized={emphasizeDevice("firewall")} />
@@ -1264,6 +1308,19 @@ function PhysicalTopologyDiagram({
         <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text>
         {taskBadge(centerX + 236, 372, hqTaskCount)}
         {hqValidation.length > 0 ? chip(centerX + 82, 360, 148, `Validation ${hqValidation.length}`, hqValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
+
+        <rect x={centerX - 236} y={438} width={142} height={118} rx={22} fill="rgba(241,247,255,0.96)" stroke="#c7d8f7" strokeDasharray="7 5" />
+        <text x={centerX - 220} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Core routing cluster</text>
+        <text x={centerX - 220} y={474} fontSize="10" fill="#607791">Summaries, north-south control, inter-site path selection.</text>
+        <rect x={centerX - 86} y={442} width={144} height={112} rx={22} fill="rgba(245,249,255,0.96)" stroke="#d1def4" strokeDasharray="7 5" />
+        <text x={centerX - 70} y={462} fontSize="10.5" fontWeight="700" fill="#284b78">Core switching cluster</text>
+        <text x={centerX - 70} y={478} fontSize="10" fill="#607791">SVIs, trunks, campus switching, local segmentation.</text>
+        <rect x={centerX + 74} y={438} width={166} height={118} rx={22} fill="rgba(247,250,255,0.98)" stroke="#c9d7ee" strokeDasharray="7 5" />
+        <text x={centerX + 90} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Shared services cluster</text>
+        <text x={centerX + 90} y={474} fontSize="10" fill="#607791">Server roles, management anchors, shared applications.</text>
+        <rect x={centerX - 42} y={552} width={300} height={108} rx={24} fill="rgba(249,252,255,0.96)" stroke="#d7e5f8" strokeDasharray="7 5" />
+        <text x={centerX - 26} y={572} fontSize="10.5" fontWeight="700" fill="#284b78">User access and wireless fabric</text>
+        <text x={centerX - 26} y={588} fontSize="10" fill="#607791">Access switching, edge closets, PoE, and staff / guest wireless coverage.</text>
 
         <DeviceIcon x={centerX - 216} y={448} kind="router" label="Core Routing" sublabel="Summaries / north-south" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("router")} />
         <DeviceIcon x={centerX - 66} y={452} kind="core-switch" label="Core Switch" sublabel="Inter-VLAN / trunks" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("core-switch")} />
@@ -1279,8 +1336,11 @@ function PhysicalTopologyDiagram({
 
         {cloudNeeded ? (
           <g>
+            <rect x={width - 348} y={148} width="268" height="146" rx="28" fill="rgba(244,239,255,0.74)" stroke="#cdb7ff" strokeDasharray="9 7" />
+            <text x={width - 324} y={174} fontSize="11.5" fontWeight="700" fill="#5a34a3">Hybrid / cloud edge domain</text>
+            <text x={width - 324} y={192} fontSize="10.5" fill="#6e5a97">Cloud attachment, edge termination, and policy exchange stay visually grouped here.</text>
             <DeviceIcon x={width - 250} y={132} kind="cloud" label="Cloud" sublabel={synthesized.topology.cloudConnected ? "Connected" : "Optional"} showSublabel={showDetailedLabels} emphasized={emphasizeDevice("cloud")} />
-            <DeviceIcon x={width - 256} y={270} kind="cloud-edge" label="Cloud Edge" sublabel="VNet / VPN / route filters" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("cloud-edge")} />
+            <DeviceIcon x={width - 256} y={224} kind="cloud-edge" label="Cloud Edge" sublabel="VNet / VPN / route filters" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("cloud-edge")} />
             {renderPath([[centerX + 58, 262], [width - 220, 262]], "vpn", "Hybrid / cloud transport", requirements.cloudConnectivity || undefined)}
           </g>
         ) : null}
@@ -1322,6 +1382,7 @@ function PhysicalTopologyDiagram({
               <text x={x + 20} y={y + 30} fontSize="17" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
               <text x={x + 20} y={y + 49} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site block assigned"}</text>
               <text x={x + 20} y={y + 64} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
+              {chip(x + 18, y + 18, 106, left ? `Row ${row + 1} left` : `Row ${row + 1} right`, "blue")}
               {chip(x + 182, y + 46, 110, site.name === synthesized.topology.primarySiteName ? "Primary hub" : "Attached site", siteTierTone(site.name, synthesized))}
               {taskBadge(x + boxWidth - 28, y + 24, siteTaskCount)}
               {siteValidation.length > 0 ? chip(x + 150, y + 18, 132, `Validation ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
@@ -1378,6 +1439,32 @@ function PhysicalTopologyDiagram({
             </g>
           );
         }) : null}
+
+
+        <g>
+          <rect x={48} y={legendDockY} width="316" height="122" rx="20" fill="rgba(255,255,255,0.92)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
+          <text x={72} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Site index</text>
+          <text x={72} y={legendDockY + 42} fontSize="10.8" fill="#607791">Primary plus the first attached sites visible on this canvas.</text>
+          {siteIndexItems.map((site, index) => (
+            <g key={`${site.id}-site-index`}>
+              <circle cx={74} cy={legendDockY + 64 + index * 14} r="3.6" fill={index === 0 ? "#1d7f4c" : "#4d6fa8"} />
+              <text x={84} y={legendDockY + 68 + index * 14} fontSize="10.6" fill="#34506f">{site.name}</text>
+              <text x={186} y={legendDockY + 68 + index * 14} fontSize="10.2" fill="#607791">{site.defaultAddressBlock || "No summary block"}</text>
+            </g>
+          ))}
+        </g>
+
+        <g>
+          <rect x={width - 322} y={legendDockY} width="274" height="122" rx="20" fill="rgba(255,255,255,0.9)" stroke="#d5e1f2" filter="url(#diagram-soft-shadow)" />
+          <text x={width - 298} y={legendDockY + 24} fontSize="12.5" fontWeight="700" fill="#284b78">Physical legend</text>
+          <text x={width - 298} y={legendDockY + 42} fontSize="10.8" fill="#607791">Read top-down: transport → primary hub → branches → flows.</text>
+          <line x1={width - 292} y1={legendDockY + 66} x2={width - 228} y2={legendDockY + 66} stroke="#85a7e6" strokeWidth="3" />
+          <text x={width - 220} y={legendDockY + 70} fontSize="10.5" fill="#4d6280">Routed / inside</text>
+          <line x1={width - 292} y1={legendDockY + 88} x2={width - 228} y2={legendDockY + 88} stroke="#1d7f4c" strokeWidth="3" strokeDasharray="10 5" />
+          <text x={width - 220} y={legendDockY + 92} fontSize="10.5" fill="#4d6280">VPN / WAN overlay</text>
+          <line x1={width - 292} y1={legendDockY + 110} x2={width - 228} y2={legendDockY + 110} stroke="#ff7a59" strokeWidth="3" />
+          <text x={width - 220} y={legendDockY + 114} fontSize="10.5" fill="#4d6280">Critical flow</text>
+        </g>
       </svg>
     </div>
   );

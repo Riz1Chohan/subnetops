@@ -55,11 +55,6 @@ const detailItems = [
   { key: "links", label: "Ports / link notes" },
 ] as const;
 
-const canvasHints = [
-  "Live canvas is the primary diagram surface",
-  "Opens in physical topology mode by default",
-  "Canvas height grows with larger enterprise layouts",
-] as const;
 
 const diagramWorkspacePresets = [
   { key: "architecture", label: "Architecture", detail: "Global physical baseline", mode: "physical" as const, scope: "global" as const, overlays: [] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
@@ -83,6 +78,7 @@ export function ProjectDiagramPage() {
   const [focusedSiteId, setFocusedSiteId] = useState<string>("");
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+  const [isCanvasFocused, setIsCanvasFocused] = useState(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
@@ -302,8 +298,8 @@ export function ProjectDiagramPage() {
         </div>
       </div>
 
-      <div className="diagram-two-pane-workspace diagram-two-pane-workspace-professional">
-        <aside className="panel diagram-control-pane diagram-control-pane-professional">
+      <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
+        <aside className={`panel diagram-control-pane diagram-control-pane-professional${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
           <div className="diagram-control-section diagram-control-section-hero">
             <div>
               <strong>Display controls</strong>
@@ -312,6 +308,7 @@ export function ProjectDiagramPage() {
             <div className="diagram-quick-actions">
               <button type="button" className="diagram-utility-button" onClick={resetToBaseline}>Baseline</button>
               <button type="button" className="diagram-utility-button" onClick={enableReviewLayer}>Review set</button>
+              <button type="button" className="diagram-utility-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
             </div>
           </div>
 
@@ -405,65 +402,18 @@ export function ProjectDiagramPage() {
 
         <div className="diagram-display-pane diagram-display-pane-professional">
           <div className="panel diagram-display-shell">
-            <div className="diagram-display-header">
+            <div className="diagram-display-header diagram-display-header-tight">
               <div>
                 <span className="diagram-kicker">Live topology canvas</span>
                 <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} focus` : "Full diagram view"}</h3>
-                <p className="muted" style={{ margin: 0 }}>This page now opens directly into the live diagram canvas. Start with the base topology, then add only the exact layers you want for review.</p>
+                <p className="muted" style={{ margin: 0 }}>The canvas is now the first thing on the page. Start from the live topology, then use presets or overlays only when you need more detail.</p>
               </div>
               <div className="diagram-display-summary">
                 <span className="diagram-display-summary-chip">{mode === "logical" ? "Logical" : "Physical"}</span>
                 <span className="diagram-display-summary-chip">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
                 <span className="diagram-display-summary-chip">Layers: {overlayCount}</span>
+                <span className="diagram-display-summary-chip">Sites: {enrichedProject.sites.length}</span>
               </div>
-            </div>
-            <div className="diagram-canvas-cue-row">
-              {canvasHints.map((hint) => (
-                <span key={hint} className="diagram-canvas-cue-chip">{hint}</span>
-              ))}
-            </div>
-            <div className="diagram-architecture-strip">
-              <div className="diagram-architecture-strip-item">
-                <span>Primary topology</span>
-                <strong>{synthesized.topology.topologyLabel}</strong>
-              </div>
-              <div className="diagram-architecture-strip-item">
-                <span>Primary site</span>
-                <strong>{synthesized.topology.primarySiteName || "Not set"}</strong>
-              </div>
-              <div className="diagram-architecture-strip-item">
-                <span>Sites</span>
-                <strong>{enrichedProject.sites.length}</strong>
-              </div>
-              <div className="diagram-architecture-strip-item">
-                <span>Boundaries</span>
-                <strong>{synthesized.securityBoundaries.length}</strong>
-              </div>
-              <div className="diagram-architecture-strip-item">
-                <span>WAN links</span>
-                <strong>{synthesized.wanLinks.length}</strong>
-              </div>
-              <div className="diagram-architecture-strip-item">
-                <span>Service anchors</span>
-                <strong>{synthesized.servicePlacements.length}</strong>
-              </div>
-            </div>
-            <div className="diagram-canvas-primary-strip">
-              <div className="diagram-canvas-primary-copy">
-                <span className="diagram-kicker">Primary canvas</span>
-                <h4>One live diagram surface</h4>
-                <p className="muted" style={{ margin: 0 }}>The snapshot preview has been removed. This page now centers the actual topology canvas as the primary diagram experience.</p>
-              </div>
-              <div className="diagram-canvas-primary-metrics">
-                <span className="diagram-display-summary-chip">Primary: {synthesized.topology.primarySiteName || "Not set"}</span>
-                <span className="diagram-display-summary-chip">WAN: {synthesized.wanLinks.length}</span>
-                <span className="diagram-display-summary-chip">Boundaries: {synthesized.securityBoundaries.length}</span>
-                <span className="diagram-display-summary-chip">Services: {synthesized.servicePlacements.length}</span>
-              </div>
-            </div>
-            <div className="diagram-workspace-shortcuts">
-              <Link to={`/projects/${projectId}/report?section=assumptions`} className="diagram-workspace-shortcut-link">Open report section</Link>
-              <Link to={`/projects/${projectId}/logical-design?section=topology`} className="diagram-workspace-shortcut-link diagram-workspace-shortcut-link-secondary">Open logical design</Link>
             </div>
             <div className="diagram-preset-row">
               {diagramWorkspacePresets.map((preset) => {
@@ -501,6 +451,7 @@ export function ProjectDiagramPage() {
                   <span className="diagram-stage-passive-pill">{enrichedProject.sites.length} sites</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
+                  <button type="button" className="diagram-stage-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("svg"); }}>SVG</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("png"); }}>PNG</button>
                   <button
@@ -518,6 +469,27 @@ export function ProjectDiagramPage() {
                   >
                     {isCanvasFullscreen ? "Exit full screen" : "Full screen"}
                   </button>
+                </div>
+              </div>
+              <div className="diagram-stage-outline-dock" aria-label="Canvas outline">
+                <div className="diagram-stage-outline-card">
+                  <span className="diagram-stage-outline-kicker">Canvas outline</span>
+                  <strong>{mode === "physical" ? "Physical blueprint" : "Logical blueprint"}</strong>
+                  <div className="diagram-stage-outline-grid">
+                    <div><span>Primary</span><strong>{synthesized.topology.primarySiteName || "Not set"}</strong></div>
+                    <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
+                    <div><span>WAN links</span><strong>{synthesized.wanLinks.length}</strong></div>
+                    <div><span>Services</span><strong>{synthesized.servicePlacements.length}</strong></div>
+                  </div>
+                </div>
+                <div className="diagram-stage-outline-card diagram-stage-outline-card-compact">
+                  <span className="diagram-stage-outline-kicker">Reading order</span>
+                  <ol className="diagram-stage-outline-list">
+                    <li>North-south edge / WAN</li>
+                    <li>Primary fabric</li>
+                    <li>Branch fabrics</li>
+                    <li>Critical flows</li>
+                  </ol>
                 </div>
               </div>
               <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
@@ -541,6 +513,38 @@ export function ProjectDiagramPage() {
                     focusedSiteId: activeSiteId,
                   }}
                 />
+              </div>
+            </div>
+            <div className="diagram-stage-support-bar">
+              <div className="diagram-architecture-strip">
+                <div className="diagram-architecture-strip-item">
+                  <span>Primary topology</span>
+                  <strong>{synthesized.topology.topologyLabel}</strong>
+                </div>
+                <div className="diagram-architecture-strip-item">
+                  <span>Primary site</span>
+                  <strong>{synthesized.topology.primarySiteName || "Not set"}</strong>
+                </div>
+                <div className="diagram-architecture-strip-item">
+                  <span>Boundaries</span>
+                  <strong>{synthesized.securityBoundaries.length}</strong>
+                </div>
+                <div className="diagram-architecture-strip-item">
+                  <span>WAN links</span>
+                  <strong>{synthesized.wanLinks.length}</strong>
+                </div>
+                <div className="diagram-architecture-strip-item">
+                  <span>Service anchors</span>
+                  <strong>{synthesized.servicePlacements.length}</strong>
+                </div>
+                <div className="diagram-architecture-strip-item">
+                  <span>Issues</span>
+                  <strong>{openIssues}</strong>
+                </div>
+              </div>
+              <div className="diagram-workspace-shortcuts">
+                <Link to={`/projects/${projectId}/report?section=assumptions`} className="diagram-workspace-shortcut-link">Open report section</Link>
+                <Link to={`/projects/${projectId}/logical-design?section=topology`} className="diagram-workspace-shortcut-link diagram-workspace-shortcut-link-secondary">Open logical design</Link>
               </div>
             </div>
           </div>
