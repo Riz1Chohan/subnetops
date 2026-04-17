@@ -2271,10 +2271,12 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   };
 
   if (sites.length === 0) {
-    return <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
+    return bareCanvas || minimalWorkspace || compact
+      ? <div className="panel diagram-minimal-panel"><div className="diagram-empty-message">Add sites and VLANs to generate a topology diagram.</div></div>
+      : <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
   }
 
-  if (minimalWorkspace) {
+  if (minimalWorkspace || bareCanvas || compact) {
     return (
       <div className="panel diagram-minimal-panel">
         {mode === "logical"

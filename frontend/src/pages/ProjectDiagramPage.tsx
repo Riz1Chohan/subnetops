@@ -165,6 +165,16 @@ export function ProjectDiagramPage() {
   const activeSiteId = focusedSiteId || enrichedProject.sites[0]?.id || "";
   const overlayFocus: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? "none";
   const overlayCount = activeOverlays.length;
+  const effectiveLabelFocus = (() => {
+    let next: "all" | "topology" | "addressing" | "zones" | "transport" | "flows" = activeOverlays.length ? "all" : "topology";
+    if (scope === "wan-cloud") next = "transport";
+    else if (scope === "boundaries") next = "zones";
+    if (activeOverlays.includes("addressing")) next = "addressing";
+    if (activeOverlays.includes("security")) next = "zones";
+    if (activeOverlays.includes("redundancy")) next = next === "addressing" ? "addressing" : "transport";
+    if (activeOverlays.includes("flows")) next = "flows";
+    return next;
+  })();
   const activeSiteName = enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "site";
   const canvasFileBase = `${project.name.replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
   const estimatedSiteCount = scope === "site" ? 1 : enrichedProject.sites.length || 1;
@@ -247,6 +257,54 @@ export function ProjectDiagramPage() {
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
     );
   };
+
+  useEffect(() => {
+    let nextDeviceFocus: DeviceFocus = "all";
+    let nextLinkFocus: LinkFocus = "all";
+    let nextLabelFocus: "all" | "topology" | "addressing" | "zones" | "transport" | "flows" = activeOverlays.length ? "all" : "topology";
+
+    if (scope === "wan-cloud") {
+      nextDeviceFocus = "edge";
+      nextLinkFocus = "transport";
+      nextLabelFocus = "transport";
+    } else if (scope === "boundaries") {
+      nextDeviceFocus = "edge";
+      nextLinkFocus = "security";
+      nextLabelFocus = "zones";
+    }
+
+    if (activeOverlays.includes("addressing")) {
+      nextLabelFocus = "addressing";
+    }
+    if (activeOverlays.includes("security")) {
+      nextDeviceFocus = "edge";
+      nextLinkFocus = "security";
+      nextLabelFocus = "zones";
+    }
+    if (activeOverlays.includes("services")) {
+      nextDeviceFocus = "services";
+    }
+    if (activeOverlays.includes("redundancy")) {
+      nextDeviceFocus = nextDeviceFocus === "services" ? "services" : "edge";
+      nextLinkFocus = "transport";
+      nextLabelFocus = nextLabelFocus === "addressing" ? "addressing" : "transport";
+    }
+    if (activeOverlays.includes("flows")) {
+      nextLinkFocus = "flows";
+      nextLabelFocus = "flows";
+    }
+
+    setDeviceFocus((current) => (current === nextDeviceFocus ? current : nextDeviceFocus));
+    setLinkFocus((current) => (current === nextLinkFocus ? current : nextLinkFocus));
+    setLabelMode((current) => {
+      const desired = activeOverlays.length > 0 ? "detailed" : current;
+      return current === desired ? current : desired;
+    });
+    setLinkAnnotationMode((current) => {
+      const desired = activeOverlays.includes("flows") || activeOverlays.includes("addressing") ? "full" : current;
+      return current === desired ? current : desired;
+    });
+  }, [activeOverlays, scope]);
 
   const resetToBaseline = () => {
     setMode("physical");
@@ -462,7 +520,7 @@ export function ProjectDiagramPage() {
                     workspaceDensity: "guided",
                     labelMode,
                     linkAnnotationMode,
-                    labelFocus: activeOverlays.length === 0 ? "topology" : "all",
+                    labelFocus: effectiveLabelFocus,
                     deviceFocus,
                     linkFocus: linkFocus === "all"
                       ? (activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all")
