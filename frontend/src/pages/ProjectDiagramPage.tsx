@@ -100,10 +100,10 @@ export function ProjectDiagramPage() {
   const project = projectQuery.data;
   const projectSites = project?.sites ?? [];
   const fetchedSites = sitesQuery.data ?? [];
-  const sites = fetchedSites.length >= projectSites.length ? fetchedSites : projectSites;
+  const baseSites = fetchedSites.length >= projectSites.length ? fetchedSites : projectSites;
   const projectVlans = projectSites.flatMap((site) => site.vlans ?? []);
   const fetchedVlans = vlansQuery.data ?? [];
-  const vlans = fetchedVlans.length > 0 ? fetchedVlans : projectVlans;
+  const baseVlans = fetchedVlans.length > 0 ? fetchedVlans : projectVlans;
   const comments = commentsQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
@@ -133,6 +133,48 @@ export function ProjectDiagramPage() {
       />
     );
   }
+
+  const seedProject = {
+    ...project,
+    sites: baseSites.map((site) => ({
+      ...site,
+      vlans: baseVlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
+    })),
+  };
+
+  const seedSynthesized = synthesizeLogicalDesign(seedProject, seedProject.sites, baseVlans, requirementsProfile);
+
+  const sites = baseSites.length > 0
+    ? baseSites
+    : seedSynthesized.siteSummaries.map((site) => ({
+        id: site.id,
+        projectId: project.id,
+        name: site.name,
+        location: site.location,
+        siteCode: site.siteCode,
+        notes: site.note,
+        defaultAddressBlock: site.siteBlockCidr,
+      }));
+
+  const vlans = baseVlans.length > 0
+    ? baseVlans
+    : seedSynthesized.addressingPlan.map((row, index) => ({
+        id: row.id || `proposed-vlan-${index}`,
+        siteId: row.siteId,
+        vlanId: row.vlanId ?? 0,
+        vlanName: row.segmentName,
+        purpose: row.purpose,
+        subnetCidr: row.subnetCidr,
+        gatewayIp: row.gatewayIp,
+        dhcpEnabled: row.dhcpEnabled,
+        estimatedHosts: row.estimatedHosts,
+        notes: row.notes.join(" • "),
+        site: {
+          id: row.siteId,
+          name: row.siteName,
+          siteCode: row.siteCode,
+        },
+      }));
 
   const enrichedProject = {
     ...project,
