@@ -3621,3 +3621,145 @@ tr:last-child td {
   background: rgba(67, 86, 115, 0.72);
   border-color: rgba(110, 168, 254, 0.26);
 }
+
+
+/* v341 diagram actual-visibility + report landing pass */
+.diagram-hero-card {
+  margin-top: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.98));
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.diagram-hero-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.diagram-hero-card-header h3 {
+  margin: 4px 0 6px 0;
+  font-size: 1.2rem;
+}
+
+.diagram-hero-schematic-shell {
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(249, 251, 255, 0.98), rgba(240, 246, 252, 0.98));
+}
+
+.diagram-hero-schematic {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.diagram-workspace-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagram-workspace-shortcut-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(239, 246, 255, 0.9);
+  color: #174ea6;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.diagram-workspace-shortcut-link-secondary {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: #334155;
+}
+
+.report-landing-shell {
+  border-radius: 24px;
+}
+
+.report-landing-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.report-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.report-section-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.98));
+  color: #1f354f;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.report-section-card strong {
+  font-size: 14px;
+}
+
+.report-section-card span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+@media (max-width: 960px) {
+  .diagram-hero-card-header,
+  .report-landing-metrics,
+  .report-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagram-hero-card-header {
+    display: grid;
+  }
+}
+
+:root[data-theme="dark"] .diagram-hero-card,
+:root[data-theme="dark"] .diagram-hero-schematic-shell,
+:root[data-theme="dark"] .report-section-card {
+  background: rgba(52, 58, 70, 0.92);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .diagram-workspace-shortcut-link {
+  background: rgba(67, 86, 115, 0.7);
+  border-color: rgba(110, 168, 254, 0.24);
+  color: #dbeafe;
+}
+
+:root[data-theme="dark"] .diagram-workspace-shortcut-link-secondary {
+  background: rgba(47, 53, 63, 0.92);
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .report-section-card strong {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .report-section-card span {
+  color: #aeb7c2;
+}

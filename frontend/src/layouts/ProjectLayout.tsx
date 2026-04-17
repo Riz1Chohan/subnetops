@@ -125,7 +125,7 @@ export function ProjectLayout() {
     {
       key: "deliver",
       label: "Deliver",
-      path: `/projects/${projectId}/report`,
+      path: `/projects/${projectId}/report?section=assumptions`,
       summary: "Report, diagram, and handoff outputs.",
       matchers: ["/report", "/diagram"],
     },
@@ -254,7 +254,7 @@ export function ProjectLayout() {
             </div>
             <div className="project-header-actions">
               <Link to={`/projects/${projectId}/diagram?section=canvas`} className={location.pathname.includes("/diagram") ? "project-quick-link active" : "project-quick-link"}>Diagram</Link>
-              <Link to={`/projects/${projectId}/report`} className={location.pathname.includes("/report") ? "project-quick-link active" : "project-quick-link"}>Reports</Link>
+              <Link to={`/projects/${projectId}/report?section=assumptions`} className={location.pathname.includes("/report") ? "project-quick-link active" : "project-quick-link"}>Reports</Link>
             </div>
           </div>
         </div>

@@ -224,6 +224,15 @@ export function ProjectReportPage() {
     }
   };
 
+  const reportSectionLinks = [
+    { key: "assumptions", label: "Assumptions & constraints", detail: "Start the written package from the design basis and open issues.", path: `/projects/${projectId}/report?section=assumptions` },
+    { key: "topology", label: "Topology & placement", detail: "Open the topology narrative and placement story.", path: `/projects/${projectId}/report?section=topology` },
+    { key: "addressing", label: "Addressing hierarchy", detail: "Review site blocks, VLANs, and subnet allocations.", path: `/projects/${projectId}/report?section=addressing` },
+    { key: "services-security", label: "Services & boundaries", detail: "Check service anchors, trust zones, and DMZ posture.", path: `/projects/${projectId}/report?section=services-security` },
+    { key: "routing-flows", label: "Routing & flows", detail: "Review routing posture and required traffic paths.", path: `/projects/${projectId}/report?section=routing-flows` },
+    { key: "site-lld", label: "Site low-level design", detail: "Jump into per-site engineering detail and implementation posture.", path: `/projects/${projectId}/report?section=site-lld` },
+  ];
+
   const topValidationItems = validations
     .filter((item) => item.severity !== "INFO")
     .sort((a, b) => (a.severity === b.severity ? a.createdAt.localeCompare(b.createdAt) : a.severity === "ERROR" ? -1 : 1))
@@ -232,10 +241,24 @@ export function ProjectReportPage() {
   if (!selectedSection) {
     return (
       <section style={{ display: "grid", gap: 18 }}>
-        <div className="panel workspace-selection-blank">
+        <div className="panel workspace-selection-blank report-landing-shell">
           <p className="workspace-detail-kicker">Deliver</p>
-          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
-          <p className="muted" style={{ margin: 0 }}>Choose a deliverable card from the left pane to open that report section only.</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
+          <p className="muted" style={{ margin: 0 }}>Pick a section below or use the left pane. This page now opens as a usable report hub instead of a dead-end blank state.</p>
+          <div className="report-landing-metrics">
+            {summaryCard("Sites", synthesized.siteSummaries.length)}
+            {summaryCard("Address rows", synthesized.addressingPlan.length)}
+            {summaryCard("Errors", errorCount)}
+            {summaryCard("Warnings", warningCount)}
+          </div>
+          <div className="report-section-grid">
+            {reportSectionLinks.map((item) => (
+              <Link key={item.key} to={item.path} className="report-section-card">
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     );
