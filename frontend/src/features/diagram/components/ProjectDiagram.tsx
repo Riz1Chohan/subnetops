@@ -132,6 +132,18 @@ function getSvgElement(svgId: string) {
   return document.getElementById(svgId) as unknown as SVGSVGElement | null;
 }
 
+function siteTierLabel(siteName: string, synthesized: SynthesizedLogicalDesign) {
+  return siteName === synthesized.topology.primarySiteName
+    ? "Primary site / shared-service hub"
+    : synthesized.topology.topologyType === "collapsed-core"
+      ? "Campus / attached access domain"
+      : "Attached site / routed edge domain";
+}
+
+function siteTierTone(siteName: string, synthesized: SynthesizedLogicalDesign): ChipTone {
+  return siteName === synthesized.topology.primarySiteName ? "blue" : synthesized.topology.topologyType === "collapsed-core" ? "purple" : "green";
+}
+
 function DiagramCanvasDefs() {
   return (
     <defs>
@@ -616,25 +628,25 @@ function primaryDmzService(synthesized: SynthesizedLogicalDesign, siteName?: str
 function sitePositionMap(sites: SiteWithVlans[], synthesized: SynthesizedLogicalDesign, cardWidth: number, startX: number, gap: number): Record<string, SitePoint> {
   const positions: Record<string, SitePoint> = {};
   if (sites.length === 1) {
-    positions[sites[0].id] = { x: 560, y: 210 };
+    positions[sites[0].id] = { x: 560, y: 272 };
     return positions;
   }
 
   if (synthesized.topology.topologyType === "hub-spoke" && synthesized.topology.primarySiteId) {
     const primary = sites.find((site) => site.id === synthesized.topology.primarySiteId) || sites[0];
     const branches = sites.filter((site) => site.id !== primary.id);
-    positions[primary.id] = { x: 560, y: 170 };
+    positions[primary.id] = { x: 560, y: 258 };
     const columns = Math.min(3, Math.max(2, branches.length));
     branches.forEach((site, index) => {
       const row = Math.floor(index / columns);
       const col = index % columns;
-      positions[site.id] = { x: 120 + col * (cardWidth + 90), y: 580 + row * 400 };
+      positions[site.id] = { x: 120 + col * (cardWidth + 90), y: 664 + row * 400 };
     });
     return positions;
   }
 
   sites.forEach((site, index) => {
-    positions[site.id] = { x: startX + index * (cardWidth + gap), y: 178 };
+    positions[site.id] = { x: startX + index * (cardWidth + gap), y: 272 };
   });
   return positions;
 }
@@ -1012,11 +1024,18 @@ function LogicalTopologyDiagram({
   const occupiedXs = Object.values(sitePositions).map((point) => point.x);
   const occupiedYs = Object.values(sitePositions).map((point) => point.y);
   const width = Math.max(1600, (Math.max(...occupiedXs, 0)) + cardWidth + 120);
-  const height = Math.max(980, (Math.max(...occupiedYs, 0)) + cardHeight + 120);
+  const height = Math.max(1100, (Math.max(...occupiedYs, 0)) + cardHeight + 120);
   const showDetailedLabels = labelMode === "detailed";
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, label, secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
+  const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
+  const primarySitePoint = primarySite ? sitePositions[primarySite.id] : undefined;
+  const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
+  const globalInternetX = primarySitePoint ? primarySitePoint.x + cardWidth / 2 - 61 : Math.max(80, (width / 2) - 61);
+  const globalInternetY = 146;
+  const cloudX = width - 250;
+  const cloudY = 154;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1031,6 +1050,12 @@ function LogicalTopologyDiagram({
           chipTone={enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green"}
         />
         {chip(width - 286, 82, 210, "Logical posture review", "green")}
+        <rect x={36} y={136} width={width - 72} height={110} rx={34} fill="rgba(238,245,255,0.8)" stroke="#c9d9f1" strokeDasharray="10 7" />
+        <text x={60} y={164} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN / cloud zone</text>
+        <text x={60} y={184} fontSize="11" fill="#607791">Internet, perimeter controls, hybrid edge, and inter-site transport anchors stay grouped here so the logical view reads more like an actual architecture map.</text>
+        <rect x={36} y={266} width={width - 72} height={height - 322} rx={34} fill="rgba(255,255,255,0.5)" stroke="#d7e2f1" strokeDasharray="10 8" />
+        <text x={60} y={294} fontSize="12.5" fontWeight="700" fill="#284b78">Site fabric domains</text>
+        <text x={60} y={314} fontSize="11" fill="#607791">Each site card shows edge, switching, service, wireless, and boundary clues so the topology reads like a real multi-site estate instead of a generic card grid.</text>
 
         {sites.map((site, index) => {
           const sitePoint = sitePositions[site.id] || { x: startX + index * (cardWidth + gap), y: 178 };
@@ -1054,6 +1079,7 @@ function LogicalTopologyDiagram({
               <text x={x + 20} y={y + 30} fontSize="18" fontWeight="700" fill="#142742" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
               <text x={x + 20} y={y + 50} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site summary block assigned"}</text>
               <text x={x + 20} y={y + 68} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
+              {chip(x + 164, y + 52, 108, site.name === synthesized.topology.primarySiteName ? "Primary hub" : "Attached site", siteTierTone(site.name, synthesized))}
               {taskBadge(x + cardWidth - 24, y + 24, taskCount)}
               {siteValidation.length > 0 ? chip(x + 156, y + 18, 94, `${validationTone.label} ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
               {site.name === synthesized.topology.primarySiteName ? <rect x={x + 18} y={y + 76} width={cardWidth - 36} height="14" rx="7" fill="#eef4ff" stroke="#bfd2f3" /> : null}
@@ -1092,6 +1118,13 @@ function LogicalTopologyDiagram({
           );
         })}
 
+        {sites.length > 1 ? (
+          <g>
+            <rect x={84} y={height - 184} width={width - 168} height={78} rx={28} fill="rgba(238,245,255,0.74)" stroke="#c9d9f1" strokeDasharray="8 6" />
+            <text x={112} y={height - 152} fontSize="12.5" fontWeight="700" fill="#284b78">Inter-site transport posture</text>
+            <text x={112} y={height - 132} fontSize="11" fill="#607791">Hub-and-spoke sites point toward the primary site. Campus or routed layouts show local backbone or inter-site path semantics directly on the canvas.</text>
+          </g>
+        ) : null}
         {sites.length > 1 ? (
           synthesized.topology.topologyType === "hub-spoke" && synthesized.topology.primarySiteId
             ? sites.filter((site) => site.id !== synthesized.topology.primarySiteId).map((site) => {
@@ -1198,6 +1231,12 @@ function PhysicalTopologyDiagram({
           chipTone={legendTone}
         />
         {(enabledOverlays.length ? enabledOverlays : ["none"]).flatMap((mode) => diagramLegend(mode as OverlayMode).details).slice(0, 3).map((detail, index) => <text key={`${detail}-${index}`} x={width - 300} y={100 + index * 18} fontSize="11" fill="#607791">• {detail}</text>)}
+        <rect x={48} y={148} width={width - 96} height={170} rx={46} fill="rgba(238,245,255,0.76)" stroke="#c6d9f5" strokeDasharray="10 8" />
+        <text x={78} y={178} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN transport domain</text>
+        <text x={78} y={198} fontSize="11" fill="#607791">Internet, firewall, DMZ, hybrid edge, and upstream transport stay grouped here so the physical view immediately reads as a real network diagram.</text>
+        <rect x={48} y={336} width={width - 96} height={388} rx={40} fill="rgba(255,255,255,0.48)" stroke="#d5e1f2" strokeDasharray="10 8" />
+        <text x={78} y={366} fontSize="12.5" fontWeight="700" fill="#284b78">Primary and branch site fabrics</text>
+        <text x={78} y={386} fontSize="11" fill="#607791">Site containers expose edge, switching, service, wireless, and boundary elements in a more diagram-like blueprint layout rather than isolated cards.</text>
 
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
@@ -1270,6 +1309,7 @@ function PhysicalTopologyDiagram({
               <text x={x + 20} y={y + 30} fontSize="17" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
               <text x={x + 20} y={y + 49} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site block assigned"}</text>
               <text x={x + 20} y={y + 64} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
+              {chip(x + 182, y + 46, 110, site.name === synthesized.topology.primarySiteName ? "Primary hub" : "Attached site", siteTierTone(site.name, synthesized))}
               {taskBadge(x + boxWidth - 28, y + 24, siteTaskCount)}
               {siteValidation.length > 0 ? chip(x + 150, y + 18, 132, `Validation ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
 

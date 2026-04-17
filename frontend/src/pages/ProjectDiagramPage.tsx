@@ -56,9 +56,16 @@ const detailItems = [
 ] as const;
 
 const canvasHints = [
-  "Default = devices + connection lines",
+  "Opens in physical topology mode by default",
   "Turn on only the layers you need",
-  "Use Per-site scope for detailed review",
+  "Use Per-site scope for deeper local review",
+] as const;
+
+const diagramWorkspacePresets = [
+  { key: "architecture", label: "Architecture", detail: "Global physical baseline", mode: "physical" as const, scope: "global" as const, overlays: [] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
+  { key: "transport", label: "WAN / Cloud", detail: "Transport and hybrid edge", mode: "physical" as const, scope: "wan-cloud" as const, overlays: ["redundancy", "flows"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
+  { key: "boundaries", label: "Boundaries", detail: "Zones, DMZ, and control points", mode: "physical" as const, scope: "boundaries" as const, overlays: ["security", "services"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
+  { key: "site", label: "Site detail", detail: "Focused local topology", mode: "physical" as const, scope: "site" as const, overlays: ["addressing", "security"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
 ] as const;
 
 export function ProjectDiagramPage() {
@@ -68,11 +75,11 @@ export function ProjectDiagramPage() {
   const commentsQuery = useProjectComments(projectId);
   const validationQuery = useValidationResults(projectId);
 
-  const [mode, setMode] = useState<DiagramMode>("logical");
+  const [mode, setMode] = useState<DiagramMode>("physical");
   const [scope, setScope] = useState<DiagramScope>("global");
   const [activeOverlays, setActiveOverlays] = useState<ActiveOverlayMode[]>([]);
-  const [labelMode, setLabelMode] = useState<DiagramLabelMode>("essential");
-  const [linkAnnotationMode, setLinkAnnotationMode] = useState<LinkAnnotationMode>("minimal");
+  const [labelMode, setLabelMode] = useState<DiagramLabelMode>("detailed");
+  const [linkAnnotationMode, setLinkAnnotationMode] = useState<LinkAnnotationMode>("full");
   const [focusedSiteId, setFocusedSiteId] = useState<string>("");
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
@@ -127,6 +134,14 @@ export function ProjectDiagramPage() {
     return node instanceof SVGSVGElement ? node : null;
   };
 
+  const centerCanvasViewport = (behavior: ScrollBehavior = "auto") => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+    const nextLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+    const nextTop = Math.max(0, (viewport.scrollHeight - viewport.clientHeight) / 2);
+    viewport.scrollTo({ left: nextLeft, top: nextTop, behavior });
+  };
+
   const fitCanvasToView = () => {
     const viewport = canvasViewportRef.current;
     const svg = getCanvasSvg();
@@ -135,7 +150,8 @@ export function ProjectDiagramPage() {
     const baseHeight = Number(svg.getAttribute("height")) || svg.viewBox.baseVal.height || 1000;
     const widthFactor = (viewport.clientWidth - 28) / baseWidth;
     const heightFactor = (viewport.clientHeight - 28) / baseHeight;
-    const nextZoom = Math.min(1.05, Math.max(0.55, Number(Math.min(widthFactor, heightFactor).toFixed(2))));
+    const fitFactor = Math.min(widthFactor, heightFactor * 1.08);
+    const nextZoom = Math.min(1.12, Math.max(0.68, Number(fitFactor.toFixed(2))));
     setCanvasZoom(nextZoom);
   };
 
@@ -202,20 +218,33 @@ export function ProjectDiagramPage() {
   );
 
   const resetToBaseline = () => {
-    setMode("logical");
+    setMode("physical");
     setScope("global");
     setActiveOverlays([]);
-    setLabelMode("essential");
-    setLinkAnnotationMode("minimal");
+    setLabelMode("detailed");
+    setLinkAnnotationMode("full");
     setFocusedSiteId(enrichedProject.sites[0]?.id || "");
   };
 
   const enableReviewLayer = () => {
-    setMode("logical");
+    setMode("physical");
     setScope("global");
     setActiveOverlays(["addressing", "security", "services", "flows"]);
     setLabelMode("detailed");
     setLinkAnnotationMode("full");
+  };
+
+  const applyWorkspacePreset = (presetKey: (typeof diagramWorkspacePresets)[number]["key"]) => {
+    const preset = diagramWorkspacePresets.find((item) => item.key === presetKey);
+    if (!preset) return;
+    setMode(preset.mode);
+    setScope(preset.scope);
+    setActiveOverlays([...preset.overlays]);
+    setLabelMode(preset.labelMode);
+    setLinkAnnotationMode(preset.linkAnnotationMode);
+    if (preset.scope === "site") {
+      setFocusedSiteId(enrichedProject.sites[0]?.id || "");
+    }
   };
 
   useEffect(() => {
@@ -227,6 +256,8 @@ export function ProjectDiagramPage() {
     svg.style.height = `${Math.round(baseHeight * canvasZoom)}px`;
     svg.style.maxWidth = "none";
     svg.style.display = "block";
+    const raf = window.requestAnimationFrame(() => centerCanvasViewport());
+    return () => window.cancelAnimationFrame(raf);
   }, [canvasZoom, mode, scope, activeSiteId, overlayCount, labelMode, linkAnnotationMode]);
 
   useEffect(() => {
@@ -385,6 +416,52 @@ export function ProjectDiagramPage() {
               {canvasHints.map((hint) => (
                 <span key={hint} className="diagram-canvas-cue-chip">{hint}</span>
               ))}
+            </div>
+            <div className="diagram-architecture-strip">
+              <div className="diagram-architecture-strip-item">
+                <span>Primary topology</span>
+                <strong>{synthesized.topology.topologyLabel}</strong>
+              </div>
+              <div className="diagram-architecture-strip-item">
+                <span>Primary site</span>
+                <strong>{synthesized.topology.primarySiteName || "Not set"}</strong>
+              </div>
+              <div className="diagram-architecture-strip-item">
+                <span>Sites</span>
+                <strong>{enrichedProject.sites.length}</strong>
+              </div>
+              <div className="diagram-architecture-strip-item">
+                <span>Boundaries</span>
+                <strong>{synthesized.securityBoundaries.length}</strong>
+              </div>
+              <div className="diagram-architecture-strip-item">
+                <span>WAN links</span>
+                <strong>{synthesized.wanLinks.length}</strong>
+              </div>
+              <div className="diagram-architecture-strip-item">
+                <span>Service anchors</span>
+                <strong>{synthesized.servicePlacements.length}</strong>
+              </div>
+            </div>
+            <div className="diagram-preset-row">
+              {diagramWorkspacePresets.map((preset) => {
+                const isActive =
+                  mode === preset.mode &&
+                  scope === preset.scope &&
+                  preset.overlays.every((overlay) => activeOverlays.includes(overlay)) &&
+                  activeOverlays.every((overlay) => preset.overlays.includes(overlay));
+                return (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    className={isActive ? "diagram-preset-chip active" : "diagram-preset-chip"}
+                    onClick={() => applyWorkspacePreset(preset.key)}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span>{preset.detail}</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="diagram-stage-surface-pro" ref={canvasStageRef}>
               <div className="diagram-stage-toolbar-pro">

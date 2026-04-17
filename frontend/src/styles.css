@@ -3510,3 +3510,114 @@ tr:last-child td {
   background: linear-gradient(180deg, rgba(43, 48, 56, 0.98), rgba(35, 39, 47, 0.98));
   border-color: rgba(255, 255, 255, 0.08);
 }
+
+
+/* v340 diagram realism / preset pass */
+.diagram-architecture-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagram-architecture-strip-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 253, 0.96));
+  min-width: 0;
+}
+
+.diagram-architecture-strip-item span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.diagram-architecture-strip-item strong {
+  font-size: 14px;
+  color: #142742;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diagram-preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagram-preset-chip {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f354f;
+  text-align: left;
+}
+
+.diagram-preset-chip strong {
+  font-size: 13px;
+}
+
+.diagram-preset-chip span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.diagram-preset-chip.active {
+  border-color: rgba(59, 130, 246, 0.26);
+  background: rgba(239, 246, 255, 0.98);
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+}
+
+.diagram-stage-viewport-pro {
+  min-height: 760px;
+}
+
+@media (max-width: 1180px) {
+  .diagram-architecture-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .diagram-preset-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .diagram-architecture-strip,
+  .diagram-preset-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+:root[data-theme="dark"] .diagram-architecture-strip-item,
+:root[data-theme="dark"] .diagram-preset-chip {
+  background: rgba(52, 58, 70, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .diagram-architecture-strip-item strong,
+:root[data-theme="dark"] .diagram-preset-chip {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .diagram-architecture-strip-item span,
+:root[data-theme="dark"] .diagram-preset-chip span {
+  color: #aeb7c2;
+}
+
+:root[data-theme="dark"] .diagram-preset-chip.active {
+  background: rgba(67, 86, 115, 0.72);
+  border-color: rgba(110, 168, 254, 0.26);
+}
