@@ -4118,3 +4118,73 @@ tr:last-child td {
   border-color: rgba(129, 199, 161, 0.22);
   box-shadow: 0 10px 22px rgba(0,0,0,0.24);
 }
+
+
+/* v350 dark-mode diagram control readability pass */
+:root[data-theme="dark"] .diagram-control-pane-professional {
+  background: linear-gradient(180deg, rgba(46, 52, 63, 0.98), rgba(39, 44, 53, 0.98));
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .diagram-control-card {
+  background: linear-gradient(180deg, rgba(51, 57, 69, 0.96), rgba(42, 47, 57, 0.96));
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+:root[data-theme="dark"] .diagram-control-label,
+:root[data-theme="dark"] .diagram-control-metrics span {
+  color: #c2cbd7;
+}
+
+:root[data-theme="dark"] .diagram-control-metrics div {
+  background: rgba(39, 44, 53, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .diagram-control-metrics strong {
+  color: #eef2f7;
+}
+
+:root[data-theme="dark"] .diagram-utility-button {
+  background: rgba(51, 57, 69, 0.94);
+  color: #eef2f7;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .diagram-utility-button:hover {
+  background: rgba(62, 69, 82, 0.96);
+}
+
+:root[data-theme="dark"] .diagram-chip-button {
+  background: rgba(45, 50, 60, 0.96);
+  color: #eef2f7;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .diagram-chip-button span {
+  color: #eef2f7;
+}
+
+:root[data-theme="dark"] .diagram-chip-button small {
+  color: #c2cbd7;
+}
+
+:root[data-theme="dark"] .diagram-chip-button:hover {
+  background: rgba(58, 65, 78, 0.96);
+}
+
+:root[data-theme="dark"] .diagram-chip-button.active {
+  background: linear-gradient(180deg, rgba(64, 90, 132, 0.98), rgba(48, 70, 104, 0.97));
+  border-color: rgba(147, 197, 253, 0.36);
+  color: #f8fbff;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="dark"] .diagram-chip-button.active span {
+  color: #f8fbff;
+}
+
+:root[data-theme="dark"] .diagram-chip-button.active small {
+  color: #dbeafe;
+}
+
