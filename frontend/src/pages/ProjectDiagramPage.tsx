@@ -58,7 +58,7 @@ const detailItems = [
 const canvasHints = [
   "Opens in physical topology mode by default",
   "Turn on only the layers you need",
-  "Use Per-site scope for deeper local review",
+  "Canvas height grows with larger enterprise layouts",
 ] as const;
 
 function ArchitectureSchematicPreview({
@@ -235,6 +235,11 @@ export function ProjectDiagramPage() {
   const overlayCount = activeOverlays.length;
   const activeSiteName = enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "site";
   const canvasFileBase = `${project.name.replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
+  const estimatedSiteCount = scope === "site" ? 1 : enrichedProject.sites.length || 1;
+  const estimatedBranchRows = Math.max(1, Math.ceil(Math.max(estimatedSiteCount - 1, 0) / 2));
+  const canvasViewportMinHeight = mode === "physical"
+    ? Math.max(760, 760 + Math.max(0, estimatedBranchRows - 1) * 250 + (activeOverlays.includes("flows") ? 120 : 0))
+    : Math.max(720, 720 + Math.max(0, estimatedSiteCount - 4) * 90);
 
   const getCanvasSvg = () => {
     const node = canvasViewportRef.current?.querySelector("svg");
@@ -612,7 +617,7 @@ export function ProjectDiagramPage() {
                   </button>
                 </div>
               </div>
-              <div className="diagram-stage-viewport-pro" ref={canvasViewportRef}>
+              <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
                 <ProjectDiagram
                   project={enrichedProject}
                   comments={comments}

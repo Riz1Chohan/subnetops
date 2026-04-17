@@ -3456,9 +3456,9 @@ tr:last-child td {
 }
 
 .diagram-stage-viewport-pro {
-  overflow: auto;
-  min-height: 680px;
-  max-height: calc(100vh - 280px);
+  overflow-x: auto;
+  overflow-y: visible;
+  min-height: var(--diagram-stage-min-height, 760px);
   padding: 14px;
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.14);
@@ -3477,7 +3477,6 @@ tr:last-child td {
 @media (max-width: 980px) {
   .diagram-stage-viewport-pro {
     min-height: 520px;
-    max-height: none;
   }
 }
 
@@ -3580,9 +3579,6 @@ tr:last-child td {
   box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
 }
 
-.diagram-stage-viewport-pro {
-  min-height: 760px;
-}
 
 @media (max-width: 1180px) {
   .diagram-architecture-strip {

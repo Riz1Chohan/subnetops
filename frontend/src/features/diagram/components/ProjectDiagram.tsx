@@ -1203,20 +1203,29 @@ function PhysicalTopologyDiagram({
   const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
   const branchSites = sites.filter((site) => site.id !== primarySite?.id);
   const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
-  const width = Math.max(1680, 1280 + branchSites.length * 140 + (cloudNeeded ? 180 : 0));
-  const height = 1160;
-  const showDetailedLabels = labelMode === "detailed";
+  const branchRows = Math.max(1, Math.ceil(Math.max(branchSites.length, 1) / 2));
+  const siteCardHeight = 340;
+  const siteRowGap = 246;
+  const siteRowStartY = 392;
+  const primarySiteBottom = 344 + 360;
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
+  const flowOverlays = hasOverlay("flows") ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
+  const branchSectionBottom = branchSites.length ? siteRowStartY + ((branchRows - 1) * siteRowGap) + siteCardHeight : primarySiteBottom;
+  const flowLaneStartY = Math.max(774, branchSectionBottom + 76);
+  const flowLaneHeight = hasOverlay("flows") ? Math.max(0, flowOverlays.length - 1) * 84 + 96 : 0;
+  const fabricSectionBottom = Math.max(primarySiteBottom, branchSectionBottom) + 28;
+  const width = Math.max(1680, 1280 + branchSites.length * 140 + (cloudNeeded ? 180 : 0));
+  const height = Math.max(1160, flowLaneStartY + flowLaneHeight + 64, fabricSectionBottom + 180);
+  const showDetailedLabels = labelMode === "detailed";
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, label, secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
   const centerX = width / 2;
   const hqTaskCount = primarySite ? openTaskCount(comments, "SITE", primarySite.id) : 0;
   const hqValidation = primarySite ? siteValidationItems(primarySite, validations) : [];
   const hqValidationTone = validationSeverityTone(hqValidation);
   const emphasizeDevice = (kind: DeviceKind) => deviceFocusMatchesKind(deviceFocus, kind);
-
-  const flowOverlays = hasOverlay("flows") ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
   const legendTone = enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green";
+  const totalVlanCount = sites.reduce((sum, site) => sum + (site.vlans?.length ?? 0), 0);
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1234,9 +1243,13 @@ function PhysicalTopologyDiagram({
         <rect x={48} y={148} width={width - 96} height={170} rx={46} fill="rgba(238,245,255,0.76)" stroke="#c6d9f5" strokeDasharray="10 8" />
         <text x={78} y={178} fontSize="12.5" fontWeight="700" fill="#284b78">North-south edge / WAN transport domain</text>
         <text x={78} y={198} fontSize="11" fill="#607791">Internet, firewall, DMZ, hybrid edge, and upstream transport stay grouped here so the physical view immediately reads as a real network diagram.</text>
-        <rect x={48} y={336} width={width - 96} height={388} rx={40} fill="rgba(255,255,255,0.48)" stroke="#d5e1f2" strokeDasharray="10 8" />
+        <rect x={48} y={336} width={width - 96} height={Math.max(388, fabricSectionBottom - 336)} rx={40} fill="rgba(255,255,255,0.48)" stroke="#d5e1f2" strokeDasharray="10 8" />
         <text x={78} y={366} fontSize="12.5" fontWeight="700" fill="#284b78">Primary and branch site fabrics</text>
         <text x={78} y={386} fontSize="11" fill="#607791">Site containers expose edge, switching, service, wireless, and boundary elements in a more diagram-like blueprint layout rather than isolated cards.</text>
+        {chip(78, 410, 118, `Sites ${sites.length}`, "blue")}
+        {chip(208, 410, 122, `VLANs ${totalVlanCount}`, "green")}
+        {chip(342, 410, 166, `Topology ${synthesized.topology.topologyLabel}`, "purple")}
+        {chip(520, 410, 128, `Services ${synthesized.servicePlacements.length}`, "orange")}
 
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
@@ -1276,7 +1289,7 @@ function PhysicalTopologyDiagram({
           const left = index % 2 === 0;
           const row = Math.floor(index / 2);
           const x = left ? 72 : width - 392;
-          const y = 392 + row * 246;
+          const y = siteRowStartY + row * siteRowGap;
           const boxWidth = 320;
           const anchorX = left ? x + boxWidth : x;
           const anchorY = y + 92;
@@ -1346,8 +1359,16 @@ function PhysicalTopologyDiagram({
           );
         })}
 
+        {labelFocusMatchesCategory(labelFocus, "flows") && flowOverlays.length ? (
+          <g>
+            <rect x={48} y={flowLaneStartY - 42} width={width - 96} height={flowLaneHeight + 40} rx={32} fill="rgba(255, 247, 237, 0.82)" stroke="#fdba74" strokeDasharray="10 8" />
+            <text x={78} y={flowLaneStartY - 14} fontSize="12.5" fontWeight="700" fill="#9a3412">Critical flow review lane</text>
+            <text x={78} y={flowLaneStartY + 4} fontSize="11" fill="#9a3412">When flow labels are enabled, traffic paths move below the site fabric so larger enterprise layouts can keep growing downward without overlap.</text>
+          </g>
+        ) : null}
+
         {labelFocusMatchesCategory(labelFocus, "flows") ? flowOverlays.map((flow, index) => {
-          const baseY = 774 + index * 84;
+          const baseY = flowLaneStartY + index * 84;
           return (
             <g key={flow.id}>
               {renderPath([[86, baseY], [width - 86, baseY]], "flow", `${flow.flowLabel} • ${flow.sourceZone} → ${flow.destinationZone}`)}
