@@ -98,8 +98,12 @@ export function ProjectDiagramPage() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
   const project = projectQuery.data;
-  const sites = sitesQuery.data ?? project?.sites ?? [];
-  const vlans = vlansQuery.data ?? [];
+  const projectSites = project?.sites ?? [];
+  const fetchedSites = sitesQuery.data ?? [];
+  const sites = fetchedSites.length >= projectSites.length ? fetchedSites : projectSites;
+  const projectVlans = projectSites.flatMap((site) => site.vlans ?? []);
+  const fetchedVlans = vlansQuery.data ?? [];
+  const vlans = fetchedVlans.length > 0 ? fetchedVlans : projectVlans;
   const comments = commentsQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
