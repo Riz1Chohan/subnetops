@@ -398,7 +398,6 @@ export function ProjectDiagramPage() {
                   <span className="diagram-stage-zoom-readout">{Math.round(canvasZoom * 100)}%</span>
                 </div>
                 <div className="diagram-stage-toolbar-group diagram-stage-toolbar-group-passive" aria-label="Canvas context">
-                  <span className="diagram-stage-passive-pill">{synthesized.topology.topologyLabel}</span>
                   <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
                   <span className="diagram-stage-passive-pill">{scope === "site" ? activeSiteName : `${enrichedProject.sites.length} sites`}</span>
                 </div>
