@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ProjectDiagram,
@@ -20,22 +20,6 @@ import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { useValidationResults } from "../features/validation/hooks";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
-
-function TinyDiagramIcon({ kind }: { kind: "firewall" | "router" | "switch" | "wireless" | "server" | "cloud" | "internet" }) {
-  return (
-    <span className={`tiny-diagram-icon tiny-diagram-icon-${kind}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        {kind === "firewall" ? <><path d="M5 7h14v10H5z" /><path d="M8 10h8" /><path d="M8 14h3" /><path d="M13 14h3" /></> : null}
-        {kind === "router" ? <><circle cx="12" cy="12" r="7" /><path d="M9 12h6" /><path d="M12 9v6" /></> : null}
-        {kind === "switch" ? <><rect x="4" y="7" width="16" height="10" rx="2" /><path d="M8 11h1" /><path d="M11 11h1" /><path d="M14 11h1" /><path d="M17 11h1" /></> : null}
-        {kind === "wireless" ? <><path d="M6 14a9 9 0 0 1 12 0" /><path d="M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="19" r="1.2" /></> : null}
-        {kind === "server" ? <><rect x="7" y="4" width="10" height="6" rx="1.5" /><rect x="7" y="14" width="10" height="6" rx="1.5" /><path d="M10 7h.01" /><path d="M10 17h.01" /></> : null}
-        {kind === "cloud" ? <><path d="M8 18h8a4 4 0 0 0 .7-7.94A5 5 0 0 0 7 11.2 3.5 3.5 0 0 0 8 18Z" /></> : null}
-        {kind === "internet" ? <><circle cx="12" cy="12" r="7" /><path d="M5 12h14" /><path d="M12 5a11 11 0 0 1 0 14" /><path d="M12 5a11 11 0 0 0 0 14" /></> : null}
-      </svg>
-    </span>
-  );
-}
 
 const overlayItems: Array<{ key: ActiveOverlayMode; label: string }> = [
   { key: "addressing", label: "IP addresses" },
@@ -91,7 +75,7 @@ export function ProjectDiagramPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
   const [isCanvasFocused, setIsCanvasFocused] = useState(false);
-  const [showCanvasOutline, setShowCanvasOutline] = useState(false);
+  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [deviceFocus, setDeviceFocus] = useState<DeviceFocus>("all");
   const [linkFocus, setLinkFocus] = useState<LinkFocus>("all");
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
@@ -273,19 +257,6 @@ export function ProjectDiagramPage() {
     );
   };
 
-  const legendItems = useMemo(
-    () => [
-      { kind: "firewall" as const, label: "Firewall / Edge" },
-      { kind: "router" as const, label: "Router" },
-      { kind: "switch" as const, label: "Switching" },
-      { kind: "wireless" as const, label: "Wireless" },
-      { kind: "server" as const, label: "Service / Server" },
-      { kind: "cloud" as const, label: "Cloud" },
-      { kind: "internet" as const, label: "Internet" },
-    ],
-    [],
-  );
-
   const resetToBaseline = () => {
     setMode("physical");
     setScope("global");
@@ -343,19 +314,6 @@ export function ProjectDiagramPage() {
     }
   };
 
-  const focusGlobalCanvas = () => {
-    setScope("global");
-    setFocusedSiteId(enrichedProject.sites[0]?.id || "");
-    setDeviceFocus("all");
-    setLinkFocus("all");
-  };
-
-  const focusSiteCanvas = (siteId: string) => {
-    setScope("site");
-    setFocusedSiteId(siteId);
-    setDeviceFocus("switching");
-    setLinkFocus("access");
-  };
 
   useEffect(() => {
     const svg = getCanvasSvg();
@@ -384,49 +342,28 @@ export function ProjectDiagramPage() {
   }, []);
 
   return (
-    <section className="diagram-workspace-shell diagram-workspace-shell-professional">
-      <div className="panel diagram-legend-strip diagram-legend-strip-compact">
-        <div className="diagram-legend-copy">
-          <span className="diagram-kicker">Diagram workspace</span>
-          <div className="diagram-legend-title-row">
-            <h2>Topology Diagram</h2>
-            <div className="diagram-status-pills" aria-label="Diagram status">
-              <span className="diagram-status-pill">Baseline: devices + links</span>
-              <span className="diagram-status-pill">Layers on: {overlayCount}</span>
-              <span className="diagram-status-pill">Confidence: {authorityLedger.confidenceScore}%</span>
-            </div>
-          </div>
-        </div>
-        <div className="diagram-legend-mini-row">
-          {legendItems.map((item) => (
-            <span key={item.label} className="diagram-legend-mini-item">
-              <TinyDiagramIcon kind={item.kind} />
-              <span>{item.label}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
-        <aside className={`panel diagram-control-pane diagram-control-pane-professional${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
+    <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">
+      <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
+        <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
           <div className="diagram-control-section diagram-control-section-hero">
             <div>
-              <strong>Display controls</strong>
-              <p className="muted" style={{ margin: 0 }}>Turn layers on only when you need them. The default view stays clean and reviewable.</p>
+              <span className="diagram-kicker">Diagram controls</span>
+              <strong>Simple by default</strong>
+              <p className="muted" style={{ margin: 0 }}>Start with the base topology. Turn on only the layers you need.</p>
             </div>
             <div className="diagram-quick-actions">
-              <button type="button" className="diagram-utility-button" onClick={resetToBaseline}>Baseline</button>
-              <button type="button" className="diagram-utility-button" onClick={enableReviewLayer}>Review set</button>
+              <button type="button" className="diagram-utility-button" onClick={resetToBaseline}>Reset</button>
+              <button type="button" className="diagram-utility-button" onClick={enableReviewLayer}>Review</button>
               <button type="button" className="diagram-utility-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
             </div>
           </div>
 
-          <div className="diagram-control-card">
+          <div className="diagram-control-card diagram-control-card-compact">
             <div className="diagram-control-section">
               <span className="diagram-control-label">View</span>
               <div className="diagram-toggle-grid">
-                <button type="button" className={mode === "logical" ? "diagram-chip-button active" : "diagram-chip-button"} onClick={() => setMode("logical")}>Logical</button>
                 <button type="button" className={mode === "physical" ? "diagram-chip-button active" : "diagram-chip-button"} onClick={() => setMode("physical")}>Physical</button>
+                <button type="button" className={mode === "logical" ? "diagram-chip-button active" : "diagram-chip-button"} onClick={() => setMode("logical")}>Logical</button>
               </div>
             </div>
 
@@ -435,7 +372,7 @@ export function ProjectDiagramPage() {
               <div className="diagram-toggle-grid diagram-toggle-grid-stack">
                 {scopeItems.map((item) => (
                   <button key={item.key} type="button" className={scope === item.key ? "diagram-chip-button active" : "diagram-chip-button"} onClick={() => setScope(item.key)}>
-                    {item.label}
+                    <span>{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -452,9 +389,12 @@ export function ProjectDiagramPage() {
             </div>
           </div>
 
-          <div className="diagram-control-card">
+          <div className="diagram-control-card diagram-control-card-compact">
             <div className="diagram-control-section">
-              <span className="diagram-control-label">Layers</span>
+              <div className="diagram-control-row-head">
+                <span className="diagram-control-label">Layers</span>
+                <span className="diagram-inline-meta">{overlayCount} active</span>
+              </div>
               <div className="diagram-toggle-grid diagram-toggle-grid-stack">
                 {overlayItems.map((item) => (
                   <button
@@ -471,60 +411,83 @@ export function ProjectDiagramPage() {
             </div>
           </div>
 
-          <div className="diagram-control-card">
-            <div className="diagram-control-section">
-              <span className="diagram-control-label">Annotations</span>
-              <div className="diagram-toggle-grid diagram-toggle-grid-stack">
-                {detailItems.map((item) => {
-                  const isActive = item.key === "labels" ? labelMode === "detailed" : linkAnnotationMode === "full";
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={isActive ? "diagram-chip-button active" : "diagram-chip-button"}
-                      onClick={() => {
-                        if (item.key === "labels") {
-                          setLabelMode((current) => (current === "detailed" ? "essential" : "detailed"));
-                        } else {
-                          setLinkAnnotationMode((current) => (current === "full" ? "minimal" : "full"));
-                        }
-                      }}
-                    >
-                      <span>{item.label}</span>
-                      <small>{isActive ? "On" : "Off"}</small>
-                    </button>
-                  );
-                })}
+          <details className="diagram-advanced-panel" open={showAdvancedControls} onToggle={(event) => setShowAdvancedControls((event.currentTarget as HTMLDetailsElement).open)}>
+            <summary>Advanced controls</summary>
+            <div className="diagram-advanced-panel-body">
+              <div className="diagram-control-card diagram-control-card-compact">
+                <div className="diagram-control-section">
+                  <span className="diagram-control-label">Focus</span>
+                  <div className="diagram-focus-preset-row diagram-focus-preset-row-sidebar">
+                    {diagramFocusPresets.map((preset) => {
+                      const isActive = deviceFocus === preset.deviceFocus && linkFocus === preset.linkFocus;
+                      return (
+                        <button
+                          key={preset.key}
+                          type="button"
+                          className={isActive ? "diagram-focus-preset active" : "diagram-focus-preset"}
+                          onClick={() => applyDiagramFocusPreset(preset.key)}
+                        >
+                          <strong>{preset.label}</strong>
+                          <span>{preset.detail}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="diagram-control-section">
+                  <span className="diagram-control-label">Annotations</span>
+                  <div className="diagram-toggle-grid diagram-toggle-grid-stack">
+                    {detailItems.map((item) => {
+                      const isActive = item.key === "labels" ? labelMode === "detailed" : linkAnnotationMode === "full";
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={isActive ? "diagram-chip-button active" : "diagram-chip-button"}
+                          onClick={() => {
+                            if (item.key === "labels") {
+                              setLabelMode((current) => (current === "detailed" ? "essential" : "detailed"));
+                            } else {
+                              setLinkAnnotationMode((current) => (current === "full" ? "minimal" : "full"));
+                            }
+                          }}
+                        >
+                          <span>{item.label}</span>
+                          <small>{isActive ? "On" : "Off"}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </details>
 
-          <div className="diagram-control-section diagram-control-metrics diagram-control-metrics-pro">
+          <div className="diagram-control-metrics diagram-control-metrics-pro diagram-control-metrics-streamlined">
             <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
             <div><span>VLANs</span><strong>{vlans.length}</strong></div>
             <div><span>Flows</span><strong>{synthesized.trafficFlows.length}</strong></div>
             <div><span>Issues</span><strong>{openIssues}</strong></div>
-            <div><span>Scope</span><strong>{scopeItems.find((item) => item.key === scope)?.label || "Global"}</strong></div>
-            <div><span>Mode</span><strong>{mode === "logical" ? "Logical" : "Physical"}</strong></div>
           </div>
         </aside>
 
         <div className="diagram-display-pane diagram-display-pane-professional">
-          <div className="panel diagram-display-shell">
-            <div className="diagram-display-header diagram-display-header-tight">
+          <div className="panel diagram-display-shell diagram-display-shell-streamlined">
+            <div className="diagram-display-header diagram-display-header-tight diagram-display-header-streamlined">
               <div>
-                <span className="diagram-kicker">Live topology canvas</span>
-                <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} focus` : "Full diagram view"}</h3>
-                <p className="muted" style={{ margin: 0 }}>Start from the live topology canvas, then add layers only when you need more detail.</p>
+                <span className="diagram-kicker">Diagram</span>
+                <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} topology` : "Topology diagram"}</h3>
+                <p className="muted" style={{ margin: 0 }}>The diagram is the main workspace. Supporting controls stay off to the side.</p>
               </div>
               <div className="diagram-display-summary">
                 <span className="diagram-display-summary-chip">{mode === "logical" ? "Logical" : "Physical"}</span>
                 <span className="diagram-display-summary-chip">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
-                <span className="diagram-display-summary-chip">Layers: {overlayCount}</span>
-                <span className="diagram-display-summary-chip">Sites: {enrichedProject.sites.length}</span>
+                <span className="diagram-display-summary-chip">{enrichedProject.sites.length} sites</span>
               </div>
             </div>
-            <div className="diagram-preset-row">
+
+            <div className="diagram-preset-row diagram-preset-row-streamlined">
               {diagramWorkspacePresets.map((preset) => {
                 const isActive =
                   mode === preset.mode &&
@@ -544,57 +507,9 @@ export function ProjectDiagramPage() {
                 );
               })}
             </div>
-            <div className="diagram-focus-preset-row" aria-label="Diagram focus presets">
-              {diagramFocusPresets.map((preset) => {
-                const isActive = deviceFocus === preset.deviceFocus && linkFocus === preset.linkFocus;
-                return (
-                  <button
-                    key={preset.key}
-                    type="button"
-                    className={isActive ? "diagram-focus-preset active" : "diagram-focus-preset"}
-                    onClick={() => applyDiagramFocusPreset(preset.key)}
-                  >
-                    <strong>{preset.label}</strong>
-                    <span>{preset.detail}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="diagram-site-lens-row" aria-label="Canvas site lenses">
-              <button
-                type="button"
-                className={scope !== "site" ? "diagram-site-lens active" : "diagram-site-lens"}
-                onClick={focusGlobalCanvas}
-              >
-                <strong>Global canvas</strong>
-                <span>Full blueprint</span>
-              </button>
-              {enrichedProject.sites.slice(0, 6).map((site) => {
-                const isActive = scope === "site" && activeSiteId === site.id;
-                const isPrimary = site.name === synthesized.topology.primarySiteName;
-                return (
-                  <button
-                    key={site.id}
-                    type="button"
-                    className={isActive ? "diagram-site-lens active" : "diagram-site-lens"}
-                    onClick={() => focusSiteCanvas(site.id)}
-                  >
-                    <strong>{site.name}</strong>
-                    <span>{isPrimary ? "Primary hub" : "Site lens"}</span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                className={scope === "wan-cloud" ? "diagram-site-lens active" : "diagram-site-lens"}
-                onClick={() => setScope("wan-cloud")}
-              >
-                <strong>WAN / Cloud</strong>
-                <span>Transport lens</span>
-              </button>
-            </div>
-            <div className="diagram-stage-surface-pro" ref={canvasStageRef}>
-              <div className="diagram-stage-toolbar-pro">
+
+            <div className="diagram-stage-surface-pro diagram-stage-surface-pro-streamlined" ref={canvasStageRef}>
+              <div className="diagram-stage-toolbar-pro diagram-stage-toolbar-pro-streamlined">
                 <div className="diagram-stage-toolbar-group">
                   <span className="diagram-stage-toolbar-label">Canvas</span>
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom((current) => Math.max(0.55, Number((current - 0.1).toFixed(2))))}>−</button>
@@ -607,12 +522,9 @@ export function ProjectDiagramPage() {
                 <div className="diagram-stage-toolbar-group diagram-stage-toolbar-group-passive" aria-label="Canvas context">
                   <span className="diagram-stage-passive-pill">{synthesized.topology.topologyLabel}</span>
                   <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
-                  <span className="diagram-stage-passive-pill">{enrichedProject.sites.length} sites</span>
-                  <span className="diagram-stage-passive-pill">Device focus: {diagramFocusPresets.find((item) => item.deviceFocus === deviceFocus && item.linkFocus === linkFocus)?.label || "Custom"}</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
                   <button type="button" className="diagram-stage-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
-                  <button type="button" className="diagram-stage-button" onClick={() => setShowCanvasOutline((current) => !current)}>{showCanvasOutline ? "Hide outline" : "Show outline"}</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("svg"); }}>SVG</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("png"); }}>PNG</button>
                   <button
@@ -632,29 +544,7 @@ export function ProjectDiagramPage() {
                   </button>
                 </div>
               </div>
-              {showCanvasOutline ? (
-                <div className="diagram-stage-outline-dock" aria-label="Canvas outline">
-                  <div className="diagram-stage-outline-card">
-                    <span className="diagram-stage-outline-kicker">Canvas outline</span>
-                    <strong>{mode === "physical" ? "Physical blueprint" : "Logical blueprint"}</strong>
-                    <div className="diagram-stage-outline-grid">
-                      <div><span>Primary</span><strong>{synthesized.topology.primarySiteName || "Not set"}</strong></div>
-                      <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
-                      <div><span>WAN links</span><strong>{synthesized.wanLinks.length}</strong></div>
-                      <div><span>Services</span><strong>{synthesized.servicePlacements.length}</strong></div>
-                    </div>
-                  </div>
-                  <div className="diagram-stage-outline-card diagram-stage-outline-card-compact">
-                    <span className="diagram-stage-outline-kicker">Reading order</span>
-                    <ol className="diagram-stage-outline-list">
-                      <li>North-south edge / WAN</li>
-                      <li>Primary fabric</li>
-                      <li>Branch fabrics</li>
-                      <li>Critical flows</li>
-                    </ol>
-                  </div>
-                </div>
-              ) : null}
+
               <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
                 <ProjectDiagram
                   project={enrichedProject}
@@ -678,38 +568,6 @@ export function ProjectDiagramPage() {
                     focusedSiteId: activeSiteId,
                   }}
                 />
-              </div>
-            </div>
-            <div className="diagram-stage-support-bar">
-              <div className="diagram-architecture-strip">
-                <div className="diagram-architecture-strip-item">
-                  <span>Primary topology</span>
-                  <strong>{synthesized.topology.topologyLabel}</strong>
-                </div>
-                <div className="diagram-architecture-strip-item">
-                  <span>Primary site</span>
-                  <strong>{synthesized.topology.primarySiteName || "Not set"}</strong>
-                </div>
-                <div className="diagram-architecture-strip-item">
-                  <span>Boundaries</span>
-                  <strong>{synthesized.securityBoundaries.length}</strong>
-                </div>
-                <div className="diagram-architecture-strip-item">
-                  <span>WAN links</span>
-                  <strong>{synthesized.wanLinks.length}</strong>
-                </div>
-                <div className="diagram-architecture-strip-item">
-                  <span>Service anchors</span>
-                  <strong>{synthesized.servicePlacements.length}</strong>
-                </div>
-                <div className="diagram-architecture-strip-item">
-                  <span>Issues</span>
-                  <strong>{openIssues}</strong>
-                </div>
-              </div>
-              <div className="diagram-workspace-shortcuts">
-                <Link to={`/projects/${projectId}/report?section=assumptions`} className="diagram-workspace-shortcut-link">Open report section</Link>
-                <Link to={`/projects/${projectId}/logical-design?section=topology`} className="diagram-workspace-shortcut-link diagram-workspace-shortcut-link-secondary">Open logical design</Link>
               </div>
             </div>
           </div>

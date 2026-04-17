@@ -4188,3 +4188,136 @@ tr:last-child td {
   color: #dbeafe;
 }
 
+
+/* v356 streamlined diagram-first layout */
+.diagram-workspace-shell-streamlined {
+  gap: 14px;
+}
+
+.diagram-two-pane-workspace-streamlined {
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.diagram-control-pane-streamlined {
+  gap: 12px;
+  top: 80px;
+}
+
+.diagram-control-card-compact {
+  gap: 12px;
+  padding: 12px;
+}
+
+.diagram-control-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.diagram-inline-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.diagram-advanced-panel {
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+}
+
+.diagram-advanced-panel summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #334155;
+}
+
+.diagram-advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.diagram-advanced-panel summary::after {
+  content: "+";
+  float: right;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.diagram-advanced-panel[open] summary::after {
+  content: "−";
+}
+
+.diagram-advanced-panel-body {
+  padding: 0 12px 12px;
+}
+
+.diagram-focus-preset-row-sidebar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.diagram-control-metrics-streamlined {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.diagram-display-shell-streamlined {
+  gap: 12px;
+  padding: 14px;
+}
+
+.diagram-display-header-streamlined {
+  margin-bottom: 0;
+}
+
+.diagram-preset-row-streamlined {
+  margin-top: 0;
+}
+
+.diagram-stage-surface-pro-streamlined {
+  gap: 10px;
+}
+
+.diagram-stage-toolbar-pro-streamlined {
+  top: 2px;
+}
+
+@media (max-width: 1100px) {
+  .diagram-two-pane-workspace-streamlined {
+    grid-template-columns: 1fr;
+  }
+
+  .diagram-focus-preset-row-sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .diagram-display-shell-streamlined {
+    padding: 12px;
+  }
+
+  .diagram-stage-toolbar-group-passive {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .diagram-inline-meta {
+  color: #aeb7c2;
+}
+
+:root[data-theme="dark"] .diagram-advanced-panel {
+  background: linear-gradient(180deg, rgba(51, 57, 69, 0.96), rgba(42, 47, 57, 0.96));
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+:root[data-theme="dark"] .diagram-advanced-panel summary {
+  color: #e5e7eb;
+}
