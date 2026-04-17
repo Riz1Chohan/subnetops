@@ -20,36 +20,41 @@ import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { useValidationResults } from "../features/validation/hooks";
 
-const overlayItems: Array<{ key: ActiveOverlayMode; label: string }> = [
-  { key: "addressing", label: "IP addresses" },
-  { key: "security", label: "Zones" },
-  { key: "services", label: "Services" },
-  { key: "redundancy", label: "Redundancy" },
-  { key: "flows", label: "Traffic emphasis" },
-];
-
 const scopeItems: Array<{ key: DiagramScope; label: string }> = [
   { key: "global", label: "Global" },
   { key: "site", label: "Per-site" },
   { key: "wan-cloud", label: "WAN / Cloud" },
-  { key: "boundaries", label: "Boundaries" },
+  { key: "boundaries", label: "Security / Boundaries" },
 ];
 
-const detailItems = [
+const layerItems: Array<{ key: ActiveOverlayMode; label: string }> = [
+  { key: "addressing", label: "IP addresses" },
+  { key: "services", label: "Services" },
+];
+
+const annotationItems = [
   { key: "labels", label: "Device labels" },
   { key: "links", label: "Ports / link notes" },
 ] as const;
 
+function deriveDeviceFocus(scope: DiagramScope, overlays: ActiveOverlayMode[]): DeviceFocus {
+  if (scope === "wan-cloud" || scope === "boundaries") return "edge";
+  if (overlays.includes("services")) return "services";
+  return "all";
+}
 
+function deriveLinkFocus(scope: DiagramScope): LinkFocus {
+  if (scope === "wan-cloud") return "transport";
+  if (scope === "boundaries") return "security";
+  return "all";
+}
 
-const diagramFocusPresets: Array<{ key: string; label: string; detail: string; deviceFocus: DeviceFocus; linkFocus: LinkFocus }> = [
-  { key: "all", label: "Blueprint", detail: "Balanced engineering view", deviceFocus: "all", linkFocus: "all" },
-  { key: "edge", label: "Edge", detail: "Firewall, WAN, perimeter", deviceFocus: "edge", linkFocus: "transport" },
-  { key: "switching", label: "Switching", detail: "Core, trunks, access", deviceFocus: "switching", linkFocus: "access" },
-  { key: "wireless", label: "Wireless", detail: "APs and user edge", deviceFocus: "wireless", linkFocus: "access" },
-  { key: "services", label: "Services", detail: "Shared service anchors", deviceFocus: "services", linkFocus: "security" },
-  { key: "flows", label: "Flows", detail: "Traffic path emphasis", deviceFocus: "all", linkFocus: "flows" },
-];
+function deriveLabelFocus(scope: DiagramScope, overlays: ActiveOverlayMode[]): "all" | "topology" | "addressing" | "zones" | "transport" | "flows" {
+  if (overlays.includes("addressing")) return "addressing";
+  if (scope === "boundaries") return "zones";
+  if (scope === "wan-cloud") return "transport";
+  return "topology";
+}
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
@@ -68,9 +73,6 @@ export function ProjectDiagramPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
   const [isCanvasFocused, setIsCanvasFocused] = useState(false);
-  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
-  const [deviceFocus, setDeviceFocus] = useState<DeviceFocus>("all");
-  const [linkFocus, setLinkFocus] = useState<LinkFocus>("all");
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
@@ -150,26 +152,20 @@ export function ProjectDiagramPage() {
   const synthesized = enrichedProject
     ? synthesizeLogicalDesign(enrichedProject, enrichedProject.sites, vlans, requirementsProfile)
     : null;
+
   const activeSiteId = focusedSiteId || enrichedProject?.sites[0]?.id || "";
-  const overlayFocus: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? "none";
-  const overlayCount = activeOverlays.length;
-  const effectiveLabelFocus = (() => {
-    let next: "all" | "topology" | "addressing" | "zones" | "transport" | "flows" = activeOverlays.length ? "all" : "topology";
-    if (scope === "wan-cloud") next = "transport";
-    else if (scope === "boundaries") next = "zones";
-    if (activeOverlays.includes("addressing")) next = "addressing";
-    if (activeOverlays.includes("security")) next = "zones";
-    if (activeOverlays.includes("redundancy")) next = next === "addressing" ? "addressing" : "transport";
-    if (activeOverlays.includes("flows")) next = "flows";
-    return next;
-  })();
   const activeSiteName = enrichedProject?.sites.find((site) => site.id === activeSiteId)?.name || "site";
+  const overlayCount = activeOverlays.length;
+  const effectiveOverlay: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? (scope === "boundaries" ? "security" : "none");
+  const effectiveLabelFocus = deriveLabelFocus(scope, activeOverlays);
+  const deviceFocus = deriveDeviceFocus(scope, activeOverlays);
+  const linkFocus = deriveLinkFocus(scope);
   const canvasFileBase = `${(project?.name || "project").replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
   const estimatedSiteCount = scope === "site" ? 1 : enrichedProject?.sites.length || 1;
   const estimatedBranchRows = Math.max(1, Math.ceil(Math.max(estimatedSiteCount - 1, 0) / 2));
   const canvasViewportMinHeight = mode === "physical"
-    ? Math.max(760, 760 + Math.max(0, estimatedBranchRows - 1) * 250 + (activeOverlays.includes("flows") ? 120 : 0))
-    : Math.max(720, 720 + Math.max(0, estimatedSiteCount - 4) * 90);
+    ? Math.max(760, 760 + Math.max(0, estimatedBranchRows - 1) * 220)
+    : Math.max(720, 720 + Math.max(0, estimatedSiteCount - 4) * 80);
 
   const getCanvasSvg = () => {
     const node = canvasViewportRef.current?.querySelector("svg");
@@ -246,54 +242,6 @@ export function ProjectDiagramPage() {
     );
   };
 
-  useEffect(() => {
-    let nextDeviceFocus: DeviceFocus = "all";
-    let nextLinkFocus: LinkFocus = "all";
-    let nextLabelFocus: "all" | "topology" | "addressing" | "zones" | "transport" | "flows" = activeOverlays.length ? "all" : "topology";
-
-    if (scope === "wan-cloud") {
-      nextDeviceFocus = "edge";
-      nextLinkFocus = "transport";
-      nextLabelFocus = "transport";
-    } else if (scope === "boundaries") {
-      nextDeviceFocus = "edge";
-      nextLinkFocus = "security";
-      nextLabelFocus = "zones";
-    }
-
-    if (activeOverlays.includes("addressing")) {
-      nextLabelFocus = "addressing";
-    }
-    if (activeOverlays.includes("security")) {
-      nextDeviceFocus = "edge";
-      nextLinkFocus = "security";
-      nextLabelFocus = "zones";
-    }
-    if (activeOverlays.includes("services")) {
-      nextDeviceFocus = "services";
-    }
-    if (activeOverlays.includes("redundancy")) {
-      nextDeviceFocus = nextDeviceFocus === "services" ? "services" : "edge";
-      nextLinkFocus = "transport";
-      nextLabelFocus = nextLabelFocus === "addressing" ? "addressing" : "transport";
-    }
-    if (activeOverlays.includes("flows")) {
-      nextLinkFocus = "flows";
-      nextLabelFocus = "flows";
-    }
-
-    setDeviceFocus((current) => (current === nextDeviceFocus ? current : nextDeviceFocus));
-    setLinkFocus((current) => (current === nextLinkFocus ? current : nextLinkFocus));
-    setLabelMode((current) => {
-      const desired: DiagramLabelMode = activeOverlays.length > 0 ? "detailed" : "essential";
-      return current === desired ? current : desired;
-    });
-    setLinkAnnotationMode((current) => {
-      const desired: LinkAnnotationMode = activeOverlays.includes("flows") || activeOverlays.includes("addressing") ? "full" : "minimal";
-      return current === desired ? current : desired;
-    });
-  }, [activeOverlays, scope]);
-
   const resetToBaseline = () => {
     setMode("physical");
     setScope("global");
@@ -301,22 +249,7 @@ export function ProjectDiagramPage() {
     setLabelMode("essential");
     setLinkAnnotationMode("minimal");
     setFocusedSiteId(enrichedProject?.sites[0]?.id || "");
-    setDeviceFocus("all");
-    setLinkFocus("all");
   };
-
-
-
-  const applyDiagramFocusPreset = (presetKey: (typeof diagramFocusPresets)[number]["key"]) => {
-    const preset = diagramFocusPresets.find((item) => item.key === presetKey);
-    if (!preset) return;
-    setDeviceFocus(preset.deviceFocus);
-    setLinkFocus(preset.linkFocus);
-    if (preset.key === "flows" && !activeOverlays.includes("flows")) {
-      setActiveOverlays((current) => [...current, "flows"]);
-    }
-  };
-
 
   useEffect(() => {
     const svg = getCanvasSvg();
@@ -369,6 +302,10 @@ export function ProjectDiagramPage() {
       <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
         <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
           <div className="diagram-control-card diagram-control-card-compact diagram-control-card-top">
+            <div className="diagram-control-section diagram-control-section-actions">
+              <button type="button" className="diagram-chip-button" onClick={resetToBaseline}>Reset</button>
+            </div>
+
             <div className="diagram-control-section">
               <span className="diagram-control-label">View</span>
               <div className="diagram-toggle-grid">
@@ -399,79 +336,52 @@ export function ProjectDiagramPage() {
             </div>
 
             <div className="diagram-control-section">
-              <div className="diagram-control-row-head">
-                <span className="diagram-control-label">Layers</span>
-                <span className="diagram-inline-meta">{overlayCount} active</span>
-              </div>
+              <span className="diagram-control-label">Annotations</span>
               <div className="diagram-toggle-grid diagram-toggle-grid-stack">
-                {overlayItems.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={activeOverlays.includes(item.key) ? "diagram-chip-button active" : "diagram-chip-button"}
-                    onClick={() => toggleOverlay(item.key)}
-                  >
-                    <span>{item.label}</span>
-                    <small>{activeOverlays.includes(item.key) ? "On" : "Off"}</small>
-                  </button>
-                ))}
+                {annotationItems.map((item) => {
+                  const isActive = item.key === "labels" ? labelMode === "detailed" : linkAnnotationMode === "full";
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={isActive ? "diagram-chip-button active" : "diagram-chip-button"}
+                      onClick={() => {
+                        if (item.key === "labels") {
+                          setLabelMode((current) => (current === "detailed" ? "essential" : "detailed"));
+                        } else {
+                          setLinkAnnotationMode((current) => (current === "full" ? "minimal" : "full"));
+                        }
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      <small>{isActive ? "On" : "Off"}</small>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
 
-          <details className="diagram-advanced-panel" open={showAdvancedControls} onToggle={(event) => setShowAdvancedControls((event.currentTarget as HTMLDetailsElement).open)}>
-            <summary>Advanced controls</summary>
-            <div className="diagram-advanced-panel-body">
-              <div className="diagram-control-card diagram-control-card-compact">
-                <div className="diagram-control-section">
-                  <span className="diagram-control-label">Focus</span>
-                  <div className="diagram-focus-preset-row diagram-focus-preset-row-sidebar">
-                    {diagramFocusPresets.map((preset) => {
-                      const isActive = deviceFocus === preset.deviceFocus && linkFocus === preset.linkFocus;
-                      return (
-                        <button
-                          key={preset.key}
-                          type="button"
-                          className={isActive ? "diagram-focus-preset active" : "diagram-focus-preset"}
-                          onClick={() => applyDiagramFocusPreset(preset.key)}
-                        >
-                          <strong>{preset.label}</strong>
-                          <span>{preset.detail}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="diagram-control-section">
-                  <span className="diagram-control-label">Annotations</span>
+            <details className="diagram-advanced-panel" open={false}>
+              <summary>More layers</summary>
+              <div className="diagram-advanced-panel-body">
+                <div className="diagram-control-section" style={{ paddingTop: 0 }}>
                   <div className="diagram-toggle-grid diagram-toggle-grid-stack">
-                    {detailItems.map((item) => {
-                      const isActive = item.key === "labels" ? labelMode === "detailed" : linkAnnotationMode === "full";
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          className={isActive ? "diagram-chip-button active" : "diagram-chip-button"}
-                          onClick={() => {
-                            if (item.key === "labels") {
-                              setLabelMode((current) => (current === "detailed" ? "essential" : "detailed"));
-                            } else {
-                              setLinkAnnotationMode((current) => (current === "full" ? "minimal" : "full"));
-                            }
-                          }}
-                        >
-                          <span>{item.label}</span>
-                          <small>{isActive ? "On" : "Off"}</small>
-                        </button>
-                      );
-                    })}
+                    {layerItems.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={activeOverlays.includes(item.key) ? "diagram-chip-button active" : "diagram-chip-button"}
+                        onClick={() => toggleOverlay(item.key)}
+                      >
+                        <span>{item.label}</span>
+                        <small>{activeOverlays.includes(item.key) ? "On" : "Off"}</small>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
-            </div>
-          </details>
-
+            </details>
+          </div>
         </aside>
 
         <div className="diagram-display-pane diagram-display-pane-professional">
@@ -490,6 +400,7 @@ export function ProjectDiagramPage() {
                 <div className="diagram-stage-toolbar-group diagram-stage-toolbar-group-passive" aria-label="Canvas context">
                   <span className="diagram-stage-passive-pill">{synthesized.topology.topologyLabel}</span>
                   <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
+                  <span className="diagram-stage-passive-pill">{scope === "site" ? activeSiteName : `${enrichedProject.sites.length} sites`}</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
                   <button type="button" className="diagram-stage-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
@@ -522,7 +433,7 @@ export function ProjectDiagramPage() {
                   minimalWorkspace
                   controls={{
                     mode,
-                    overlay: overlayFocus,
+                    overlay: effectiveOverlay,
                     activeOverlays,
                     scope,
                     workspaceDensity: "guided",
@@ -530,9 +441,7 @@ export function ProjectDiagramPage() {
                     linkAnnotationMode,
                     labelFocus: effectiveLabelFocus,
                     deviceFocus,
-                    linkFocus: linkFocus === "all"
-                      ? (activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all")
-                      : linkFocus,
+                    linkFocus,
                     focusedSiteId: activeSiteId,
                     bareCanvas: true,
                   }}

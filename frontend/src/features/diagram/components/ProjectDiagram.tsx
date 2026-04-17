@@ -1033,7 +1033,7 @@ function LogicalTopologyDiagram({
   const showDetailedLabels = labelMode === "detailed";
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
-  const showOverlayNotes = !bareCanvas || enabledOverlays.length > 0;
+  const showOverlayNotes = !bareCanvas;
   const showAddressing = !bareCanvas || hasOverlay("addressing");
   const showSecurity = !bareCanvas || hasOverlay("security");
   const showServices = !bareCanvas || hasOverlay("services");
@@ -1226,7 +1226,7 @@ function PhysicalTopologyDiagram({
   const primarySiteBottom = 344 + 360;
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
-  const showOverlayNotes = !bareCanvas || enabledOverlays.length > 0;
+  const showOverlayNotes = !bareCanvas;
   const showAddressing = !bareCanvas || hasOverlay("addressing");
   const showSecurity = !bareCanvas || hasOverlay("security");
   const showServices = !bareCanvas || hasOverlay("services");
