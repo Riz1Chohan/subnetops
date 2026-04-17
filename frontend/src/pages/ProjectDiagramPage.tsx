@@ -8,6 +8,8 @@ import {
   type ActiveOverlayMode,
   type DiagramLabelMode,
   type LinkAnnotationMode,
+  type DeviceFocus,
+  type LinkFocus,
 } from "../features/diagram/components/ProjectDiagram";
 import { useProject, useProjectVlans } from "../features/projects/hooks";
 import { useProjectComments } from "../features/comments/hooks";
@@ -63,6 +65,15 @@ const diagramWorkspacePresets = [
   { key: "site", label: "Site detail", detail: "Focused local topology", mode: "physical" as const, scope: "site" as const, overlays: ["addressing", "security"] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
 ] as const;
 
+const diagramFocusPresets: Array<{ key: string; label: string; detail: string; deviceFocus: DeviceFocus; linkFocus: LinkFocus }> = [
+  { key: "all", label: "Blueprint", detail: "Balanced engineering view", deviceFocus: "all", linkFocus: "all" },
+  { key: "edge", label: "Edge", detail: "Firewall, WAN, perimeter", deviceFocus: "edge", linkFocus: "transport" },
+  { key: "switching", label: "Switching", detail: "Core, trunks, access", deviceFocus: "switching", linkFocus: "access" },
+  { key: "wireless", label: "Wireless", detail: "APs and user edge", deviceFocus: "wireless", linkFocus: "access" },
+  { key: "services", label: "Services", detail: "Shared service anchors", deviceFocus: "services", linkFocus: "security" },
+  { key: "flows", label: "Flows", detail: "Traffic path emphasis", deviceFocus: "all", linkFocus: "flows" },
+];
+
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
   const projectQuery = useProject(projectId);
@@ -79,6 +90,9 @@ export function ProjectDiagramPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
   const [isCanvasFocused, setIsCanvasFocused] = useState(false);
+  const [showCanvasOutline, setShowCanvasOutline] = useState(false);
+  const [deviceFocus, setDeviceFocus] = useState<DeviceFocus>("all");
+  const [linkFocus, setLinkFocus] = useState<LinkFocus>("all");
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
@@ -225,6 +239,8 @@ export function ProjectDiagramPage() {
     setLabelMode("detailed");
     setLinkAnnotationMode("full");
     setFocusedSiteId(enrichedProject.sites[0]?.id || "");
+    setDeviceFocus("all");
+    setLinkFocus("all");
   };
 
   const enableReviewLayer = () => {
@@ -233,6 +249,8 @@ export function ProjectDiagramPage() {
     setActiveOverlays(["addressing", "security", "services", "flows"]);
     setLabelMode("detailed");
     setLinkAnnotationMode("full");
+    setDeviceFocus("all");
+    setLinkFocus("security");
   };
 
   const applyWorkspacePreset = (presetKey: (typeof diagramWorkspacePresets)[number]["key"]) => {
@@ -245,6 +263,29 @@ export function ProjectDiagramPage() {
     setLinkAnnotationMode(preset.linkAnnotationMode);
     if (preset.scope === "site") {
       setFocusedSiteId(enrichedProject.sites[0]?.id || "");
+    }
+    if (preset.key === "transport") {
+      setDeviceFocus("edge");
+      setLinkFocus("transport");
+    } else if (preset.key === "boundaries") {
+      setDeviceFocus("edge");
+      setLinkFocus("security");
+    } else if (preset.key === "site") {
+      setDeviceFocus("switching");
+      setLinkFocus("access");
+    } else {
+      setDeviceFocus("all");
+      setLinkFocus("all");
+    }
+  };
+
+  const applyDiagramFocusPreset = (presetKey: (typeof diagramFocusPresets)[number]["key"]) => {
+    const preset = diagramFocusPresets.find((item) => item.key === presetKey);
+    if (!preset) return;
+    setDeviceFocus(preset.deviceFocus);
+    setLinkFocus(preset.linkFocus);
+    if (preset.key === "flows" && !activeOverlays.includes("flows")) {
+      setActiveOverlays((current) => [...current, "flows"]);
     }
   };
 
@@ -406,7 +447,7 @@ export function ProjectDiagramPage() {
               <div>
                 <span className="diagram-kicker">Live topology canvas</span>
                 <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} focus` : "Full diagram view"}</h3>
-                <p className="muted" style={{ margin: 0 }}>The canvas is now the first thing on the page. Start from the live topology, then use presets or overlays only when you need more detail.</p>
+                <p className="muted" style={{ margin: 0 }}>Start from the live topology canvas, then add layers only when you need more detail.</p>
               </div>
               <div className="diagram-display-summary">
                 <span className="diagram-display-summary-chip">{mode === "logical" ? "Logical" : "Physical"}</span>
@@ -435,6 +476,22 @@ export function ProjectDiagramPage() {
                 );
               })}
             </div>
+            <div className="diagram-focus-preset-row" aria-label="Diagram focus presets">
+              {diagramFocusPresets.map((preset) => {
+                const isActive = deviceFocus === preset.deviceFocus && linkFocus === preset.linkFocus;
+                return (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    className={isActive ? "diagram-focus-preset active" : "diagram-focus-preset"}
+                    onClick={() => applyDiagramFocusPreset(preset.key)}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span>{preset.detail}</span>
+                  </button>
+                );
+              })}
+            </div>
             <div className="diagram-stage-surface-pro" ref={canvasStageRef}>
               <div className="diagram-stage-toolbar-pro">
                 <div className="diagram-stage-toolbar-group">
@@ -449,9 +506,11 @@ export function ProjectDiagramPage() {
                   <span className="diagram-stage-passive-pill">{synthesized.topology.topologyLabel}</span>
                   <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
                   <span className="diagram-stage-passive-pill">{enrichedProject.sites.length} sites</span>
+                  <span className="diagram-stage-passive-pill">Device focus: {diagramFocusPresets.find((item) => item.deviceFocus === deviceFocus && item.linkFocus === linkFocus)?.label || "Custom"}</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
                   <button type="button" className="diagram-stage-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>
+                  <button type="button" className="diagram-stage-button" onClick={() => setShowCanvasOutline((current) => !current)}>{showCanvasOutline ? "Hide outline" : "Show outline"}</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("svg"); }}>SVG</button>
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("png"); }}>PNG</button>
                   <button
@@ -471,27 +530,29 @@ export function ProjectDiagramPage() {
                   </button>
                 </div>
               </div>
-              <div className="diagram-stage-outline-dock" aria-label="Canvas outline">
-                <div className="diagram-stage-outline-card">
-                  <span className="diagram-stage-outline-kicker">Canvas outline</span>
-                  <strong>{mode === "physical" ? "Physical blueprint" : "Logical blueprint"}</strong>
-                  <div className="diagram-stage-outline-grid">
-                    <div><span>Primary</span><strong>{synthesized.topology.primarySiteName || "Not set"}</strong></div>
-                    <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
-                    <div><span>WAN links</span><strong>{synthesized.wanLinks.length}</strong></div>
-                    <div><span>Services</span><strong>{synthesized.servicePlacements.length}</strong></div>
+              {showCanvasOutline ? (
+                <div className="diagram-stage-outline-dock" aria-label="Canvas outline">
+                  <div className="diagram-stage-outline-card">
+                    <span className="diagram-stage-outline-kicker">Canvas outline</span>
+                    <strong>{mode === "physical" ? "Physical blueprint" : "Logical blueprint"}</strong>
+                    <div className="diagram-stage-outline-grid">
+                      <div><span>Primary</span><strong>{synthesized.topology.primarySiteName || "Not set"}</strong></div>
+                      <div><span>Sites</span><strong>{enrichedProject.sites.length}</strong></div>
+                      <div><span>WAN links</span><strong>{synthesized.wanLinks.length}</strong></div>
+                      <div><span>Services</span><strong>{synthesized.servicePlacements.length}</strong></div>
+                    </div>
+                  </div>
+                  <div className="diagram-stage-outline-card diagram-stage-outline-card-compact">
+                    <span className="diagram-stage-outline-kicker">Reading order</span>
+                    <ol className="diagram-stage-outline-list">
+                      <li>North-south edge / WAN</li>
+                      <li>Primary fabric</li>
+                      <li>Branch fabrics</li>
+                      <li>Critical flows</li>
+                    </ol>
                   </div>
                 </div>
-                <div className="diagram-stage-outline-card diagram-stage-outline-card-compact">
-                  <span className="diagram-stage-outline-kicker">Reading order</span>
-                  <ol className="diagram-stage-outline-list">
-                    <li>North-south edge / WAN</li>
-                    <li>Primary fabric</li>
-                    <li>Branch fabrics</li>
-                    <li>Critical flows</li>
-                  </ol>
-                </div>
-              </div>
+              ) : null}
               <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
                 <ProjectDiagram
                   project={enrichedProject}
@@ -508,8 +569,10 @@ export function ProjectDiagramPage() {
                     labelMode,
                     linkAnnotationMode,
                     labelFocus: activeOverlays.length === 0 ? "topology" : "all",
-                    deviceFocus: "all",
-                    linkFocus: activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all",
+                    deviceFocus,
+                    linkFocus: linkFocus === "all"
+                      ? (activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all")
+                      : linkFocus,
                     focusedSiteId: activeSiteId,
                   }}
                 />

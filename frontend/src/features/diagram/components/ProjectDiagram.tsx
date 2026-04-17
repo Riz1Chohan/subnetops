@@ -1238,6 +1238,10 @@ function PhysicalTopologyDiagram({
   });
   const legendDockY = height - 168;
   const siteIndexItems = (primarySite ? [primarySite, ...branchSites] : branchSites).slice(0, 4);
+  const siteVlanCount = (site?: SiteWithVlans) => site?.vlans?.length ?? 0;
+  const siteServiceCount = (siteName?: string) => synthesized.servicePlacements.filter((service) => !siteName || service.siteName === siteName).length;
+  const siteWanLink = (siteId?: string) => synthesized.wanLinks.find((link) => link.endpointASiteId === siteId || link.endpointBSiteId === siteId);
+  const siteWanLabel = (siteId?: string) => siteWanLink(siteId)?.linkName || (synthesized.topology.topologyType === "hub-spoke" ? "WAN / hub-spoke" : "Inter-site path");
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1263,6 +1267,26 @@ function PhysicalTopologyDiagram({
         {chip(342, 410, 166, `Topology ${synthesized.topology.topologyLabel}`, "purple")}
         {chip(520, 410, 128, `Services ${synthesized.servicePlacements.length}`, "orange")}
 
+        <rect x={centerX - 196} y={98} width={392} height={92} rx={26} fill="rgba(245,249,255,0.78)" stroke="#cad9f2" strokeDasharray="8 6" />
+        <text x={centerX} y={122} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Internet / northbound exchange</text>
+        <text x={centerX} y={140} textAnchor="middle" fontSize="10.5" fill="#607791">Public edge, provider handoff, and upstream routing entry stay centered before the perimeter stack.</text>
+        <rect x={centerX - 188} y={214} width={376} height={88} rx={24} fill="rgba(249,252,255,0.74)" stroke="#d3e0f4" strokeDasharray="8 6" />
+        <text x={centerX} y={238} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Perimeter control stack</text>
+        <text x={centerX} y={256} textAnchor="middle" fontSize="10.5" fill="#607791">Firewall, DMZ publication, and routed handoff into the internal fabric.</text>
+
+        <rect x={centerX - 316} y={332} width={632} height={384} rx={34} fill="rgba(242,247,255,0.58)" stroke="#cad9f2" strokeDasharray="8 6" />
+        <text x={centerX} y={356} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#284b78">Primary hub backbone zone</text>
+        <text x={centerX} y={374} textAnchor="middle" fontSize="10.5" fill="#607791">Core routing, campus switching, shared services, and user access stay visually grouped in one central engineering zone.</text>
+        {branchSites.length ? Array.from({ length: branchRows }).map((_, rowIndex) => {
+          const rowY = siteRowStartY + rowIndex * siteRowGap;
+          return (
+            <g key={`branch-corridor-${rowIndex}`}>
+              <rect x={58} y={rowY - 34} width={width - 116} height={388} rx={30} fill="rgba(248,251,255,0.48)" stroke="#d9e4f4" strokeDasharray="8 7" />
+              <text x={centerX} y={rowY - 14} textAnchor="middle" fontSize="10.8" fontWeight="700" fill="#4a6587">Branch corridor {rowIndex + 1} • attached access + local services + WAN uplink</text>
+            </g>
+          );
+        }) : null}
+
         <g opacity="0.9">
           <rect x={sectionRailX} y={160} width="8" height={Math.max(520, fabricSectionBottom - 130)} rx="4" fill="#d9e7fb" />
           <rect x={sectionRailX - 12} y={168} width="118" height="24" rx="12" fill="#eef5ff" stroke="#bfd2f3" />
@@ -1281,6 +1305,9 @@ function PhysicalTopologyDiagram({
               <line x1={entry.anchorX} y1={transportSpineY} x2={entry.anchorX} y2={entry.anchorY - 18} stroke="#d0ddf2" strokeWidth="2.4" strokeDasharray="7 7" />
               <circle cx={entry.anchorX} cy={transportSpineY} r="8" fill="#ffffff" stroke="#7ea3e1" strokeWidth="3" />
               <text x={entry.anchorX} y={transportSpineY - 16} textAnchor="middle" fontSize="10" fill="#5e7691">{entry.site.name}</text>
+              <rect x={entry.anchorX - 86} y={transportSpineY + 16} width="172" height="34" rx="17" fill="rgba(255,255,255,0.92)" stroke="#d6e3f5" />
+              <text x={entry.anchorX} y={transportSpineY + 30} textAnchor="middle" fontSize="10.2" fontWeight="700" fill="#365d93">{siteWanLabel(entry.site.id)}</text>
+              <text x={entry.anchorX} y={transportSpineY + 43} textAnchor="middle" fontSize="9.8" fill="#607791">VLANs {siteVlanCount(entry.site)} • Services {siteServiceCount(entry.site.name)}</text>
             </g>
           ))}
         </g>
@@ -1302,10 +1329,14 @@ function PhysicalTopologyDiagram({
         {primaryDmzService(synthesized, primarySite?.name) ? <><g>{renderPath([[centerX + 58, 262], [centerX + 126, 262]], "internet", "dmz", primaryDmzService(synthesized, primarySite?.name)?.ingressInterface || undefined)}</g><g>{renderPath([[centerX + 246, 262], [centerX + 270, 262]], "trunk", "dmz host", primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || undefined)}</g></> : null}
         {renderPath([[centerX, 278], [centerX, 340]], "routed", "inside / routed core", synthesized.routingPlan.find((item) => item.siteId === primarySite?.id)?.summaryAdvertisement || undefined)}
 
+        <rect x={centerX - 186} y={320} width="372" height="20" rx="10" fill="#eef4ff" stroke="#bfd2f3" />
+        <text x={centerX} y={334} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">PRIMARY HUB • POLICY EXCHANGE • SHARED SERVICES BACKBONE</text>
+
         <rect x={centerX - 270} y={344} width={540} height={360} rx={28} fill={hqValidationTone.fill} stroke={hqValidationTone.stroke} strokeWidth="2.5" filter="url(#diagram-soft-shadow)" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
         <text x={centerX - 236} y={380} fontSize="19" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{primarySite?.name || project.name}</text>
         <text x={centerX - 236} y={400} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "topology")}>Primary site / policy hub</text>
         <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text>
+        <text x={centerX - 236} y={434} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>VLANs {siteVlanCount(primarySite)} • Services {siteServiceCount(primarySite?.name)} • WAN {siteWanLabel(primarySite?.id)}</text>
         {taskBadge(centerX + 236, 372, hqTaskCount)}
         {hqValidation.length > 0 ? chip(centerX + 82, 360, 148, `Validation ${hqValidation.length}`, hqValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
 
@@ -1382,15 +1413,18 @@ function PhysicalTopologyDiagram({
               <text x={x + 20} y={y + 30} fontSize="17" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
               <text x={x + 20} y={y + 49} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site block assigned"}</text>
               <text x={x + 20} y={y + 64} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
+              <text x={x + 20} y={y + 78} fontSize="10.2" fill="#5b708d" opacity={labelFocusOpacity(labelFocus, "topology")}>VLANs {siteVlanCount(site)} • Services {siteServiceCount(site.name)} • WAN {siteWanLabel(site.id)}</text>
+              <circle cx={x + boxWidth - 48} cy={y + 54} r="13" fill="#eef5ff" stroke="#bfd2f3" />
+              <text x={x + boxWidth - 48} y={y + 58} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">{index + 1}</text>
               {chip(x + 18, y + 18, 106, left ? `Row ${row + 1} left` : `Row ${row + 1} right`, "blue")}
               {chip(x + 182, y + 46, 110, site.name === synthesized.topology.primarySiteName ? "Primary hub" : "Attached site", siteTierTone(site.name, synthesized))}
               {taskBadge(x + boxWidth - 28, y + 24, siteTaskCount)}
               {siteValidation.length > 0 ? chip(x + 150, y + 18, 132, `Validation ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
 
-              <rect x={x + 8} y={y + 74} width={112} height={100} rx={16} fill="#f8fbff" stroke="#c7d8f7" strokeDasharray="6 4" />
-              <text x={x + 20} y={y + 88} fontSize="10.5" fill="#526984">Perimeter / edge zone group</text>
-              <rect x={x + 118} y={y + 78} width={122} height={96} rx={16} fill="#f9fcff" stroke="#d6e4fb" strokeDasharray="6 4" />
-              <text x={x + 130} y={y + 92} fontSize="10.5" fill="#526984">Core / access zone group</text>
+              <rect x={x + 8} y={y + 86} width={112} height={92} rx={16} fill="#f8fbff" stroke="#c7d8f7" strokeDasharray="6 4" />
+              <text x={x + 20} y={y + 100} fontSize="10.5" fill="#526984">Perimeter / edge zone group</text>
+              <rect x={x + 118} y={y + 90} width={122} height={88} rx={16} fill="#f9fcff" stroke="#d6e4fb" strokeDasharray="6 4" />
+              <text x={x + 130} y={y + 104} fontSize="10.5" fill="#526984">Core / access zone group</text>
               {site.name === synthesized.topology.primarySiteName ? <rect x={x + 8} y={y + 58} width={boxWidth - 16} height="12" rx="6" fill="#eef4ff" stroke="#bfd2f3" /> : null}
               {site.name === synthesized.topology.primarySiteName ? <text x={x + boxWidth / 2} y={y + 67} textAnchor="middle" fontSize="10" fontWeight="700" fill="#284b78" opacity={labelFocusOpacity(labelFocus, "topology")}>PRIMARY / SHARED-SERVICE / POLICY HUB</text> : null}
 
