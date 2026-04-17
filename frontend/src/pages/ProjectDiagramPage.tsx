@@ -62,8 +62,8 @@ export function ProjectDiagramPage() {
   const [mode, setMode] = useState<DiagramMode>("physical");
   const [scope, setScope] = useState<DiagramScope>("global");
   const [activeOverlays, setActiveOverlays] = useState<ActiveOverlayMode[]>([]);
-  const [labelMode, setLabelMode] = useState<DiagramLabelMode>("detailed");
-  const [linkAnnotationMode, setLinkAnnotationMode] = useState<LinkAnnotationMode>("full");
+  const [labelMode, setLabelMode] = useState<DiagramLabelMode>("essential");
+  const [linkAnnotationMode, setLinkAnnotationMode] = useState<LinkAnnotationMode>("minimal");
   const [focusedSiteId, setFocusedSiteId] = useState<string>("");
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
@@ -285,11 +285,11 @@ export function ProjectDiagramPage() {
     setDeviceFocus((current) => (current === nextDeviceFocus ? current : nextDeviceFocus));
     setLinkFocus((current) => (current === nextLinkFocus ? current : nextLinkFocus));
     setLabelMode((current) => {
-      const desired = activeOverlays.length > 0 ? "detailed" : current;
+      const desired: DiagramLabelMode = activeOverlays.length > 0 ? "detailed" : "essential";
       return current === desired ? current : desired;
     });
     setLinkAnnotationMode((current) => {
-      const desired = activeOverlays.includes("flows") || activeOverlays.includes("addressing") ? "full" : current;
+      const desired: LinkAnnotationMode = activeOverlays.includes("flows") || activeOverlays.includes("addressing") ? "full" : "minimal";
       return current === desired ? current : desired;
     });
   }, [activeOverlays, scope]);
@@ -298,8 +298,8 @@ export function ProjectDiagramPage() {
     setMode("physical");
     setScope("global");
     setActiveOverlays([]);
-    setLabelMode("detailed");
-    setLinkAnnotationMode("full");
+    setLabelMode("essential");
+    setLinkAnnotationMode("minimal");
     setFocusedSiteId(enrichedProject?.sites[0]?.id || "");
     setDeviceFocus("all");
     setLinkFocus("all");
@@ -334,7 +334,7 @@ export function ProjectDiagramPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => fitCanvasToView(), 0);
     return () => window.clearTimeout(timer);
-  }, [mode, scope, activeSiteId]);
+  }, [mode, scope, activeSiteId, overlayCount]);
 
   useEffect(() => {
     const syncFullscreen = () => {
@@ -534,7 +534,7 @@ export function ProjectDiagramPage() {
                       ? (activeOverlays.includes("flows") ? "flows" : activeOverlays.includes("security") ? "security" : activeOverlays.includes("redundancy") ? "transport" : "all")
                       : linkFocus,
                     focusedSiteId: activeSiteId,
-                  bareCanvas: true,
+                    bareCanvas: true,
                   }}
                 />
               </div>

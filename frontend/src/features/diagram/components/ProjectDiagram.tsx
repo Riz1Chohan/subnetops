@@ -1033,6 +1033,11 @@ function LogicalTopologyDiagram({
   const showDetailedLabels = labelMode === "detailed";
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
+  const showOverlayNotes = !bareCanvas || enabledOverlays.length > 0;
+  const showAddressing = !bareCanvas || hasOverlay("addressing");
+  const showSecurity = !bareCanvas || hasOverlay("security");
+  const showServices = !bareCanvas || hasOverlay("services");
+  const showRedundancy = !bareCanvas || hasOverlay("redundancy");
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, label, secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
   const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
   const primarySitePoint = primarySite ? sitePositions[primarySite.id] : undefined;
@@ -1085,43 +1090,43 @@ function LogicalTopologyDiagram({
             <g key={site.id}>
               <rect x={x} y={y} width={cardWidth} height={cardHeight} rx={24} fill={validationTone.fill} stroke={validationTone.stroke} strokeWidth="2.3" filter="url(#diagram-soft-shadow)" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
               <text x={x + 20} y={y + 30} fontSize="18" fontWeight="700" fill="#142742" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
-              <text x={x + 20} y={y + 50} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site summary block assigned"}</text>
-              <text x={x + 20} y={y + 68} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
+              {showAddressing ? <text x={x + 20} y={y + 50} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site summary block assigned"}</text> : null}
+              {!bareCanvas ? <text x={x + 20} y={y + 68} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text> : null}
               {chip(x + 164, y + 52, 108, site.name === synthesized.topology.primarySiteName ? "Primary hub" : "Attached site", siteTierTone(site.name, synthesized))}
-              {taskBadge(x + cardWidth - 24, y + 24, taskCount)}
-              {siteValidation.length > 0 ? chip(x + 156, y + 18, 94, `${validationTone.label} ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
-              {site.name === synthesized.topology.primarySiteName ? <rect x={x + 18} y={y + 76} width={cardWidth - 36} height="14" rx="7" fill="#eef4ff" stroke="#bfd2f3" /> : null}
-              {site.name === synthesized.topology.primarySiteName ? <text x={x + cardWidth / 2} y={y + 86} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78" opacity={labelFocusOpacity(labelFocus, "topology")}>PRIMARY / SHARED-SERVICE / POLICY HUB</text> : null}
-              {site.name !== synthesized.topology.primarySiteName ? <rect x={x + 18} y={y + 76} width={cardWidth - 36} height="14" rx="7" fill="#f8fbff" stroke="#d7e5fb" /> : null}
-              {site.name !== synthesized.topology.primarySiteName ? <text x={x + cardWidth / 2} y={y + 86} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#4f6582" opacity={labelFocusOpacity(labelFocus, "topology")}>ATTACHED SITE / LOCAL ACCESS / UPLINKED EDGE</text> : null}
+              {!bareCanvas ? taskBadge(x + cardWidth - 24, y + 24, taskCount) : null}
+              {!bareCanvas && siteValidation.length > 0 ? chip(x + 156, y + 18, 94, `${validationTone.label} ${siteValidation.length}`, siteValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
+              {!bareCanvas && site.name === synthesized.topology.primarySiteName ? <rect x={x + 18} y={y + 76} width={cardWidth - 36} height="14" rx="7" fill="#eef4ff" stroke="#bfd2f3" /> : null}
+              {!bareCanvas && site.name === synthesized.topology.primarySiteName ? <text x={x + cardWidth / 2} y={y + 86} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78" opacity={labelFocusOpacity(labelFocus, "topology")}>PRIMARY / SHARED-SERVICE / POLICY HUB</text> : null}
+              {!bareCanvas && site.name !== synthesized.topology.primarySiteName ? <rect x={x + 18} y={y + 76} width={cardWidth - 36} height="14" rx="7" fill="#f8fbff" stroke="#d7e5fb" /> : null}
+              {!bareCanvas && site.name !== synthesized.topology.primarySiteName ? <text x={x + cardWidth / 2} y={y + 86} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#4f6582" opacity={labelFocusOpacity(labelFocus, "topology")}>ATTACHED SITE / LOCAL ACCESS / UPLINKED EDGE</text> : null}
 
               <rect x={x + 12} y={y + 92} width="108" height="116" rx="18" fill="#f8fbff" stroke="#c7d8f7" strokeDasharray="6 4" />
-              <text x={x + 22} y={y + 108} fontSize="10.5" fill="#526984">Perimeter / edge group</text>
+              {!bareCanvas ? <text x={x + 22} y={y + 108} fontSize="10.5" fill="#526984">Perimeter / edge group</text> : null}
               <rect x={x + 122} y={y + 92} width="160" height="116" rx="18" fill="#fbfdff" stroke="#d9e6fb" strokeDasharray="6 4" />
-              <text x={x + 132} y={y + 108} fontSize="10.5" fill="#526984">Core / services / access group</text>
+              {!bareCanvas ? <text x={x + 132} y={y + 108} fontSize="10.5" fill="#526984">Core / services / access group</text> : null}
 
               {edgeDevice ? <DeviceIcon x={x + 18} y={y + 112} kind={edgeDevice.deviceType} label={edgeDevice.deviceName} sublabel={`${edgeDevice.role}${edgeDevice.uplinkTarget ? ` • uplink ${edgeDevice.uplinkTarget}` : ""}`} showSublabel={showDetailedLabels} /> : null}
               {switchDevice ? <DeviceIcon x={x + 126} y={y + 112} kind={switchDevice.deviceType} label={switchDevice.deviceName} sublabel={`${switchDevice.role}${switchDevice.uplinkTarget ? ` • uplink ${switchDevice.uplinkTarget}` : ""}`} showSublabel={showDetailedLabels} /> : null}
               {serviceDevice ? <DeviceIcon x={x + 212} y={y + 112} kind={serviceDevice.deviceType} label="Services" sublabel={`${serviceDevice.role}${serviceDevice.uplinkTarget ? ` • upstream ${serviceDevice.uplinkTarget}` : ""}`} showSublabel={showDetailedLabels} /> : null}
               {wirelessDevice ? <DeviceIcon x={x + 140} y={y + 196} kind={wirelessDevice.deviceType} label={wirelessDevice.deviceName} sublabel={`${wirelessDevice.role}${wirelessDevice.uplinkTarget ? ` • uplink ${wirelessDevice.uplinkTarget}` : ""}`} showSublabel={showDetailedLabels} /> : null}
-              {edgeDevice ? chip(x + 24, y + 188, 90, `${deviceValidationItems(edgeDevice, site, validations, synthesized).length} edge flags`, deviceValidationItems(edgeDevice, site, validations, synthesized).length ? "orange" : "green") : null}
-              {switchDevice ? chip(x + 150, y + 188, 104, `${deviceValidationItems(switchDevice, site, validations, synthesized).length} core/access flags`, deviceValidationItems(switchDevice, site, validations, synthesized).length ? "orange" : "blue") : null}
-              {dmzService ? <g><rect x={x + 194} y={y + 188} width="88" height="24" rx="12" fill="#eef6ff" stroke="#9ab9ef" /><text x={x + 238} y={y + 204} textAnchor="middle" fontSize="10.5" fill="#24446f">DMZ subnet</text><DeviceIcon x={x + 210} y={y + 218} kind="server" label="DMZ Host" sublabel={dmzService.subnetCidr || "Published"} showSublabel={showDetailedLabels} /></g> : null}
+              {!bareCanvas && edgeDevice ? chip(x + 24, y + 188, 90, `${deviceValidationItems(edgeDevice, site, validations, synthesized).length} edge flags`, deviceValidationItems(edgeDevice, site, validations, synthesized).length ? "orange" : "green") : null}
+              {!bareCanvas && switchDevice ? chip(x + 150, y + 188, 104, `${deviceValidationItems(switchDevice, site, validations, synthesized).length} core/access flags`, deviceValidationItems(switchDevice, site, validations, synthesized).length ? "orange" : "blue") : null}
+              {(showServices || showSecurity) && dmzService ? <g><rect x={x + 194} y={y + 188} width="88" height="24" rx="12" fill="#eef6ff" stroke="#9ab9ef" /><text x={x + 238} y={y + 204} textAnchor="middle" fontSize="10.5" fill="#24446f">DMZ subnet</text><DeviceIcon x={x + 210} y={y + 218} kind="server" label="DMZ Host" sublabel={dmzService.subnetCidr || "Published"} showSublabel={showDetailedLabels} /></g> : null}
 
               {edgeDevice && switchDevice ? renderPath([[x + 120, y + 142], [x + 126, y + 142]], "routed", edgeDevice.deviceType === "firewall" ? "inside / transit" : "LAN handoff", edgeDevice.connectedSubnets[0] || undefined) : null}
               {switchDevice && serviceDevice ? renderPath([[x + 238, y + 142], [x + 212, y + 142]], "trunk", "server trunk", serviceDevice.connectedSubnets[0] || undefined) : null}
               {switchDevice && wirelessDevice ? renderPath([[x + 182, y + 175], [x + 166, y + 196]], "trunk", "AP uplink", wirelessDevice.connectedZones[0] || undefined) : null}
               {edgeDevice && dmzService ? <><g>{renderPath([[x + 78, y + 164], [x + 194, y + 200]], "internet", "Published-service path", dmzService.ingressInterface || dmzService.subnetCidr || undefined)}</g><g>{renderPath([[x + 238, y + 212], [x + 238, y + 218]], "trunk", "DMZ host access", dmzService.subnetCidr || undefined)}</g>{managementBoundaryForSite(site.name, synthesized) ? <g>{renderPath([[x + 170, y + 155], [x + 214, y + 250]], "ha", "Management-only path", managementBoundaryForSite(site.name, synthesized)?.attachedInterface || managementBoundaryForSite(site.name, synthesized)?.zoneName)}</g> : null}</> : null}
 
-              <text x={x + 18} y={y + 286} fontSize="12" fontWeight="700" fill="#324866" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>{enabledOverlays.length ? "Selected overlays" : "Devices + lines"}</text>
-              {siteOverlays.slice(0, 3).map((item, overlayIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + overlayIndex * 24, cardWidth - 36, item.text, item.tone) : null)}
-              {siteOverlays.length === 0 ? <text x={x + 18} y={y + 316} fontSize="10.5" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>No overlay items yet for this site.</text> : null}
-              {interfaceSummary(edgeDevice).slice(0,2).map((label, interfaceIndex) => chip(x + 18, y + 224 + interfaceIndex * 24, 118, label, "green"))}
-              {interfaceSummary(switchDevice).slice(0, 2).map((label, interfaceIndex) => chip(x + 146, y + 224 + interfaceIndex * 24, 126, label, "blue"))}
-              {securitySummary.map((boundary, boundaryIndex) => (
+              {showOverlayNotes && !bareCanvas ? <text x={x + 18} y={y + 286} fontSize="12" fontWeight="700" fill="#324866" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>{enabledOverlays.length ? "Selected overlays" : "Devices + lines"}</text> : null}
+              {showOverlayNotes ? siteOverlays.slice(0, 3).map((item, overlayIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + overlayIndex * 24, cardWidth - 36, item.text, item.tone) : null) : null}
+              {!bareCanvas && showOverlayNotes && siteOverlays.length === 0 ? <text x={x + 18} y={y + 316} fontSize="10.5" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>No overlay items yet for this site.</text> : null}
+              {showAddressing || showRedundancy ? interfaceSummary(edgeDevice).slice(0,2).map((label, interfaceIndex) => chip(x + 18, y + 224 + interfaceIndex * 24, 118, label, "green")) : null}
+              {showAddressing || showRedundancy ? interfaceSummary(switchDevice).slice(0, 2).map((label, interfaceIndex) => chip(x + 146, y + 224 + interfaceIndex * 24, 126, label, "blue")) : null}
+              {showSecurity ? securitySummary.map((boundary, boundaryIndex) => (
                 <text key={`${site.id}-${boundary.zoneName}-${boundaryIndex}`} x={x + 18} y={y + cardHeight - 30 + boundaryIndex * 14} fontSize="10.5" fill="#61758f">{boundary.zoneName}: {boundary.controlPoint}{boundary.attachedInterface ? ` • ${boundary.attachedInterface}` : ""}</text>
-              ))}
-              {siteValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-validation-${itemIndex}`} x={x + 18} y={y + cardHeight - 8} fontSize="10.5" fill="#9a3412">Validation: {item.title}</text>)}
+              )) : null}
+              {!bareCanvas ? siteValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-validation-${itemIndex}`} x={x + 18} y={y + cardHeight - 8} fontSize="10.5" fill="#9a3412">Validation: {item.title}</text>) : null}
             </g>
           );
         })}
@@ -1221,7 +1226,13 @@ function PhysicalTopologyDiagram({
   const primarySiteBottom = 344 + 360;
   const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
   const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
-  const flowOverlays = hasOverlay("flows") ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
+  const showOverlayNotes = !bareCanvas || enabledOverlays.length > 0;
+  const showAddressing = !bareCanvas || hasOverlay("addressing");
+  const showSecurity = !bareCanvas || hasOverlay("security");
+  const showServices = !bareCanvas || hasOverlay("services");
+  const showRedundancy = !bareCanvas || hasOverlay("redundancy");
+  const showFlows = hasOverlay("flows");
+  const flowOverlays = showFlows ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
   const branchSectionBottom = branchSites.length ? siteRowStartY + ((branchRows - 1) * siteRowGap) + siteCardHeight : primarySiteBottom;
   const flowLaneStartY = Math.max(774, branchSectionBottom + 76);
   const flowLaneHeight = hasOverlay("flows") ? Math.max(0, flowOverlays.length - 1) * 84 + 96 : 0;
@@ -1354,33 +1365,33 @@ function PhysicalTopologyDiagram({
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
         <DeviceIcon x={centerX - 60} y={226} kind="firewall" label="Perimeter Firewall" sublabel={synthesized.topology.redundancyModel} emphasized={emphasizeDevice("firewall")} />
-        {primaryDmzService(synthesized, primarySite?.name) ? <g><rect x={centerX + 126} y={246} width="120" height="28" rx="14" fill="#eef6ff" stroke="#9ab9ef" /><text x={centerX + 186} y={264} textAnchor="middle" fontSize="11" fill="#24446f">DMZ subnet</text><DeviceIcon x={centerX + 270} y={232} kind="server" label="DMZ Host" sublabel={primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || "Published service"} showSublabel={showDetailedLabels} emphasized={emphasizeDevice("server")} /></g> : null}
-        {primaryDmzService(synthesized, primarySite?.name) ? <><g>{renderPath([[centerX + 58, 262], [centerX + 126, 262]], "internet", "dmz", primaryDmzService(synthesized, primarySite?.name)?.ingressInterface || undefined)}</g><g>{renderPath([[centerX + 246, 262], [centerX + 270, 262]], "trunk", "dmz host", primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || undefined)}</g></> : null}
+        {(showServices || showSecurity) && primaryDmzService(synthesized, primarySite?.name) ? <g><rect x={centerX + 126} y={246} width="120" height="28" rx="14" fill="#eef6ff" stroke="#9ab9ef" /><text x={centerX + 186} y={264} textAnchor="middle" fontSize="11" fill="#24446f">DMZ subnet</text><DeviceIcon x={centerX + 270} y={232} kind="server" label="DMZ Host" sublabel={primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || "Published service"} showSublabel={showDetailedLabels} emphasized={emphasizeDevice("server")} /></g> : null}
+        {(showServices || showSecurity) && primaryDmzService(synthesized, primarySite?.name) ? <><g>{renderPath([[centerX + 58, 262], [centerX + 126, 262]], "internet", "dmz", primaryDmzService(synthesized, primarySite?.name)?.ingressInterface || undefined)}</g><g>{renderPath([[centerX + 246, 262], [centerX + 270, 262]], "trunk", "dmz host", primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || undefined)}</g></> : null}
         {renderPath([[centerX, 278], [centerX, 340]], "routed", "inside / routed core", synthesized.routingPlan.find((item) => item.siteId === primarySite?.id)?.summaryAdvertisement || undefined)}
 
-        <rect x={centerX - 186} y={320} width="372" height="20" rx="10" fill="#eef4ff" stroke="#bfd2f3" />
-        <text x={centerX} y={334} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">PRIMARY HUB • POLICY EXCHANGE • SHARED SERVICES BACKBONE</text>
+        {!bareCanvas ? <rect x={centerX - 186} y={320} width="372" height="20" rx="10" fill="#eef4ff" stroke="#bfd2f3" /> : null}
+        {!bareCanvas ? <text x={centerX} y={334} textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#284b78">PRIMARY HUB • POLICY EXCHANGE • SHARED SERVICES BACKBONE</text> : null}
 
         <rect x={centerX - 270} y={344} width={540} height={360} rx={28} fill={hqValidationTone.fill} stroke={hqValidationTone.stroke} strokeWidth="2.5" filter="url(#diagram-soft-shadow)" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
         <text x={centerX - 236} y={380} fontSize="19" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{primarySite?.name || project.name}</text>
-        <text x={centerX - 236} y={400} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "topology")}>Primary site / policy hub</text>
-        <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text>
-        <text x={centerX - 236} y={434} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>VLANs {siteVlanCount(primarySite)} • Services {siteServiceCount(primarySite?.name)} • WAN {siteWanLabel(primarySite?.id)}</text>
-        {taskBadge(centerX + 236, 372, hqTaskCount)}
-        {hqValidation.length > 0 ? chip(centerX + 82, 360, 148, `Validation ${hqValidation.length}`, hqValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
+        {!bareCanvas ? <text x={centerX - 236} y={400} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "topology")}>Primary site / policy hub</text> : null}
+        {showAddressing ? <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text> : null}
+        {(showServices || showRedundancy || !bareCanvas) ? <text x={centerX - 236} y={434} fontSize="10.5" fill="#526984" opacity={labelFocusOpacity(labelFocus, "topology")}>VLANs {siteVlanCount(primarySite)} • Services {siteServiceCount(primarySite?.name)} • WAN {siteWanLabel(primarySite?.id)}</text> : null}
+        {!bareCanvas ? taskBadge(centerX + 236, 372, hqTaskCount) : null}
+        {!bareCanvas && hqValidation.length > 0 ? chip(centerX + 82, 360, 148, `Validation ${hqValidation.length}`, hqValidation.some((item) => item.severity === "ERROR") ? "orange" : "purple") : null}
 
-        <rect x={centerX - 236} y={438} width={142} height={118} rx={22} fill="rgba(241,247,255,0.96)" stroke="#c7d8f7" strokeDasharray="7 5" />
-        <text x={centerX - 220} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Core routing cluster</text>
-        <text x={centerX - 220} y={474} fontSize="10" fill="#607791">Summaries, north-south control, inter-site path selection.</text>
-        <rect x={centerX - 86} y={442} width={144} height={112} rx={22} fill="rgba(245,249,255,0.96)" stroke="#d1def4" strokeDasharray="7 5" />
-        <text x={centerX - 70} y={462} fontSize="10.5" fontWeight="700" fill="#284b78">Core switching cluster</text>
-        <text x={centerX - 70} y={478} fontSize="10" fill="#607791">SVIs, trunks, campus switching, local segmentation.</text>
-        <rect x={centerX + 74} y={438} width={166} height={118} rx={22} fill="rgba(247,250,255,0.98)" stroke="#c9d7ee" strokeDasharray="7 5" />
-        <text x={centerX + 90} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Shared services cluster</text>
-        <text x={centerX + 90} y={474} fontSize="10" fill="#607791">Server roles, management anchors, shared applications.</text>
-        <rect x={centerX - 42} y={552} width={300} height={108} rx={24} fill="rgba(249,252,255,0.96)" stroke="#d7e5f8" strokeDasharray="7 5" />
-        <text x={centerX - 26} y={572} fontSize="10.5" fontWeight="700" fill="#284b78">User access and wireless fabric</text>
-        <text x={centerX - 26} y={588} fontSize="10" fill="#607791">Access switching, edge closets, PoE, and staff / guest wireless coverage.</text>
+        {!bareCanvas ? <rect x={centerX - 236} y={438} width={142} height={118} rx={22} fill="rgba(241,247,255,0.96)" stroke="#c7d8f7" strokeDasharray="7 5" /> : null}
+        {!bareCanvas ? <text x={centerX - 220} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Core routing cluster</text> : null}
+        {!bareCanvas ? <text x={centerX - 220} y={474} fontSize="10" fill="#607791">Summaries, north-south control, inter-site path selection.</text> : null}
+        {!bareCanvas ? <rect x={centerX - 86} y={442} width={144} height={112} rx={22} fill="rgba(245,249,255,0.96)" stroke="#d1def4" strokeDasharray="7 5" /> : null}
+        {!bareCanvas ? <text x={centerX - 70} y={462} fontSize="10.5" fontWeight="700" fill="#284b78">Core switching cluster</text> : null}
+        {!bareCanvas ? <text x={centerX - 70} y={478} fontSize="10" fill="#607791">SVIs, trunks, campus switching, local segmentation.</text> : null}
+        {!bareCanvas ? <rect x={centerX + 74} y={438} width={166} height={118} rx={22} fill="rgba(247,250,255,0.98)" stroke="#c9d7ee" strokeDasharray="7 5" /> : null}
+        {!bareCanvas ? <text x={centerX + 90} y={458} fontSize="10.5" fontWeight="700" fill="#284b78">Shared services cluster</text> : null}
+        {!bareCanvas ? <text x={centerX + 90} y={474} fontSize="10" fill="#607791">Server roles, management anchors, shared applications.</text> : null}
+        {!bareCanvas ? <rect x={centerX - 42} y={552} width={300} height={108} rx={24} fill="rgba(249,252,255,0.96)" stroke="#d7e5f8" strokeDasharray="7 5" /> : null}
+        {!bareCanvas ? <text x={centerX - 26} y={572} fontSize="10.5" fontWeight="700" fill="#284b78">User access and wireless fabric</text> : null}
+        {!bareCanvas ? <text x={centerX - 26} y={588} fontSize="10" fill="#607791">Access switching, edge closets, PoE, and staff / guest wireless coverage.</text> : null}
 
         <DeviceIcon x={centerX - 216} y={448} kind="router" label="Core Routing" sublabel="Summaries / north-south" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("router")} />
         <DeviceIcon x={centerX - 66} y={452} kind="core-switch" label="Core Switch" sublabel="Inter-VLAN / trunks" showSublabel={showDetailedLabels} emphasized={emphasizeDevice("core-switch")} />
@@ -1392,7 +1403,7 @@ function PhysicalTopologyDiagram({
         {renderPath([[centerX + 46, 480], [centerX + 96, 480]], "trunk", firstInterfaceLabel(synthesized.sitePlacements.find((item) => item.siteId === primarySite?.id && item.deviceType === "server")) || "server / service trunk", synthesized.servicePlacements.find((item) => item.siteName === primarySite?.name)?.subnetCidr || undefined)}
         {renderPath([[centerX - 8, 594], [centerX + 178, 594]], "trunk", firstInterfaceLabel(synthesized.sitePlacements.find((item) => item.siteId === primarySite?.id && item.deviceType === "access-point")) || "edge access / AP uplink", (requirements.wireless || requirements.guestWifi) ? "staff + guest SSIDs" : undefined)}
 
-        {overlayRowsForSite(primarySite || sites[0], synthesized, enabledOverlays, 5).map((row, index) => labelFocusMatchesCategory(labelFocus, row.category) ? chip(centerX - 238, 630 + index * 28, 476, row.text, row.tone) : null)}
+        {showOverlayNotes ? overlayRowsForSite(primarySite || sites[0], synthesized, enabledOverlays, 5).map((row, index) => labelFocusMatchesCategory(labelFocus, row.category) ? chip(centerX - 238, 630 + index * 28, 476, row.text, row.tone) : null) : null}
 
         {cloudNeeded ? (
           <g>
@@ -1464,26 +1475,26 @@ function PhysicalTopologyDiagram({
               {renderPath([[x + 118, y + 125], [x + 132, y + 125]], "routed", firstInterfaceLabel(edgePlacement) || "inside", synthesized.addressingPlan.find((row) => row.siteId === site.id)?.gatewayIp || undefined)}
               {wirelessPlacement ? renderPath([[x + 244, y + 125], [x + 254, y + 125]], "trunk", firstInterfaceLabel(wirelessPlacement) || "wireless / access", localOverlay[0]?.text || undefined) : null}
 
-              {edgeStack.map((item, itemIndex) => chip(x + 18, y + 178 + itemIndex * 24, boxWidth - 36, item, "green"))}
-              {switchStack.map((item, itemIndex) => chip(x + 18, y + 226 + itemIndex * 24, boxWidth - 36, item, "blue"))}
-              {labelFocusMatchesCategory(labelFocus, "zones") ? zoneLabels.slice(0, 1).map((item, itemIndex) => chip(x + 18, y + 274 + itemIndex * 24, boxWidth - 36, item, "purple")) : null}
-              {localOverlay.slice(0, 2).map((item, itemIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + itemIndex * 24, boxWidth - 36, item.text, item.tone) : null)}
-              {dmzBoundary ? <text x={x + 18} y={y + 320} fontSize="10.2" fill="#5a34a3" opacity={labelFocusOpacity(labelFocus, "zones")}>DMZ boundary: {dmzBoundary.attachedDevice}{dmzBoundary.attachedInterface ? ` • ${dmzBoundary.attachedInterface}` : ''}</text> : null}
-              {managementBoundary ? <text x={x + 18} y={y + 334} fontSize="10.2" fill="#24446f" opacity={labelFocusOpacity(labelFocus, "zones")}>Management boundary: {managementBoundary.controlPoint}</text> : null}
+              {showAddressing || showRedundancy ? edgeStack.map((item, itemIndex) => chip(x + 18, y + 178 + itemIndex * 24, boxWidth - 36, item, "green")) : null}
+              {showAddressing || showRedundancy ? switchStack.map((item, itemIndex) => chip(x + 18, y + 226 + itemIndex * 24, boxWidth - 36, item, "blue")) : null}
+              {showSecurity ? zoneLabels.slice(0, 1).map((item, itemIndex) => chip(x + 18, y + 274 + itemIndex * 24, boxWidth - 36, item, "purple")) : null}
+              {showOverlayNotes ? localOverlay.slice(0, 2).map((item, itemIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + itemIndex * 24, boxWidth - 36, item.text, item.tone) : null) : null}
+              {showSecurity && dmzBoundary ? <text x={x + 18} y={y + 320} fontSize="10.2" fill="#5a34a3" opacity={labelFocusOpacity(labelFocus, "zones")}>DMZ boundary: {dmzBoundary.attachedDevice}{dmzBoundary.attachedInterface ? ` • ${dmzBoundary.attachedInterface}` : ''}</text> : null}
+              {showSecurity && managementBoundary ? <text x={x + 18} y={y + 334} fontSize="10.2" fill="#24446f" opacity={labelFocusOpacity(labelFocus, "zones")}>Management boundary: {managementBoundary.controlPoint}</text> : null}
 
-              {edgeInterfaceValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-edge-if-validation-${itemIndex}`} x={x + 18} y={y + 352 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Edge interface: {item.title}</text>)}
-              {switchInterfaceValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-switch-if-validation-${itemIndex}`} x={x + 18} y={y + 366 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Switch interface: {item.title}</text>)}
-              {pathValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-path-validation-${itemIndex}`} x={x + 18} y={y + 380 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Path/link: {item.title}</text>)}
-              {edgeValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-edge-validation-${itemIndex}`} x={x + 18} y={y + 394 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Edge role: {item.title}</text>)}
-              {switchValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-switch-validation-${itemIndex}`} x={x + 18} y={y + 408 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Switching role: {item.title}</text>)}
+              {!bareCanvas ? edgeInterfaceValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-edge-if-validation-${itemIndex}`} x={x + 18} y={y + 352 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Edge interface: {item.title}</text>) : null}
+              {!bareCanvas ? switchInterfaceValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-switch-if-validation-${itemIndex}`} x={x + 18} y={y + 366 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Switch interface: {item.title}</text>) : null}
+              {!bareCanvas ? pathValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-path-validation-${itemIndex}`} x={x + 18} y={y + 380 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Path/link: {item.title}</text>) : null}
+              {!bareCanvas ? edgeValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-edge-validation-${itemIndex}`} x={x + 18} y={y + 394 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Edge role: {item.title}</text>) : null}
+              {!bareCanvas ? switchValidation.slice(0, 1).map((item, itemIndex) => <text key={`${site.id}-switch-validation-${itemIndex}`} x={x + 18} y={y + 408 + itemIndex * 14} fontSize="10.2" fill="#9a3412">Switching role: {item.title}</text>) : null}
 
-              {zoneRects.slice(0, 2).map((zone, zoneIndex) => <text key={`${site.id}-zone-rect-${zoneIndex}`} x={x + 214} y={y + 186 + zoneIndex * 14} fontSize="10.2" fill="#5a34a3">{zone.label}: {zone.anchor}</text>)}
-              {dmzService ? <g>{renderPath([[x + 66, y + 118], [x + 252, y + 74]], 'internet', 'Published-service path', dmzService.ingressInterface || dmzService.subnetCidr || undefined)}<rect x={x + 234} y={y + 28} width="68" height="18" rx="9" fill="#eef6ff" stroke="#9ab9ef" /><text x={x + 268} y={y + 40} textAnchor="middle" fontSize="10" fill="#24446f">DMZ subnet</text>{renderPath([[x + 268, y + 46], [x + 268, y + 62]], 'trunk', 'Published host', dmzService.subnetCidr || undefined)}{managementBoundary ? renderPath([[x + 184, y + 122], [x + 268, y + 62]], 'ha', 'Management-only path', managementBoundary.attachedInterface || managementBoundary.zoneName) : null}</g> : null}
+              {showSecurity ? zoneRects.slice(0, 2).map((zone, zoneIndex) => <text key={`${site.id}-zone-rect-${zoneIndex}`} x={x + 214} y={y + 186 + zoneIndex * 14} fontSize="10.2" fill="#5a34a3">{zone.label}: {zone.anchor}</text>) : null}
+              {(showServices || showSecurity) && dmzService ? <g>{renderPath([[x + 66, y + 118], [x + 252, y + 74]], 'internet', 'Published-service path', dmzService.ingressInterface || dmzService.subnetCidr || undefined)}<rect x={x + 234} y={y + 28} width="68" height="18" rx="9" fill="#eef6ff" stroke="#9ab9ef" /><text x={x + 268} y={y + 40} textAnchor="middle" fontSize="10" fill="#24446f">DMZ subnet</text>{renderPath([[x + 268, y + 46], [x + 268, y + 62]], 'trunk', 'Published host', dmzService.subnetCidr || undefined)}{showSecurity && managementBoundary ? renderPath([[x + 184, y + 122], [x + 268, y + 62]], 'ha', 'Management-only path', managementBoundary.attachedInterface || managementBoundary.zoneName) : null}</g> : null}
             </g>
           );
         })}
 
-        {labelFocusMatchesCategory(labelFocus, "flows") && flowOverlays.length ? (
+        {labelFocusMatchesCategory(labelFocus, "flows") && flowOverlays.length && !bareCanvas ? (
           <g>
             <rect x={48} y={flowLaneStartY - 42} width={width - 96} height={flowLaneHeight + 40} rx={32} fill="rgba(255, 247, 237, 0.82)" stroke="#fdba74" strokeDasharray="10 8" />
             <text x={78} y={flowLaneStartY - 14} fontSize="12.5" fontWeight="700" fill="#9a3412">Critical flow review lane</text>
@@ -1496,9 +1507,9 @@ function PhysicalTopologyDiagram({
           return (
             <g key={flow.id}>
               {renderPath([[86, baseY], [width - 86, baseY]], "flow", `${flow.flowLabel} • ${flow.sourceZone} → ${flow.destinationZone}`)}
-              <text x={92} y={baseY + 22} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>Path: {flow.path.join(" → ")}</text>
-              <text x={92} y={baseY + 40} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>Control points: {flow.controlPoints.join(", ")}</text>
-              <text x={92} y={baseY + 58} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>NAT / policy: {flow.natBehavior} • {flow.enforcementPolicy}</text>
+              {!bareCanvas ? <text x={92} y={baseY + 22} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>Path: {flow.path.join(" → ")}</text> : null}
+              {!bareCanvas ? <text x={92} y={baseY + 40} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>Control points: {flow.controlPoints.join(", ")}</text> : null}
+              {!bareCanvas ? <text x={92} y={baseY + 58} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "flows")}>NAT / policy: {flow.natBehavior} • {flow.enforcementPolicy}</text> : null}
             </g>
           );
         }) : null}
@@ -2223,6 +2234,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const focusedSiteId = controls?.focusedSiteId ?? internalFocusedSiteId;
   const bareCanvas = controls?.bareCanvas ?? minimalWorkspace;
   const isExternallyControlled = Boolean(controls);
+  const renderBareCanvas = isExternallyControlled || minimalWorkspace || bareCanvas || compact;
   const setMode = controls?.mode !== undefined ? (_next: DiagramMode) => {} : setInternalMode;
   const setOverlay = controls?.overlay !== undefined ? (_next: OverlayMode) => {} : setInternalOverlay;
   const setScope = controls?.scope !== undefined ? (_next: DiagramScope) => {} : setInternalScope;
@@ -2272,17 +2284,17 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   };
 
   if (sites.length === 0) {
-    return isExternallyControlled || bareCanvas || minimalWorkspace || compact
+    return renderBareCanvas
       ? <div className="panel diagram-minimal-panel"><div className="diagram-empty-message">Add sites and VLANs to generate a topology diagram.</div></div>
       : <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
   }
 
-  if (isExternallyControlled || minimalWorkspace || bareCanvas || compact) {
+  if (renderBareCanvas) {
     return (
       <div className="panel diagram-minimal-panel">
         {mode === "logical"
-          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />
-          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas={bareCanvas} />}
+          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas />
+          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} bareCanvas />}
       </div>
     );
   }
