@@ -1242,6 +1242,13 @@ function PhysicalTopologyDiagram({
   const siteServiceCount = (siteName?: string) => synthesized.servicePlacements.filter((service) => !siteName || service.siteName === siteName).length;
   const siteWanLink = (siteId?: string) => synthesized.wanLinks.find((link) => link.endpointASiteId === siteId || link.endpointBSiteId === siteId);
   const siteWanLabel = (siteId?: string) => siteWanLink(siteId)?.linkName || (synthesized.topology.topologyType === "hub-spoke" ? "WAN / hub-spoke" : "Inter-site path");
+  const transportCapsuleSites = primarySite ? [primarySite, ...branchSites] : branchSites;
+  const transportCapsuleWidth = 172;
+  const transportCapsuleGap = 12;
+  const transportCapsuleCount = Math.max(1, Math.min(transportCapsuleSites.length, 6));
+  const transportCapsuleVisibleSites = transportCapsuleSites.slice(0, transportCapsuleCount);
+  const transportCapsuleTotalWidth = transportCapsuleVisibleSites.length * transportCapsuleWidth + Math.max(0, transportCapsuleVisibleSites.length - 1) * transportCapsuleGap;
+  const transportCapsuleStartX = centerX - transportCapsuleTotalWidth / 2;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1305,11 +1312,19 @@ function PhysicalTopologyDiagram({
               <line x1={entry.anchorX} y1={transportSpineY} x2={entry.anchorX} y2={entry.anchorY - 18} stroke="#d0ddf2" strokeWidth="2.4" strokeDasharray="7 7" />
               <circle cx={entry.anchorX} cy={transportSpineY} r="8" fill="#ffffff" stroke="#7ea3e1" strokeWidth="3" />
               <text x={entry.anchorX} y={transportSpineY - 16} textAnchor="middle" fontSize="10" fill="#5e7691">{entry.site.name}</text>
-              <rect x={entry.anchorX - 86} y={transportSpineY + 16} width="172" height="34" rx="17" fill="rgba(255,255,255,0.92)" stroke="#d6e3f5" />
-              <text x={entry.anchorX} y={transportSpineY + 30} textAnchor="middle" fontSize="10.2" fontWeight="700" fill="#365d93">{siteWanLabel(entry.site.id)}</text>
-              <text x={entry.anchorX} y={transportSpineY + 43} textAnchor="middle" fontSize="9.8" fill="#607791">VLANs {siteVlanCount(entry.site)} • Services {siteServiceCount(entry.site.name)}</text>
             </g>
           ))}
+          {transportCapsuleVisibleSites.map((site, index) => {
+            const x = transportCapsuleStartX + index * (transportCapsuleWidth + transportCapsuleGap);
+            const isPrimaryTransportSite = site.id === primarySite?.id;
+            return (
+              <g key={`${site.id}-transport-capsule`}>
+                <rect x={x} y={transportSpineY + 18} width={transportCapsuleWidth} height="42" rx="18" fill={isPrimaryTransportSite ? "rgba(236, 251, 242, 0.98)" : "rgba(255,255,255,0.94)"} stroke={isPrimaryTransportSite ? "#a7d8b6" : "#d6e3f5"} filter="url(#diagram-soft-shadow)" />
+                <text x={x + transportCapsuleWidth / 2} y={transportSpineY + 34} textAnchor="middle" fontSize="10.2" fontWeight="700" fill={isPrimaryTransportSite ? "#17603b" : "#365d93"}>{site.name} • {siteWanLabel(site.id)}</text>
+                <text x={x + transportCapsuleWidth / 2} y={transportSpineY + 48} textAnchor="middle" fontSize="9.8" fill="#607791">{isPrimaryTransportSite ? "Primary hub" : "Attached site"} • VLANs {siteVlanCount(site)} • Services {siteServiceCount(site.name)}</text>
+              </g>
+            );
+          })}
         </g>
 
         {Array.from({ length: branchRows }).map((_, rowIndex) => {

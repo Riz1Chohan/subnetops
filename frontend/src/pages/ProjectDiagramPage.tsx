@@ -492,6 +492,39 @@ export function ProjectDiagramPage() {
                 );
               })}
             </div>
+            <div className="diagram-site-lens-row" aria-label="Canvas site lenses">
+              <button
+                type="button"
+                className={scope !== "site" ? "diagram-site-lens active" : "diagram-site-lens"}
+                onClick={focusGlobalCanvas}
+              >
+                <strong>Global canvas</strong>
+                <span>Full blueprint</span>
+              </button>
+              {enrichedProject.sites.slice(0, 6).map((site) => {
+                const isActive = scope === "site" && activeSiteId === site.id;
+                const isPrimary = site.name === synthesized.topology.primarySiteName;
+                return (
+                  <button
+                    key={site.id}
+                    type="button"
+                    className={isActive ? "diagram-site-lens active" : "diagram-site-lens"}
+                    onClick={() => focusSiteCanvas(site.id)}
+                  >
+                    <strong>{site.name}</strong>
+                    <span>{isPrimary ? "Primary hub" : "Site lens"}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className={scope === "wan-cloud" ? "diagram-site-lens active" : "diagram-site-lens"}
+                onClick={() => setScope("wan-cloud")}
+              >
+                <strong>WAN / Cloud</strong>
+                <span>Transport lens</span>
+              </button>
+            </div>
             <div className="diagram-stage-surface-pro" ref={canvasStageRef}>
               <div className="diagram-stage-toolbar-pro">
                 <div className="diagram-stage-toolbar-group">
@@ -499,6 +532,7 @@ export function ProjectDiagramPage() {
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom((current) => Math.max(0.55, Number((current - 0.1).toFixed(2))))}>−</button>
                   <button type="button" className="diagram-stage-button" onClick={fitCanvasToView}>Fit</button>
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom(1)}>100%</button>
+                  <button type="button" className="diagram-stage-button" onClick={() => { setCanvasZoom(1); centerCanvasViewport("smooth"); }}>Center</button>
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom((current) => Math.min(1.6, Number((current + 0.1).toFixed(2))))}>+</button>
                   <span className="diagram-stage-zoom-readout">{Math.round(canvasZoom * 100)}%</span>
                 </div>

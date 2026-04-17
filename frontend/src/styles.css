@@ -4063,3 +4063,58 @@ tr:last-child td {
     linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
 }
+
+
+.diagram-site-lens-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.diagram-site-lens {
+  display: grid;
+  gap: 3px;
+  min-width: 132px;
+  padding: 11px 13px;
+  border-radius: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255,255,255,0.92);
+  color: #24405f;
+  text-align: left;
+}
+
+.diagram-site-lens strong {
+  font-size: 12.5px;
+  color: #16314f;
+}
+
+.diagram-site-lens span {
+  font-size: 10.8px;
+  color: #64748b;
+}
+
+.diagram-site-lens.active {
+  border-color: rgba(29, 127, 76, 0.26);
+  background: linear-gradient(180deg, rgba(239,252,245,0.98), rgba(233,248,240,0.96));
+  box-shadow: 0 10px 20px rgba(29, 127, 76, 0.1);
+}
+
+:root[data-theme="dark"] .diagram-site-lens {
+  background: rgba(43,48,56,0.94);
+  border-color: rgba(255,255,255,0.08);
+}
+
+:root[data-theme="dark"] .diagram-site-lens strong {
+  color: #eef2f7;
+}
+
+:root[data-theme="dark"] .diagram-site-lens span {
+  color: #aeb7c2;
+}
+
+:root[data-theme="dark"] .diagram-site-lens.active {
+  background: linear-gradient(180deg, rgba(30,66,51,0.96), rgba(25,52,42,0.94));
+  border-color: rgba(129, 199, 161, 0.22);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.24);
+}
