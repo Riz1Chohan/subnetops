@@ -75,6 +75,12 @@ export function ProjectDiagramPage() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
   const project = projectQuery.data;
+  const isWorkspaceLoading = projectQuery.isLoading || sitesQuery.isLoading;
+  const workspaceError = projectQuery.isError
+    ? projectQuery.error
+    : sitesQuery.isError
+      ? sitesQuery.error
+      : null;
   const projectSites = project?.sites ?? [];
   const fetchedSites = sitesQuery.data ?? [];
   const baseSites = fetchedSites.length >= projectSites.length ? fetchedSites : projectSites;
@@ -85,47 +91,25 @@ export function ProjectDiagramPage() {
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
 
-  if (projectQuery.isLoading || sitesQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the topology canvas." />;
-  if (projectQuery.isError || sitesQuery.isError) {
-    return (
-      <ErrorState
-        title="Unable to load diagram workspace"
-        message={
-          projectQuery.error instanceof Error
-            ? projectQuery.error.message
-            : sitesQuery.error instanceof Error
-              ? sitesQuery.error.message
-              : "SubnetOps could not load this diagram right now."
-        }
-        action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
-      />
-    );
-  }
-  if (!project) {
-    return (
-      <EmptyState
-        title="Project not found"
-        message="The requested diagram workspace could not be loaded."
-        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
-      />
-    );
-  }
+  const seedProject = project
+    ? {
+        ...project,
+        sites: baseSites.map((site) => ({
+          ...site,
+          vlans: baseVlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
+        })),
+      }
+    : null;
 
-  const seedProject = {
-    ...project,
-    sites: baseSites.map((site) => ({
-      ...site,
-      vlans: baseVlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
-    })),
-  };
-
-  const seedSynthesized = synthesizeLogicalDesign(seedProject, seedProject.sites, baseVlans, requirementsProfile);
+  const seedSynthesized = seedProject
+    ? synthesizeLogicalDesign(seedProject, seedProject.sites, baseVlans, requirementsProfile)
+    : null;
 
   const sites = baseSites.length > 0
     ? baseSites
-    : seedSynthesized.siteSummaries.map((site) => ({
+    : (seedSynthesized?.siteSummaries ?? []).map((site) => ({
         id: site.id,
-        projectId: project.id,
+        projectId: project?.id || projectId,
         name: site.name,
         location: site.location,
         siteCode: site.siteCode,
@@ -135,7 +119,7 @@ export function ProjectDiagramPage() {
 
   const vlans = baseVlans.length > 0
     ? baseVlans
-    : seedSynthesized.addressingPlan.map((row, index) => ({
+    : (seedSynthesized?.addressingPlan ?? []).map((row, index) => ({
         id: row.id || `proposed-vlan-${index}`,
         siteId: row.siteId,
         vlanId: row.vlanId ?? 0,
@@ -153,16 +137,20 @@ export function ProjectDiagramPage() {
         },
       }));
 
-  const enrichedProject = {
-    ...project,
-    sites: sites.map((site) => ({
-      ...site,
-      vlans: vlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
-    })),
-  };
+  const enrichedProject = project
+    ? {
+        ...project,
+        sites: sites.map((site) => ({
+          ...site,
+          vlans: vlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
+        })),
+      }
+    : null;
 
-  const synthesized = synthesizeLogicalDesign(enrichedProject, enrichedProject.sites, vlans, requirementsProfile);
-  const activeSiteId = focusedSiteId || enrichedProject.sites[0]?.id || "";
+  const synthesized = enrichedProject
+    ? synthesizeLogicalDesign(enrichedProject, enrichedProject.sites, vlans, requirementsProfile)
+    : null;
+  const activeSiteId = focusedSiteId || enrichedProject?.sites[0]?.id || "";
   const overlayFocus: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? "none";
   const overlayCount = activeOverlays.length;
   const effectiveLabelFocus = (() => {
@@ -175,9 +163,9 @@ export function ProjectDiagramPage() {
     if (activeOverlays.includes("flows")) next = "flows";
     return next;
   })();
-  const activeSiteName = enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "site";
-  const canvasFileBase = `${project.name.replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
-  const estimatedSiteCount = scope === "site" ? 1 : enrichedProject.sites.length || 1;
+  const activeSiteName = enrichedProject?.sites.find((site) => site.id === activeSiteId)?.name || "site";
+  const canvasFileBase = `${(project?.name || "project").replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
+  const estimatedSiteCount = scope === "site" ? 1 : enrichedProject?.sites.length || 1;
   const estimatedBranchRows = Math.max(1, Math.ceil(Math.max(estimatedSiteCount - 1, 0) / 2));
   const canvasViewportMinHeight = mode === "physical"
     ? Math.max(760, 760 + Math.max(0, estimatedBranchRows - 1) * 250 + (activeOverlays.includes("flows") ? 120 : 0))
@@ -312,7 +300,7 @@ export function ProjectDiagramPage() {
     setActiveOverlays([]);
     setLabelMode("detailed");
     setLinkAnnotationMode("full");
-    setFocusedSiteId(enrichedProject.sites[0]?.id || "");
+    setFocusedSiteId(enrichedProject?.sites[0]?.id || "");
     setDeviceFocus("all");
     setLinkFocus("all");
   };
@@ -355,6 +343,26 @@ export function ProjectDiagramPage() {
     document.addEventListener("fullscreenchange", syncFullscreen);
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
+
+  if (isWorkspaceLoading) return <LoadingState title="Loading diagram" message="Preparing the topology canvas." />;
+  if (workspaceError) {
+    return (
+      <ErrorState
+        title="Unable to load diagram workspace"
+        message={workspaceError instanceof Error ? workspaceError.message : "SubnetOps could not load this diagram right now."}
+        action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
+      />
+    );
+  }
+  if (!project || !enrichedProject || !synthesized) {
+    return (
+      <EmptyState
+        title="Project not found"
+        message="The requested diagram workspace could not be loaded."
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
 
   return (
     <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">

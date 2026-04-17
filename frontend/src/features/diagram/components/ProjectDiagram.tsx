@@ -2222,6 +2222,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const linkFocus = controls?.linkFocus ?? internalLinkFocus;
   const focusedSiteId = controls?.focusedSiteId ?? internalFocusedSiteId;
   const bareCanvas = controls?.bareCanvas ?? minimalWorkspace;
+  const isExternallyControlled = Boolean(controls);
   const setMode = controls?.mode !== undefined ? (_next: DiagramMode) => {} : setInternalMode;
   const setOverlay = controls?.overlay !== undefined ? (_next: OverlayMode) => {} : setInternalOverlay;
   const setScope = controls?.scope !== undefined ? (_next: DiagramScope) => {} : setInternalScope;
@@ -2249,8 +2250,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const activePresetKey = useMemo(() => activePresetKeyForState(mode, scope, overlay), [mode, scope, overlay]);
   const activePreset = reviewPresets.find((preset) => preset.key === activePresetKey) || null;
   const topologyBehaviorSummary = useMemo(() => topologyScopeBehaviorSummary(scope, synthesized, focusedSite), [scope, synthesized, focusedSite]);
-  const showNarrativePanels = !compact && !minimalWorkspace;
-  const showSupportPanels = workspaceDensity === "expanded" && !compact && !minimalWorkspace;
+  const showNarrativePanels = !compact && !minimalWorkspace && !isExternallyControlled;
+  const showSupportPanels = workspaceDensity === "expanded" && !compact && !minimalWorkspace && !isExternallyControlled;
   const densityLabel = workspaceDensity === "guided" ? "Guided" : "Expanded";
 
   const applyPreset = (presetKey: DiagramReviewPresetKey) => {
@@ -2271,12 +2272,12 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   };
 
   if (sites.length === 0) {
-    return bareCanvas || minimalWorkspace || compact
+    return isExternallyControlled || bareCanvas || minimalWorkspace || compact
       ? <div className="panel diagram-minimal-panel"><div className="diagram-empty-message">Add sites and VLANs to generate a topology diagram.</div></div>
       : <div className="panel"><div className="diagram-toolbar"><div><h2 style={{ marginBottom: 6 }}>Diagram</h2><p className="muted" style={{ margin: 0 }}>Add sites and VLANs to generate a topology diagram.</p></div></div></div>;
   }
 
-  if (minimalWorkspace || bareCanvas || compact) {
+  if (isExternallyControlled || minimalWorkspace || bareCanvas || compact) {
     return (
       <div className="panel diagram-minimal-panel">
         {mode === "logical"
