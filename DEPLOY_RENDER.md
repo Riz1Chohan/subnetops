@@ -35,6 +35,8 @@ The backend service is configured to:
 - start the compiled server
 
 ## 5. Frontend behavior
+The Blueprint frontend build command is intentionally `npm run build` rather than `npm install && npm run build`, because Render already performs dependency installation before the build step. Keeping the build command install-free avoids duplicate network fetches and reduces timeout risk during deployment.
+
 The frontend is deployed as a Render static site. The Blueprint uses `staticPublishPath: ./frontend/dist` so the publish path is expressed relative to the repository root, matching Render's Blueprint behavior for static site publish paths.
 Render documents static sites as a first-class service type, and Blueprint YAML supports static sites via `type: web`, `runtime: static`, `buildCommand`, and `staticPublishPath`. citeturn576735view0turn576735view4
 
