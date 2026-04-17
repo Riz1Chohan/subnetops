@@ -20,9 +20,18 @@ import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
+const allowedOrigins = new Set(env.corsOrigins.map((origin) => origin.replace(/\/$/, "")));
 
 app.use(helmet());
-app.use(cors({ origin: env.corsOrigin, credentials: true }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.has(normalizedOrigin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 

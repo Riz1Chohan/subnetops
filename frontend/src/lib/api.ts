@@ -1,12 +1,33 @@
 const envApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
-function defaultApiBase() {
-  const { hostname, port } = window.location;
+function cleanBase(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+function inferHostedApiBase() {
+  const { protocol, hostname, port } = window.location;
   const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1";
-  if (envApiBase) return envApiBase.replace(/\/$/, "");
+
   if (isLocalDev && (port === "5173" || port === "4173" || port === "3000")) {
     return "http://localhost:4000/api";
   }
+
+  if (/\.onrender\.com$/i.test(hostname)) {
+    if (hostname.includes("-frontend")) {
+      return `${protocol}//${hostname.replace("-frontend", "-backend")}/api`;
+    }
+    if (hostname.includes("frontend")) {
+      return `${protocol}//${hostname.replace("frontend", "backend")}/api`;
+    }
+  }
+
+  return null;
+}
+
+function defaultApiBase() {
+  if (envApiBase) return cleanBase(envApiBase);
+  const inferredHostedBase = inferHostedApiBase();
+  if (inferredHostedBase) return cleanBase(inferredHostedBase);
   return "/api";
 }
 

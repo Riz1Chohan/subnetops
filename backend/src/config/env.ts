@@ -18,10 +18,23 @@ function toNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toList(value: string | undefined, fallback: string[]) {
+  const source = value && value.trim().length ? value : fallback.join(",");
+  return source
+    .split(",")
+    .map((item) => item.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
 export const env = {
   port: toNumber(process.env.PORT, 4000),
   databaseUrl: required("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/subnetops?schema=public"),
-  corsOrigin: required("CORS_ORIGIN", "http://localhost:4173"),
+  corsOrigins: toList(process.env.CORS_ORIGIN, [
+    "http://localhost:4173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://subnetops-frontend.onrender.com",
+  ]),
   jwtSecret: required("JWT_SECRET", "change-this-in-development"),
   nodeEnv: process.env.NODE_ENV || "development",
   smtpHost: process.env.SMTP_HOST || "",
