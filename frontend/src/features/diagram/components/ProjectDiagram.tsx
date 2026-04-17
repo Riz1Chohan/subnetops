@@ -12,6 +12,7 @@ export type DiagramDensity = "guided" | "expanded";
 export type DiagramLabelMode = "essential" | "detailed";
 export type LinkAnnotationMode = "minimal" | "full";
 export type OverlayMode = "none" | "addressing" | "security" | "flows" | "services" | "redundancy";
+export type ActiveOverlayMode = Exclude<OverlayMode, "none">;
 type DiagramReviewPresetKey = "architecture" | "site-lld" | "transport" | "boundaries" | "services" | "critical-flows";
 export type DiagramScope = "global" | "site" | "wan-cloud" | "boundaries";
 export type DeviceFocus = "all" | "edge" | "switching" | "wireless" | "services";
@@ -28,6 +29,7 @@ interface ProjectDiagramProps {
   controls?: Partial<{
     mode: DiagramMode;
     overlay: OverlayMode;
+    activeOverlays: ActiveOverlayMode[];
     scope: DiagramScope;
     workspaceDensity: DiagramDensity;
     labelMode: DiagramLabelMode;
@@ -127,6 +129,54 @@ function diagramScopeMeta(scope: DiagramScope, synthesized: SynthesizedLogicalDe
 
 function getSvgElement(svgId: string) {
   return document.getElementById(svgId) as unknown as SVGSVGElement | null;
+}
+
+function DiagramCanvasDefs() {
+  return (
+    <defs>
+      <pattern id="diagram-grid-fine" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#dfe7f3" strokeWidth="1" opacity="0.55" />
+      </pattern>
+      <pattern id="diagram-grid-major" width="96" height="96" patternUnits="userSpaceOnUse">
+        <rect width="96" height="96" fill="url(#diagram-grid-fine)" />
+        <path d="M 96 0 L 0 0 0 96" fill="none" stroke="#cfd9e8" strokeWidth="1.2" opacity="0.78" />
+      </pattern>
+      <linearGradient id="diagram-canvas-bg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#f8fbff" />
+        <stop offset="100%" stopColor="#eef4fb" />
+      </linearGradient>
+      <filter id="diagram-soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#8aa0c7" floodOpacity="0.14" />
+      </filter>
+      <marker id="diagram-arrow-flow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff7a59" />
+      </marker>
+      <marker id="diagram-arrow-internet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ca5eb" />
+      </marker>
+      <marker id="diagram-arrow-vpn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d7f4c" />
+      </marker>
+      <marker id="diagram-arrow-routed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#85a7e6" />
+      </marker>
+    </defs>
+  );
+}
+
+function DiagramCanvasBackdrop({ width, height, title, subtitle, summary, chipLabel, chipTone }: { width: number; height: number; title: string; subtitle: string; summary: string; chipLabel: string; chipTone: ChipTone; }) {
+  return (
+    <>
+      <DiagramCanvasDefs />
+      <rect x={0} y={0} width={width} height={height} rx={30} fill="url(#diagram-canvas-bg)" />
+      <rect x={0} y={0} width={width} height={height} rx={30} fill="url(#diagram-grid-major)" opacity="0.72" />
+      <rect x={34} y={30} width={width - 68} height={96} rx={24} fill="rgba(255,255,255,0.84)" stroke="#d8e3f2" filter="url(#diagram-soft-shadow)" />
+      <text x={58} y={64} fontSize="20" fontWeight="700" fill="#142742">{title}</text>
+      <text x={58} y={86} fontSize="12" fill="#5f748f">{subtitle}</text>
+      <text x={58} y={106} fontSize="11" fill="#6d819a">{summary}</text>
+      {chip(width - 282, 52, 206, chipLabel, chipTone)}
+    </>
+  );
 }
 
 function exportSvg(svgId: string, filename: string) {
@@ -524,9 +574,19 @@ function pathLine(
   const visibleSecondaryLabel = rawSecondaryLabel && labelFocusMatchesCategory(labelFocus, secondaryCategory) ? rawSecondaryLabel : undefined;
   const labelWidth = Math.max(116, ((visibleLabel?.length ?? 0) * 6.3) + 24);
   const secondaryWidth = Math.max(104, ((visibleSecondaryLabel?.length ?? 0) * 6.1) + 24);
+  const markerEnd = type === "flow"
+    ? "url(#diagram-arrow-flow)"
+    : type === "internet"
+      ? "url(#diagram-arrow-internet)"
+      : type === "vpn"
+        ? "url(#diagram-arrow-vpn)"
+        : type === "routed"
+          ? "url(#diagram-arrow-routed)"
+          : undefined;
   return (
     <g opacity={emphasized ? 1 : 0.2}>
-      <path d={path} fill="none" stroke={style.stroke} strokeWidth={style.width} strokeDasharray={style.dash} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} fill="none" stroke="#ffffff" strokeWidth={style.width + 4} strokeLinecap="round" strokeLinejoin="round" opacity={0.78} />
+      <path d={path} fill="none" stroke={style.stroke} strokeWidth={style.width} strokeDasharray={style.dash} strokeLinecap="round" strokeLinejoin="round" markerEnd={markerEnd} />
       {(visibleLabel || visibleSecondaryLabel) && labelPoint ? (
         <g>
           {visibleLabel ? (
@@ -878,6 +938,35 @@ function diagramLegend(mode: OverlayMode) {
   return { title, details };
 }
 
+function normalizeActiveOverlays(overlay: OverlayMode, activeOverlays?: ActiveOverlayMode[]) {
+  const normalized = Array.from(new Set((activeOverlays ?? []).filter((item): item is ActiveOverlayMode => item !== "none")));
+  if (normalized.length > 0) return normalized;
+  return overlay === "none" ? [] : [overlay];
+}
+
+function overlaySummaryLabel(activeOverlays: ActiveOverlayMode[]) {
+  if (!activeOverlays.length) return "Devices + traffic lines";
+  const labels = activeOverlays.map((item) => diagramLegend(item).title.replace(/ overlay$/i, ""));
+  return labels.length <= 2 ? labels.join(" + ") : `${labels.slice(0, 2).join(" + ")} +${labels.length - 2}`;
+}
+
+function placementRowsForSite(site: SiteWithVlans, synthesized: SynthesizedLogicalDesign, limit = 5) {
+  return synthesized.sitePlacements
+    .filter((placement) => placement.siteId === site.id)
+    .slice(0, limit)
+    .map((placement) => ({ text: `${deviceLabel(placement.deviceType)} • ${placement.role} • ${placement.connectedZones.join(", ") || "No zone labels yet"}`, tone: "green" as const, category: "topology" as const }));
+}
+
+function overlayRowsForSite(site: SiteWithVlans, synthesized: SynthesizedLogicalDesign, activeOverlays: ActiveOverlayMode[], limit = 3) {
+  if (!activeOverlays.length) return placementRowsForSite(site, synthesized, limit);
+  const perOverlayLimit = Math.max(1, Math.floor(limit / Math.max(activeOverlays.length, 1)));
+  return activeOverlays.flatMap((mode) =>
+    overlayItems(site, synthesized, mode)
+      .slice(0, perOverlayLimit + (activeOverlays.length === 1 ? limit : 0))
+      .map((item) => ({ text: item, tone: overlayTone(mode), category: overlayLabelCategory(mode) }))
+  ).slice(0, limit);
+}
+
 function LogicalTopologyDiagram({
   project,
   synthesized,
@@ -885,6 +974,7 @@ function LogicalTopologyDiagram({
   comments,
   validations,
   overlay,
+  activeOverlays,
   scope,
   focusedSiteId,
   labelMode,
@@ -900,6 +990,7 @@ function LogicalTopologyDiagram({
   comments: ProjectComment[];
   validations: ValidationResult[];
   overlay: OverlayMode;
+  activeOverlays?: ActiveOverlayMode[];
   scope: DiagramScope;
   focusedSiteId?: string;
   labelMode: DiagramLabelMode;
@@ -922,26 +1013,30 @@ function LogicalTopologyDiagram({
   const width = Math.max(1600, (Math.max(...occupiedXs, 0)) + cardWidth + 120);
   const height = Math.max(980, (Math.max(...occupiedYs, 0)) + cardHeight + 120);
   const showDetailedLabels = labelMode === "detailed";
+  const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
+  const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, label, secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
 
   return (
     <div style={{ overflowX: "auto" }}>
       <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Logical topology diagram with explicit device placement, addressing, and overlay modes">
-        <rect x={0} y={0} width={width} height={height} rx={30} fill="#fbfdff" />
-        <rect x={40} y={36} width={width - 80} height={110} rx={24} fill="#f6f9ff" stroke="#d9e6fb" />
-        <text x={64} y={72} fontSize="20" fontWeight="700" fill="#142742">{diagramScopeMeta(scope, synthesized, sites[0]).title}</text>
-        <text x={64} y={96} fontSize="12" fill="#637998">{diagramScopeMeta(scope, synthesized, sites[0]).detail}</text>
-        <text x={64} y={118} fontSize="12" fill="#637998">Topology: {synthesized.topology.topologyLabel} • Breakout: {synthesized.topology.internetBreakout} • Redundancy: {synthesized.topology.redundancyModel}</text>
-        <text x={64} y={136} fontSize="11" fill="#6c819b">Legend intent: firewall / router / switching / wireless / server / cloud edge should read as real network roles, not generic boxes.</text>
-        {chip(width - 286, 58, 210, diagramLegend(overlay).title, overlayTone(overlay))}
-        {chip(width - 286, 86, 210, "Logical posture review", "green")}
+        <DiagramCanvasBackdrop
+          width={width}
+          height={height}
+          title={diagramScopeMeta(scope, synthesized, sites[0]).title}
+          subtitle={diagramScopeMeta(scope, synthesized, sites[0]).detail}
+          summary={`Topology: ${synthesized.topology.topologyLabel} • Breakout: ${synthesized.topology.internetBreakout} • Redundancy: ${synthesized.topology.redundancyModel}`}
+          chipLabel={overlaySummaryLabel(enabledOverlays)}
+          chipTone={enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green"}
+        />
+        {chip(width - 286, 82, 210, "Logical posture review", "green")}
 
         {sites.map((site, index) => {
           const sitePoint = sitePositions[site.id] || { x: startX + index * (cardWidth + gap), y: 178 };
           const x = sitePoint.x;
           const y = sitePoint.y;
           const siteDevices = synthesized.sitePlacements.filter((placement) => placement.siteId === site.id);
-          const siteOverlays = overlayItems(site, synthesized, overlay);
+          const siteOverlays = overlayRowsForSite(site, synthesized, enabledOverlays, 3);
           const taskCount = openTaskCount(comments, "SITE", site.id);
           const siteValidation = siteValidationItems(site, validations);
           const validationTone = validationSeverityTone(siteValidation);
@@ -954,7 +1049,7 @@ function LogicalTopologyDiagram({
 
           return (
             <g key={site.id}>
-              <rect x={x} y={y} width={cardWidth} height={cardHeight} rx={24} fill={validationTone.fill} stroke={validationTone.stroke} strokeWidth="2.3" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
+              <rect x={x} y={y} width={cardWidth} height={cardHeight} rx={24} fill={validationTone.fill} stroke={validationTone.stroke} strokeWidth="2.3" filter="url(#diagram-soft-shadow)" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => onSelectTarget?.("SITE", site.id)} />
               <text x={x + 20} y={y + 30} fontSize="18" fontWeight="700" fill="#142742" opacity={labelFocusOpacity(labelFocus, "topology")}>{site.name}</text>
               <text x={x + 20} y={y + 50} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "addressing")}>{site.defaultAddressBlock || "No site summary block assigned"}</text>
               <text x={x + 20} y={y + 68} fontSize="11" fill="#697f98" opacity={labelFocusOpacity(labelFocus, "topology")}>{siteRoleSummary(site.name, synthesized)}</text>
@@ -983,9 +1078,9 @@ function LogicalTopologyDiagram({
               {switchDevice && wirelessDevice ? renderPath([[x + 182, y + 175], [x + 166, y + 196]], "trunk", "AP uplink", wirelessDevice.connectedZones[0] || undefined) : null}
               {edgeDevice && dmzService ? <><g>{renderPath([[x + 78, y + 164], [x + 194, y + 200]], "internet", "Published-service path", dmzService.ingressInterface || dmzService.subnetCidr || undefined)}</g><g>{renderPath([[x + 238, y + 212], [x + 238, y + 218]], "trunk", "DMZ host access", dmzService.subnetCidr || undefined)}</g>{managementBoundaryForSite(site.name, synthesized) ? <g>{renderPath([[x + 170, y + 155], [x + 214, y + 250]], "ha", "Management-only path", managementBoundaryForSite(site.name, synthesized)?.attachedInterface || managementBoundaryForSite(site.name, synthesized)?.zoneName)}</g> : null}</> : null}
 
-              <text x={x + 18} y={y + 286} fontSize="12" fontWeight="700" fill="#324866" opacity={labelFocusOpacity(labelFocus, overlayLabelCategory(overlay))}>{diagramLegend(overlay).title}</text>
-              {labelFocusMatchesCategory(labelFocus, overlayLabelCategory(overlay)) ? siteOverlays.slice(0, 3).map((item, overlayIndex) => chip(x + 18, y + 298 + overlayIndex * 24, cardWidth - 36, item, overlayTone(overlay))) : null}
-              {siteOverlays.length === 0 ? <text x={x + 18} y={y + 316} fontSize="10.5" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, overlayLabelCategory(overlay))}>No overlay items yet for this site.</text> : null}
+              <text x={x + 18} y={y + 286} fontSize="12" fontWeight="700" fill="#324866" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>{enabledOverlays.length ? "Selected overlays" : "Devices + lines"}</text>
+              {siteOverlays.slice(0, 3).map((item, overlayIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + overlayIndex * 24, cardWidth - 36, item.text, item.tone) : null)}
+              {siteOverlays.length === 0 ? <text x={x + 18} y={y + 316} fontSize="10.5" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, enabledOverlays[0] ? overlayLabelCategory(enabledOverlays[0]) : "topology")}>No overlay items yet for this site.</text> : null}
               {interfaceSummary(edgeDevice).slice(0,2).map((label, interfaceIndex) => chip(x + 18, y + 224 + interfaceIndex * 24, 118, label, "green"))}
               {interfaceSummary(switchDevice).slice(0, 2).map((label, interfaceIndex) => chip(x + 146, y + 224 + interfaceIndex * 24, 126, label, "blue"))}
               {securitySummary.map((boundary, boundaryIndex) => (
@@ -1042,6 +1137,7 @@ function PhysicalTopologyDiagram({
   comments,
   validations,
   overlay,
+  activeOverlays,
   scope,
   focusedSiteId,
   labelMode,
@@ -1057,6 +1153,7 @@ function PhysicalTopologyDiagram({
   comments: ProjectComment[];
   validations: ValidationResult[];
   overlay: OverlayMode;
+  activeOverlays?: ActiveOverlayMode[];
   scope: DiagramScope;
   focusedSiteId?: string;
   labelMode: DiagramLabelMode;
@@ -1075,6 +1172,8 @@ function PhysicalTopologyDiagram({
   const width = Math.max(1680, 1280 + branchSites.length * 140 + (cloudNeeded ? 180 : 0));
   const height = 1160;
   const showDetailedLabels = labelMode === "detailed";
+  const enabledOverlays = normalizeActiveOverlays(overlay, activeOverlays);
+  const hasOverlay = (mode: ActiveOverlayMode) => enabledOverlays.includes(mode);
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, label, secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
   const centerX = width / 2;
   const hqTaskCount = primarySite ? openTaskCount(comments, "SITE", primarySite.id) : 0;
@@ -1082,20 +1181,22 @@ function PhysicalTopologyDiagram({
   const hqValidationTone = validationSeverityTone(hqValidation);
   const emphasizeDevice = (kind: DeviceKind) => deviceFocusMatchesKind(deviceFocus, kind);
 
-  const flowOverlays = overlay === "flows" ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
-  const legend = diagramLegend(overlay);
+  const flowOverlays = hasOverlay("flows") ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
+  const legendTone = enabledOverlays[0] ? overlayTone(enabledOverlays[0]) : "green";
 
   return (
     <div style={{ overflowX: "auto" }}>
       <svg id={svgId} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Physical style topology diagram with network-style device symbols, overlay modes, and reviewable connection semantics">
-        <rect x={0} y={0} width={width} height={height} rx={30} fill="#fbfdff" />
-
-        <rect x={48} y={42} width={width - 96} height={180} rx={28} fill="#f8fbff" stroke="#dbe6f7" strokeWidth="2" />
-        <text x={72} y={76} fontSize="21" fontWeight="700" fill="#152742">Physical / topology diagram</text>
-        <text x={72} y={101} fontSize="12" fill="#607791">v160 keeps the diagram moving toward network-style symbols, clearer path semantics, stronger boundary visibility, and more reviewable topology behavior across primary, branch, and cloud contexts.</text>
-        <text x={72} y={122} fontSize="12" fill="#607791">Connection semantics: routed = blue, trunk = purple, VPN/WAN = green dashed, internet = blue dashed, management/control = slate, flow overlay = orange.</text>
-        {chip(width - 310, 68, 230, legend.title, overlayTone(overlay))}
-        {legend.details.map((detail, index) => <text key={detail} x={width - 300} y={104 + index * 18} fontSize="11" fill="#607791">• {detail}</text>)}
+        <DiagramCanvasBackdrop
+          width={width}
+          height={height}
+          title="Physical / topology diagram"
+          subtitle="Device-aware symbols, connection semantics, and boundary placement stay visible without flooding the canvas with extra text."
+          summary="Connection semantics: routed = blue, trunk = purple, VPN/WAN = green dashed, internet = blue dashed, management/control = slate, critical flow = orange."
+          chipLabel={overlaySummaryLabel(enabledOverlays)}
+          chipTone={legendTone}
+        />
+        {(enabledOverlays.length ? enabledOverlays : ["none"]).flatMap((mode) => diagramLegend(mode as OverlayMode).details).slice(0, 3).map((detail, index) => <text key={`${detail}-${index}`} x={width - 300} y={100 + index * 18} fontSize="11" fill="#607791">• {detail}</text>)}
 
         <DeviceIcon x={centerX - 65} y={104} kind="internet" label="Internet / WAN" sublabel={synthesized.topology.internetBreakout} emphasized={emphasizeDevice("internet")} />
         {renderPath([[centerX, 170], [centerX, 222]], "internet", synthesized.topology.topologyType === "hub-spoke" ? "Internet + branch WAN" : "North-south edge")}
@@ -1104,7 +1205,7 @@ function PhysicalTopologyDiagram({
         {primaryDmzService(synthesized, primarySite?.name) ? <><g>{renderPath([[centerX + 58, 262], [centerX + 126, 262]], "internet", "dmz", primaryDmzService(synthesized, primarySite?.name)?.ingressInterface || undefined)}</g><g>{renderPath([[centerX + 246, 262], [centerX + 270, 262]], "trunk", "dmz host", primaryDmzService(synthesized, primarySite?.name)?.subnetCidr || undefined)}</g></> : null}
         {renderPath([[centerX, 278], [centerX, 340]], "routed", "inside / routed core", synthesized.routingPlan.find((item) => item.siteId === primarySite?.id)?.summaryAdvertisement || undefined)}
 
-        <rect x={centerX - 270} y={344} width={540} height={360} rx={28} fill={hqValidationTone.fill} stroke={hqValidationTone.stroke} strokeWidth="2.5" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
+        <rect x={centerX - 270} y={344} width={540} height={360} rx={28} fill={hqValidationTone.fill} stroke={hqValidationTone.stroke} strokeWidth="2.5" filter="url(#diagram-soft-shadow)" style={{ cursor: onSelectTarget ? "pointer" : "default" }} onClick={() => primarySite && onSelectTarget?.("SITE", primarySite.id)} />
         <text x={centerX - 236} y={380} fontSize="19" fontWeight="700" fill="#16263d" opacity={labelFocusOpacity(labelFocus, "topology")}>{primarySite?.name || project.name}</text>
         <text x={centerX - 236} y={400} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "topology")}>Primary site / policy hub</text>
         <text x={centerX - 236} y={418} fontSize="11" fill="#6a7d97" opacity={labelFocusOpacity(labelFocus, "addressing")}>{primarySite?.defaultAddressBlock || "No site summary block assigned"}</text>
@@ -1121,10 +1222,7 @@ function PhysicalTopologyDiagram({
         {renderPath([[centerX + 46, 480], [centerX + 96, 480]], "trunk", firstInterfaceLabel(synthesized.sitePlacements.find((item) => item.siteId === primarySite?.id && item.deviceType === "server")) || "server / service trunk", synthesized.servicePlacements.find((item) => item.siteName === primarySite?.name)?.subnetCidr || undefined)}
         {renderPath([[centerX - 8, 594], [centerX + 178, 594]], "trunk", firstInterfaceLabel(synthesized.sitePlacements.find((item) => item.siteId === primarySite?.id && item.deviceType === "access-point")) || "edge access / AP uplink", (requirements.wireless || requirements.guestWifi) ? "staff + guest SSIDs" : undefined)}
 
-        {overlay === "addressing" && labelFocusMatchesCategory(labelFocus, "addressing") ? synthesized.addressingPlan.filter((row) => row.siteId === primarySite?.id).slice(0, 6).map((row, index) => chip(centerX - 238, 630 + index * 28, 476, `${row.segmentName} • VLAN ${row.vlanId ?? "—"} • ${row.subnetCidr}`, "blue")) : null}
-        {overlay === "security" && labelFocusMatchesCategory(labelFocus, "zones") ? synthesized.securityBoundaries.filter((boundary) => boundary.siteName === primarySite?.name).slice(0, 5).map((boundary, index) => chip(centerX - 238, 630 + index * 28, 476, `${boundary.zoneName} • ${boundary.attachedDevice} • ${boundary.controlPoint}`, "purple")) : null}
-        {overlay === "flows" && labelFocusMatchesCategory(labelFocus, "flows") ? flowOverlays.slice(0, 3).map((flow, index) => chip(centerX - 238, 630 + index * 28, 476, `${flow.flowLabel} • ${flow.sourceZone} → ${flow.destinationZone}`, "orange")) : null}
-        {overlay === "none" && labelFocusMatchesCategory(labelFocus, "topology") ? synthesized.sitePlacements.filter((placement) => placement.siteId === primarySite?.id).slice(0, 5).map((placement, index) => chip(centerX - 238, 630 + index * 28, 476, `${deviceLabel(placement.deviceType)} • ${placement.role} • ${placement.connectedZones.join(", ") || "No zone labels yet"}`, "green")) : null}
+        {overlayRowsForSite(primarySite || sites[0], synthesized, enabledOverlays, 5).map((row, index) => labelFocusMatchesCategory(labelFocus, row.category) ? chip(centerX - 238, 630 + index * 28, 476, row.text, row.tone) : null)}
 
         {cloudNeeded ? (
           <g>
@@ -1150,7 +1248,7 @@ function PhysicalTopologyDiagram({
           const serverPlacement = synthesized.sitePlacements.find((placement) => placement.siteId === site.id && placement.deviceType === "server");
           const wirelessPlacement = synthesized.sitePlacements.find((placement) => placement.siteId === site.id && (placement.deviceType === "access-point" || placement.deviceType === "wireless-controller"));
           const edgeDevice = edgePlacement?.deviceType || "router";
-          const localOverlay = overlayItems(site, synthesized, overlay);
+          const localOverlay = overlayRowsForSite(site, synthesized, enabledOverlays, 2);
           const edgeValidation = deviceValidationItems(edgePlacement, site, validations, synthesized);
           const switchValidation = deviceValidationItems(switchPlacement, site, validations, synthesized);
           const edgeInterfaceValidation = interfaceValidationItems(edgePlacement, site, validations, synthesized);
@@ -1186,12 +1284,12 @@ function PhysicalTopologyDiagram({
               {wirelessPlacement ? <DeviceIcon x={x + 254} y={y + 102} kind={wirelessPlacement.deviceType} label={wirelessPlacement.deviceName} sublabel={`${wirelessPlacement.role}${wirelessPlacement.uplinkTarget ? ` • uplink ${wirelessPlacement.uplinkTarget}` : ""}`} showSublabel={showDetailedLabels} emphasized={emphasizeDevice(wirelessPlacement.deviceType)} /> : null}
               {serverPlacement ? <DeviceIcon x={x + 214} y={y + 26} kind="server" label={serverPlacement.deviceName} sublabel={serverPlacement.connectedSubnets[0] || serverPlacement.role} showSublabel={showDetailedLabels} emphasized={emphasizeDevice("server")} /> : null}
               {renderPath([[x + 118, y + 125], [x + 132, y + 125]], "routed", firstInterfaceLabel(edgePlacement) || "inside", synthesized.addressingPlan.find((row) => row.siteId === site.id)?.gatewayIp || undefined)}
-              {wirelessPlacement ? renderPath([[x + 244, y + 125], [x + 254, y + 125]], "trunk", firstInterfaceLabel(wirelessPlacement) || "wireless / access", localOverlay[0] || undefined) : null}
+              {wirelessPlacement ? renderPath([[x + 244, y + 125], [x + 254, y + 125]], "trunk", firstInterfaceLabel(wirelessPlacement) || "wireless / access", localOverlay[0]?.text || undefined) : null}
 
               {edgeStack.map((item, itemIndex) => chip(x + 18, y + 178 + itemIndex * 24, boxWidth - 36, item, "green"))}
               {switchStack.map((item, itemIndex) => chip(x + 18, y + 226 + itemIndex * 24, boxWidth - 36, item, "blue"))}
               {labelFocusMatchesCategory(labelFocus, "zones") ? zoneLabels.slice(0, 1).map((item, itemIndex) => chip(x + 18, y + 274 + itemIndex * 24, boxWidth - 36, item, "purple")) : null}
-              {labelFocusMatchesCategory(labelFocus, overlayLabelCategory(overlay)) ? localOverlay.slice(0, 1).map((item, itemIndex) => chip(x + 18, y + 298 + itemIndex * 24, boxWidth - 36, item, overlayTone(overlay))) : null}
+              {localOverlay.slice(0, 2).map((item, itemIndex) => labelFocusMatchesCategory(labelFocus, item.category) ? chip(x + 18, y + 298 + itemIndex * 24, boxWidth - 36, item.text, item.tone) : null)}
               {dmzBoundary ? <text x={x + 18} y={y + 320} fontSize="10.2" fill="#5a34a3" opacity={labelFocusOpacity(labelFocus, "zones")}>DMZ boundary: {dmzBoundary.attachedDevice}{dmzBoundary.attachedInterface ? ` • ${dmzBoundary.attachedInterface}` : ''}</text> : null}
               {managementBoundary ? <text x={x + 18} y={y + 334} fontSize="10.2" fill="#24446f" opacity={labelFocusOpacity(labelFocus, "zones")}>Management boundary: {managementBoundary.controlPoint}</text> : null}
 
@@ -1887,6 +1985,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const svgId = `diagram-${project.id}`;
   const [internalMode, setInternalMode] = useState<DiagramMode>("logical");
   const [internalOverlay, setInternalOverlay] = useState<OverlayMode>("none");
+  const [internalActiveOverlays] = useState<ActiveOverlayMode[]>([]);
   const [internalScope, setInternalScope] = useState<DiagramScope>("global");
   const [internalWorkspaceDensity, setInternalWorkspaceDensity] = useState<DiagramDensity>("guided");
   const [internalLabelMode, setInternalLabelMode] = useState<DiagramLabelMode>("essential");
@@ -1897,6 +1996,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
   const [internalFocusedSiteId, setInternalFocusedSiteId] = useState<string>(sites[0]?.id ?? "");
   const mode = controls?.mode ?? internalMode;
   const overlay = controls?.overlay ?? internalOverlay;
+  const activeOverlays = controls?.activeOverlays ?? (overlay === "none" ? internalActiveOverlays : [overlay]);
   const scope = controls?.scope ?? internalScope;
   const workspaceDensity = controls?.workspaceDensity ?? internalWorkspaceDensity;
   const labelMode = controls?.labelMode ?? internalLabelMode;
@@ -1961,8 +2061,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
     return (
       <div className="panel diagram-minimal-panel">
         {mode === "logical"
-          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
-          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
+          ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
+          : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
       </div>
     );
   }
@@ -2131,8 +2231,8 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
       {showSupportPanels ? <SiteDeviceLinkMatrixPanel synthesized={synthesized} siteIds={scopedSites.map((site) => site.id)} /> : null}
       {overlay === "flows" ? <FlowSummaryPanel flows={scopedFlows} /> : null}
       {mode === "logical"
-        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
-        : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
+        ? <LogicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />
+        : <PhysicalTopologyDiagram project={project} synthesized={synthesized} svgId={svgId} comments={comments} validations={validations} overlay={overlay} activeOverlays={activeOverlays} scope={scope} focusedSiteId={focusedSite?.id} labelMode={labelMode} linkAnnotationMode={linkAnnotationMode} labelFocus={labelFocus} deviceFocus={deviceFocus} linkFocus={linkFocus} onSelectTarget={onSelectTarget} />}
     </div>
   );
 }

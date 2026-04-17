@@ -2868,14 +2868,74 @@ tr:last-child td {
   gap: 16px;
 }
 
+.diagram-workspace-shell-professional {
+  gap: 18px;
+}
+
+.diagram-kicker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
 .diagram-legend-strip {
   display: grid;
   gap: 12px;
 }
 
+.diagram-legend-strip-compact {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.96));
+}
+
+.diagram-legend-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.diagram-legend-title-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.diagram-legend-title-row h2,
+.diagram-display-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #10213a;
+}
+
+.diagram-status-pills,
+.diagram-display-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.diagram-status-pill,
+.diagram-display-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.96);
+  color: #42566f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .diagram-legend-mini-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -2884,7 +2944,8 @@ tr:last-child td {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: #f8fbff;
@@ -2916,6 +2977,11 @@ tr:last-child td {
   align-items: start;
 }
 
+.diagram-two-pane-workspace-professional {
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  gap: 18px;
+}
+
 .diagram-control-pane {
   display: grid;
   gap: 14px;
@@ -2925,9 +2991,54 @@ tr:last-child td {
   overflow-y: auto;
 }
 
+.diagram-control-pane-professional {
+  padding: 16px;
+  border-color: rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(245, 248, 252, 0.96));
+}
+
 .diagram-control-section {
   display: grid;
   gap: 10px;
+}
+
+.diagram-control-section-hero {
+  gap: 12px;
+}
+
+.diagram-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diagram-utility-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+  color: #10213a;
+  font-weight: 700;
+}
+
+.diagram-utility-button:hover {
+  background: #ffffff;
+}
+
+.diagram-control-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.diagram-site-select-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .diagram-control-label {
@@ -2949,11 +3060,27 @@ tr:last-child td {
 }
 
 .diagram-chip-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 10px 12px;
   background: #ffffff;
   color: #24405f;
   border: 1px solid #d7deea;
   box-shadow: none;
   text-align: left;
+  border-radius: 12px;
+}
+
+.diagram-chip-button span {
+  font-weight: 700;
+}
+
+.diagram-chip-button small {
+  font-size: 11px;
+  color: #7c8ba0;
 }
 
 .diagram-chip-button:hover {
@@ -2962,17 +3089,43 @@ tr:last-child td {
 }
 
 .diagram-chip-button.active {
-  background: #16a34a;
-  border-color: #15803d;
-  color: #ffffff;
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(22, 163, 74, 0.3);
+  color: #166534;
+}
+
+.diagram-chip-button.active small {
+  color: #166534;
 }
 
 .diagram-display-pane {
   min-width: 0;
 }
 
+.diagram-display-pane-professional {
+  display: grid;
+}
+
+.diagram-display-shell {
+  display: grid;
+  gap: 14px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.98));
+}
+
+.diagram-display-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
 .diagram-minimal-panel {
-  padding: 12px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .diagram-minimal-panel > .diagram-wrap,
@@ -3003,8 +3156,13 @@ tr:last-child td {
   color: #10213a;
 }
 
+.diagram-control-metrics-pro div {
+  background: rgba(255, 255, 255, 0.82);
+}
+
 @media (max-width: 980px) {
-  .diagram-two-pane-workspace {
+  .diagram-two-pane-workspace,
+  .diagram-two-pane-workspace-professional {
     grid-template-columns: 1fr;
   }
 
@@ -3012,4 +3170,343 @@ tr:last-child td {
     position: static;
     max-height: none;
   }
+}
+
+
+.diagram-display-shell {
+  overflow: hidden;
+}
+
+.diagram-canvas-cue-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.diagram-canvas-cue-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(237, 243, 251, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: #51657f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diagram-minimal-panel {
+  overflow: auto;
+  padding: 10px 2px 2px;
+}
+
+.diagram-minimal-panel svg {
+  display: block;
+  min-width: 1120px;
+}
+
+/* v336 theme system */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.theme-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+  color: #122033;
+  box-shadow: none;
+}
+
+.theme-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] body {
+  background: linear-gradient(180deg, #2c313a 0%, #23272f 100%);
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] a,
+:root[data-theme="dark"] .brand-link,
+:root[data-theme="dark"] .project-stage-nav-link,
+:root[data-theme="dark"] .project-stage-chip,
+:root[data-theme="dark"] .project-quick-link,
+:root[data-theme="dark"] .project-action-center-link,
+:root[data-theme="dark"] .workflow-stage-card,
+:root[data-theme="dark"] .project-nav-link {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .brand-copy small,
+:root[data-theme="dark"] .brand-slogan,
+:root[data-theme="dark"] .project-stage-chip small,
+:root[data-theme="dark"] .project-stage-chip-step,
+:root[data-theme="dark"] .project-stage-nav-link small,
+:root[data-theme="dark"] .project-user-label,
+:root[data-theme="dark"] .project-action-center-link span,
+:root[data-theme="dark"] th {
+  color: #aeb7c2;
+}
+
+:root[data-theme="dark"] .topbar {
+  background: rgba(39, 44, 52, 0.88);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .card-link,
+:root[data-theme="dark"] .summary-card,
+:root[data-theme="dark"] .workflow-stage-card,
+:root[data-theme="dark"] .project-quick-link,
+:root[data-theme="dark"] .project-stage-chip,
+:root[data-theme="dark"] .project-stage-nav-link,
+:root[data-theme="dark"] .project-action-center-link,
+:root[data-theme="dark"] .project-nav-link,
+:root[data-theme="dark"] .metric-pill,
+:root[data-theme="dark"] .legend-item,
+:root[data-theme="dark"] .data-table,
+:root[data-theme="dark"] table,
+:root[data-theme="dark"] .topbar-notification-popover .panel,
+:root[data-theme="dark"] .topbar-user-pill,
+:root[data-theme="dark"] .theme-toggle-button,
+:root[data-theme="dark"] .diagram-chip-button,
+:root[data-theme="dark"] .diagram-control-card,
+:root[data-theme="dark"] .diagram-display-shell,
+:root[data-theme="dark"] .diagram-legend-strip,
+:root[data-theme="dark"] .diagram-display-pane,
+:root[data-theme="dark"] .diagram-control-pane,
+:root[data-theme="dark"] .diagram-minimal-panel {
+  background: #343a46;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .badge-soft,
+:root[data-theme="dark"] .button-nav,
+:root[data-theme="dark"] .review-next-move,
+:root[data-theme="dark"] .theme-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #dde4ed;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .button-secondary {
+  background: #2b3038;
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #8e99a8;
+}
+
+:root[data-theme="dark"] .button-secondary:hover,
+:root[data-theme="dark"] .project-nav-link:hover,
+:root[data-theme="dark"] .workflow-stage-card:hover {
+  background: #3a414d;
+}
+
+:root[data-theme="dark"] .project-quick-link.active,
+:root[data-theme="dark"] .project-stage-chip.active,
+:root[data-theme="dark"] .project-stage-nav-link.active,
+:root[data-theme="dark"] .workflow-stage-card.current,
+:root[data-theme="dark"] .diagram-chip-button.active {
+  background: rgba(16, 163, 127, 0.14);
+  border-color: rgba(16, 163, 127, 0.32);
+  color: #e9fff7;
+}
+
+:root[data-theme="dark"] .project-action-center-link.primary {
+  background: rgba(127, 29, 29, 0.28);
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+:root[data-theme="dark"] .project-action-center-link.warning,
+:root[data-theme="dark"] .workspace-detail-warning {
+  background: rgba(146, 97, 18, 0.18);
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+:root[data-theme="dark"] .workspace-issue-banner {
+  background: linear-gradient(180deg, rgba(16, 163, 127, 0.14), rgba(52, 58, 70, 0.86));
+  border-color: rgba(16, 163, 127, 0.28);
+}
+
+:root[data-theme="dark"] .workspace-issue-kicker {
+  color: #7ce6ca;
+}
+
+:root[data-theme="dark"] .usage-banner,
+:root[data-theme="dark"] .trust-note,
+:root[data-theme="dark"] .workflow-panel,
+:root[data-theme="dark"] .recovery-focus-panel,
+:root[data-theme="dark"] .project-stage-focus-summary {
+  background: linear-gradient(180deg, #343a46 0%, #2f353f 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .brand-copy strong,
+:root[data-theme="dark"] strong,
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3,
+:root[data-theme="dark"] h4 {
+  color: #eceff3;
+}
+
+:root[data-theme="dark"] .topbar-user-pill,
+:root[data-theme="dark"] .topbar-account-cluster,
+:root[data-theme="dark"] .project-header-card,
+:root[data-theme="dark"] .project-stage-strip-panel {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .diagram-display-header,
+:root[data-theme="dark"] .diagram-canvas-panel,
+:root[data-theme="dark"] .diagram-workspace-shell {
+  color: #e5e7eb;
+}
+
+
+/* v337 diagram viewport stage */
+.diagram-stage-surface-pro {
+  display: grid;
+  gap: 12px;
+}
+
+.diagram-stage-toolbar-pro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.diagram-stage-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diagram-stage-toolbar-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.diagram-stage-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #d7deea;
+  background: #ffffff;
+  color: #24405f;
+  font-weight: 700;
+}
+
+.diagram-stage-button:hover {
+  background: #f7fbff;
+}
+
+.diagram-stage-zoom-readout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(237, 243, 251, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: #51657f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagram-stage-viewport-pro {
+  overflow: auto;
+  min-height: 680px;
+  max-height: calc(100vh - 280px);
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(239, 244, 251, 0.98));
+}
+
+.diagram-stage-viewport-pro .diagram-minimal-panel {
+  overflow: visible;
+  padding: 0;
+}
+
+.diagram-stage-viewport-pro .diagram-minimal-panel svg {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .diagram-stage-viewport-pro {
+    min-height: 520px;
+    max-height: none;
+  }
+}
+
+:root[data-theme="dark"] .diagram-stage-toolbar-pro {
+  background: rgba(52, 58, 70, 0.92);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .diagram-stage-button {
+  background: #2b3038;
+  color: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] .diagram-stage-button:hover {
+  background: #3a414d;
+}
+
+:root[data-theme="dark"] .diagram-stage-zoom-readout {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #dde4ed;
+}
+
+:root[data-theme="dark"] .diagram-stage-toolbar-label {
+  color: #aeb7c2;
+}
+
+:root[data-theme="dark"] .diagram-stage-viewport-pro {
+  background: linear-gradient(180deg, rgba(43, 48, 56, 0.98), rgba(35, 39, 47, 0.98));
+  border-color: rgba(255, 255, 255, 0.08);
 }
