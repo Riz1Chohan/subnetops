@@ -1233,8 +1233,8 @@ function PhysicalTopologyDiagram({
         <DiagramCanvasBackdrop
           width={width}
           height={height}
-          title="Physical / topology diagram"
-          subtitle="Device-aware symbols, connection semantics, and boundary placement stay visible without flooding the canvas with extra text."
+          title="Physical network blueprint"
+          subtitle="The live canvas is the main diagram surface, with device-aware symbols, connection semantics, and boundary placement visible without flooding the view."
           summary="Connection semantics: routed = blue, trunk = purple, VPN/WAN = green dashed, internet = blue dashed, management/control = slate, critical flow = orange."
           chipLabel={overlaySummaryLabel(enabledOverlays)}
           chipTone={legendTone}

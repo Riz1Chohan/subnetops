@@ -56,117 +56,10 @@ const detailItems = [
 ] as const;
 
 const canvasHints = [
+  "Live canvas is the primary diagram surface",
   "Opens in physical topology mode by default",
-  "Turn on only the layers you need",
   "Canvas height grows with larger enterprise layouts",
 ] as const;
-
-function ArchitectureSchematicPreview({
-  projectName,
-  synthesized,
-  siteNames,
-  scope,
-  activeSiteName,
-  overlayCount,
-}: {
-  projectName: string;
-  synthesized: ReturnType<typeof synthesizeLogicalDesign>;
-  siteNames: string[];
-  scope: DiagramScope;
-  activeSiteName?: string;
-  overlayCount: number;
-}) {
-  const primarySite = synthesized.topology.primarySiteName || siteNames[0] || projectName;
-  const branchSites = siteNames.filter((name) => name !== primarySite).slice(0, 4);
-  const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
-  const highlightedSite = scope === "site" ? activeSiteName : primarySite;
-  const width = 980;
-  const height = 300;
-  const centerX = width / 2;
-  const branchStartX = centerX - ((Math.max(branchSites.length, 1) - 1) * 170) / 2;
-
-  return (
-    <div className="panel diagram-hero-card">
-      <div className="diagram-hero-card-header">
-        <div>
-          <span className="diagram-kicker">Architecture preview</span>
-          <h3>Actual topology snapshot</h3>
-          <p className="muted" style={{ margin: 0 }}>This gives the diagram page an immediate real network view before you start zooming the larger canvas.</p>
-        </div>
-        <div className="diagram-display-summary">
-          <span className="diagram-display-summary-chip">{synthesized.topology.topologyLabel}</span>
-          <span className="diagram-display-summary-chip">Sites: {siteNames.length}</span>
-          <span className="diagram-display-summary-chip">Layers: {overlayCount}</span>
-        </div>
-      </div>
-      <div className="diagram-hero-schematic-shell">
-        <svg viewBox={`0 0 ${width} ${height}`} className="diagram-hero-schematic" role="img" aria-label="Architecture preview diagram">
-          <defs>
-            <linearGradient id="heroBg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f8fbff" />
-              <stop offset="100%" stopColor="#eef4fb" />
-            </linearGradient>
-            <filter id="heroShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#94a3b8" floodOpacity="0.18" />
-            </filter>
-          </defs>
-
-          <rect x="1" y="1" width={width - 2} height={height - 2} rx="30" fill="url(#heroBg)" stroke="#d9e5f2" />
-          <rect x="28" y="26" width={width - 56} height="78" rx="24" fill="rgba(238,245,255,0.88)" stroke="#c9daf3" strokeDasharray="8 6" />
-          <text x="48" y="51" fontSize="13" fontWeight="700" fill="#24446f">Internet / cloud / transport domain</text>
-          <text x="48" y="70" fontSize="11" fill="#5f748f">North-south edge, hybrid connectivity, and upstream transport are always visible here.</text>
-
-          <rect x="28" y="120" width={width - 56} height="152" rx="28" fill="rgba(255,255,255,0.82)" stroke="#d9e5f2" strokeDasharray="8 6" />
-          <text x="48" y="145" fontSize="13" fontWeight="700" fill="#24446f">Site fabrics and service anchors</text>
-
-          <circle cx={centerX} cy="66" r="26" fill="#eef5ff" stroke="#8cb0ef" strokeWidth="2" filter="url(#heroShadow)" />
-          <text x={centerX} y="62" textAnchor="middle" fontSize="11" fontWeight="700" fill="#234878">Internet</text>
-          <text x={centerX} y="76" textAnchor="middle" fontSize="10" fill="#607791">WAN</text>
-
-          <line x1={centerX} y1="92" x2={centerX} y2="122" stroke="#7ca5eb" strokeWidth="3" strokeDasharray="8 7" />
-
-          <rect x={centerX - 58} y="122" width="116" height="42" rx="16" fill="#ebf3ff" stroke="#73a1ef" strokeWidth="2" filter="url(#heroShadow)" />
-          <text x={centerX} y="146" textAnchor="middle" fontSize="12" fontWeight="700" fill="#144aab">Perimeter Firewall</text>
-
-          <line x1={centerX} y1="164" x2={centerX} y2="190" stroke="#85a7e6" strokeWidth="3" />
-
-          <rect x={centerX - 164} y="188" width="328" height="56" rx="20" fill="#ffffff" stroke={highlightedSite === primarySite ? '#4f8cff' : '#b8cae4'} strokeWidth={highlightedSite === primarySite ? '3' : '2'} filter="url(#heroShadow)" />
-          <text x={centerX} y="212" textAnchor="middle" fontSize="14" fontWeight="700" fill="#16263d">{primarySite}</text>
-          <text x={centerX} y="230" textAnchor="middle" fontSize="11" fill="#607791">Primary site / shared services / routing core</text>
-
-          <rect x={centerX - 126} y="206" width="74" height="22" rx="11" fill="#eef6ff" stroke="#9ab9ef" />
-          <text x={centerX - 89} y="220" textAnchor="middle" fontSize="10" fill="#24446f">Edge</text>
-          <rect x={centerX - 36} y="206" width="74" height="22" rx="11" fill="#f4efff" stroke="#c7b0ff" />
-          <text x={centerX + 1} y="220" textAnchor="middle" fontSize="10" fill="#5a34a3">Core</text>
-          <rect x={centerX + 54} y="206" width="92" height="22" rx="11" fill="#f3fff8" stroke="#8fdab3" />
-          <text x={centerX + 100} y="220" textAnchor="middle" fontSize="10" fill="#1d7f4c">Services</text>
-
-          {cloudNeeded ? (
-            <>
-              <line x1={centerX + 58} y1="143" x2={width - 156} y2="143" stroke="#8e7af7" strokeWidth="3" strokeDasharray="8 6" />
-              <path d={`M ${width - 196} 152 C ${width - 218} 152 ${width - 228} 136 ${width - 224} 120 C ${width - 218} 98 ${width - 190} 92 ${width - 174} 104 C ${width - 166} 92 ${width - 146} 90 ${width - 132} 98 C ${width - 116} 108 ${width - 114} 130 ${width - 126} 142 C ${width - 132} 150 ${width - 144} 152 ${width - 156} 152 Z`} fill="#f4efff" stroke="#b59cff" strokeWidth="2" filter="url(#heroShadow)" />
-              <text x={width - 170} y="126" textAnchor="middle" fontSize="12" fontWeight="700" fill="#5a34a3">Cloud</text>
-              <text x={width - 170} y="142" textAnchor="middle" fontSize="10" fill="#6c57b3">Hosted services</text>
-            </>
-          ) : null}
-
-          {branchSites.map((siteName, index) => {
-            const x = branchStartX + index * 170;
-            const isFocused = highlightedSite === siteName;
-            return (
-              <g key={siteName}>
-                <line x1={centerX} y1="244" x2={x + 66} y2="260" stroke="#1d7f4c" strokeWidth="3" strokeDasharray="7 6" />
-                <rect x={x} y="258" width="132" height="46" rx="18" fill="#ffffff" stroke={isFocused ? '#4f8cff' : '#bfd2f3'} strokeWidth={isFocused ? '3' : '2'} filter="url(#heroShadow)" />
-                <text x={x + 66} y="278" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#16263d">{siteName}</text>
-                <text x={x + 66} y="294" textAnchor="middle" fontSize="10" fill="#607791">Branch / attached fabric</text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    </div>
-  );
-}
 
 const diagramWorkspacePresets = [
   { key: "architecture", label: "Architecture", detail: "Global physical baseline", mode: "physical" as const, scope: "global" as const, overlays: [] as ActiveOverlayMode[], labelMode: "detailed" as const, linkAnnotationMode: "full" as const },
@@ -516,7 +409,7 @@ export function ProjectDiagramPage() {
               <div>
                 <span className="diagram-kicker">Live topology canvas</span>
                 <h3>{scope === "site" && enrichedProject.sites.length ? `${enrichedProject.sites.find((site) => site.id === activeSiteId)?.name || "Site"} focus` : "Full diagram view"}</h3>
-                <p className="muted" style={{ margin: 0 }}>Start with the base topology only, then layer in the exact details you want for review. The canvas stays cleaner by default.</p>
+                <p className="muted" style={{ margin: 0 }}>This page now opens directly into the live diagram canvas. Start with the base topology, then add only the exact layers you want for review.</p>
               </div>
               <div className="diagram-display-summary">
                 <span className="diagram-display-summary-chip">{mode === "logical" ? "Logical" : "Physical"}</span>
@@ -555,14 +448,19 @@ export function ProjectDiagramPage() {
                 <strong>{synthesized.servicePlacements.length}</strong>
               </div>
             </div>
-            <ArchitectureSchematicPreview
-              projectName={project.name}
-              synthesized={synthesized}
-              siteNames={enrichedProject.sites.map((site) => site.name)}
-              scope={scope}
-              activeSiteName={enrichedProject.sites.find((site) => site.id === activeSiteId)?.name}
-              overlayCount={overlayCount}
-            />
+            <div className="diagram-canvas-primary-strip">
+              <div className="diagram-canvas-primary-copy">
+                <span className="diagram-kicker">Primary canvas</span>
+                <h4>One live diagram surface</h4>
+                <p className="muted" style={{ margin: 0 }}>The snapshot preview has been removed. This page now centers the actual topology canvas as the primary diagram experience.</p>
+              </div>
+              <div className="diagram-canvas-primary-metrics">
+                <span className="diagram-display-summary-chip">Primary: {synthesized.topology.primarySiteName || "Not set"}</span>
+                <span className="diagram-display-summary-chip">WAN: {synthesized.wanLinks.length}</span>
+                <span className="diagram-display-summary-chip">Boundaries: {synthesized.securityBoundaries.length}</span>
+                <span className="diagram-display-summary-chip">Services: {synthesized.servicePlacements.length}</span>
+              </div>
+            </div>
             <div className="diagram-workspace-shortcuts">
               <Link to={`/projects/${projectId}/report?section=assumptions`} className="diagram-workspace-shortcut-link">Open report section</Link>
               <Link to={`/projects/${projectId}/logical-design?section=topology`} className="diagram-workspace-shortcut-link diagram-workspace-shortcut-link-secondary">Open logical design</Link>
@@ -596,6 +494,11 @@ export function ProjectDiagramPage() {
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom(1)}>100%</button>
                   <button type="button" className="diagram-stage-button" onClick={() => setCanvasZoom((current) => Math.min(1.6, Number((current + 0.1).toFixed(2))))}>+</button>
                   <span className="diagram-stage-zoom-readout">{Math.round(canvasZoom * 100)}%</span>
+                </div>
+                <div className="diagram-stage-toolbar-group diagram-stage-toolbar-group-passive" aria-label="Canvas context">
+                  <span className="diagram-stage-passive-pill">{synthesized.topology.topologyLabel}</span>
+                  <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
+                  <span className="diagram-stage-passive-pill">{enrichedProject.sites.length} sites</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
                   <button type="button" className="diagram-stage-button" onClick={() => { void exportCanvas("svg"); }}>SVG</button>
