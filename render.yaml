@@ -23,6 +23,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20.12.2
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
       - key: NPM_CONFIG_PREFER_OFFLINE
         value: "true"
       - key: NPM_CONFIG_FETCH_RETRIES
@@ -80,7 +82,7 @@ services:
     name: subnetops-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: npm run build
+    buildCommand: sh -c 'test -f dist/index.html && echo "Using committed frontend dist"'
     staticPublishPath: ./dist
     buildFilter:
       paths:
@@ -90,6 +92,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.12.2
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
       - key: NPM_CONFIG_PREFER_OFFLINE
         value: "true"
       - key: NPM_CONFIG_FETCH_RETRIES

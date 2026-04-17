@@ -289,6 +289,20 @@ export function ProjectDiagramPage() {
     }
   };
 
+  const focusGlobalCanvas = () => {
+    setScope("global");
+    setFocusedSiteId(enrichedProject.sites[0]?.id || "");
+    setDeviceFocus("all");
+    setLinkFocus("all");
+  };
+
+  const focusSiteCanvas = (siteId: string) => {
+    setScope("site");
+    setFocusedSiteId(siteId);
+    setDeviceFocus("switching");
+    setLinkFocus("access");
+  };
+
   useEffect(() => {
     const svg = getCanvasSvg();
     if (!svg) return;
