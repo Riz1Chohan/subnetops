@@ -13,6 +13,7 @@ export type DiagramLabelMode = "essential" | "detailed";
 export type LinkAnnotationMode = "minimal" | "full";
 export type OverlayMode = "none" | "addressing" | "security" | "flows" | "services" | "redundancy";
 export type ActiveOverlayMode = Exclude<OverlayMode, "none">;
+type ChipTone = "blue" | "purple" | "green" | "orange";
 type DiagramReviewPresetKey = "architecture" | "site-lld" | "transport" | "boundaries" | "services" | "critical-flows";
 export type DiagramScope = "global" | "site" | "wan-cloud" | "boundaries";
 export type DeviceFocus = "all" | "edge" | "switching" | "wireless" | "services";
@@ -939,7 +940,7 @@ function diagramLegend(mode: OverlayMode) {
 }
 
 function normalizeActiveOverlays(overlay: OverlayMode, activeOverlays?: ActiveOverlayMode[]) {
-  const normalized = Array.from(new Set((activeOverlays ?? []).filter((item): item is ActiveOverlayMode => item !== "none")));
+  const normalized = Array.from(new Set(activeOverlays ?? []));
   if (normalized.length > 0) return normalized;
   return overlay === "none" ? [] : [overlay];
 }
