@@ -27,6 +27,18 @@ type StageGroup = {
   matchers: string[];
 };
 
+type ActionSeverity = "primary" | "warning" | "secondary";
+
+function actionSeverityClass(severity: ActionSeverity) {
+  if (severity === "primary") return "primary";
+  if (severity === "warning") return "warning";
+  return "secondary";
+}
+
+function isBlockingActionSeverity(severity: ActionSeverity) {
+  return severity === "primary" || severity === "warning";
+}
+
 function approvalBadge(approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return "badge badge-info";
   if (approvalStatus === "IN_REVIEW") return "badge badge-warning";
@@ -78,7 +90,7 @@ export function ProjectLayout() {
   const unresolvedTaskCount = comments.filter((item) => item.taskStatus !== "DONE").length;
   const siteCount = Math.max(sites.length, synthesized.siteSummaries.length);
   const vlanCount = Math.max(vlans.length, synthesized.addressingPlan.length);
-  const blockerCount = Math.max(errorCount, recoveryCompletion.mustFinish.length, workflowReview.actionQueue.filter((item) => item.severity !== "secondary").length);
+  const blockerCount = Math.max(errorCount, recoveryCompletion.mustFinish.length, workflowReview.actionQueue.filter((item) => isBlockingActionSeverity(item.severity)).length);
   const openTaskCount = Math.max(unresolvedTaskCount, workflowReview.actionQueue.length);
 
   const stageGroups: StageGroup[] = [
@@ -306,7 +318,7 @@ export function ProjectLayout() {
                   ) : workflowReview.actionQueue.map((item) => {
                     const issuePath = buildWorkspaceIssuePath(item.path, { key: item.key, title: item.title, detail: item.detail });
                     return (
-                      <Link key={item.key} to={issuePath} className={`project-action-center-link ${item.severity === "primary" ? "primary" : item.severity === "warning" ? "warning" : "secondary"}`}>
+                      <Link key={item.key} to={issuePath} className={`project-action-center-link ${actionSeverityClass(item.severity)}`}>
                         <strong>{item.title}</strong>
                         <span>{item.detail}</span>
                       </Link>
