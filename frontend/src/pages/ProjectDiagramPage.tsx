@@ -11,7 +11,7 @@ import {
   type DeviceFocus,
   type LinkFocus,
 } from "../features/diagram/components/ProjectDiagram";
-import { useProject, useProjectVlans } from "../features/projects/hooks";
+import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useProjectComments } from "../features/comments/hooks";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
@@ -77,6 +77,7 @@ const diagramFocusPresets: Array<{ key: string; label: string; detail: string; d
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
   const projectQuery = useProject(projectId);
+  const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const commentsQuery = useProjectComments(projectId);
   const validationQuery = useValidationResults(projectId);
@@ -97,17 +98,24 @@ export function ProjectDiagramPage() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
   const project = projectQuery.data;
+  const sites = sitesQuery.data ?? project?.sites ?? [];
   const vlans = vlansQuery.data ?? [];
   const comments = commentsQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
 
-  if (projectQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the topology canvas." />;
-  if (projectQuery.isError) {
+  if (projectQuery.isLoading || sitesQuery.isLoading) return <LoadingState title="Loading diagram" message="Preparing the topology canvas." />;
+  if (projectQuery.isError || sitesQuery.isError) {
     return (
       <ErrorState
         title="Unable to load diagram workspace"
-        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this diagram right now."}
+        message={
+          projectQuery.error instanceof Error
+            ? projectQuery.error.message
+            : sitesQuery.error instanceof Error
+              ? sitesQuery.error.message
+              : "SubnetOps could not load this diagram right now."
+        }
         action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
       />
     );
@@ -124,7 +132,7 @@ export function ProjectDiagramPage() {
 
   const enrichedProject = {
     ...project,
-    sites: project.sites.map((site) => ({
+    sites: sites.map((site) => ({
       ...site,
       vlans: vlans.filter((vlan) => vlan.site?.id === site.id || vlan.siteId === site.id),
     })),
