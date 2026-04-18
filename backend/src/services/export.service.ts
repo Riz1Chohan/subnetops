@@ -248,32 +248,32 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
 
 export function composeProfessionalReport(project: Awaited<ReturnType<typeof getProjectExportData>>, snapshot?: ExportSnapshot) {
   if (snapshot?.synthesized) return composeProfessionalReportFromSnapshot(snapshot);
-  const ctx = buildExportContext(project);
-  if (!ctx) return null;
+  const exportContext = buildExportContext(project);
+  if (!exportContext) return null;
 
   const generatedAt = new Date().toLocaleString();
-  const projectEnvironment = titleCase(ctx.environment || "custom");
+  const projectEnvironment = titleCase(exportContext.environment || "custom");
   const architecturePattern =
-    ctx.siteCount > 1
+    exportContext.siteCount > 1
       ? "a multi-site architecture with per-site addressing boundaries, summarized routing, and shared design standards"
       : "a compact single-site architecture with segmented trust boundaries, routed gateway control, and centralized review artifacts";
 
   const narrativeScope = humanJoin(
     [
-      ctx.planningFor ? `${ctx.planningFor.toLowerCase()} delivery scope` : "general network design scope",
-      ctx.primaryGoal ? `${ctx.primaryGoal.toLowerCase()} as the leading design objective` : "clean segmentation and supportable implementation as the working design assumption",
-      ctx.usersPerSite ? `approximately ${ctx.usersPerSite} user${ctx.usersPerSite === 1 ? "" : "s"} per site` : "user counts still requiring final confirmation",
+      exportContext.planningFor ? `${exportContext.planningFor.toLowerCase()} delivery scope` : "general network design scope",
+      exportContext.primaryGoal ? `${exportContext.primaryGoal.toLowerCase()} as the leading design objective` : "clean segmentation and supportable implementation as the working design assumption",
+      exportContext.usersPerSite ? `approximately ${exportContext.usersPerSite} user${exportContext.usersPerSite === 1 ? "" : "s"} per site` : "user counts still requiring final confirmation",
     ],
     "and",
   );
 
   const executiveSummary = [
-    `${ctx.project.name} is presented as a ${projectEnvironment.toLowerCase()} technical design report covering ${ctx.siteCount || 0} site${ctx.siteCount === 1 ? "" : "s"}, ${ctx.vlanCount || 0} current addressing row${ctx.vlanCount === 1 ? "" : "s"}, and a structured package of architecture, security, routing, implementation, and platform-planning outputs. The report is intended to serve as a review-ready planning document rather than a raw export of application screens.`,
+    `${exportContext.project.name} is presented as a ${projectEnvironment.toLowerCase()} technical design report covering ${exportContext.siteCount || 0} site${exportContext.siteCount === 1 ? "" : "s"}, ${exportContext.vlanCount || 0} current addressing row${exportContext.vlanCount === 1 ? "" : "s"}, and a structured package of architecture, security, routing, implementation, and platform-planning outputs. The report is intended to serve as a review-ready planning document rather than a raw export of application screens.`,
     `The current design direction follows ${architecturePattern}. This approach was selected to keep the package supportable for implementation teams while still preserving segmentation, growth headroom, and clearer operational boundaries before production configuration work begins.`,
-    ctx.errors.length > 0
-      ? `The present validation posture includes ${ctx.errors.length} error-level blocker${ctx.errors.length === 1 ? "" : "s"} and ${ctx.warnings.length} warning${ctx.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
-      : ctx.warnings.length > 0
-        ? `The current design contains ${ctx.warnings.length} warning${ctx.warnings.length === 1 ? "" : "s"} but no active error-level blockers. The package can be reviewed professionally now, although the warning items should still be addressed during technical sign-off.`
+    exportContext.errors.length > 0
+      ? `The present validation posture includes ${exportContext.errors.length} error-level blocker${exportContext.errors.length === 1 ? "" : "s"} and ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
+      : exportContext.warnings.length > 0
+        ? `The current design contains ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"} but no active error-level blockers. The package can be reviewed professionally now, although the warning items should still be addressed during technical sign-off.`
         : "The current design is in a clean validation state with no active error-level or warning-level blockers recorded in the latest validation cycle.",
     `At this stage, the package is best used for design review, addressing confirmation, security and routing discussion, implementation planning, and stakeholder handoff. Procurement, platform-specific engineering, and migration approval should still be tied to the remaining assumptions and open review items documented later in the report.`,
   ];
@@ -281,48 +281,48 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const introSection: ReportSection = {
     title: "1. Introduction and Project Scope",
     paragraphs: [
-      `${ctx.project.name} is currently being developed as a ${projectEnvironment.toLowerCase()} network planning package. The saved project scope points toward ${narrativeScope}. Where the brief is still incomplete, the report presents reasonable planning assumptions and clearly identifies them as items requiring confirmation rather than hiding the gaps inside the document body.`,
+      `${exportContext.project.name} is currently being developed as a ${projectEnvironment.toLowerCase()} network planning package. The saved project scope points toward ${narrativeScope}. Where the brief is still incomplete, the report presents reasonable planning assumptions and clearly identifies them as items requiring confirmation rather than hiding the gaps inside the document body.`,
       `This report is designed to provide a professional design narrative that can be reviewed by technical stakeholders, project leads, or approval teams. It translates the saved planning record into a structured package covering discovery context, high-level design, low-level addressing and segmentation, routing and switching intent, implementation planning, and platform readiness.`,
     ],
     bullets: [
-      maybeBullet("Organization", ctx.project.organizationName),
+      maybeBullet("Organization", exportContext.project.organizationName),
       maybeBullet("Environment", projectEnvironment),
-      maybeBullet("Planning focus", ctx.planningFor),
-      maybeBullet("Current project phase", ctx.requirements.projectPhase),
-      maybeBullet("Primary design objective", ctx.primaryGoal),
-      ctx.usersPerSite ? `Estimated users per site: ${ctx.usersPerSite}` : null,
-      maybeBullet("Compliance or governance profile", ctx.requirements.complianceProfile),
+      maybeBullet("Planning focus", exportContext.planningFor),
+      maybeBullet("Current project phase", exportContext.requirements.projectPhase),
+      maybeBullet("Primary design objective", exportContext.primaryGoal),
+      exportContext.usersPerSite ? `Estimated users per site: ${exportContext.usersPerSite}` : null,
+      maybeBullet("Compliance or governance profile", exportContext.requirements.complianceProfile),
     ].filter(Boolean) as string[],
   };
 
   const discoverySection: ReportSection = {
     title: "2. Discovery and Requirements Baseline",
     paragraphs: [
-      ctx.discoveryHighlights.length > 0
+      exportContext.discoveryHighlights.length > 0
         ? "The project includes saved discovery notes that help anchor the target design in current-state information. These inputs should still be treated as a baseline rather than a complete discovery record, but they already provide enough context to improve migration planning, implementation sequencing, and design review quality."
         : "The current project record contains only a limited discovery baseline. The target design can still be reviewed and refined, but migration planning, procurement, and implementation approval should remain conditional until fuller current-state information is captured.",
-      `The saved requirements presently indicate ${ctx.primaryGoal ? `${ctx.primaryGoal.toLowerCase()} as the main objective` : "a still-developing main design objective"}. The design engine has therefore emphasized structured segmentation, supportable gateway ownership, reviewable security boundaries, and implementation clarity rather than over-optimizing for platform-specific detail too early in the lifecycle.`,
+      `The saved requirements presently indicate ${exportContext.primaryGoal ? `${exportContext.primaryGoal.toLowerCase()} as the main objective` : "a still-developing main design objective"}. The design engine has therefore emphasized structured segmentation, supportable gateway ownership, reviewable security boundaries, and implementation clarity rather than over-optimizing for platform-specific detail too early in the lifecycle.`,
     ],
-    bullets: ctx.discoveryHighlights,
+    bullets: exportContext.discoveryHighlights,
   };
 
   const hldBullets = [
     `Architecture direction: ${architecturePattern}`,
-    `Base private range: ${asString(ctx.project.basePrivateRange) || "working range still needs explicit confirmation"}`,
-    `Site count in scope: ${ctx.siteCount}`,
-    `Logical security domains in scope: ${humanJoin(ctx.securityZones) || "to be finalized"}`,
-    ctx.internetModel ? `Internet or edge posture: ${ctx.internetModel}` : null,
-    ctx.serverPlacement ? `Server or service placement: ${ctx.serverPlacement}` : null,
-    isEnabled(ctx.requirements.dualIsp)
-      ? `Resilience posture: ${asString(ctx.requirements.resilienceTarget, "dual-path or failover-aware design")}`
-      : `Resilience posture: ${asString(ctx.requirements.resilienceTarget, "single-primary-path posture pending further review")}`,
+    `Base private range: ${asString(exportContext.project.basePrivateRange) || "working range still needs explicit confirmation"}`,
+    `Site count in scope: ${exportContext.siteCount}`,
+    `Logical security domains in scope: ${humanJoin(exportContext.securityZones) || "to be finalized"}`,
+    exportContext.internetModel ? `Internet or edge posture: ${exportContext.internetModel}` : null,
+    exportContext.serverPlacement ? `Server or service placement: ${exportContext.serverPlacement}` : null,
+    isEnabled(exportContext.requirements.dualIsp)
+      ? `Resilience posture: ${asString(exportContext.requirements.resilienceTarget, "dual-path or failover-aware design")}`
+      : `Resilience posture: ${asString(exportContext.requirements.resilienceTarget, "single-primary-path posture pending further review")}`,
   ].filter(Boolean) as string[];
 
   const hldSection: ReportSection = {
     title: "3. High-Level Design Overview",
     paragraphs: [
       `The proposed high-level design follows ${architecturePattern}. For the current scope, that means the design package is aiming for clear trust boundaries, manageable operational control, and an addressing hierarchy that can grow without forcing redesign after the first implementation cycle.`,
-      ctx.siteCount > 1
+      exportContext.siteCount > 1
         ? "Because multiple sites are present, the architecture assumes a parent organizational block, per-site summary blocks, and transport logic that can be summarized cleanly at site boundaries. This reduces route sprawl and makes later expansion easier to reason about."
         : "Because the saved scope currently centers on a single site, the architecture stays intentionally compact. The priority is to establish good segmentation, disciplined gateway placement, and supportable controls before introducing complexity that the environment does not yet require.",
     ],
@@ -330,7 +330,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   };
 
   const zoneRows = sortUnique(
-    ctx.sites.flatMap((site) => site.vlans.map((vlan) => `${classifyZone(vlan.vlanName, vlan.purpose)}|${site.name}|VLAN ${vlan.vlanId} ${vlan.vlanName}|${vlan.subnetCidr}`)),
+    exportContext.sites.flatMap((site) => site.vlans.map((vlan) => `${classifyZone(vlan.vlanName, vlan.purpose)}|${site.name}|VLAN ${vlan.vlanId} ${vlan.vlanName}|${vlan.subnetCidr}`)),
   ).map((row) => {
     const [zone, site, segment, subnet] = row.split("|");
     return [zone, site, segment, subnet];
@@ -340,10 +340,10 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     title: "4. Security Architecture and Segmentation Model",
     paragraphs: [
       "The security design should be interpreted as a structural zone model that shapes addressing, routing, and implementation review. The current package is not yet pretending to be a fully vendor-specific firewall rulebase. Instead, it is defining the security boundaries that the implementation team will need to preserve when real devices, policies, and access controls are configured.",
-      ctx.securityZones.includes("Guest")
+      exportContext.securityZones.includes("Guest")
         ? "Guest or untrusted access is in scope and should remain isolated from trusted user, service, and management boundaries unless an explicitly reviewed exception is approved."
         : "Guest access is not strongly modeled in the current saved scope, so the present package focuses more on trusted user, service, management, and infrastructure boundaries.",
-      ctx.securityZones.includes("Management")
+      exportContext.securityZones.includes("Management")
         ? "Management access is treated as a privileged boundary and should be carried on dedicated administrative paths rather than blended into general user access."
         : "A dedicated management boundary is not fully modeled yet, so that remains an important design checkpoint before implementation sign-off if infrastructure operations will require segregated administrative control.",
     ],
@@ -355,14 +355,14 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
       },
     ],
     bullets: [
-      isEnabled(ctx.requirements.remoteAccess) ? `Remote access posture: ${asString(ctx.requirements.remoteAccessMethod, "reviewed remote-access edge required")}` : null,
-      isEnabled(ctx.requirements.guestWifi) ? `Guest policy intent: ${asString(ctx.requirements.guestPolicy, "internet-only or tightly filtered guest access")}` : null,
-      isEnabled(ctx.requirements.management) ? `Management policy intent: ${asString(ctx.requirements.managementAccess, "trusted administrative access only")}` : null,
-      isEnabled(ctx.requirements.wireless) || isEnabled(ctx.requirements.guestWifi) ? `Wireless mapping: ${asString(ctx.requirements.wirelessSecurity, "staff and guest wireless should remain mapped to the correct trust domains")}` : null,
+      isEnabled(exportContext.requirements.remoteAccess) ? `Remote access posture: ${asString(exportContext.requirements.remoteAccessMethod, "reviewed remote-access edge required")}` : null,
+      isEnabled(exportContext.requirements.guestWifi) ? `Guest policy intent: ${asString(exportContext.requirements.guestPolicy, "internet-only or tightly filtered guest access")}` : null,
+      isEnabled(exportContext.requirements.management) ? `Management policy intent: ${asString(exportContext.requirements.managementAccess, "trusted administrative access only")}` : null,
+      isEnabled(exportContext.requirements.wireless) || isEnabled(exportContext.requirements.guestWifi) ? `Wireless mapping: ${asString(exportContext.requirements.wirelessSecurity, "staff and guest wireless should remain mapped to the correct trust domains")}` : null,
     ].filter(Boolean) as string[],
   };
 
-  const siteSummaryRows = ctx.sites.map((site) => [
+  const siteSummaryRows = exportContext.sites.map((site) => [
     site.name,
     asString(site.siteCode, "—"),
     asString(site.location, "Location not set"),
@@ -370,7 +370,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     String(site.vlans.length),
   ]);
 
-  const addressingRows = ctx.sites.flatMap((site) =>
+  const addressingRows = exportContext.sites.flatMap((site) =>
     site.vlans.map((vlan) => [
       site.name,
       String(vlan.vlanId),
@@ -386,7 +386,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const addressingSection: ReportSection = {
     title: "5. Logical Design and Addressing Plan",
     paragraphs: [
-      `The low-level design currently contains ${ctx.vlanCount} addressing row${ctx.vlanCount === 1 ? "" : "s"}. These rows act as the main implementation artifact for subnet ownership, gateway placement, DHCP posture, and segmented trust boundaries.`,
+      `The low-level design currently contains ${exportContext.vlanCount} addressing row${exportContext.vlanCount === 1 ? "" : "s"}. These rows act as the main implementation artifact for subnet ownership, gateway placement, DHCP posture, and segmented trust boundaries.`,
       "The addressing schedule should be reviewed carefully before implementation because it affects gateway conventions, helper policies, firewall and ACL placement, and the cleanliness of later summarization. This section is therefore intended to function as a true design artifact rather than an afterthought or status card.",
     ],
     tables: [
@@ -404,39 +404,39 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   };
 
   const routingBullets = [
-    maybeBullet("Internet or edge model", ctx.internetModel),
-    maybeBullet("Server or service placement", ctx.serverPlacement),
-    maybeBullet("Platform WAN posture", ctx.platform.wanPosture),
-    isEnabled(ctx.requirements.voice) ? `QoS or voice posture: ${asString(ctx.requirements.voiceQos, "voice and real-time traffic require reviewed prioritization")}` : null,
-    ctx.siteCount > 1 ? "Routing posture: prefer site summarization and deliberate default-route ownership at the edge." : "Routing posture: simple routed edge with explicit gateway ownership and a controlled path to later IGP growth.",
+    maybeBullet("Internet or edge model", exportContext.internetModel),
+    maybeBullet("Server or service placement", exportContext.serverPlacement),
+    maybeBullet("Platform WAN posture", exportContext.platform.wanPosture),
+    isEnabled(exportContext.requirements.voice) ? `QoS or voice posture: ${asString(exportContext.requirements.voiceQos, "voice and real-time traffic require reviewed prioritization")}` : null,
+    exportContext.siteCount > 1 ? "Routing posture: prefer site summarization and deliberate default-route ownership at the edge." : "Routing posture: simple routed edge with explicit gateway ownership and a controlled path to later IGP growth.",
   ].filter(Boolean) as string[];
 
   const routingSection: ReportSection = {
     title: "6. Routing, Switching, and Transport Intent",
     paragraphs: [
-      `The routing and switching design is currently framed as ${ctx.routingPosture}. The package is intentionally trying to keep control-plane ownership obvious, site boundaries reviewable, and gateway behavior stable before platform-specific configuration is generated.`,
+      `The routing and switching design is currently framed as ${exportContext.routingPosture}. The package is intentionally trying to keep control-plane ownership obvious, site boundaries reviewable, and gateway behavior stable before platform-specific configuration is generated.`,
       "Switching intent should reinforce segmentation rather than hide it. Trunking, VLAN propagation, loop prevention, and first-hop placement should all be reviewed against the addressing hierarchy so that the final implementation does not undermine the logical model presented in this report.",
     ],
     bullets: routingBullets,
   };
 
-  const validationRows = ctx.validations.length > 0
-    ? ctx.validations.slice(0, 15).map((item) => [item.severity, item.title, item.message])
+  const validationRows = exportContext.validations.length > 0
+    ? exportContext.validations.slice(0, 15).map((item) => [item.severity, item.title, item.message])
     : [["INFO", "No validation findings saved", "Run validation after changes if a fresh technical review is required."]];
 
   const implementationSection: ReportSection = {
     title: "7. Implementation, Testing, and Validation Strategy",
     paragraphs: [
       "Implementation should proceed in controlled phases so that addressing, gateway ownership, service reachability, security boundary enforcement, and rollback conditions can be verified without expanding the blast radius of each change window.",
-      ctx.errors.length > 0
+      exportContext.errors.length > 0
         ? "Because the current package still contains error-level blockers, implementation approval should pause until those blockers are reviewed and resolved."
         : "Because the current validation posture does not contain active error-level blockers, the package can move into deeper technical sign-off and change preparation once the warning and assumption items are reviewed.",
     ],
     bullets: [
-      `Validation blockers: ${ctx.errors.length}`,
-      `Validation warnings: ${ctx.warnings.length}`,
-      `Validation information items: ${ctx.infos.length}`,
-      ctx.warnings.length > 0 ? "Warning-level findings should be cleared or accepted explicitly before final handoff." : null,
+      `Validation blockers: ${exportContext.errors.length}`,
+      `Validation warnings: ${exportContext.warnings.length}`,
+      `Validation information items: ${exportContext.infos.length}`,
+      exportContext.warnings.length > 0 ? "Warning-level findings should be cleared or accepted explicitly before final handoff." : null,
     ].filter(Boolean) as string[],
     tables: [
       {
@@ -447,7 +447,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     ],
   };
 
-  const platformRows = ctx.platformHighlights.map((line) => [line, "Review during final engineering and procurement alignment"]);
+  const platformRows = exportContext.platformHighlights.map((line) => [line, "Review during final engineering and procurement alignment"]);
 
   const platformSection: ReportSection = {
     title: "8. Platform Profile and Bill of Materials Foundation",
@@ -470,17 +470,17 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
       "Professional design packages should make uncertainty visible rather than bury it. The items below are not necessarily design failures; they are the remaining assumptions or review points that should be acknowledged before the package is treated as final implementation truth.",
     ],
     bullets: [
-      ...ctx.openItems,
-      ...ctx.warnings.slice(0, 6).map((item) => `Validation review item: ${item.title} — ${item.message}`),
+      ...exportContext.openItems,
+      ...exportContext.warnings.slice(0, 6).map((item) => `Validation review item: ${item.title} — ${item.message}`),
     ],
   };
 
   const conclusionSection: ReportSection = {
     title: "10. Conclusion and Handoff Notes",
     paragraphs: [
-      `${ctx.project.name} now has a structured network design package that translates saved requirements and synthesized planning data into a more formal handoff document. The report provides enough structure for technical review, addressing confirmation, security discussion, routing review, implementation planning, and platform alignment without pretending that the remaining open items do not exist.`,
-      ctx.errors.length > 0
-        ? `The next priority should be to resolve the remaining ${ctx.errors.length} blocker${ctx.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the final handoff reflects a cleaner implementation posture.`
+      `${exportContext.project.name} now has a structured network design package that translates saved requirements and synthesized planning data into a more formal handoff document. The report provides enough structure for technical review, addressing confirmation, security discussion, routing review, implementation planning, and platform alignment without pretending that the remaining open items do not exist.`,
+      exportContext.errors.length > 0
+        ? `The next priority should be to resolve the remaining ${exportContext.errors.length} blocker${exportContext.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the final handoff reflects a cleaner implementation posture.`
         : "The next priority should be to tighten discovery detail, confirm platform and compliance assumptions, and carry the approved design into platform-specific implementation artifacts, diagrams, and change-control evidence.",
     ],
   };
@@ -495,7 +495,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
         {
           title: "Addressing Rows",
           headers: ["Site", "VLAN", "Segment", "Subnet", "Gateway", "DHCP", "Est. Hosts"],
-          rows: ctx.sites.flatMap((site) =>
+          rows: exportContext.sites.flatMap((site) =>
             site.vlans.map((vlan) => [
               site.name,
               String(vlan.vlanId),
@@ -506,7 +506,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
               vlan.estimatedHosts != null ? String(vlan.estimatedHosts) : "—",
             ]),
           ).length > 0
-            ? ctx.sites.flatMap((site) =>
+            ? exportContext.sites.flatMap((site) =>
                 site.vlans.map((vlan) => [
                   site.name,
                   String(vlan.vlanId),
@@ -531,8 +531,8 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
           title: "Validation Findings",
           headers: ["Severity", "Entity", "Title", "Message"],
           rows:
-            ctx.validations.length > 0
-              ? ctx.validations.map((item) => [item.severity, asString(item.entityType, "PROJECT"), item.title, item.message])
+            exportContext.validations.length > 0
+              ? exportContext.validations.map((item) => [item.severity, asString(item.entityType, "PROJECT"), item.title, item.message])
               : [["INFO", "PROJECT", "No validation results recorded", "Run validation again if a fresh review is needed."]],
         },
       ],
@@ -540,38 +540,38 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   ];
 
   const reportMetadata: ReportMetadata = {
-    organizationName: asString(ctx.project.organizationName, "To be confirmed"),
+    organizationName: asString(exportContext.project.organizationName, "To be confirmed"),
     environment: projectEnvironment,
     reportVersion: "Version 0.92",
-    revisionStatus: ctx.errors.length > 0 ? "Draft - blockers present" : ctx.warnings.length > 0 ? "Review draft" : "Review-ready draft",
-    documentOwner: asString(ctx.project.ownerName, "SubnetOps project owner"),
-    approvalStatus: ctx.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
-    projectPhase: asString(ctx.requirements.projectPhase, "To be confirmed"),
-    planningFocus: asString(ctx.planningFor, "To be confirmed"),
-    primaryObjective: asString(ctx.primaryGoal, "To be confirmed"),
+    revisionStatus: exportContext.errors.length > 0 ? "Draft - blockers present" : exportContext.warnings.length > 0 ? "Review draft" : "Review-ready draft",
+    documentOwner: asString(exportContext.project.ownerName, "SubnetOps project owner"),
+    approvalStatus: exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
+    projectPhase: asString(exportContext.requirements.projectPhase, "To be confirmed"),
+    planningFocus: asString(exportContext.planningFor, "To be confirmed"),
+    primaryObjective: asString(exportContext.primaryGoal, "To be confirmed"),
     generatedFrom: "Saved project records and synthesized planning outputs",
   };
 
   const visualSnapshot: ReportVisualSnapshot = {
     metrics: [
-      ["Sites in scope", String(ctx.siteCount)],
-      ["Addressing rows", String(ctx.vlanCount)],
-      ["Security zones", String(ctx.securityZones.length)],
-      ["Validation blockers", String(ctx.errors.length)],
-      ["Validation warnings", String(ctx.warnings.length)],
-      ["Base range", asString(ctx.project.basePrivateRange, "Working range pending confirmation")],
+      ["Sites in scope", String(exportContext.siteCount)],
+      ["Addressing rows", String(exportContext.vlanCount)],
+      ["Security zones", String(exportContext.securityZones.length)],
+      ["Validation blockers", String(exportContext.errors.length)],
+      ["Validation warnings", String(exportContext.warnings.length)],
+      ["Base range", asString(exportContext.project.basePrivateRange, "Working range pending confirmation")],
     ],
     topologyRows: [
-      ["Edge / Internet", ctx.internetModel || "Single internet edge pending refinement", ctx.siteCount > 1 ? "Prefer explicit WAN summaries between sites" : "Keep the routed edge intentionally simple"],
-      ["Core / Distribution", ctx.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
-      ["Services", ctx.serverPlacement || "Small centralized service block", "Keep shared services separated from users and guest access"],
-      ["Security", humanJoin(ctx.securityZones) || "Users and services", "Apply default-deny principles between unlike trust boundaries"],
+      ["Edge / Internet", exportContext.internetModel || "Single internet edge pending refinement", exportContext.siteCount > 1 ? "Prefer explicit WAN summaries between sites" : "Keep the routed edge intentionally simple"],
+      ["Core / Distribution", exportContext.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
+      ["Services", exportContext.serverPlacement || "Small centralized service block", "Keep shared services separated from users and guest access"],
+      ["Security", humanJoin(exportContext.securityZones) || "Users and services", "Apply default-deny principles between unlike trust boundaries"],
     ],
   };
 
   return {
-    title: ctx.project.reportHeader || `${ctx.project.name} Technical Design Report`,
-    subtitle: `${ctx.project.name} — Professional Network Planning Package`,
+    title: exportContext.project.reportHeader || `${exportContext.project.name} Technical Design Report`,
+    subtitle: `${exportContext.project.name} — Professional Network Planning Package`,
     generatedAt,
     executiveSummary,
     sections: [introSection, discoverySection, hldSection, securitySection, addressingSection, routingSection, implementationSection, platformSection, risksSection, conclusionSection],
@@ -584,22 +584,22 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
 export async function getCsvRows(projectId: string, snapshot?: ExportSnapshot) {
   if (snapshot?.synthesized) return getCsvRowsFromSnapshot(snapshot);
   const project = await getProjectExportData(projectId);
-  const ctx = buildExportContext(project);
-  if (!ctx) return [];
+  const exportContext = buildExportContext(project);
+  if (!exportContext) return [];
 
   const rows: Array<Record<string, unknown>> = [];
 
   rows.push(
-    { Section: "Project", Scope: "Project", Name: ctx.project.name, Key: "Organization", Value: ctx.project.organizationName ?? "", Notes: "" },
-    { Section: "Project", Scope: "Project", Name: ctx.project.name, Key: "Environment", Value: ctx.project.environmentType ?? "", Notes: "" },
-    { Section: "Project", Scope: "Project", Name: ctx.project.name, Key: "Base Private Range", Value: ctx.project.basePrivateRange ?? "", Notes: "" },
-    { Section: "Requirements", Scope: "Project", Name: ctx.project.name, Key: "Planning For", Value: ctx.requirements.planningFor ?? "", Notes: "" },
-    { Section: "Requirements", Scope: "Project", Name: ctx.project.name, Key: "Project Phase", Value: ctx.requirements.projectPhase ?? "", Notes: "" },
-    { Section: "Requirements", Scope: "Project", Name: ctx.project.name, Key: "Primary Goal", Value: ctx.requirements.primaryGoal ?? "", Notes: "" },
-    { Section: "Requirements", Scope: "Project", Name: ctx.project.name, Key: "Compliance Profile", Value: ctx.requirements.complianceProfile ?? "", Notes: "" },
+    { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Organization", Value: exportContext.project.organizationName ?? "", Notes: "" },
+    { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Environment", Value: exportContext.project.environmentType ?? "", Notes: "" },
+    { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Base Private Range", Value: exportContext.project.basePrivateRange ?? "", Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Planning For", Value: exportContext.requirements.planningFor ?? "", Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Project Phase", Value: exportContext.requirements.projectPhase ?? "", Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Primary Goal", Value: exportContext.requirements.primaryGoal ?? "", Notes: "" },
+    { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Compliance Profile", Value: exportContext.requirements.complianceProfile ?? "", Notes: "" },
   );
 
-  for (const site of ctx.sites) {
+  for (const site of exportContext.sites) {
     rows.push({ Section: "Sites", Scope: "Site", Name: site.name, Key: "Address Block", Value: site.defaultAddressBlock ?? "", Notes: site.location ?? "" });
     for (const vlan of site.vlans) {
       rows.push({
@@ -613,20 +613,20 @@ export async function getCsvRows(projectId: string, snapshot?: ExportSnapshot) {
     }
   }
 
-  for (const zone of ctx.securityZones) {
+  for (const zone of exportContext.securityZones) {
     rows.push({ Section: "Security", Scope: "Project", Name: zone, Key: "Zone", Value: zone, Notes: "Generated from current requirements scope" });
   }
 
-  for (const item of ctx.validations) {
+  for (const item of exportContext.validations) {
     rows.push({ Section: "Validation", Scope: item.entityType ?? "PROJECT", Name: item.title, Key: item.severity, Value: item.message, Notes: item.ruleCode ?? "" });
   }
 
-  for (const item of ctx.platformHighlights) {
-    rows.push({ Section: "Platform/BOM", Scope: "Project", Name: ctx.project.name, Key: "Profile", Value: item, Notes: "Review before procurement" });
+  for (const item of exportContext.platformHighlights) {
+    rows.push({ Section: "Platform/BOM", Scope: "Project", Name: exportContext.project.name, Key: "Profile", Value: item, Notes: "Review before procurement" });
   }
 
-  for (const item of ctx.discoveryHighlights) {
-    rows.push({ Section: "Discovery", Scope: "Project", Name: ctx.project.name, Key: "Highlight", Value: item, Notes: "Current-state input" });
+  for (const item of exportContext.discoveryHighlights) {
+    rows.push({ Section: "Discovery", Scope: "Project", Name: exportContext.project.name, Key: "Highlight", Value: item, Notes: "Current-state input" });
   }
 
   return rows;

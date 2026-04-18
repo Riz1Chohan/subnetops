@@ -1,0 +1,12 @@
+export { default as aiRoutes } from "./ai.routes";
+export { default as authRoutes } from "./auth.routes";
+export { default as commentRoutes } from "./comment.routes";
+export { default as exportRoutes } from "./export.routes";
+export { default as notificationPreferenceRoutes } from "./notificationPreference.routes";
+export { default as notificationRoutes } from "./notification.routes";
+export { default as organizationRoutes } from "./organization.routes";
+export { default as projectRoutes } from "./project.routes";
+export { default as projectWatchRoutes } from "./projectWatch.routes";
+export { default as siteRoutes } from "./site.routes";
+export { default as validationRoutes } from "./validation.routes";
+export { default as vlanRoutes } from "./vlan.routes";

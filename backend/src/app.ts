@@ -4,20 +4,21 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { checkDatabaseHealth } from "./db/prisma.js";
-import authRoutes from "./routes/auth.routes.js";
-import projectRoutes from "./routes/project.routes.js";
-import siteRoutes from "./routes/site.routes.js";
-import vlanRoutes from "./routes/vlan.routes.js";
-import validationRoutes from "./routes/validation.routes.js";
-import exportRoutes from "./routes/export.routes.js";
-import organizationRoutes from "./routes/organization.routes.js";
-import commentRoutes from "./routes/comment.routes.js";
-import notificationRoutes from "./routes/notification.routes.js";
-import notificationPreferenceRoutes from "./routes/notificationPreference.routes.js";
-import projectWatchRoutes from "./routes/projectWatch.routes.js";
-import aiRoutes from "./routes/ai.routes.js";
-import { notFound } from "./middleware/notFound.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import {
+  aiRoutes,
+  authRoutes,
+  commentRoutes,
+  exportRoutes,
+  notificationPreferenceRoutes,
+  notificationRoutes,
+  organizationRoutes,
+  projectRoutes,
+  projectWatchRoutes,
+  siteRoutes,
+  validationRoutes,
+  vlanRoutes,
+} from "./routes/index.js";
+import { errorHandler, notFound } from "./middleware/index.js";
 
 const app = express();
 const allowedOrigins = new Set(env.corsOrigins.map((origin) => origin.replace(/\/$/, "")));

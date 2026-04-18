@@ -63,14 +63,17 @@ export function buildDiagramGovernancePack(design: SynthesizedLogicalDesign): Di
     note: flow.natBehavior,
   }));
 
-  const publicationContracts = design.servicePlacements.filter((svc) => svc.publishedExternally || svc.placementType === 'dmz' || svc.placementType === 'cloud').slice(0,6).map((svc) => ({
-    service: svc.serviceName,
-    ingressAnchor: svc.ingressInterface || svc.attachedDevice || 'Published ingress not explicit yet',
-    enforcementBoundary: design.securityBoundaries.find((b) => b.siteName === svc.siteName && b.zoneName === svc.zoneName)?.controlPoint || svc.zoneName,
-    deliveryAnchor: svc.attachedDevice || svc.siteName,
-    consumerModel: svc.consumers.join(', ') || 'External / shared consumers',
-    note: svc.notes[0] || 'Review service exposure path and control boundary.',
-  }));
+  const publicationContracts = design.servicePlacements
+    .filter((servicePlacement) => servicePlacement.publishedExternally || servicePlacement.placementType === 'dmz' || servicePlacement.placementType === 'cloud')
+    .slice(0, 6)
+    .map((servicePlacement) => ({
+      service: servicePlacement.serviceName,
+      ingressAnchor: servicePlacement.ingressInterface || servicePlacement.attachedDevice || 'Published ingress not explicit yet',
+      enforcementBoundary: design.securityBoundaries.find((boundary) => boundary.siteName === servicePlacement.siteName && boundary.zoneName === servicePlacement.zoneName)?.controlPoint || servicePlacement.zoneName,
+      deliveryAnchor: servicePlacement.attachedDevice || servicePlacement.siteName,
+      consumerModel: servicePlacement.consumers.join(', ') || 'External / shared consumers',
+      note: servicePlacement.notes[0] || 'Review service exposure path and control boundary.',
+    }));
 
   const milestones = [
     { title: 'Placement and anchor confidence', objective: 'Confirm every site has believable edge, switching, and service anchors.', checks: ['Edge / WAN anchor visible', 'Switching layer visible', 'Primary service anchor visible'], evidence: ['Site placements', 'Addressing rows'] },

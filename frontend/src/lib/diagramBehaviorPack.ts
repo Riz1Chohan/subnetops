@@ -152,7 +152,7 @@ export function buildDiagramBehaviorPack(design: SynthesizedLogicalDesign): Diag
     }
     const weakSignals: string[] = [];
     if (!flows.length) weakSignals.push("No cross-site or local critical flow evidence yet");
-    if (!design.servicePlacements.some((svc) => svc.siteName === site.name)) weakSignals.push("No service anchor recorded for this site");
+    if (!design.servicePlacements.some((servicePlacement) => servicePlacement.siteName === site.name)) weakSignals.push("No service anchor recorded for this site");
     return {
       siteId: site.id,
       siteName: site.name,

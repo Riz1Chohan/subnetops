@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import {
-  ProjectDiagram,
-  type DiagramMode,
-  type DiagramScope,
-  type OverlayMode,
-  type ActiveOverlayMode,
-  type DiagramLabelMode,
-  type LinkAnnotationMode,
-  type DeviceFocus,
-  type LinkFocus,
-} from "../features/diagram/components/ProjectDiagram";
+  annotationItems,
+  deriveDeviceFocus,
+  deriveLabelFocus,
+  deriveLinkFocus,
+  layerItems,
+  scopeItems,
+} from "../features/diagram/diagramWorkspace";
+import type {
+  ActiveOverlayMode,
+  DiagramLabelMode,
+  DiagramMode,
+  DiagramScope,
+  LinkAnnotationMode,
+  LinkFocus,
+  OverlayMode,
+} from "../features/diagram/diagramTypes";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useProjectComments } from "../features/comments/hooks";
 import { LoadingState } from "../components/app/LoadingState";
@@ -19,42 +26,6 @@ import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { useValidationResults } from "../features/validation/hooks";
-
-const scopeItems: Array<{ key: DiagramScope; label: string }> = [
-  { key: "global", label: "Global" },
-  { key: "site", label: "Per-site" },
-  { key: "wan-cloud", label: "WAN / Cloud" },
-  { key: "boundaries", label: "Security / Boundaries" },
-];
-
-const layerItems: Array<{ key: ActiveOverlayMode; label: string }> = [
-  { key: "addressing", label: "IP addresses" },
-  { key: "services", label: "Services" },
-];
-
-const annotationItems = [
-  { key: "labels", label: "Device labels" },
-  { key: "links", label: "Ports / link notes" },
-] as const;
-
-function deriveDeviceFocus(scope: DiagramScope, overlays: ActiveOverlayMode[]): DeviceFocus {
-  if (scope === "wan-cloud" || scope === "boundaries") return "edge";
-  if (overlays.includes("services")) return "services";
-  return "all";
-}
-
-function deriveLinkFocus(scope: DiagramScope): LinkFocus {
-  if (scope === "wan-cloud") return "transport";
-  if (scope === "boundaries") return "security";
-  return "all";
-}
-
-function deriveLabelFocus(scope: DiagramScope, overlays: ActiveOverlayMode[]): "all" | "topology" | "addressing" | "zones" | "transport" | "flows" {
-  if (overlays.includes("addressing")) return "addressing";
-  if (scope === "boundaries") return "zones";
-  if (scope === "wan-cloud") return "transport";
-  return "topology";
-}
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();

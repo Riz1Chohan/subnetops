@@ -225,11 +225,11 @@ function WizardFooter({
 }) {
   return (
     <div className="planner-footer-actions">
-      <button type="button" className="link-button" onClick={onBack} disabled={currentStep === 0}>
-        ← Back
+      <button type="button" className="link-button button-flow-back" onClick={onBack} disabled={currentStep === 0}>
+        Back
       </button>
-      <button type="button" onClick={onNext} disabled={!canProceed}>
-        {currentStep === wizardSteps.length - 1 ? "Stay on review" : "Next →"}
+      <button type="button" className="button-primary button-flow-next" onClick={onNext} disabled={!canProceed}>
+        {currentStep === wizardSteps.length - 1 ? "Stay on review" : "Next"}
       </button>
     </div>
   );

@@ -17,8 +17,8 @@ export function isValidIpv4(value: string): boolean {
 
   return parts.every((part) => {
     if (!/^\d+$/.test(part)) return false;
-    const n = Number(part);
-    return n >= 0 && n <= 255;
+    const octetNumber = Number(part);
+    return octetNumber >= 0 && octetNumber <= 255;
   });
 }
 
@@ -41,8 +41,8 @@ export function isValidCidr(value: string): boolean {
   if (!ip || prefix === undefined) return false;
   if (!isValidIpv4(ip)) return false;
   if (!/^\d+$/.test(prefix)) return false;
-  const n = Number(prefix);
-  return n >= 0 && n <= 32;
+  const prefixNumber = Number(prefix);
+  return prefixNumber >= 0 && prefixNumber <= 32;
 }
 
 export function classifySegmentRole(input?: string): SegmentRole {

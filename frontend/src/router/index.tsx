@@ -1,40 +1,39 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { AuthLayout } from "../layouts/AuthLayout";
-import { DashboardLayout } from "../layouts/DashboardLayout";
-import { ProjectLayout } from "../layouts/ProjectLayout";
-import { PublicLayout } from "../layouts/PublicLayout";
-import { LandingPage } from "../pages/LandingPage";
-import { LoginPage } from "../pages/LoginPage";
-import { RegisterPage } from "../pages/RegisterPage";
-import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
-import { ResetPasswordPage } from "../pages/ResetPasswordPage";
-import { DashboardPage } from "../pages/DashboardPage";
-import { NewProjectPage } from "../pages/NewProjectPage";
-import { ProjectOverviewPage } from "../pages/ProjectOverviewPage";
-import { ProjectRequirementsPage } from "../pages/ProjectRequirementsPage";
-import { ProjectDiscoveryPage } from "../pages/ProjectDiscoveryPage";
-import { ProtectedRoute } from "../components/app/ProtectedRoute";
-import { ProjectReportPage } from "../pages/ProjectReportPage";
-import { ProjectSettingsPage } from "../pages/ProjectSettingsPage";
-import { MyTasksPage } from "../pages/MyTasksPage";
-import { ProjectSitesPage } from "../pages/ProjectSitesPage";
-import { ProjectVlansPage } from "../pages/ProjectVlansPage";
-import { ProjectValidationPage } from "../pages/ProjectValidationPage";
-import { ProjectDiagramPage } from "../pages/ProjectDiagramPage";
-import { ProjectTasksPage } from "../pages/ProjectTasksPage";
-import { ProjectAddressingPage } from "../pages/ProjectAddressingPage";
-import { ProjectCoreModelPage } from "../pages/ProjectCoreModelPage";
-import { ProjectSecurityPage } from "../pages/ProjectSecurityPage";
-import { ProjectRoutingPage } from "../pages/ProjectRoutingPage";
-import { ProjectImplementationPage } from "../pages/ProjectImplementationPage";
-import { ProjectStandardsPage } from "../pages/ProjectStandardsPage";
-import { ProjectPlatformBomPage } from "../pages/ProjectPlatformBomPage";
-import { RouteErrorPage } from "../pages/RouteErrorPage";
-import { AboutPage } from "../pages/AboutPage";
-import { AIWorkspacePage } from "../pages/AIWorkspacePage";
-import { HelpPage } from "../pages/HelpPage";
-import { FaqPage } from "../pages/FaqPage";
-import { AccountSecurityPage } from "../pages/AccountSecurityPage";
+import { ProtectedRoute } from "../components/app";
+import { AuthLayout, DashboardLayout, ProjectLayout, PublicLayout } from "../layouts";
+import {
+  AIWorkspacePage,
+  AboutPage,
+  AccountSecurityPage,
+  DashboardPage,
+  FaqPage,
+  ForgotPasswordPage,
+  HelpPage,
+  LandingPage,
+  LoginPage,
+  MyTasksPage,
+  NewProjectPage,
+  ProjectAddressingPage,
+  ProjectCoreModelPage,
+  ProjectDiagramPage,
+  ProjectDiscoveryPage,
+  ProjectImplementationPage,
+  ProjectOverviewPage,
+  ProjectPlatformBomPage,
+  ProjectReportPage,
+  ProjectRequirementsPage,
+  ProjectRoutingPage,
+  ProjectSecurityPage,
+  ProjectSettingsPage,
+  ProjectSitesPage,
+  ProjectStandardsPage,
+  ProjectTasksPage,
+  ProjectValidationPage,
+  ProjectVlansPage,
+  RegisterPage,
+  ResetPasswordPage,
+  RouteErrorPage,
+} from "../pages";
 
 export const router = createBrowserRouter([
   {

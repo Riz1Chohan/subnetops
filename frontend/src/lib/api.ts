@@ -1,4 +1,4 @@
-const envApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
 function cleanBase(value: string) {
   return value.replace(/\/$/, "");
@@ -25,7 +25,7 @@ function inferHostedApiBase() {
 }
 
 function defaultApiBase() {
-  if (envApiBase) return cleanBase(envApiBase);
+  if (configuredApiBaseUrl) return cleanBase(configuredApiBaseUrl);
   const inferredHostedBase = inferHostedApiBase();
   if (inferredHostedBase) return cleanBase(inferredHostedBase);
   return "/api";

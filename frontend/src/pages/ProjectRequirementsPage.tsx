@@ -1453,7 +1453,7 @@ export function ProjectRequirementsPage() {
               {updateMutation.isPending ? "Saving..." : "Save"}
             </button>
             {nextStep ? (
-              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary">Next: {nextStep.title}</Link>
+              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary button-flow-next">Next: {nextStep.title}</Link>
             ) : (
               <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
             )}
@@ -1665,7 +1665,7 @@ export function ProjectRequirementsPage() {
           <div className="panel planner-footer-actions planner-footer-actions-v109">
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {previousStep ? (
-                <button type="button" className="button-nav" onClick={() => setCurrentStepKey(previousStep.key)}>Back: {previousStep.title}</button>
+                <button type="button" className="button-nav button-flow-back" onClick={() => setCurrentStepKey(previousStep.key)}>Back: {previousStep.title}</button>
               ) : (
                 <span className="muted">You are at the first visible step.</span>
               )}
@@ -1675,7 +1675,7 @@ export function ProjectRequirementsPage() {
                 {updateMutation.isPending ? "Saving..." : "Save"}
               </button>
               {nextStep ? (
-                <button type="button" className="button-primary" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
+                <button type="button" className="button-primary button-flow-next" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
               ) : (
                 <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
               )}

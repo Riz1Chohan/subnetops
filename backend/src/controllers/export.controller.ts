@@ -157,14 +157,14 @@ function drawControlRow(
   value: string,
 ) {
   ensurePage(state);
-  const x = 54;
+  const leftMargin = 54;
   const labelWidth = 150;
   const valueWidth = state.width - 108 - labelWidth;
   const rowHeight = 22;
-  state.page.drawRectangle({ x, y: state.y - 4, width: labelWidth, height: rowHeight, color: rgb(0.93, 0.95, 0.98) });
-  state.page.drawRectangle({ x: x + labelWidth, y: state.y - 4, width: valueWidth, height: rowHeight, color: rgb(0.985, 0.988, 0.995), borderColor: rgb(0.83, 0.86, 0.91), borderWidth: 0.5 });
-  state.page.drawText(sanitizePdfText(label), { x: x + 8, y: state.y + 3, size: 10, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-  state.page.drawText(sanitizePdfText(value), { x: x + labelWidth + 8, y: state.y + 3, size: 10, font, color: rgb(0.2, 0.25, 0.32), maxWidth: valueWidth - 16 });
+  state.page.drawRectangle({ x: leftMargin, y: state.y - 4, width: labelWidth, height: rowHeight, color: rgb(0.93, 0.95, 0.98) });
+  state.page.drawRectangle({ x: leftMargin + labelWidth, y: state.y - 4, width: valueWidth, height: rowHeight, color: rgb(0.985, 0.988, 0.995), borderColor: rgb(0.83, 0.86, 0.91), borderWidth: 0.5 });
+  state.page.drawText(sanitizePdfText(label), { x: leftMargin + 8, y: state.y + 3, size: 10, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
+  state.page.drawText(sanitizePdfText(value), { x: leftMargin + labelWidth + 8, y: state.y + 3, size: 10, font, color: rgb(0.2, 0.25, 0.32), maxWidth: valueWidth - 16 });
   state.y -= rowHeight + 2;
 }
 
@@ -174,7 +174,7 @@ function drawMetricCards(
   boldFont: PDFFont,
   metrics: Array<[string, string]>,
 ) {
-  const x = 54;
+  const leftMargin = 54;
   const gap = 10;
   const columns = 2;
   const cardWidth = (state.width - 108 - gap) / columns;
@@ -183,7 +183,7 @@ function drawMetricCards(
     ensurePage(state);
     const row = metrics.slice(i, i + columns);
     row.forEach(([label, value], idx) => {
-      const cardX = x + idx * (cardWidth + gap);
+      const cardX = leftMargin + idx * (cardWidth + gap);
       state.page.drawRectangle({ x: cardX, y: state.y - cardHeight + 6, width: cardWidth, height: cardHeight, color: rgb(0.97, 0.98, 0.995), borderColor: rgb(0.83, 0.86, 0.91), borderWidth: 0.8 });
       state.page.drawText(sanitizePdfText(label), { x: cardX + 10, y: state.y - 10, size: 9.5, font: boldFont, color: rgb(0.12, 0.31, 0.77) });
       state.page.drawText(sanitizePdfText(value), { x: cardX + 10, y: state.y - 30, size: 12, font, color: rgb(0.12, 0.16, 0.24), maxWidth: cardWidth - 20 });

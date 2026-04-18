@@ -85,19 +85,19 @@ export function buildDiagramProofPack(synthesized: SynthesizedLogicalDesign): Di
     const placements = synthesized.sitePlacements.filter((item) => item.siteId === site.id);
     const boundaries = synthesized.securityBoundaries.filter((item) => item.siteName === site.name);
     const flows = synthesized.trafficFlows.filter((flow) => flow.sourceSite === site.name || flow.destinationSite === site.name);
-    const deps = new Set<string>();
+    const dependencyAnchors = new Set<string>();
     placements.forEach((item) => {
-      if (item.uplinkTarget) deps.add(item.uplinkTarget);
+      if (item.uplinkTarget) dependencyAnchors.add(item.uplinkTarget);
     });
     synthesized.servicePlacements
-      .filter((svc) => svc.siteName === site.name)
-      .forEach((svc) => svc.dependsOn.forEach((dependency) => deps.add(dependency)));
+      .filter((servicePlacement) => servicePlacement.siteName === site.name)
+      .forEach((servicePlacement) => servicePlacement.dependsOn.forEach((dependency) => dependencyAnchors.add(dependency)));
 
     return {
       id: site.id,
       siteName: site.name,
       siteRole: site.source === "configured" ? "Configured site" : "Planned site",
-      dependencies: Array.from(deps).slice(0, 6),
+      dependencies: Array.from(dependencyAnchors).slice(0, 6),
       evidence: [
         `${placements.length} placement objects`,
         `${boundaries.length} boundary objects`,
