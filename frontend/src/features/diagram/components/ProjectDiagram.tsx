@@ -1062,11 +1062,37 @@ function LogicalTopologyDiagram({
   bareCanvas?: boolean;
 }) {
   const sites = sitesForDiagramScope((project.sites ?? []) as SiteWithVlans[], synthesized, scope, focusedSiteId);
-  const cardWidth = bareCanvas ? 300 : 320;
-  const cardHeight = bareCanvas ? 248 : 276;
+  const cardWidth = bareCanvas ? 280 : 304;
+  const cardHeight = bareCanvas ? 222 : 250;
   const startX = 64;
   const gap = 36;
-  const sitePositions = sitePositionMap(sites, synthesized, cardWidth, startX, gap);
+  const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
+  const primarySiteId = synthesized.topology.primarySiteId || primarySite?.id;
+  const baseSitePositions = sitePositionMap(sites, synthesized, cardWidth, startX, gap);
+  const logicalHubSpokePositions = useMemo(() => {
+    if (!(synthesized.topology.topologyType === "hub-spoke" && primarySiteId && scope === "global" && sites.length > 1)) {
+      return baseSitePositions;
+    }
+    const primary = sites.find((site) => site.id === primarySiteId) || sites[0];
+    if (!primary) return baseSitePositions;
+    const branches = sites.filter((site) => site.id !== primary.id);
+    if (!branches.length) return baseSitePositions;
+    const positions: Record<string, SitePoint> = {};
+    const centerX = 800;
+    positions[primary.id] = { x: centerX - cardWidth / 2, y: 188 };
+    if (branches.length <= 4) {
+      const branchGap = 38;
+      const branchY = 500;
+      const totalWidth = branches.length * cardWidth + Math.max(0, branches.length - 1) * branchGap;
+      const rowStartX = centerX - totalWidth / 2;
+      branches.forEach((site, index) => {
+        positions[site.id] = { x: rowStartX + index * (cardWidth + branchGap), y: branchY };
+      });
+      return positions;
+    }
+    return baseSitePositions;
+  }, [baseSitePositions, cardWidth, primarySiteId, scope, sites, synthesized.topology.topologyType]);
+  const sitePositions = logicalHubSpokePositions;
   const emphasizeDevice = (kind: DeviceKind) => deviceFocusMatchesKind(deviceFocus, kind);
   const occupiedXs = Object.values(sitePositions).map((point) => point.x);
   const occupiedYs = Object.values(sitePositions).map((point) => point.y);
@@ -1082,8 +1108,6 @@ function LogicalTopologyDiagram({
   const showRedundancy = false;
   const quietCanvas = bareCanvas && linkAnnotationMode !== "full";
   const renderPath = (points: Array<[number, number]>, type: "internet" | "routed" | "trunk" | "vpn" | "ha" | "flow", label?: string, secondaryLabel?: string) => pathLine(points, type, quietCanvas ? undefined : label, quietCanvas ? undefined : secondaryLabel, linkAnnotationMode, linkFocusMatchesType(linkFocus, type), labelFocus);
-  const primarySite = sites.find((site) => site.name === synthesized.topology.primarySiteName) || sites[0];
-  const primarySiteId = synthesized.topology.primarySiteId || primarySite?.id;
   const primarySitePoint = primarySite ? sitePositions[primarySite.id] : undefined;
   const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
   const globalInternetX = primarySitePoint ? primarySitePoint.x + cardWidth / 2 - 61 : Math.max(80, (width / 2) - 61);
@@ -1165,33 +1189,21 @@ function LogicalTopologyDiagram({
                 const primaryPoint = sitePositions[primarySiteId];
                 const branchEntries = sites.filter((site) => site.id !== primarySiteId).map((site) => ({ site, point: sitePositions[site.id] }));
                 const routeType = bareCanvas && scope !== "wan-cloud" ? "routed" : "vpn";
-                const busY = (primaryPoint?.y ?? 0) + cardHeight + 48;
-                const columnXs = Array.from(new Set(branchEntries.map((entry) => entry.point.x + cardWidth / 2))).sort((a, b) => a - b);
-                const busLeft = Math.min(...columnXs, primaryPoint.x + cardWidth / 2);
-                const busRight = Math.max(...columnXs, primaryPoint.x + cardWidth / 2);
+                const busY = (primaryPoint?.y ?? 0) + cardHeight + 52;
+                const branchCenters = branchEntries.map((entry) => entry.point.x + cardWidth / 2).sort((a, b) => a - b);
+                const busLeft = Math.min(...branchCenters, primaryPoint.x + cardWidth / 2);
+                const busRight = Math.max(...branchCenters, primaryPoint.x + cardWidth / 2);
                 return (
                   <g>
                     {renderPath([[primaryPoint.x + cardWidth / 2, primaryPoint.y + cardHeight], [primaryPoint.x + cardWidth / 2, busY]], routeType, undefined, undefined)}
                     {renderPath([[busLeft, busY], [busRight, busY]], routeType, undefined, undefined)}
-                    {columnXs.map((columnX) => {
-                      const columnEntries = branchEntries.filter((entry) => entry.point.x + cardWidth / 2 === columnX);
-                      const lastEntry = columnEntries[columnEntries.length - 1];
+                    {branchEntries.map((entry) => {
+                      const columnX = entry.point.x + cardWidth / 2;
+                      const entryY = entry.point.y;
+                      const wanLink = synthesized.wanLinks.find((link) => link.endpointASiteId === entry.site.id || link.endpointBSiteId === entry.site.id);
                       return (
-                        <g key={`logical-column-${columnX}`}>
-                          {renderPath([[columnX, busY], [columnX, lastEntry.point.y]], routeType, undefined, undefined)}
-                          {columnEntries.map((entry) => {
-                            const wanLink = synthesized.wanLinks.find((link) => link.endpointASiteId === entry.site.id || link.endpointBSiteId === entry.site.id);
-                            return (
-                              <g key={`inter-${entry.site.id}`}>
-                                {renderPath(
-                                  [[columnX, entry.point.y], [columnX, entry.point.y + 18]],
-                                  routeType,
-                                  "WAN / hub-spoke",
-                                  wanLink?.subnetCidr || "Point-to-point transit",
-                                )}
-                              </g>
-                            );
-                          })}
+                        <g key={`logical-drop-${entry.site.id}`}>
+                          {renderPath([[columnX, busY], [columnX, entryY - 16], [columnX, entryY]], routeType, "WAN / hub-spoke", wanLink?.subnetCidr || "Point-to-point transit")}
                         </g>
                       );
                     })}
@@ -1263,7 +1275,7 @@ function PhysicalTopologyDiagram({
   const branchSites = sites.filter((site) => site.id !== primarySite?.id);
   const cloudNeeded = synthesized.topology.cloudConnected || synthesized.servicePlacements.some((service) => service.placementType === "cloud");
   const branchRows = Math.max(1, Math.ceil(Math.max(branchSites.length, 1) / 2));
-  const branchCardWidth = bareCanvas ? 356 : 320;
+  const branchCardWidth = bareCanvas ? 382 : 334;
   const siteCardHeight = bareCanvas ? 316 : 340;
   const siteRowGap = bareCanvas ? 334 : 246;
   const siteRowStartY = bareCanvas ? 430 : 392;
@@ -1278,7 +1290,7 @@ function PhysicalTopologyDiagram({
   const flowOverlays = showFlows ? flowsForDiagramScope(synthesized.trafficFlows, scope, sites[0]?.name).slice(0, 4) : [];
   const width = Math.max(bareCanvas ? 1640 : 1480, (bareCanvas ? 1260 : 1180) + branchSites.length * 120 + (cloudNeeded ? 150 : 0));
   const centerX = width / 2;
-  const primaryCardWidth = bareCanvas ? 620 : 540;
+  const primaryCardWidth = bareCanvas ? 680 : 570;
   const primaryCardHeight = bareCanvas ? 420 : 360;
   const primaryCardX = centerX - primaryCardWidth / 2;
   const primaryCardY = bareCanvas ? 332 : 344;
@@ -1306,7 +1318,7 @@ function PhysicalTopologyDiagram({
     const row = Math.floor(index / 2);
     const x = left ? 76 : width - 76 - branchCardWidth;
     const y = siteRowStartY + row * siteRowGap;
-    return { site, index, row, left, x, y, anchorX: left ? x + branchCardWidth : x, anchorY: y + siteCardHeight / 2 - 8 };
+    return { site, index, row, left, x, y, anchorX: left ? x + branchCardWidth : x, anchorY: y + siteCardHeight / 2 - 8, topX: x + branchCardWidth / 2, topY: y };
   });
   const legendDockY = height - 168;
   const siteIndexItems = (primarySite ? [primarySite, ...branchSites] : branchSites).slice(0, 4);
@@ -1318,9 +1330,9 @@ function PhysicalTopologyDiagram({
   const branchRouteType = bareCanvas && scope !== "wan-cloud" ? "routed" : (synthesized.topology.topologyType === "hub-spoke" ? "vpn" : "routed");
   const leftBranchAnchors = branchAnchorBlueprint.filter((entry) => entry.left);
   const rightBranchAnchors = branchAnchorBlueprint.filter((entry) => !entry.left);
-  const lowerBusY = primarySiteBottom + (bareCanvas ? 56 : 46);
-  const leftSpineX = primaryCardX - (bareCanvas ? 52 : 44);
-  const rightSpineX = primaryCardX + primaryCardWidth + (bareCanvas ? 52 : 44);
+  const branchMidY = primaryCardY + (bareCanvas ? 176 : 166);
+  const leftSpineX = primaryCardX - (bareCanvas ? 58 : 48);
+  const rightSpineX = primaryCardX + primaryCardWidth + (bareCanvas ? 58 : 48);
   const transportCapsuleWidth = 172;
   const transportCapsuleGap = 12;
   const transportCapsuleCount = Math.max(1, Math.min(transportCapsuleSites.length, 6));
@@ -1328,11 +1340,11 @@ function PhysicalTopologyDiagram({
   const transportCapsuleTotalWidth = transportCapsuleVisibleSites.length * transportCapsuleWidth + Math.max(0, transportCapsuleVisibleSites.length - 1) * transportCapsuleGap;
   const transportCapsuleStartX = centerX - transportCapsuleTotalWidth / 2;
   const layoutShiftY = bareCanvas ? -124 : 0;
-  const primaryRouterPos = bareCanvas ? { x: primaryCardX + 74, y: primaryCardY + 132 } : { x: centerX - 216, y: 448 };
-  const primarySwitchPos = bareCanvas ? { x: primaryCardX + 276, y: primaryCardY + 132 } : { x: centerX - 66, y: 452 };
-  const primaryServerPos = bareCanvas ? { x: primaryCardX + 464, y: primaryCardY + 126 } : { x: centerX + 96, y: 448 };
-  const primaryAccessPos = bareCanvas ? { x: primaryCardX + 204, y: primaryCardY + 254 } : { x: centerX - 20, y: 564 };
-  const primaryWirelessPos = bareCanvas ? { x: primaryCardX + 500, y: primaryCardY + 248 } : { x: centerX + 178, y: 564 };
+  const primaryRouterPos = bareCanvas ? { x: primaryCardX + 104, y: primaryCardY + 138 } : { x: centerX - 216, y: 448 };
+  const primarySwitchPos = bareCanvas ? { x: primaryCardX + 328, y: primaryCardY + 138 } : { x: centerX - 66, y: 452 };
+  const primaryServerPos = bareCanvas ? { x: primaryCardX + 542, y: primaryCardY + 132 } : { x: centerX + 96, y: 448 };
+  const primaryAccessPos = bareCanvas ? { x: primaryCardX + 256, y: primaryCardY + 278 } : { x: centerX - 20, y: 564 };
+  const primaryWirelessPos = bareCanvas ? { x: primaryCardX + 560, y: primaryCardY + 272 } : { x: centerX + 178, y: 564 };
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -1478,11 +1490,10 @@ function PhysicalTopologyDiagram({
 
         {branchSites.length ? (
           <g>
-            {renderPath([[centerX, primarySiteBottom], [centerX, lowerBusY]], branchRouteType, undefined, undefined)}
-            {leftBranchAnchors.length ? renderPath([[centerX, lowerBusY], [leftSpineX, lowerBusY]], branchRouteType, undefined, undefined) : null}
-            {rightBranchAnchors.length ? renderPath([[centerX, lowerBusY], [rightSpineX, lowerBusY]], branchRouteType, undefined, undefined) : null}
-            {leftBranchAnchors.length ? renderPath([[leftSpineX, lowerBusY], [leftSpineX, Math.max(...leftBranchAnchors.map((entry) => entry.anchorY))]], branchRouteType, undefined, undefined) : null}
-            {rightBranchAnchors.length ? renderPath([[rightSpineX, lowerBusY], [rightSpineX, Math.max(...rightBranchAnchors.map((entry) => entry.anchorY))]], branchRouteType, undefined, undefined) : null}
+            {leftBranchAnchors.length ? renderPath(orthogonalHV([primaryCardX, branchMidY], [leftSpineX, Math.min(...leftBranchAnchors.map((entry) => entry.anchorY))], primaryCardX - 30), branchRouteType, undefined, undefined) : null}
+            {rightBranchAnchors.length ? renderPath(orthogonalHV([primaryCardX + primaryCardWidth, branchMidY], [rightSpineX, Math.min(...rightBranchAnchors.map((entry) => entry.anchorY))], primaryCardX + primaryCardWidth + 30), branchRouteType, undefined, undefined) : null}
+            {leftBranchAnchors.length ? renderPath([[leftSpineX, Math.min(...leftBranchAnchors.map((entry) => entry.anchorY))], [leftSpineX, Math.max(...leftBranchAnchors.map((entry) => entry.anchorY))]], branchRouteType, undefined, undefined) : null}
+            {rightBranchAnchors.length ? renderPath([[rightSpineX, Math.min(...rightBranchAnchors.map((entry) => entry.anchorY))], [rightSpineX, Math.max(...rightBranchAnchors.map((entry) => entry.anchorY))]], branchRouteType, undefined, undefined) : null}
             {branchAnchorBlueprint.map((entry) => {
               const wanLink = synthesized.wanLinks.find((link) => link.endpointASiteId === entry.site.id || link.endpointBSiteId === entry.site.id);
               const trunkX = entry.left ? leftSpineX : rightSpineX;
