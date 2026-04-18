@@ -8,7 +8,20 @@ export * from "./email.service.js";
 export * from "./export.service.js";
 export * from "./notification.service.js";
 export * from "./notificationPreference.service.js";
-export * from "./organization.service.js";
+export {
+  listOrganizations,
+  createOrganization,
+  listMembers,
+  listInvitations,
+  createInvitation,
+  listMyInvitations,
+  acceptInvitation,
+  updateMemberRole,
+  removeMember,
+  revokeInvitation,
+  transferOwnership,
+  listEmailOutbox as listOrganizationEmailOutbox,
+} from "./organization.service.js";
 export * from "./project.service.js";
 export * from "./projectWatch.service.js";
 export * from "./site.service.js";
