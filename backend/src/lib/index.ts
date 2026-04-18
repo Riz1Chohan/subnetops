@@ -1,2 +1,2 @@
-export * from "./cidr";
-export * from "./domainTypes";
+export * from "./cidr.js";
+export * from "./domainTypes.js";
