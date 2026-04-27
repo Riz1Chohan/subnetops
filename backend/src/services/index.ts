@@ -4,6 +4,7 @@ export * from "./auth.service.js";
 export * from "./automation.service.js";
 export * from "./changeLog.service.js";
 export * from "./comment.service.js";
+export * from "./designCore.service.js";
 export * from "./email.service.js";
 export * from "./export.service.js";
 export * from "./notification.service.js";

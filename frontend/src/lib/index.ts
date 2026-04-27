@@ -1,3 +1,4 @@
+export * from "./cidrCore";
 export * from "./api";
 export * from "./designAuthorityLedger";
 export * from "./designReadiness";

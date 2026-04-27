@@ -8,6 +8,7 @@ import {
   aiRoutes,
   authRoutes,
   commentRoutes,
+  designCoreRoutes,
   exportRoutes,
   notificationPreferenceRoutes,
   notificationRoutes,
@@ -18,9 +19,10 @@ import {
   validationRoutes,
   vlanRoutes,
 } from "./routes/index.js";
-import { errorHandler, notFound } from "./middleware/index.js";
+import { csrfProtection, errorHandler, notFound } from "./middleware/index.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const allowedOrigins = new Set(env.corsOrigins.map((origin) => origin.replace(/\/$/, "")));
 
 app.use(helmet());
@@ -35,6 +37,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
+app.use(csrfProtection);
 
 app.get("/api/health", async (_req, res) => {
   try {
@@ -66,6 +69,7 @@ app.use("/api/validation", validationRoutes);
 app.use("/api/export", exportRoutes);
 app.use("/api/organizations", organizationRoutes);
 app.use("/api/comments", commentRoutes);
+app.use("/api/design-core", designCoreRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/notification-preferences", notificationPreferenceRoutes);
 app.use("/api/project-watchers", projectWatchRoutes);

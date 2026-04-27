@@ -11,6 +11,16 @@ import {
   type SiteWithVlans,
 } from "../diagramWorkspaceHelpers";
 
+export {
+  diagramScopeMeta,
+  flowsForDiagramScope,
+  siteIdsWithBoundaries,
+  siteIdsWithCloudOrInternetEdges,
+  siteIdsWithWanLinks,
+  sitesForDiagramScope,
+} from "../diagramWorkspaceHelpers";
+export type { SiteWithVlans } from "../diagramWorkspaceHelpers";
+
 export type SitePoint = { x: number; y: number };
 
 export type DeviceKind = SitePlacementDevice["deviceType"] | "internet" | "cloud";

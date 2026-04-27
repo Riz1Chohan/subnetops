@@ -863,7 +863,7 @@ export function buildUnifiedDesignTruthModel(input: BuildUnifiedDesignTruthModel
       status: siteNodes.every((site) => site.authorityStatus === "ready") ? "ready" : siteNodes.some((site) => site.authorityStatus !== "pending") ? "partial" : "pending",
       detail: siteNodes.every((site) => site.authorityStatus === "ready")
         ? `Every site currently resolves with explicit route, boundary, placement, and flow support strong enough for the shared model.`
-        : `${siteNodes.filter((site) => site.authorityStatus !== "ready").length} site authority row${siteNodes.filter((site) => site.authorityStatus !== "ready").length === 1 ? " still needs" : "s still need"} deeper cleanup before the model can be treated as fully authoritative.`,
+        : `${siteNodes.filter((site) => site.authorityStatus !== "ready").length} site authority row${siteNodes.filter((site) => site.authorityStatus !== "ready").length === 1 ? " still needs" : "s still need"} deeper cleanup before the model can be treated as review-ready.`,
     },
   ];
 

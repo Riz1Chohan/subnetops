@@ -11,11 +11,18 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "setup": "npm install --ignore-scripts && npm run prisma:update",
+    "setup": "npm install --ignore-scripts && npm run prisma:generate && npm run prisma:migrate:deploy",
     "prisma:push": "prisma db push",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:update": "npm run prisma:generate && npm run prisma:push",
-    "prisma:update:dev": "npm run prisma:update && npm run prisma:seed"
+    "prisma:update": "npm run prisma:generate && npm run prisma:migrate:deploy",
+    "prisma:update:dev": "npm run prisma:generate && npm run prisma:push && npm run prisma:seed",
+    "engine:selftest": "tsx src/lib/cidr.selftest.ts",
+    "engine:selftest:design-core": "tsx src/lib/designCore.selftest.ts",
+    "engine:selftest:proof": "tsx src/lib/cidrProof.selftest.ts",
+    "engine:selftest:allocator": "tsx src/lib/addressAllocator.selftest.ts",
+    "engine:selftest:matrix": "tsx src/lib/proofMatrix.selftest.ts",
+    "engine:selftest:boundary": "tsx src/lib/cidrBoundary.selftest.ts",
+    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -2,10 +2,38 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const weakJwtSecrets = new Set([
+  "change-this-in-development",
+  "change-this-in-production",
+  "changeme",
+  "change-me",
+  "default",
+  "dev-secret",
+  "jwt-secret",
+  "secret",
+  "password",
+  "subnetops-secret",
+]);
+
 function required(name: string, fallback?: string) {
   const value = process.env[name] || fallback;
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
   return value;
+}
+
+function getJwtSecret() {
+  const value = process.env.JWT_SECRET?.trim();
+
+  if (nodeEnv === "production") {
+    if (!value) throw new Error("Missing required environment variable: JWT_SECRET");
+    if (weakJwtSecrets.has(value) || value.length < 32) {
+      throw new Error("JWT_SECRET must be a non-default value with at least 32 characters in production.");
+    }
+    return value;
+  }
+
+  return value || "change-this-in-development";
 }
 
 function toBool(value: string | undefined, fallback = false) {
@@ -35,14 +63,15 @@ export const env = {
     "http://localhost:3000",
     "https://subnetops-frontend.onrender.com",
   ]),
-  jwtSecret: required("JWT_SECRET", "change-this-in-development"),
-  nodeEnv: process.env.NODE_ENV || "development",
+  jwtSecret: getJwtSecret(),
+  nodeEnv,
   smtpHost: process.env.SMTP_HOST || "",
   smtpPort: toNumber(process.env.SMTP_PORT, 587),
   smtpUser: process.env.SMTP_USER || "",
   smtpPass: process.env.SMTP_PASS || "",
   smtpFrom: process.env.SMTP_FROM || "no-reply@subnetops.local",
   sendRealEmails: toBool(process.env.SEND_REAL_EMAILS, false),
+  frontendAppUrl: (process.env.FRONTEND_APP_URL || "http://localhost:5173").replace(/\/$/, ""),
   automationSweepEnabled: toBool(process.env.AUTOMATION_SWEEP_ENABLED, false),
   automationSweepIntervalMs: toNumber(process.env.AUTOMATION_SWEEP_INTERVAL_MS, 300000),
   dbPushOnBoot: toBool(process.env.DB_PUSH_ON_BOOT, false),

@@ -36,6 +36,19 @@ SubnetOps is a VLAN/IP planning workspace for small IT teams.
 - the project form can now start from a generated requirements summary, not only from raw AI output
 - the AI seed prompt is now driven by a richer requirements brief so the first draft is grounded in more realistic design intent
 
+
+## Phase 8/9 status
+
+- Phase 8 fixed unsigned IPv4 CIDR boundary math and added hostile subnet proof tests.
+- Phase 9 removes the committed `frontend/dist` deployment shortcut and makes Render build from source.
+- Build verification now requires `npm ci` and committed lockfiles.
+- `backend/package-lock.json` must be generated on a machine with npm registry access before deployment.
+
+```bash
+scripts/generate-lockfiles.sh
+./scripts/verify-build.sh
+```
+
 ## What is real in this codebase
 - React + Vite frontend
 - Express + Prisma backend
@@ -67,7 +80,7 @@ docker compose up -d db
 ### 2. Backend
 ```bash
 cd backend
-npm install --ignore-scripts
+npm ci --ignore-scripts
 cp .env.example .env
 ```
 
@@ -95,7 +108,7 @@ This now handles the normal Prisma update flow in one step:
 ### 3. Frontend
 ```bash
 cd frontend
-npm install
+npm ci
 cp .env.local.example .env.local
 npm run dev
 ```
@@ -188,7 +201,7 @@ Before a real production deployment:
 
 ## Deployment-oriented container behavior
 - frontend builds to static assets and serves through nginx
-- backend install uses `npm install --ignore-scripts` so Prisma generation is deferred to startup
+- backend install uses `npm ci --ignore-scripts` so Prisma generation is deferred to startup
 - the provided smoke-test script checks frontend + live + ready endpoints
 
 
@@ -360,3 +373,58 @@ Before a real production deployment:
 - fixed requirements readiness labels in the project shell to use the correct readiness property
 - fixed backend PostgreSQL pool import handling for Node ESM/CommonJS interop on Render
 - fixed the PostgreSQL pool global type annotation to keep the backend TypeScript build clean
+
+## Phase 4 production hardening note
+
+Production startup now prefers Prisma migrations instead of automatic `prisma db push`.
+
+For a new database:
+
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
+For an existing database that was previously created with `prisma db push`, baseline the initial migration once before using migrate deploy:
+
+```bash
+cd backend
+npx prisma migrate resolve --applied 20260425160000_init
+npx prisma migrate deploy
+```
+
+The startup script refuses unsafe `db push` unless `ALLOW_UNSAFE_DB_PUSH=true` is explicitly set. Keep that false for production.
+
+Password reset email delivery requires SMTP settings, `SEND_REAL_EMAILS=true`, and `FRONTEND_APP_URL` pointing to the deployed frontend.
+
+## Phase 6 verification
+
+Use the project verification script before deployment packaging:
+
+```bash
+./scripts/verify-build.sh
+```
+
+This runs a dependency-free relative import check, backend Prisma generation, backend TypeScript build, and frontend TypeScript/Vite build. A backend `package-lock.json` should be generated and committed from a normal local environment before production deployment.
+
+## Phase 7 deployment rehearsal
+
+Before treating a deployment as clean, run the build verifier and the deployment rehearsal script:
+
+```bash
+./scripts/verify-build.sh
+scripts/deployment-rehearsal.sh https://subnetops-frontend.onrender.com https://subnetops-backend.onrender.com
+```
+
+For authenticated export rehearsal:
+
+```bash
+SUBNETOPS_TEST_EMAIL="test@example.com" \
+SUBNETOPS_TEST_PASSWORD="your-password" \
+SUBNETOPS_TEST_PROJECT_ID="project-id" \
+scripts/deployment-rehearsal.sh \
+  https://subnetops-frontend.onrender.com \
+  https://subnetops-backend.onrender.com
+```
+
+Read `docs/PHASE7-DEPLOYMENT-REHEARSAL.md` before deploying to an existing Render database.

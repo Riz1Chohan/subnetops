@@ -1,9 +1,9 @@
-import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../../lib/designSynthesis";
-import type { Site } from "../../../lib/types";
-import type { DeviceFocus, DiagramScope, LabelFocus, LinkFocus } from "../diagramTypes";
+import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../lib/designSynthesis";
+import type { Site, Vlan } from "../../lib/types";
+import type { DeviceFocus, DiagramScope, LabelFocus, LinkFocus } from "./diagramTypes";
 
 export interface SiteWithVlans extends Site {
-  vlans?: Array<{ id: string }>;
+  vlans?: Vlan[];
 }
 
 export function siteIdsWithBoundaries(synthesized: SynthesizedLogicalDesign) {

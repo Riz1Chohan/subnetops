@@ -1,6 +1,7 @@
 export * from "./ai.controller.js";
 export * from "./auth.controller.js";
 export * from "./comment.controller.js";
+export * from "./designCore.controller.js";
 export * from "./export.controller.js";
 export * from "./notification.controller.js";
 export * from "./notificationPreference.controller.js";

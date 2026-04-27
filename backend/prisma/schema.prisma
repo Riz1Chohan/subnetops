@@ -23,6 +23,7 @@ model User {
   notifications Notification[]
   notificationPreference NotificationPreference?
   watches       ProjectWatch[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 enum NotificationType {
@@ -36,6 +37,19 @@ enum NotificationType {
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Notification {

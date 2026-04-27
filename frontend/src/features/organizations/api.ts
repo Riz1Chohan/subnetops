@@ -27,7 +27,7 @@ export interface OrganizationInvitation {
   organizationId: string;
   email: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
-  token: string;
+  token?: string;
   status: "PENDING" | "ACCEPTED" | "REVOKED";
   createdAt: string;
   acceptedAt?: string;

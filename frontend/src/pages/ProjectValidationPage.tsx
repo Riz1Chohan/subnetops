@@ -93,7 +93,7 @@ export function ProjectValidationPage() {
         const matchesEntity = entityFilter === "all" || item.entityType === entityFilter;
         const category = categoryForRule(item.ruleCode);
         const matchesCategory = categoryFilter === "all" || category === categoryFilter;
-        const haystack = `${item.title} ${item.message} ${item.ruleCode} ${item.entityType} ${category}`.toLowerCase();
+        const haystack = `${item.title} ${item.message} ${item.issue ?? ""} ${item.impact ?? ""} ${item.recommendation ?? ""} ${item.ruleCode} ${item.entityType} ${category}`.toLowerCase();
         const matchesSearch = haystack.includes(searchText.toLowerCase());
         return matchesSeverity && matchesEntity && matchesCategory && matchesSearch;
       })
@@ -442,7 +442,7 @@ export function ProjectValidationPage() {
                     items={categoryItems}
                     openTaskBodies={openTaskBodies}
                     onConvertToTask={async (item) => {
-                      const body = `[Validation] ${item.title} — ${item.message}`;
+                      const body = `[Validation] ${item.title} — ${item.issue || item.message}`;
                       if (openTaskBodies.has(body)) {
                         window.alert("A task for this validation finding already exists.");
                         return;
@@ -460,7 +460,7 @@ export function ProjectValidationPage() {
                       explainMutation.reset();
                       explainMutation.mutate({
                         title: item.title,
-                        message: item.message,
+                        message: `${item.issue || item.message}\n\nImpact: ${item.impact || "Review impact with the project context."}\n\nRecommendation: ${item.recommendation || "Review and correct the finding before handoff."}`,
                         severity: item.severity,
                         entityType: item.entityType,
                       }, {

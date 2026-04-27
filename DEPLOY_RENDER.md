@@ -1,82 +1,150 @@
 # Deploy SubnetOps on Render
 
-This repository includes a `render.yaml` Blueprint for a three-part Render deployment:
-- Render Postgres database
-- backend web service
-- frontend static site
+## Services
 
-## 1. Push this repo to GitHub
-Render Blueprints are synced from a Git repository.
+This package expects two Render services and one Render PostgreSQL database:
 
-## 2. Create the Blueprint on Render
-In Render:
-- New > Blueprint
-- select the repository
-- confirm `render.yaml`
+- `subnetops-backend` — Node web service using `backend/`
+- `subnetops-frontend` — static frontend built from `frontend/` source
+- `subnetops-db` — PostgreSQL database
 
-Render Blueprints use a single YAML file to define multiple services and databases. Render documents `render.yaml` as the standard Blueprint file format, with support for both services and Postgres databases. citeturn801191search0turn521230search10
 
-## 3. Fill the prompted environment variables
-When the Blueprint is created, Render will prompt for values marked with `sync: false`.
+## Reproducible build rule
 
-Set these carefully:
-- `CORS_ORIGIN` = your frontend Render URL, for example `https://subnetops-frontend.onrender.com`
-- `VITE_API_BASE_URL` = your backend Render URL with `/api`, for example `https://subnetops-backend.onrender.com/api`
-- SMTP values only if you want real outbound email
+Render must build from source. Do not deploy a committed `frontend/dist` folder. Both services must install with `npm ci`, which means both lockfiles must be committed:
 
-This Blueprint deploys the frontend as a **Render static site**, not the nginx container used in the Docker production example. That means the frontend should call the backend using its public Render URL through `VITE_API_BASE_URL`, rather than relying on same-origin `/api` proxying.
+```text
+backend/package-lock.json
+frontend/package-lock.json
+```
 
-## 4. Backend behavior
-The backend service is configured to:
-- install dependencies
-- run `prisma generate`
-- build TypeScript
-- run `prisma db push` before deploy
-- start the compiled server
+If the backend lockfile is missing, generate lockfiles on a machine with npm registry access:
 
-## 5. Frontend behavior
-The Blueprint frontend build command is intentionally `npm run build` rather than `npm install && npm run build`, because Render already performs dependency installation before the build step. Keeping the build command install-free avoids duplicate network fetches and reduces timeout risk during deployment.
+```bash
+scripts/generate-lockfiles.sh
+./scripts/verify-build.sh
+```
 
-The frontend is deployed as a Render static site. The Blueprint uses `staticPublishPath: ./frontend/dist` so the publish path is expressed relative to the repository root, matching Render's Blueprint behavior for static site publish paths.
-Render documents static sites as a first-class service type, and Blueprint YAML supports static sites via `type: web`, `runtime: static`, `buildCommand`, and `staticPublishPath`. citeturn576735view0turn576735view4
+## Required production posture
 
-## 6. Database wiring
-The backend `DATABASE_URL` is sourced from the managed Render Postgres instance using Blueprint database references. Render documents `fromDatabase` as the supported way to wire a service env var from a Postgres resource. citeturn576735view3
+Production startup should use Prisma migrations, not automatic schema push:
 
-## 7. Important Prisma note
-Prisma documents the rust-free/client engine path using `engineType = "client"` plus a driver adapter. However, Prisma v6 also has a documented issue where `prisma generate` can still try to reach Prisma engine download infrastructure during generation in some environments. citeturn1search2turn1search7
+```text
+PRISMA_SYNC_ON_BOOT=true
+PRISMA_SYNC_STRATEGY=migrate
+ALLOW_UNSAFE_DB_PUSH=false
+DB_PUSH_ON_BOOT=false
+```
 
-If that happens on Render:
-- check the backend build logs
-- retry the deploy
-- if needed, move Prisma generation into a build environment that has normal outbound network access and redeploy
+Do not use `prisma db push` in production unless you are intentionally doing a temporary non-production recovery.
 
-## 8. After deploy
-Verify:
-- frontend loads
-- backend `/api/health/ready` returns OK
-- login works
+## New database deployment path
+
+For a brand-new Render PostgreSQL database, deploy normally. The backend entrypoint will run:
+
+```bash
+npx prisma migrate deploy
+```
+
+Then check:
+
+```bash
+curl -fsS https://subnetops-backend.onrender.com/api/health/ready
+```
+
+## Existing database baseline step
+
+If your current Render database was previously created by `prisma db push`, run this once before switching fully to migrations:
+
+```bash
+cd backend
+npx prisma migrate resolve --applied 20260425160000_init
+```
+
+Then normal deployments can run:
+
+```bash
+npx prisma migrate deploy
+```
+
+For a new empty database, skip the baseline step.
+
+## Production CORS
+
+Production `CORS_ORIGIN` should contain only the deployed frontend origin:
+
+```text
+https://subnetops-frontend.onrender.com
+```
+
+Keep localhost origins in local `.env` files only. Do not put localhost in production Render environment variables.
+
+## Password reset email
+
+To make password reset actually send email, configure:
+
+```text
+SEND_REAL_EMAILS=true
+SMTP_HOST=<your SMTP host>
+SMTP_PORT=587
+SMTP_USER=<your SMTP user>
+SMTP_PASS=<your SMTP password>
+SMTP_FROM=no-reply@your-domain.com
+FRONTEND_APP_URL=https://subnetops-frontend.onrender.com
+```
+
+If SMTP is not configured, reset emails are queued in `EmailOutbox` but not sent.
+
+## CSRF protection
+
+The backend uses cookie auth. CSRF protection is enabled for unsafe requests. The frontend API client automatically calls `/api/auth/csrf` and sends `X-CSRF-Token`.
+
+Expected deployment behavior:
+
+- `GET /api/auth/csrf` returns a token and sets the `subnetops_csrf` cookie.
+- unsafe requests without the CSRF token return `403`.
+- normal frontend requests automatically include the token.
+
+## Deployment rehearsal
+
+Run the build gate locally first, then run the deployment rehearsal after deploying backend and frontend:
+
+```bash
+./scripts/verify-build.sh
+scripts/deployment-rehearsal.sh \
+  https://subnetops-frontend.onrender.com \
+  https://subnetops-backend.onrender.com
+```
+
+For an authenticated export rehearsal, set a test account and project ID:
+
+```bash
+SUBNETOPS_TEST_EMAIL="test@example.com" \
+SUBNETOPS_TEST_PASSWORD="your-password" \
+SUBNETOPS_TEST_PROJECT_ID="project-id" \
+scripts/deployment-rehearsal.sh \
+  https://subnetops-frontend.onrender.com \
+  https://subnetops-backend.onrender.com
+```
+
+Read the full checklist in:
+
+```text
+docs/PHASE7-DEPLOYMENT-REHEARSAL.md
+```
+
+## Final deployment gate
+
+Do not call the app deployment-ready until all of these pass:
+
+```bash
+./scripts/verify-build.sh
+scripts/deployment-rehearsal.sh https://subnetops-frontend.onrender.com https://subnetops-backend.onrender.com
+```
+
+Also verify in browser:
+
+- register/login works
 - project creation works
-- validation works
-- CSV/PDF export works
-
-## 9. Recommended upgrade after first success
-Once the first Render deployment works:
-- replace `prisma db push` with reviewed migrations
-- move SMTP values to real secrets
-- disable demo accounts/seeding in production
-- attach a custom domain
-
-
-## Prisma update behavior
-The backend now starts through `./entrypoint.sh` on Render. That startup path will:
-- run `prisma generate`
-- sync the schema on boot when `PRISMA_SYNC_ON_BOOT=true`
-- use `PRISMA_SYNC_STRATEGY=push` by default in this starter
-
-For this codebase, that means schema changes like new JSON columns are applied as part of the normal startup/deploy flow instead of being left as a manual reminder.
-
-If you later move to reviewed Prisma migration files, change:
-- `PRISMA_SYNC_STRATEGY=migrate`
-
-and keep `PRISMA_SYNC_ON_BOOT=true`.
+- project export downloads CSV/PDF/DOCX
+- password reset behavior matches your SMTP mode

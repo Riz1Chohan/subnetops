@@ -39,7 +39,7 @@ export function ValidationList({
   return (
     <div style={{ display: "grid", gap: 12 }}>
       {items.map((item) => {
-        const taskBody = `[Validation] ${item.title} — ${item.message}`;
+        const taskBody = `[Validation] ${item.title} — ${item.issue || item.message}`;
         const alreadyTracked = openTaskBodies?.has(taskBody);
         const fixPath = getFixPath?.(item);
         const fixLabel = getFixLabel?.(item) || "Open fix area";
@@ -53,7 +53,15 @@ export function ValidationList({
               {alreadyTracked ? <span className="badge-soft">Task already exists</span> : null}
             </div>
             <h4 style={{ marginBottom: 8 }}>{item.title}</h4>
-            <p style={{ margin: 0 }}>{item.message}</p>
+            {item.issue || item.impact || item.recommendation ? (
+              <div className="validation-finding-body" style={{ display: "grid", gap: 8 }}>
+                <p style={{ margin: 0 }}><strong>Issue:</strong> {item.issue || item.message}</p>
+                {item.impact ? <p style={{ margin: 0 }}><strong>Impact:</strong> {item.impact}</p> : null}
+                {item.recommendation ? <p style={{ margin: 0 }}><strong>Recommendation:</strong> {item.recommendation}</p> : null}
+              </div>
+            ) : (
+              <p style={{ margin: 0 }}>{item.message}</p>
+            )}
             {fixPath ? (
               <div className="validation-meta-row">
                 <span className="muted">Need to fix this?</span>

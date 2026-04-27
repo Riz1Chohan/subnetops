@@ -7,8 +7,10 @@ import {
   cidrOverlap,
   classifySegmentRole,
   intToIpv4,
+  isValidIpv4,
   ipv4ToInt,
   parseCidrRange,
+  tryIpv4ToInt,
   recommendedPrefixForHosts,
   subnetFacts,
   subnetWithinBlock,
@@ -835,6 +837,21 @@ function rangeFromBounds(start?: number | null, end?: number | null) {
   return `${intToIpv4(start)}–${intToIpv4(end)}`;
 }
 
+function gatewayIntWithinSubnet(row: { gatewayIp: string; role: SegmentRole }, facts: NonNullable<ReturnType<typeof subnetFacts>>) {
+  if (!row.gatewayIp || row.gatewayIp === "—" || !isValidIpv4(row.gatewayIp)) return undefined;
+
+  const parsedGateway = tryIpv4ToInt(row.gatewayIp);
+  if (parsedGateway === null) return undefined;
+
+  const firstUsable = facts.firstUsableIp ? ipv4ToInt(facts.firstUsableIp) : undefined;
+  const lastUsable = facts.lastUsableIp ? ipv4ToInt(facts.lastUsableIp) : undefined;
+
+  if (firstUsable === undefined || lastUsable === undefined) return undefined;
+  if (parsedGateway < firstUsable || parsedGateway > lastUsable) return undefined;
+
+  return parsedGateway;
+}
+
 function computeServiceRanges(row: { subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; role: SegmentRole }) {
   const facts = subnetFacts(row.subnetCidr, row.role);
   if (!facts) {
@@ -850,7 +867,7 @@ function computeServiceRanges(row: { subnetCidr: string; gatewayIp: string; dhcp
     };
   }
 
-  const gatewayInt = row.gatewayIp && row.gatewayIp !== "—" ? ipv4ToInt(row.gatewayIp) : undefined;
+  const gatewayInt = gatewayIntWithinSubnet(row, facts);
   const firstUsable = facts.firstUsableIp ? ipv4ToInt(facts.firstUsableIp) : undefined;
   const lastUsable = facts.lastUsableIp ? ipv4ToInt(facts.lastUsableIp) : undefined;
 
@@ -892,6 +909,7 @@ function buildConfiguredRow(vlan: Vlan, siteBlockCidr?: string): AddressingPlanR
 
   const notes: string[] = [];
   if (siteBlockCidr && insideSiteBlock === false) notes.push("Configured subnet sits outside the current site summary block.");
+  if (vlan.gatewayIp && vlan.gatewayIp !== "—" && !isValidIpv4(vlan.gatewayIp)) notes.push("Configured gateway is not a valid IPv4 address, so service range planning used the subnet defaults instead.");
   if (estimatedHosts > usableHosts && usableHosts > 0) notes.push("Estimated host demand exceeds the usable capacity of this subnet.");
   if (usableHosts > 0 && estimatedHosts > 0 && estimatedHosts / usableHosts >= 0.85) {
     notes.push("Configured subnet is at or above 85% of usable host capacity.");

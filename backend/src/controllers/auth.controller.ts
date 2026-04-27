@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { ApiError } from "../utils/apiError.js";
+import { csrfTokenHandler as issueCsrfTokenHandler } from "../middleware/csrf.js";
 import {
   changePasswordSchema,
   loginSchema,
@@ -109,3 +110,5 @@ export async function resetPasswordHandler(req: Request, res: Response) {
   clearAuthCookie(res);
   res.json({ message: "Password reset successfully. Please sign in with your new password." });
 }
+
+export const csrfTokenHandler = issueCsrfTokenHandler;

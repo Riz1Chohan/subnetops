@@ -319,7 +319,7 @@ export function ProjectCoreModelPage() {
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority split</h2>
             <p className="muted" style={{ margin: 0 }}>
-              The recovery goal is not just to have more model objects. It is to make the model authoritative. These counts show both the raw explicit-vs-inferred split and where the explicit pressure is now coming from.
+              The recovery goal is not just to have more model objects. It is to make the model evidence-driven and reviewable. These counts show both the raw explicit-vs-inferred split and where the explicit pressure is now coming from.
             </p>
           </div>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>

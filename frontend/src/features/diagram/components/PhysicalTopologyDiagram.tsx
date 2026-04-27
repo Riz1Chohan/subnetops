@@ -4,8 +4,10 @@ import type { ProjectComment, ProjectDetail, ValidationResult } from "../../../l
 import type { ActiveOverlayMode, DeviceFocus, DiagramLabelMode, DiagramScope, LabelFocus, LinkAnnotationMode, LinkFocus, OverlayMode, SiteWithVlans } from "..";
 import {
   type ChipTone,
+  type DeviceKind,
   type SitePoint,
   DiagramCanvasBackdrop,
+  DeviceIcon,
   chip,
   compactInterfaceStack,
   boundaryLabelsForSite,
@@ -25,6 +27,7 @@ import {
   labelFocusTitle,
   linkFocusMatchesType,
   linkFocusTitle,
+  linkValidationItems,
   logicalNode,
   managementBoundaryForSite,
   normalizeActiveOverlays,

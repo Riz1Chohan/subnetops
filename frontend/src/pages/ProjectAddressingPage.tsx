@@ -10,6 +10,9 @@ import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { useDesignCoreSnapshot } from "../features/designCore/hooks";
+import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
+import { applyDesignCoreSnapshotToSynthesis } from "../lib/designCoreAdapter";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -32,15 +35,21 @@ export function ProjectAddressingPage() {
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
+  const designCoreQuery = useDesignCoreSnapshot(projectId);
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
+  const localSynthesized = useMemo(
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
+  );
+  const designCore = designCoreQuery.data;
+  const synthesized = useMemo(
+    () => applyDesignCoreSnapshotToSynthesis(localSynthesized, designCore),
+    [localSynthesized, designCore],
   );
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
@@ -102,14 +111,19 @@ export function ProjectAddressingPage() {
       <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div className="trust-note">
           <p className="muted" style={{ margin: 0 }}>
+            <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+          </p>
+        </div>
+        <div className="trust-note">
+          <p className="muted" style={{ margin: 0 }}>
             <strong>{synthesized.designEngineFoundation.stageLabel}:</strong> {synthesized.designEngineFoundation.summary}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
+          <span className="badge-soft">Organization block {designCore?.organizationBlock?.canonicalCidr ?? synthesized.organizationBlock}</span>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
           <span className="badge-soft">{synthesized.siteHierarchy.length} site(s)</span>
-          <span className="badge-soft">{synthesized.addressingPlan.length} rows</span>
+          <span className="badge-soft">{designCore?.summary.vlanCount ?? synthesized.addressingPlan.length} rows</span>
           <span className="badge-soft">Validation {errorCount} errors / {warningCount} warnings</span>
           {synthesized.organizationBlockAssumed ? <span className="badge-soft">Working range assumed</span> : null}
         </div>

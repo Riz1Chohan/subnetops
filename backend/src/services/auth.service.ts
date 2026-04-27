@@ -1,8 +1,10 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db/prisma.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/apiError.js";
+import { queueEmail } from "./email.service.js";
 import type { PlanTier } from "../lib/domainTypes.js";
 
 export interface AuthTokenPayload {
@@ -11,14 +13,18 @@ export interface AuthTokenPayload {
   planTier: PlanTier;
 }
 
-interface PasswordResetTokenPayload {
-  sub: string;
-  purpose: "password-reset";
-  email: string;
-}
+const passwordResetTtlMs = 30 * 60 * 1000;
 
 function normalizedEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function createRandomResetToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashResetToken(token: string) {
+  return crypto.createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 export async function hashPassword(password: string) {
@@ -35,22 +41,6 @@ export function signToken(payload: AuthTokenPayload) {
 
 export function verifyToken(token: string): AuthTokenPayload {
   return jwt.verify(token, env.jwtSecret) as AuthTokenPayload;
-}
-
-export function signPasswordResetToken(user: { id: string; email: string }) {
-  return jwt.sign(
-    { sub: user.id, purpose: "password-reset", email: user.email } satisfies PasswordResetTokenPayload,
-    env.jwtSecret,
-    { expiresIn: "30m" },
-  );
-}
-
-export function verifyPasswordResetToken(token: string) {
-  const payload = jwt.verify(token, env.jwtSecret) as PasswordResetTokenPayload;
-  if (payload.purpose !== "password-reset") {
-    throw new ApiError(400, "Reset token is invalid or expired");
-  }
-  return payload;
 }
 
 export async function registerUser(input: { email: string; password: string; fullName?: string }) {
@@ -98,10 +88,7 @@ export async function changePassword(input: { userId: string; currentPassword: s
   }
 
   const passwordHash = await hashPassword(input.newPassword);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash },
-  });
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
 }
 
 export async function createPasswordResetRequest(input: { email: string }) {
@@ -110,30 +97,63 @@ export async function createPasswordResetRequest(input: { email: string }) {
     return { delivered: false as const, resetToken: undefined as string | undefined };
   }
 
-  const resetToken = signPasswordResetToken({ id: user.id, email: user.email });
+  const resetToken = createRandomResetToken();
+  const tokenHash = hashResetToken(resetToken);
+  const expiresAt = new Date(Date.now() + passwordResetTtlMs);
+
+  await prisma.$transaction(async (tx: any) => {
+    await tx.passwordResetToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { userId: user.id, usedAt: null },
+        ],
+      },
+    });
+
+    await tx.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+  });
+
+  const resetUrl = `${env.frontendAppUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+  await queueEmail({
+    toEmail: user.email,
+    subject: "Reset your SubnetOps password",
+    templateKey: "password-reset",
+    payload: { resetUrl },
+  });
+
   return { delivered: true as const, resetToken };
 }
 
 export async function resetPassword(input: { token: string; newPassword: string }) {
-  const payload = verifyPasswordResetToken(input.token);
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-  if (!user || normalizedEmail(user.email) != normalizedEmail(payload.email)) {
-    throw new ApiError(400, "Reset token is invalid or expired");
-  }
-
+  const tokenHash = hashResetToken(input.token);
   const passwordHash = await hashPassword(input.newPassword);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  const now = new Date();
+
+  await prisma.$transaction(async (tx: any) => {
+    const resetToken = await tx.passwordResetToken.findUnique({ where: { tokenHash } });
+    if (!resetToken || resetToken.usedAt || resetToken.expiresAt.getTime() <= now.getTime()) {
+      throw new ApiError(400, "Reset token is invalid or expired");
+    }
+
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: { id: resetToken.id, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now },
+    });
+    if (claimed.count !== 1) {
+      throw new ApiError(400, "Reset token is invalid or expired");
+    }
+
+    await tx.user.update({ where: { id: resetToken.userId }, data: { passwordHash } });
+  });
 }
 
 export async function getSafeUser(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      planTier: true,
-      createdAt: true,
-    },
+    select: { id: true, email: true, fullName: true, planTier: true, createdAt: true },
   });
 }

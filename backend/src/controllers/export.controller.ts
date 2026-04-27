@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
+import { isIP } from "node:net";
 import { requireParam } from "../utils/request.js";
+import { ApiError } from "../utils/apiError.js";
+import { ensureCanViewProject } from "../services/access.service.js";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
   AlignmentType,
@@ -16,12 +19,7 @@ import {
   ShadingType,
   TableLayoutType,
 } from "docx";
-import { composeProfessionalReport, getCsvRows, getProjectExportData, type ExportSnapshot, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
-
-function readExportSnapshot(req: Request): ExportSnapshot | undefined {
-  const body = req.body as { exportSnapshot?: ExportSnapshot } | undefined;
-  return body?.exportSnapshot;
-}
+import { composeProfessionalReportForProject, getCsvRows, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
 
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
@@ -40,29 +38,94 @@ function toCsv(rows: Array<Record<string, unknown>>) {
   return lines.join("\n");
 }
 
-async function tryEmbedRemoteLogo(pdf: PDFDocument, logoUrl?: string | null) {
-  if (!logoUrl) return null;
+const MAX_REMOTE_LOGO_BYTES = 1_000_000;
+const REMOTE_LOGO_TIMEOUT_MS = 3_000;
+
+function isPrivateIPv4(hostname: string) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a === 0
+  );
+}
+
+function isPrivateIPv6(hostname: string) {
+  const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80");
+}
+
+function isSafeRemoteLogoUrl(logoUrl?: string | null) {
+  if (!logoUrl) return false;
 
   try {
-    const response = await fetch(logoUrl);
+    const parsed = new URL(logoUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    const ipVersion = isIP(hostname);
+
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    if (parsed.port && parsed.port !== "443") return false;
+    if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) return false;
+    if (ipVersion === 4 && isPrivateIPv4(hostname)) return false;
+    if (ipVersion === 6 && isPrivateIPv6(hostname)) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryEmbedRemoteLogo(pdf: PDFDocument, logoUrl?: string | null) {
+  if (!isSafeRemoteLogoUrl(logoUrl)) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REMOTE_LOGO_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(logoUrl!, {
+      signal: controller.signal,
+      headers: { Accept: "image/png,image/jpeg" },
+    });
     if (!response.ok) return null;
+
     const contentType = response.headers.get("content-type") || "";
+    const isPng = contentType.includes("png");
+    const isJpeg = contentType.includes("jpeg") || contentType.includes("jpg");
+    if (!isPng && !isJpeg) return null;
+
+    const contentLength = Number(response.headers.get("content-length") || "0");
+    if (contentLength > MAX_REMOTE_LOGO_BYTES) return null;
+
     const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > MAX_REMOTE_LOGO_BYTES) return null;
 
-    if (contentType.includes("png")) {
-      return pdf.embedPng(bytes);
-    }
-
-    if (contentType.includes("jpeg") || contentType.includes("jpg")) {
-      return pdf.embedJpg(bytes);
-    }
+    if (isPng) return pdf.embedPng(bytes);
+    if (isJpeg) return pdf.embedJpg(bytes);
 
     return null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
+function requireAuthenticatedUserId(req: Request) {
+  if (!req.user?.id) {
+    throw new ApiError(401, "Unauthorized");
+  }
+  return req.user.id;
+}
+
+async function ensureCanExportProject(req: Request, projectId: string) {
+  await ensureCanViewProject(requireAuthenticatedUserId(req), projectId);
+}
 
 function sanitizePdfText(value: string) {
   return value
@@ -192,15 +255,13 @@ function drawMetricCards(
   }
 }
 
-async function buildPdf(projectId: string, snapshot?: ExportSnapshot) {
-  const project = await getProjectExportData(projectId);
-  const report = composeProfessionalReport(project, snapshot);
-  const snapshotProject = (snapshot?.project ?? {}) as Record<string, unknown>;
-  if ((!project && !snapshot?.project) || !report) return null;
-  const projectName = typeof snapshotProject.name === "string" && snapshotProject.name.trim() ? snapshotProject.name : project?.name ?? "SubnetOps Project";
-  const organizationName = typeof snapshotProject.organizationName === "string" && snapshotProject.organizationName.trim() ? snapshotProject.organizationName : project?.organizationName ?? "To be confirmed";
-  const environmentType = typeof snapshotProject.environmentType === "string" && snapshotProject.environmentType.trim() ? snapshotProject.environmentType : project?.environmentType ?? "Custom";
-  const logoUrl = typeof snapshotProject.logoUrl === "string" && snapshotProject.logoUrl.trim() ? snapshotProject.logoUrl : project?.logoUrl;
+async function buildPdf(projectId: string) {
+  const { project, report } = await composeProfessionalReportForProject(projectId);
+  if (!project || !report) return null;
+  const projectName = project.name ?? "SubnetOps Project";
+  const organizationName = project.organizationName ?? "To be confirmed";
+  const environmentType = project.environmentType ?? "Custom";
+  const logoUrl = project.logoUrl;
 
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -295,15 +356,13 @@ function cellParagraph(text: string, bold = false) {
   });
 }
 
-async function buildDocx(projectId: string, snapshot?: ExportSnapshot) {
-  const project = await getProjectExportData(projectId);
-  const report = composeProfessionalReport(project, snapshot);
-  const snapshotProject = (snapshot?.project ?? {}) as Record<string, unknown>;
-  if ((!project && !snapshot?.project) || !report) return null;
-  const projectName = typeof snapshotProject.name === "string" && snapshotProject.name.trim() ? snapshotProject.name : project?.name ?? "SubnetOps Project";
-  const organizationName = typeof snapshotProject.organizationName === "string" && snapshotProject.organizationName.trim() ? snapshotProject.organizationName : project?.organizationName ?? "To be confirmed";
-  const environmentType = typeof snapshotProject.environmentType === "string" && snapshotProject.environmentType.trim() ? snapshotProject.environmentType : project?.environmentType ?? "Custom";
-  const logoUrl = typeof snapshotProject.logoUrl === "string" && snapshotProject.logoUrl.trim() ? snapshotProject.logoUrl : project?.logoUrl;
+async function buildDocx(projectId: string) {
+  const { project, report } = await composeProfessionalReportForProject(projectId);
+  if (!project || !report) return null;
+  const projectName = project.name ?? "SubnetOps Project";
+  const organizationName = project.organizationName ?? "To be confirmed";
+  const environmentType = project.environmentType ?? "Custom";
+  const logoUrl = project.logoUrl;
 
   const children: Array<Paragraph | Table> = [];
 
@@ -438,7 +497,10 @@ async function buildDocx(projectId: string, snapshot?: ExportSnapshot) {
 }
 
 export async function exportCsv(req: Request, res: Response) {
-  const rows = await getCsvRows(requireParam(req, "projectId"), readExportSnapshot(req));
+  const projectId = requireParam(req, "projectId");
+  await ensureCanExportProject(req, projectId);
+
+  const rows = await getCsvRows(projectId);
   const csv = toCsv(rows);
 
   res.setHeader("Content-Type", "text/csv");
@@ -447,7 +509,10 @@ export async function exportCsv(req: Request, res: Response) {
 }
 
 export async function exportPdf(req: Request, res: Response) {
-  const pdfBytes = await buildPdf(requireParam(req, "projectId"), readExportSnapshot(req));
+  const projectId = requireParam(req, "projectId");
+  await ensureCanExportProject(req, projectId);
+
+  const pdfBytes = await buildPdf(projectId);
   if (!pdfBytes) {
     return res.status(404).json({ message: "Project not found" });
   }
@@ -458,7 +523,10 @@ export async function exportPdf(req: Request, res: Response) {
 }
 
 export async function exportDocx(req: Request, res: Response) {
-  const docxBytes = await buildDocx(requireParam(req, "projectId"), readExportSnapshot(req));
+  const projectId = requireParam(req, "projectId");
+  await ensureCanExportProject(req, projectId);
+
+  const docxBytes = await buildDocx(projectId);
   if (!docxBytes) {
     return res.status(404).json({ message: "Project not found" });
   }

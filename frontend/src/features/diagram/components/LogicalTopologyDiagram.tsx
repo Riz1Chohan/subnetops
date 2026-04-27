@@ -40,6 +40,7 @@ import {
   placementRowsForSite,
   primaryDmzService,
   relevantSiteSubnets,
+  relevantZoneNames,
   roleTone,
   siteAnchorSummary,
   siteBreakoutSummary,

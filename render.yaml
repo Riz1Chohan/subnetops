@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: npm install --ignore-scripts --include=dev && npm run prisma:generate && npm run build
+    buildCommand: npm ci --include=dev --ignore-scripts --no-audit --no-fund && npm run prisma:generate && npm run build
     startCommand: ./entrypoint.sh
     healthCheckPath: /api/health/ready
     autoDeployTrigger: commit
@@ -23,10 +23,6 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20.12.2
-      - key: SKIP_INSTALL_DEPS
-        value: "true"
-      - key: NPM_CONFIG_PREFER_OFFLINE
-        value: "true"
       - key: NPM_CONFIG_FETCH_RETRIES
         value: "6"
       - key: NPM_CONFIG_FETCH_RETRY_FACTOR
@@ -46,7 +42,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://subnetops-frontend.onrender.com,http://localhost:4173,http://localhost:5173,http://localhost:3000
+        value: https://subnetops-frontend.onrender.com
+      - key: FRONTEND_APP_URL
+        value: https://subnetops-frontend.onrender.com
       - key: SEND_REAL_EMAILS
         value: "false"
       - key: SMTP_HOST
@@ -66,7 +64,9 @@ services:
       - key: PRISMA_SYNC_ON_BOOT
         value: "true"
       - key: PRISMA_SYNC_STRATEGY
-        value: push
+        value: migrate
+      - key: ALLOW_UNSAFE_DB_PUSH
+        value: "false"
       - key: DB_PUSH_ON_BOOT
         value: "false"
       - key: SEED_DEMO_ON_BOOT
@@ -82,7 +82,7 @@ services:
     name: subnetops-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: sh -c 'test -f dist/index.html && echo "Using committed frontend dist"'
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run build
     staticPublishPath: ./dist
     buildFilter:
       paths:
@@ -92,10 +92,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.12.2
-      - key: SKIP_INSTALL_DEPS
-        value: "true"
-      - key: NPM_CONFIG_PREFER_OFFLINE
-        value: "true"
       - key: NPM_CONFIG_FETCH_RETRIES
         value: "6"
       - key: NPM_CONFIG_FETCH_RETRY_FACTOR

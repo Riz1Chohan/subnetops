@@ -13,9 +13,11 @@ export async function createSite(userId: string, planTier: PlanTier, data: { pro
     if (siteCount >= 2) throw new ApiError(403, "Free plan limit reached: up to 2 sites per project allowed.");
   }
 
-  const site = await prisma.site.create({ data });
-  await addChangeLog(data.projectId, `Site created: ${site.name}`, actorLabel);
-  return site;
+  return prisma.$transaction(async (tx: any) => {
+    const site = await tx.site.create({ data });
+    await addChangeLog(data.projectId, `Site created: ${site.name}`, actorLabel, tx);
+    return site;
+  });
 }
 
 export async function updateSite(siteId: string, userId: string, data: Record<string, unknown>, actorLabel?: string) {
@@ -23,9 +25,11 @@ export async function updateSite(siteId: string, userId: string, data: Record<st
   if (!site) throw new ApiError(404, "Site not found");
   await ensureCanEditProject(userId, site.projectId);
 
-  const updated = await prisma.site.update({ where: { id: siteId }, data });
-  await addChangeLog(site.projectId, `Site updated: ${updated.name}`, actorLabel);
-  return updated;
+  return prisma.$transaction(async (tx: any) => {
+    const updated = await tx.site.update({ where: { id: siteId }, data });
+    await addChangeLog(site.projectId, `Site updated: ${updated.name}`, actorLabel, tx);
+    return updated;
+  });
 }
 
 export async function deleteSite(siteId: string, userId: string, actorLabel?: string) {
@@ -33,7 +37,9 @@ export async function deleteSite(siteId: string, userId: string, actorLabel?: st
   if (!site) throw new ApiError(404, "Site not found");
   await ensureCanEditProject(userId, site.projectId);
 
-  const deleted = await prisma.site.delete({ where: { id: siteId } });
-  await addChangeLog(site.projectId, `Site deleted: ${deleted.name}`, actorLabel);
-  return deleted;
+  return prisma.$transaction(async (tx: any) => {
+    const deleted = await tx.site.delete({ where: { id: siteId } });
+    await addChangeLog(site.projectId, `Site deleted: ${deleted.name}`, actorLabel, tx);
+    return deleted;
+  });
 }

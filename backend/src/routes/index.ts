@@ -1,6 +1,7 @@
 export { default as aiRoutes } from "./ai.routes.js";
 export { default as authRoutes } from "./auth.routes.js";
 export { default as commentRoutes } from "./comment.routes.js";
+export { default as designCoreRoutes } from "./designCore.routes.js";
 export { default as exportRoutes } from "./export.routes.js";
 export { default as notificationPreferenceRoutes } from "./notificationPreference.routes.js";
 export { default as notificationRoutes } from "./notification.routes.js";

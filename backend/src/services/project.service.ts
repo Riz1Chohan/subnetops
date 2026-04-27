@@ -61,12 +61,14 @@ export async function createProject(
   await enforceProjectLimit(userId, planTier);
   const organizationId = await ensureOrganizationAssignable(userId, data.organizationId || null);
 
-  const project = await prisma.project.create({
-    data: { userId, ...data, organizationId: organizationId || undefined },
-  });
+  return prisma.$transaction(async (tx: any) => {
+    const project = await tx.project.create({
+      data: { userId, ...data, organizationId: organizationId || undefined },
+    });
 
-  await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel);
-  return project;
+    await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
+    return project;
+  });
 }
 
 export async function createProjectFromTemplate(
@@ -106,23 +108,27 @@ export async function createProjectFromTemplate(
   const template = templateMap[templateKey];
   if (!template) throw new ApiError(404, "Template not found");
 
-  const project = await prisma.project.create({
-    data: {
-      userId,
-      name: customName?.trim() || template.name,
-      description: template.description,
-      organizationName: template.organizationName,
-      environmentType: template.environmentType,
-      basePrivateRange: template.basePrivateRange,
-    },
+  const project = await prisma.$transaction(async (tx: any) => {
+    const createdProject = await tx.project.create({
+      data: {
+        userId,
+        name: customName?.trim() || template.name,
+        description: template.description,
+        organizationName: template.organizationName,
+        environmentType: template.environmentType,
+        basePrivateRange: template.basePrivateRange,
+      },
+    });
+
+    for (const siteTemplate of template.sites) {
+      const site = await tx.site.create({ data: { projectId: createdProject.id, name: siteTemplate.name, location: siteTemplate.location, siteCode: siteTemplate.siteCode, defaultAddressBlock: siteTemplate.defaultAddressBlock } });
+      await tx.vlan.createMany({ data: siteTemplate.vlans.map((vlan: any) => ({ siteId: site.id, ...vlan })) });
+    }
+
+    await addChangeLog(createdProject.id, `Project created from template: ${template.name}`, actorLabel, tx);
+    return createdProject;
   });
 
-  for (const siteTemplate of template.sites) {
-    const site = await prisma.site.create({ data: { projectId: project.id, name: siteTemplate.name, location: siteTemplate.location, siteCode: siteTemplate.siteCode, defaultAddressBlock: siteTemplate.defaultAddressBlock } });
-    await prisma.vlan.createMany({ data: siteTemplate.vlans.map((vlan: any) => ({ siteId: site.id, ...vlan })) });
-  }
-
-  await addChangeLog(project.id, `Project created from template: ${template.name}`, actorLabel);
   return getProject(project.id, userId);
 }
 
@@ -138,46 +144,50 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
   });
   if (!source) throw new ApiError(404, "Source project not found");
 
-  const newProject = await prisma.project.create({
-    data: {
-      userId,
-      organizationId: source.organizationId,
-      name: `${source.name} Copy`,
-      description: source.description,
-      organizationName: source.organizationName,
-      environmentType: source.environmentType,
-      basePrivateRange: source.basePrivateRange,
-      logoUrl: source.logoUrl,
-      reportHeader: source.reportHeader,
-      reportFooter: source.reportFooter,
-      approvalStatus: source.approvalStatus,
-      reviewerNotes: source.reviewerNotes,
-      requirementsJson: source.requirementsJson,
-      discoveryJson: source.discoveryJson,
-      platformProfileJson: source.platformProfileJson,
-    },
-  });
-
-  for (const sourceSite of source.sites) {
-    const newSite = await prisma.site.create({
+  const newProject = await prisma.$transaction(async (tx: any) => {
+    const createdProject = await tx.project.create({
       data: {
-        projectId: newProject.id,
-        name: sourceSite.name,
-        location: sourceSite.location,
-        siteCode: sourceSite.siteCode,
-        notes: sourceSite.notes,
-        defaultAddressBlock: sourceSite.defaultAddressBlock,
+        userId,
+        organizationId: source.organizationId,
+        name: `${source.name} Copy`,
+        description: source.description,
+        organizationName: source.organizationName,
+        environmentType: source.environmentType,
+        basePrivateRange: source.basePrivateRange,
+        logoUrl: source.logoUrl,
+        reportHeader: source.reportHeader,
+        reportFooter: source.reportFooter,
+        approvalStatus: source.approvalStatus,
+        reviewerNotes: source.reviewerNotes,
+        requirementsJson: source.requirementsJson,
+        discoveryJson: source.discoveryJson,
+        platformProfileJson: source.platformProfileJson,
       },
     });
 
-    if (sourceSite.vlans.length > 0) {
-      await prisma.vlan.createMany({
-        data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
+    for (const sourceSite of source.sites) {
+      const newSite = await tx.site.create({
+        data: {
+          projectId: createdProject.id,
+          name: sourceSite.name,
+          location: sourceSite.location,
+          siteCode: sourceSite.siteCode,
+          notes: sourceSite.notes,
+          defaultAddressBlock: sourceSite.defaultAddressBlock,
+        },
       });
-    }
-  }
 
-  await addChangeLog(newProject.id, `Project duplicated from ${source.name}`, actorLabel);
+      if (sourceSite.vlans.length > 0) {
+        await tx.vlan.createMany({
+          data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
+        });
+      }
+    }
+
+    await addChangeLog(createdProject.id, `Project duplicated from ${source.name}`, actorLabel, tx);
+    return createdProject;
+  });
+
   return getProject(newProject.id, userId);
 }
 
@@ -213,9 +223,11 @@ export async function updateProject(projectId: string, userId: string, data: Rec
   const project = await ensureCanEditProject(userId, projectId);
   const organizationId = await ensureOrganizationAssignable(userId, (data.organizationId as string | undefined) || project.organizationId || null);
   const normalizedData = { ...data, organizationId: organizationId || undefined };
-  const result = await prisma.project.updateMany({ where: { id: projectId }, data: normalizedData });
-  await addChangeLog(projectId, `Project settings updated`, actorLabel);
-  return result;
+  return prisma.$transaction(async (tx: any) => {
+    const result = await tx.project.updateMany({ where: { id: projectId }, data: normalizedData });
+    await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
+    return result;
+  });
 }
 
 export async function deleteProject(projectId: string, userId: string) {

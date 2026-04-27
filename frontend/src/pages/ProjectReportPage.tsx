@@ -17,6 +17,9 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { apiBlob } from "../lib/api";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
+import { useDesignCoreSnapshot } from "../features/designCore/hooks";
+import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
+import { applyDesignCoreSnapshotToSynthesis } from "../lib/designCoreAdapter";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -66,6 +69,29 @@ function sectionList(items: string[], empty: string) {
   );
 }
 
+const PLANNING_ASSUMPTIONS = [
+  "Inputs were provided by the user and are not live-discovered network facts.",
+  "Subnet allocations are based on declared host counts, saved site blocks, and planning growth buffers.",
+  "Security zones are planning recommendations unless verified against actual firewall, identity, and access-control policy.",
+  "Device placement is conceptual unless a confirmed hardware inventory and cabling model have been provided.",
+  "Routing, WAN, DHCP, monitoring, and redundancy choices must be reviewed against business policy and vendor-specific implementation requirements.",
+  "Engineer review is required before implementation or production deployment.",
+];
+
+const ENGINEER_REVIEW_STATEMENT =
+  "This design package is intended for planning and review. Validate against the live environment, business policy, and vendor-specific implementation requirements before production deployment.";
+
+const ENGINEER_REVIEW_CHECKLIST = [
+  "Confirm live inventory.",
+  "Confirm WAN/provider constraints.",
+  "Confirm firewall policy requirements.",
+  "Confirm DHCP/static reservation strategy.",
+  "Confirm routing protocol choice.",
+  "Confirm redundancy/HA requirements.",
+  "Confirm monitoring/SNMP/logging requirements.",
+  "Confirm implementation change window.",
+];
+
 export function ProjectReportPage() {
   const { projectId = "" } = useParams();
   const location = useLocation();
@@ -74,6 +100,7 @@ export function ProjectReportPage() {
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
+  const designCoreQuery = useDesignCoreSnapshot(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const project = projectQuery.data;
@@ -84,9 +111,14 @@ export function ProjectReportPage() {
   const selectedSection = new URLSearchParams(location.search).get("section");
   const isFocusedSectionView = Boolean(selectedSection);
   const issueNotice = parseWorkspaceIssueNotice(location.search);
-  const synthesized = useMemo(
+  const localSynthesized = useMemo(
     () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
     [project, sites, vlans, requirementsProfile],
+  );
+  const designCore = designCoreQuery.data;
+  const synthesized = useMemo(
+    () => applyDesignCoreSnapshotToSynthesis(localSynthesized, designCore),
+    [localSynthesized, designCore],
   );
 
   const discoverySummary = useMemo(
@@ -171,44 +203,11 @@ export function ProjectReportPage() {
     synthesized.siteSummaries.length === 0 ? "No site design has been defined yet" : null,
   ].filter(Boolean) as string[];
 
-  const exportSnapshot = useMemo(() => ({
-    generatedAt: new Date().toISOString(),
-    project: project
-      ? {
-          id: project.id,
-          name: project.name,
-          organizationName: project.organizationName,
-          environmentType: project.environmentType,
-          basePrivateRange: project.basePrivateRange,
-          reportHeader: project.reportHeader,
-          logoUrl: project.logoUrl,
-          approvalStatus: project.approvalStatus,
-          requirementsJson: project.requirementsJson,
-          discoveryJson: project.discoveryJson,
-          platformProfileJson: project.platformProfileJson,
-        }
-      : null,
-    requirementsProfile,
-    validations: validations.map((item) => ({
-      id: item.id,
-      ruleCode: item.ruleCode,
-      severity: item.severity,
-      entityType: item.entityType,
-      title: item.title,
-      message: item.message,
-      createdAt: item.createdAt,
-    })),
-    synthesized,
-    discoverySummary,
-    platformFoundation,
-  }), [project, requirementsProfile, validations, synthesized, discoverySummary, platformFoundation]);
-
   const downloadExport = async (kind: "pdf" | "docx" | "csv") => {
     try {
       setExportMessage(kind === "pdf" ? "Preparing professional PDF report..." : kind === "docx" ? "Preparing professional DOCX report..." : "Preparing Excel-friendly CSV export...");
       const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
         method: "POST",
-        body: JSON.stringify({ exportSnapshot }),
       });
       saveBlob(
         blob,
@@ -231,6 +230,8 @@ export function ProjectReportPage() {
     { key: "services-security", label: "Services & boundaries", detail: "Check service anchors, trust zones, and DMZ posture.", path: `/projects/${projectId}/report?section=services-security` },
     { key: "routing-flows", label: "Routing & flows", detail: "Review routing posture and required traffic paths.", path: `/projects/${projectId}/report?section=routing-flows` },
     { key: "site-lld", label: "Site low-level design", detail: "Jump into per-site engineering detail and implementation posture.", path: `/projects/${projectId}/report?section=site-lld` },
+    { key: "validation", label: "Validation findings", detail: "Review issue, impact, and recommendation for open findings.", path: `/projects/${projectId}/report?section=validation` },
+    { key: "implementation", label: "Engineer checklist", detail: "Confirm the review gates before implementation handoff.", path: `/projects/${projectId}/report?section=implementation` },
   ];
 
   const topValidationItems = validations
@@ -245,9 +246,14 @@ export function ProjectReportPage() {
           <p className="workspace-detail-kicker">Deliver</p>
           <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
           <p className="muted" style={{ margin: 0 }}>Pick a section below or use the left pane. This page now opens as a usable report hub instead of a dead-end blank state.</p>
+          <div className="trust-note" style={{ marginTop: 12 }}>
+            <p className="muted" style={{ margin: 0 }}>
+              <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+            </p>
+          </div>
           <div className="report-landing-metrics">
-            {summaryCard("Sites", synthesized.siteSummaries.length)}
-            {summaryCard("Address rows", synthesized.addressingPlan.length)}
+            {summaryCard("Sites", designCore?.summary.siteCount ?? synthesized.siteSummaries.length)}
+            {summaryCard("Address rows", designCore?.summary.vlanCount ?? synthesized.addressingPlan.length)}
             {summaryCard("Errors", errorCount)}
             {summaryCard("Warnings", warningCount)}
           </div>
@@ -309,11 +315,14 @@ export function ProjectReportPage() {
             <span className="badge-soft">Requirements {readinessSummary.completionLabel}</span>
             {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
             <span className="badge-soft">Topology {synthesized.topology.topologyLabel}</span>
-            <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
+            <span className="badge-soft">Organization block {designCore?.organizationBlock?.canonicalCidr ?? synthesized.organizationBlock}</span>
           </div>
           <div>
             <h1 style={{ marginBottom: 8 }}>{project.reportHeader || `${project.name} — Design Package`}</h1>
             <p className="muted" style={{ margin: 0 }}>{summary}</p>
+            <p className="muted" style={{ margin: "8px 0 0 0" }}>
+              <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+            </p>
           </div>
           <div className="form-actions" style={{ flexWrap: "wrap" }}>
             <button type="button" onClick={() => void downloadExport("pdf")}>Export Professional PDF</button>
@@ -338,8 +347,8 @@ export function ProjectReportPage() {
 
 
       {!isFocusedSectionView ? <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        {summaryCard("Sites", synthesized.siteSummaries.length)}
-        {summaryCard("Address rows", synthesized.addressingPlan.length)}
+        {summaryCard("Sites", designCore?.summary.siteCount ?? synthesized.siteSummaries.length)}
+        {summaryCard("Address rows", designCore?.summary.vlanCount ?? synthesized.addressingPlan.length)}
         {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
         {summaryCard("Security boundaries", synthesized.securityBoundaries.length)}
         {summaryCard("Service placements", synthesized.servicePlacements.length)}
@@ -354,8 +363,9 @@ export function ProjectReportPage() {
           <div>
             <h2 style={{ margin: "0 0 8px 0" }}>1. Design assumptions and constraints</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This report is now structured around explicit design facts first. It should answer what is placed where, which subnets belong to which domains, how traffic moves, and what still needs confirmation.
+              This report is structured around explicit design facts, clear assumptions, deterministic checks, and engineer review. It should answer what is placed where, which subnets belong to which domains, how traffic moves, and what still needs confirmation.
             </p>
+            <p className="muted" style={{ margin: "8px 0 0 0" }}>{ENGINEER_REVIEW_STATEMENT}</p>
           </div>
           <span className="badge-soft">{exportBlockers.length === 0 ? "Export ready" : `${exportBlockers.length} review item${exportBlockers.length === 1 ? "" : "s"}`}</span>
         </div>
@@ -363,7 +373,7 @@ export function ProjectReportPage() {
           <div>
             <h3 style={{ marginTop: 0, marginBottom: 8 }}>Assumptions</h3>
             {sectionList(
-              synthesized.designReview.filter((item) => item.kind === "assumption").map((item) => item.detail).slice(0, 6),
+              [...PLANNING_ASSUMPTIONS, ...synthesized.designReview.filter((item) => item.kind === "assumption").map((item) => item.detail)].slice(0, 10),
               "No explicit assumptions surfaced yet.",
             )}
           </div>
@@ -696,7 +706,7 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h3>
           <p className="muted" style={{ margin: 0 }}>
-            Validation should remain actionable. Keep the list focused on what must be corrected before implementation or export.
+            Validation should remain actionable. Findings should explain the issue, why it matters, and what to fix before implementation or export.
           </p>
         </div>
         <ValidationList
@@ -727,13 +737,17 @@ export function ProjectReportPage() {
             </ul>
           </div>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Cutover checkpoints</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {synthesized.cutoverChecklist.slice(0, 8).map((item) => (
-                <li key={`${item.stage}-${item.item}`} style={{ marginBottom: 8 }}><strong>{item.stage}:</strong> {item.item}</li>
-              ))}
-            </ul>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Engineer review checklist</h3>
+            {sectionList(ENGINEER_REVIEW_CHECKLIST, "No checklist items available.")}
           </div>
+        </div>
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Cutover checkpoints</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {synthesized.cutoverChecklist.slice(0, 8).map((item) => (
+              <li key={`${item.stage}-${item.item}`} style={{ marginBottom: 8 }}><strong>{item.stage}:</strong> {item.item}</li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -741,7 +755,7 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h3>
           <p className="muted" style={{ margin: 0 }}>
-            The product should stay honest about unresolved assumptions and next actions. This is where the handoff package should clearly say what still needs confirmation.
+            The package should stay honest about unresolved assumptions, risks, and next actions. This is where the handoff should clearly say what still needs confirmation.
           </p>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
@@ -756,7 +770,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
+      <div data-report-section="diagram-cross-check" className="panel report-section" style={{ display: selectedSection && selectedSection !== "diagram-cross-check" ? "none" : "grid", gap: 14 }}>
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h3>
           <p className="muted" style={{ margin: 0 }}>

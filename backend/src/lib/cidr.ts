@@ -61,7 +61,7 @@ export function parseCidr(input: string): ParsedCidr {
 
   const ipInt = ipv4ToInt(ip);
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
-  const network = ipInt & mask;
+  const network = (ipInt & mask) >>> 0;
   const broadcast = (network | (~mask >>> 0)) >>> 0;
 
   return {
@@ -179,12 +179,15 @@ export function describeSubnet(cidr: ParsedCidr, role: SegmentRole = "OTHER") {
 }
 
 export function recommendedPrefixForHosts(hosts: number, role: SegmentRole = "OTHER") {
-  const bufferMultiplier = role === "USER" || role === "GUEST" || role === "VOICE" ? 1.3 : 1.2;
-  const minimumRequired = role === "WAN_TRANSIT" ? 2 : role === "LOOPBACK" ? 1 : 2;
-  const target = Math.max(minimumRequired, Math.ceil(hosts * bufferMultiplier));
+  if (!Number.isFinite(hosts) || hosts < 0) {
+    throw new Error(`Invalid host count: ${hosts}`);
+  }
 
   if (role === "LOOPBACK") return 32;
-  if (role === "WAN_TRANSIT" && target <= 2) return 31;
+  if (role === "WAN_TRANSIT") return hosts <= 2 ? 31 : 30;
+
+  const bufferMultiplier = role === "USER" || role === "GUEST" || role === "VOICE" ? 1.3 : 1.2;
+  const target = Math.max(2, Math.ceil(hosts * bufferMultiplier));
 
   for (let prefix = 30; prefix >= 1; prefix -= 1) {
     if (usableHostCount(parseCidr(`0.0.0.0/${prefix}`), role) >= target) return prefix;

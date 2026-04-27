@@ -110,6 +110,9 @@ export interface ValidationResult {
   ruleCode: string;
   title: string;
   message: string;
+  issue?: string;
+  impact?: string;
+  recommendation?: string;
   entityType: "PROJECT" | "SITE" | "VLAN";
   entityId?: string;
   createdAt: string;
