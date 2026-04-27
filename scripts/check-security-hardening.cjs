@@ -44,4 +44,9 @@ for (const file of ["backend/src/services/project.service.ts", "backend/src/serv
   assert(source.includes("addChangeLog") && source.includes(", tx)"), `${file} does not write change logs inside the transaction.`);
 }
 
+const loginPage = read("frontend/src/pages/LoginPage.tsx");
+assert(loginPage.includes("VITE_ENABLE_DEMO_LOGIN") && loginPage.includes("demoLoginEnabled"), "frontend demo login is not gated behind an explicit env flag.");
+const renderYaml = read("render.yaml");
+assert(!renderYaml.includes("VITE_ENABLE_DEMO_LOGIN") || renderYaml.includes("value: \"false\""), "Render must not expose demo login by default.");
+
 console.log("Security hardening check passed.");

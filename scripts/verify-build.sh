@@ -37,6 +37,10 @@ echo "==> Backend-authority seam check"
 node scripts/check-design-authority.cjs
 
 echo
+echo "==> Design-core modularity check"
+node scripts/check-design-core-modularity.cjs
+
+echo
 echo "==> Security hardening seam check"
 node scripts/check-security-hardening.cjs
 

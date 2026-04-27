@@ -65,6 +65,8 @@ services:
         value: "true"
       - key: PRISMA_SYNC_STRATEGY
         value: migrate
+      - key: PRISMA_BASELINE_EXISTING_DB
+        value: "true"
       - key: ALLOW_UNSAFE_DB_PUSH
         value: "false"
       - key: DB_PUSH_ON_BOOT
