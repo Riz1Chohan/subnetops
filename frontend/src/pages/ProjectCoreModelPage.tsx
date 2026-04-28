@@ -5,8 +5,8 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
@@ -47,10 +47,7 @@ export function ProjectCoreModelPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading unified design model" message="Linking topology, routing, service placement, boundaries, and flows into one engineering view." />;
@@ -82,10 +79,10 @@ export function ProjectCoreModelPage() {
   const inferredBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.sourceModel === "inferred").length;
   const savedRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "saved-design").length;
   const discoveryRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "discovery-derived").length;
-  const plannerRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "planner-preview").length;
+  const backendUnconfirmedRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "backend-unconfirmed").length;
   const savedBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "saved-design").length;
   const discoveryBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "discovery-derived").length;
-  const plannerBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "planner-preview").length;
+  const backendUnconfirmedBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "backend-unconfirmed").length;
   const recovery = buildRecoveryRoadmapStatus(synthesized);
   const focusPlan = buildRecoveryFocusPlan(projectId, synthesized);
   const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
@@ -168,7 +165,7 @@ export function ProjectCoreModelPage() {
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority-source ledger</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This ledger keeps the shared model honest about where its trust is coming from. It separates stronger saved design truth from discovery-backed, planner-preview, and still inferred anchors instead of treating every object as equally real.
+              This ledger keeps the shared model honest about where its trust is coming from. It separates stronger saved design truth from discovery-backed, backend-unconfirmed, and still inferred anchors instead of treating every object as equally real.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -331,12 +328,12 @@ export function ProjectCoreModelPage() {
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {summaryCard("Saved route anchors", savedRouteDomains, "Backed by saved routing objects.")}
             {summaryCard("Discovery route anchors", discoveryRouteDomains, "Promoted from current-state evidence.")}
-            {summaryCard("Planner route anchors", plannerRouteDomains, "Held by planner/addressing truth until saved routing records catch up.")}
+            {summaryCard("Backend-unconfirmed route anchors", backendUnconfirmedRouteDomains, "Held by planner/addressing truth until saved routing records catch up.")}
           </div>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {summaryCard("Saved boundaries", savedBoundaryDomains, "Backed by saved boundary objects.")}
             {summaryCard("Discovery boundaries", discoveryBoundaryDomains, "Promoted from security or addressing discovery evidence.")}
-            {summaryCard("Planner boundaries", plannerBoundaryDomains, "Held by planner/addressing truth until saved boundary records catch up.")}
+            {summaryCard("Backend-unconfirmed boundaries", backendUnconfirmedBoundaryDomains, "Held by planner/addressing truth until saved boundary records catch up.")}
           </div>
         </div>
 

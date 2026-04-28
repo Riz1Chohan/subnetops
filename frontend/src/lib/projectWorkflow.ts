@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import { buildDesignAuthorityLedger } from "./designAuthorityLedger";
 import { buildRecoveryFocusPlan } from "./recoveryFocus";
 import { buildRecoveryRoadmapStatus, type RecoveryPhaseStatus } from "./recoveryRoadmap";

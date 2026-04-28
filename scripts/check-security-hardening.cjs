@@ -13,6 +13,12 @@ function assert(condition, message) {
 }
 
 assert(exists("backend/src/middleware/rateLimit.ts"), "rateLimit middleware is missing.");
+const rateLimit = read("backend/src/middleware/rateLimit.ts");
+assert(rateLimit.includes("return `${keyPrefix}:${ip}`;"), "rate limiter must key buckets by both limiter prefix and normalized client IP.");
+assert(exists("backend/src/middleware/rateLimit.selftest.ts"), "rate limiter behavioral selftest is missing.");
+const rateLimitSelftest = read("backend/src/middleware/rateLimit.selftest.ts");
+assert(rateLimitSelftest.includes("client B must not inherit client A's exhausted bucket"), "rate limiter selftest must prove per-IP bucket separation.");
+assert(rateLimitSelftest.includes("different limiter prefixes must use separate buckets"), "rate limiter selftest must prove per-prefix bucket separation.");
 const authRoutes = read("backend/src/routes/auth.routes.ts");
 for (const route of ["/register", "/login", "/change-password", "/request-password-reset", "/reset-password"]) {
   assert(authRoutes.includes(route) && authRoutes.includes("authRateLimit"), `${route} is not protected by authRateLimit.`);
@@ -50,3 +56,5 @@ const renderYaml = read("render.yaml");
 assert(!renderYaml.includes("VITE_ENABLE_DEMO_LOGIN") || renderYaml.includes("value: \"false\""), "Render must not expose demo login by default.");
 
 console.log("Security hardening check passed.");
+
+process.exit(0);

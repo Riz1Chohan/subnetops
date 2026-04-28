@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 
 export interface DiagramControlDomainRow {
   site: string;

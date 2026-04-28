@@ -52,3 +52,5 @@ if (!reportPage.includes('data-report-section="diagram-cross-check"')) fail('dia
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('Final trust cleanup check passed.');
+
+process.exit(0);

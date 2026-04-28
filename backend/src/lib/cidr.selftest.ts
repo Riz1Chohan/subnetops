@@ -76,7 +76,7 @@ run("containsIp and address identity helpers remain consistent", () => {
 run("recommended prefix keeps WAN and loopback special cases", () => {
   assert.equal(recommendedPrefixForHosts(2, "WAN_TRANSIT"), 31);
   assert.equal(recommendedPrefixForHosts(1, "LOOPBACK"), 32);
-  assert.equal(recommendedPrefixForHosts(200, "USER"), 24);
+  assert.equal(recommendedPrefixForHosts(200, "USER"), 23);
 });
 
 run("subnet description stays coherent", () => {

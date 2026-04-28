@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import { buildRecoveryRoadmapStatus, type RecoveryPhaseReview } from "./recoveryRoadmap";
 
 export interface RecoveryFocusAction {

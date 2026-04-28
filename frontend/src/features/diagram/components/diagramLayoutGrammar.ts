@@ -1,6 +1,6 @@
 import type { DiagramScope } from "../diagramTypes";
 import type { SitePoint, SiteWithVlans } from "./diagramRendererShared";
-import type { SynthesizedLogicalDesign } from "../../../lib/designSynthesis";
+import type { SynthesizedLogicalDesign } from "../../../lib/designSynthesis.types";
 import { sitePositionMap } from "./diagramRendererShared";
 
 export type DiagramCanvasMode = "logical" | "physical";

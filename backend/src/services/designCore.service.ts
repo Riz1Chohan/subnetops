@@ -36,6 +36,7 @@ import {
   buildPlanningInputDisciplineSummary,
 } from "./designCore/designCore.planningInputDiscipline.js";
 import { getProjectDesignData } from "./designCore/designCore.repository.js";
+import { buildNetworkObjectModel } from "./designCore/designCore.networkObjectModel.js";
 import {
   canonicalCidr,
   cidrsOverlap,
@@ -71,7 +72,7 @@ import {
   type PlanningInputAuditSummary,
 } from "../lib/planningInputAudit.js";
 
-import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignCoreSnapshot } from "./designCore.types.js";
+import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, DesignCoreSnapshot } from "./designCore.types.js";
 
 type ProjectWithDesignData = NonNullable<Awaited<ReturnType<typeof getProjectDesignData>>>;
 type SiteBlockRecord = DesignCoreSiteBlock & { parsed?: ParsedCidr };
@@ -1025,6 +1026,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   const transitPlan = buildTransitPlan(project, organizationBlock, siteBlocks, addressingRows, issues);
   const loopbackPlan = buildLoopbackPlan(project, organizationBlock, siteBlocks, addressingRows, issues);
   const currentStateBoundary = buildCurrentStateBoundary(siteBlocks, addressingRows, issues);
+  const networkObjectModel = buildNetworkObjectModel({ project, addressingRows, siteSummaries, transitPlan, loopbackPlan });
   const truthStateSummary = buildTruthStateLedger(currentStateBoundary);
   const allocationPolicy = buildAllocationPolicySummary(organizationBlock, siteBlocks, addressingRows, transitPlan, loopbackPlan);
   const routingIntent = buildRoutingIntentSummary(project, siteSummaries, transitPlan, loopbackPlan, issues);
@@ -1069,7 +1071,30 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     summarizationReviewCount: siteSummaries.length,
     transitPlanCount: transitPlan.length,
     loopbackPlanCount: loopbackPlan.length,
-    readyForBackendAuthority: !issues.some((issue) => issue.severity === "ERROR"),
+    networkObjectCount: networkObjectModel.summary.deviceCount + networkObjectModel.summary.interfaceCount + networkObjectModel.summary.linkCount + networkObjectModel.summary.routeDomainCount + networkObjectModel.summary.securityZoneCount + networkObjectModel.summary.policyRuleCount + networkObjectModel.summary.natRuleCount + networkObjectModel.summary.dhcpPoolCount + networkObjectModel.summary.ipReservationCount,
+    modeledDeviceCount: networkObjectModel.summary.deviceCount,
+    modeledInterfaceCount: networkObjectModel.summary.interfaceCount,
+    modeledSecurityZoneCount: networkObjectModel.summary.securityZoneCount,
+    modeledRouteDomainCount: networkObjectModel.summary.routeDomainCount,
+    designGraphNodeCount: networkObjectModel.summary.designGraphNodeCount,
+    designGraphEdgeCount: networkObjectModel.summary.designGraphEdgeCount,
+    designGraphIntegrityFindingCount: networkObjectModel.summary.designGraphIntegrityFindingCount,
+    designGraphBlockingFindingCount: networkObjectModel.summary.designGraphBlockingFindingCount,
+    routeIntentCount: networkObjectModel.routingSegmentation.summary.routeIntentCount,
+    routingReachabilityFindingCount: networkObjectModel.routingSegmentation.summary.reachabilityFindingCount,
+    routingBlockingFindingCount: networkObjectModel.routingSegmentation.summary.blockingFindingCount,
+    segmentationExpectationCount: networkObjectModel.routingSegmentation.summary.segmentationExpectationCount,
+    segmentationConflictCount: networkObjectModel.routingSegmentation.summary.conflictingPolicyCount,
+    securityFlowRequirementCount: networkObjectModel.securityPolicyFlow.summary.flowRequirementCount,
+    securityPolicyFindingCount: networkObjectModel.securityPolicyFlow.summary.findingCount,
+    securityPolicyBlockingFindingCount: networkObjectModel.securityPolicyFlow.summary.blockingFindingCount,
+    securityPolicyMissingNatCount: networkObjectModel.securityPolicyFlow.summary.missingNatCount,
+    implementationPlanStepCount: networkObjectModel.implementationPlan.summary.stepCount,
+    implementationPlanBlockedStepCount: networkObjectModel.implementationPlan.summary.blockedStepCount,
+    implementationPlanReviewStepCount: networkObjectModel.implementationPlan.summary.reviewStepCount,
+    implementationPlanFindingCount: networkObjectModel.implementationPlan.summary.findingCount,
+    implementationPlanBlockingFindingCount: networkObjectModel.implementationPlan.summary.blockingFindingCount,
+    readyForBackendAuthority: !issues.some((issue) => issue.severity === "ERROR") && networkObjectModel.summary.designGraphBlockingFindingCount === 0 && networkObjectModel.routingSegmentation.summary.blockingFindingCount === 0 && networkObjectModel.securityPolicyFlow.summary.blockingFindingCount === 0 && networkObjectModel.implementationPlan.summary.blockingFindingCount === 0,
     readyForLiveMappingSplit: currentStateBoundary.liveMappingReady,
   };
 
@@ -1091,6 +1116,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     },
     summary,
     truthStateSummary,
+    truthStateLedger: truthStateSummary,
     allocationPolicy,
     routingIntent,
     routeDomain,
@@ -1109,6 +1135,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     planningInputDiscipline,
     requirementsCoverage,
     currentStateBoundary,
+    networkObjectModel,
     siteBlocks: siteBlocks.map(({ parsed: _parsed, ...item }) => item),
     addressingRows: addressingRows.map(({ parsed: _parsed, ...item }) => item),
     proposedRows: proposals,
@@ -1132,4 +1159,4 @@ export async function getDesignCoreSnapshotForExport(projectId: string) {
   const project = await getProjectDesignData(projectId);
   return buildDesignCoreSnapshot(project);
 }
-export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignCoreSnapshot } from "./designCore.types.js";
+export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, DesignCoreSnapshot } from "./designCore.types.js";

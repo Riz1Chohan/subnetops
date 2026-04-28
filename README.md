@@ -1,4 +1,137 @@
+# SubnetOps
+
+## Phase 35 release notes — Security policy engine upgrade
+
+Phase 35 upgrades the backend security-policy engine. It does not move policy decisions back into the frontend and it does not generate vendor firewall commands.
+
+Backend security engine additions:
+
+- backend security policy matrix rows for zone-to-zone posture review
+- backend service groups and richer service-object metadata
+- ordered rule review with first-match evidence
+- rule shadowing detection
+- implicit-deny gap detection for high-risk zone pairs
+- NAT review rows tied to NAT-required security flows
+- logging/evidence requirements for sensitive boundaries
+- `backend/src/lib/phase35SecurityPolicyEngine.selftest.ts`
+- `npm run engine:selftest:phase35-security`
+- `scripts/check-security-policy-engine-upgrade.cjs`
+
+Frontend boundary remains locked:
+
+- frontend may render, filter, and visualize backend security outputs
+- frontend must not compute policy posture, NAT coverage, implicit deny state, or rule shadowing
+- frontend snapshot types mirror backend outputs for display only
+
+Static preflight passes in this package. Full dependency install/build proof must still be run locally with:
+
+```bash
+bash scripts/verify-build.sh
+```
+
+
+
+## Phase 33 release notes — Frontend authority completion + backend engine matrix hardening
+
+Phase 33 was not allowed to start until the frontend authority audit was finished. That audit found remaining browser-side engine behavior, so this package first removes those leftovers and then adds the backend engine matrix gate.
+
+Frontend authority cleanup completed before Phase 33:
+
+- removed frontend CIDR/subnet math and validators from runtime source
+- removed VLAN form subnet suggestions, recommended-size hints, role classification, gateway validation, and usable-host calculations
+- removed VLAN table subnet-fact calculations; the table now shows stored inputs and backend validation status only
+- removed site-form CIDR validation; site blocks are collected as input and validated by backend design-core
+- removed frontend topology classification, primary-site selection, capacity math, and device-tier inference from backend snapshot view-model mapping
+- strengthened `scripts/check-frontend-authority.cjs` so those browser-side engine patterns fail the release gate if they return
+
+Backend engine matrix hardening added in Phase 33:
+
+- `backend/src/lib/phase33EngineMatrix.selftest.ts`
+- `npm run engine:selftest:phase33-matrix`
+- Phase 33 matrix wired into `npm run engine:selftest:all`
+- `scripts/check-engine-test-matrix.cjs` wired into `final-preflight.sh` and `verify-build.sh`
+
+The Phase 33 matrix covers backend authority metadata, object-model coverage, routing intent, security-flow/NAT consequences, implementation-plan generation, and hostile-defect blocking.
+
+Important boundary: frontend code may still format, group, filter, and visualize backend data. It must not infer subnets, routes, gateways, topology, security zones, policies, implementation phases, or capacity facts.
+
+Full dependency install/build proof must still be run locally with:
+
+```bash
+bash scripts/verify-build.sh
+```
+
+
+## Phase 31 release notes — Release integrity / build truth
+
+Phase 31 hardens the package as the chosen base before deeper engine expansion. It is intentionally scoped to release integrity, source discipline, and build-truth proof.
+
+This phase adds:
+
+- root-level verification commands through `package.json`
+- `scripts/clean-generated-artifacts.sh` to remove generated `dist`, `node_modules`, cache, and TypeScript build-info artifacts before verification
+- `scripts/check-release-artifacts.cjs` to reject dirty packages and unsafe release posture
+- safer Render backend startup with `sh ./entrypoint.sh`
+- restored executable permissions for shell scripts in the package
+- Phase 31 documentation under `docs/doc/PHASE31-RELEASE-INTEGRITY-BUILD-TRUTH.md`
+
+Use these gates from the repo root:
+
+```bash
+bash scripts/final-preflight.sh
+bash scripts/verify-build.sh
+```
+
+Important boundary: Phase 31 does **not** claim the routing/security/implementation engines are A+ yet. It makes the source package cleaner and more provable so the next phases can upgrade backend authority wiring and engine depth without building on stale artifacts.
+
+## Phase 30 release notes — Implementation-neutral plan generator
+
+Phase 30 converts the authoritative backend object graph, routing model, segmentation model, security-flow model, NAT intent, and DHCP pools into a neutral engineering implementation plan.
+
+This phase adds:
+
+- `ImplementationPlanModel`
+- ordered implementation stages
+- implementation steps tied to backend authority objects
+- verification checks for addressing, routing, policy, NAT, DHCP, and documentation
+- rollback actions tied to risky implementation areas
+- implementation findings and readiness counts
+- implementation stage/step nodes in the design graph
+- Phase 30 report/export tables and design-core self-test coverage
+
+Important boundary: Phase 30 does **not** generate vendor-specific Cisco, Palo Alto, Fortinet, Juniper, cloud, or Linux commands. That would still be premature. This phase creates the neutral implementation plan first so future vendor translation has a trustworthy blueprint.
+
 # SubnetOps Starter
+
+## Phase 29 release notes — Security policy and flow engine
+- added a first-class backend security policy and flow model
+- converted segmentation expectations into explicit source-zone/destination-zone/service/action flow requirements
+- added NAT coverage checks for allowed egress flows
+- added security policy findings for missing policy, policy conflicts, missing NAT, broken zone references, and broad risky permits
+- connected security flows and service objects into the authoritative design graph
+- added Phase 29 report/export tables and design-core self-test coverage
+
+## Phase 25 release notes — Production-readiness audit
+- added a final production-readiness checker for package shape, Render posture, lockfile sanity, source surfaces, and release gates
+- added `scripts/final-preflight.sh` for fast source/static verification before the heavier dependency install/build gate
+- wired the production-readiness checker into `scripts/verify-build.sh`
+- made `scripts/verify-build.sh` use a repo-local `.npm-cache` by default to avoid broken global npm cache state
+- strengthened smoke testing so backend health endpoints must return `ok=true` and the frontend must return a real HTML shell
+- kept Render in steady-state migration mode with unsafe DB push and one-time Prisma baselining disabled
+
+## Phase 24 release notes — Behavioral test matrix
+- added backend design-core behavioral selftests for deterministic output, subnet defects, proposal handling, and configured-truth separation
+- added a frontend/backend authority overlay selftest so pages cannot silently fall back to frontend-only planning truth
+- wired the behavioral matrix into the release verification gate
+- kept the older static seam checks, but stopped treating them as enough on their own
+
+## Phase 23 release notes — Frontend engine cleanup
+- split the giant frontend synthesis engine into focused type, implementation-plan, and topology/flow modules
+- kept `synthesizeLogicalDesign(...)` as the stable compatibility entry point for existing pages and Phase 22 backend-authority overlay behavior
+- moved type-only consumers to `designSynthesis.types.ts` so they do not pull the main browser-side synthesis orchestrator into their module graph
+- added `scripts/check-frontend-engine-modularity.cjs` to stop the browser-side synthesis engine from silently becoming one massive second brain again
+- updated `scripts/verify-build.sh` so frontend engine modularity is checked before full backend/frontend build verification
+
 
 SubnetOps is a VLAN/IP planning workspace for small IT teams.
 
@@ -36,6 +169,14 @@ SubnetOps is a VLAN/IP planning workspace for small IT teams.
 - the project form can now start from a generated requirements summary, not only from raw AI output
 - the AI seed prompt is now driven by a richer requirements brief so the first draft is grounded in more realistic design intent
 
+
+## Phase 21 release-foundation status
+
+- fixed auth rate limiting so buckets are separated by limiter prefix and normalized client IP
+- added a behavioral rate-limiter selftest proving one client cannot exhaust another client's bucket
+- release discipline now rejects committed `backend/dist` and `frontend/dist` build artifacts
+- Render recovery mode is no longer left enabled by default: `PRISMA_BASELINE_EXISTING_DB=false`
+- this package is intended to build backend and frontend artifacts from source during deployment
 
 ## Phase 8/9 status
 
@@ -428,3 +569,50 @@ scripts/deployment-rehearsal.sh \
 ```
 
 Read `docs/PHASE7-DEPLOYMENT-REHEARSAL.md` before deploying to an existing Render database.
+
+## Phase 24 behavioral test matrix
+
+Phase 24 adds executable behavior checks for the high-risk design seams:
+
+- backend design-core deterministic outputs;
+- non-canonical subnet, undersized subnet, unusable gateway, overlap, and outside-site detection;
+- backend site-block proposal separation from configured truth;
+- frontend/backend authority overlay behavior.
+
+Run the full verification gate with:
+
+```bash
+./scripts/verify-build.sh
+```
+
+The backend behavioral test is also available directly after backend dependencies are installed:
+
+```bash
+cd backend
+npm run engine:selftest:behavioral-matrix
+```
+
+The frontend/backend authority overlay selftest is wired into `verify-build.sh` and runs through the backend `tsx` dev dependency.
+
+## Phase 32 — Frontend Authority Wiring
+
+Phase 32 started moving project views toward backend design-core authority. The later 32B/33 cleanup removes the labeled frontend fallback entirely, so this section is retained only as historical context.
+
+## Phase 32B — Frontend Authority Lockdown
+
+The frontend planning fallback has been removed. Project design surfaces now start from a backend-only display shell and render backend design-core snapshots only. If the backend snapshot is unavailable, the UI must show an honest unavailable state instead of generating a browser-side replacement plan.
+
+## Phase 34 — Routing Engine Upgrade
+
+Phase 34 keeps the frontend backend-authoritative and upgrades the backend routing model with neutral route-table entries, next-hop validation, duplicate/overlap reviews, and bidirectional site-to-site reachability checks. It does not generate vendor configuration yet.
+
+Run:
+
+```bash
+bash scripts/final-preflight.sh
+bash scripts/verify-build.sh
+```
+
+## Phase 36 — Implementation Planning Engine
+
+Phase 36 upgrades the backend implementation-planning engine into a stronger change-plan compiler. Implementation steps now carry readiness reasons, blockers, upstream finding links, dependencies, blast radius, required evidence, acceptance criteria, and rollback intent. NAT implementation readiness consumes security NAT reviews instead of guessing from raw NAT status. See `docs/doc/PHASE36-IMPLEMENTATION-PLANNING-ENGINE.md`.

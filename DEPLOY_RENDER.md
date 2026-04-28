@@ -1,5 +1,24 @@
 # Deploy SubnetOps on Render
 
+## Phase 25 final deployment rule
+
+Do not deploy this package until the local source/static preflight and the full clean build gate pass:
+
+```bash
+./scripts/final-preflight.sh
+./scripts/verify-build.sh
+```
+
+After deployment, run the live rehearsal:
+
+```bash
+scripts/deployment-rehearsal.sh \
+  https://subnetops-frontend.onrender.com \
+  https://subnetops-backend.onrender.com
+```
+
+The package is intentionally source-only. It must not contain `backend/dist`, `frontend/dist`, or `node_modules`.
+
 ## Services
 
 This package expects two Render services and one Render PostgreSQL database:
@@ -32,11 +51,12 @@ Production startup should use Prisma migrations, not automatic schema push:
 ```text
 PRISMA_SYNC_ON_BOOT=true
 PRISMA_SYNC_STRATEGY=migrate
+PRISMA_BASELINE_EXISTING_DB=false
 ALLOW_UNSAFE_DB_PUSH=false
 DB_PUSH_ON_BOOT=false
 ```
 
-Do not use `prisma db push` in production unless you are intentionally doing a temporary non-production recovery.
+Do not use `prisma db push` in production unless you are intentionally doing a temporary non-production recovery. Do not leave `PRISMA_BASELINE_EXISTING_DB=true` in `render.yaml`; that flag is only for one controlled recovery deploy against an existing database that was created by `prisma db push`.
 
 ## New database deployment path
 
@@ -148,3 +168,13 @@ Also verify in browser:
 - project creation works
 - project export downloads CSV/PDF/DOCX
 - password reset behavior matches your SMTP mode
+
+## Phase 24 behavioral gate
+
+Before deploying the final package, run:
+
+```bash
+./scripts/verify-build.sh
+```
+
+Phase 24 extends this gate with behavior checks for the backend design core and the frontend/backend authority overlay. Do not skip this step: the new tests catch behavior regressions that older static string checks could miss.

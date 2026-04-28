@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../../lib/designSynthesis";
+import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../../lib/designSynthesis.types";
 import type { LabelFocus, OverlayMode } from "../diagramTypes";
 import { DeviceIcon, type DeviceKind, linkStyle } from "./diagramRendererShared";
 

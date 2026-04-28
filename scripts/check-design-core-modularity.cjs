@@ -37,3 +37,5 @@ if (serviceBytes > 90_000) {
 }
 
 console.log("Design core modularity check passed.");
+
+process.exit(0);

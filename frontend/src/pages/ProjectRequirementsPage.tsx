@@ -19,8 +19,6 @@ import {
   stringifyRequirementsProfile,
   type RequirementsProfile,
 } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
-import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 
@@ -83,13 +81,6 @@ export function ProjectRequirementsPage() {
   const trackStatuses = useMemo(() => planningTrackStatuses(requirements), [requirements]);
   const readinessSummary = useMemo(() => planningReadinessSummary(requirements), [requirements]);
   const namingPreview = useMemo(() => buildNamingPreviewExamples(requirements, project?.sites?.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirements.closetModel })) ), [requirements, project?.sites]);
-  const synthesizedPreview = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirements), [project, sites, vlans, requirements]);
-  const recoveryPreview = useMemo(() => buildRecoveryRoadmapStatus(synthesizedPreview), [synthesizedPreview]);
-  const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recoveryPreview), [recoveryPreview]);
-  const previewDiscoveryRouteAnchors = useMemo(() => synthesizedPreview.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived").length, [synthesizedPreview]);
-  const previewPlannerRouteAnchors = useMemo(() => synthesizedPreview.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview").length, [synthesizedPreview]);
-  const previewDiscoveryBoundaryAnchors = useMemo(() => synthesizedPreview.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived").length, [synthesizedPreview]);
-  const previewPlannerBoundaryAnchors = useMemo(() => synthesizedPreview.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview").length, [synthesizedPreview]);
 
   const multiSitePlanning = Number(requirements.siteCount || "0") > 1 || requirements.internetModel !== "internet at each site";
   const wirelessPlanning = requirements.wireless || requirements.guestWifi;
@@ -1509,51 +1500,16 @@ export function ProjectRequirementsPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Early design-engine preview</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Backend design-core required</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This preview uses your current planner answers, even before you save, to pressure the app toward explicit design objects earlier in the workflow instead of waiting for later inference-only review.
+            This page collects and saves requirements only. It no longer generates an early browser-side design preview from unsaved planner answers.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
-            {masterGate.status === "ready-for-master" ? "Recovery-ready preview" : masterGate.status === "near-transition" ? "Recovery close" : "Recovery still active"}
-          </span>
-          <span className="badge-soft">Site nodes {synthesizedPreview.designTruthModel.siteNodes.length}</span>
-          <span className="badge-soft">Route domains {synthesizedPreview.designTruthModel.routeDomains.length}</span>
-          <span className="badge-soft">Boundaries {synthesizedPreview.designTruthModel.boundaryDomains.length}</span>
-          <span className="badge-soft">Flows {synthesizedPreview.designTruthModel.flowContracts.length}</span>
-          <span className="badge-soft">Discovery route anchors {previewDiscoveryRouteAnchors}</span>
-          <span className="badge-soft">Planner route anchors {previewPlannerRouteAnchors}</span>
-          <span className="badge-soft">Discovery boundaries {previewDiscoveryBoundaryAnchors}</span>
-          <span className="badge-soft">Planner boundaries {previewPlannerBoundaryAnchors}</span>
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>Per-site authority preview</strong>
-            <div style={{ display: "grid", gap: 10 }}>
-              {synthesizedPreview.designTruthModel.siteNodes.slice(0, 6).map((site) => (
-                <div key={site.id} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                    <strong>{site.siteName}</strong>
-                    <span className={site.authorityStatus === "ready" ? "badge badge-info" : site.authorityStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{site.authorityStatus}</span>
-                    <span className="badge-soft">services {site.serviceIds.length}</span>
-                    <span className="badge-soft">flows {site.flowIds.length}</span>
-                  </div>
-                  <p className="muted" style={{ margin: 0 }}>{site.authorityNotes[0] || "Authority is currently supported by linked route, boundary, placement, and service objects."}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>What these answers already trigger</strong>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li style={{ marginBottom: 8 }}>{masterGate.summary}</li>
-              <li style={{ marginBottom: 8 }}>Topology preview: <strong>{synthesizedPreview.topology.topologyLabel}</strong> with <strong>{synthesizedPreview.topology.internetBreakout}</strong> breakout.</li>
-              <li style={{ marginBottom: 8 }}>Required flow coverage currently shows <strong>{synthesizedPreview.flowCoverage.filter((item) => item.required && item.status === "ready").length}</strong> ready categories out of <strong>{synthesizedPreview.flowCoverage.filter((item) => item.required).length}</strong>.</li>
-              <li style={{ marginBottom: 8 }}>Authority mix: <strong>{previewDiscoveryRouteAnchors + previewDiscoveryBoundaryAnchors}</strong> discovery-backed anchor(s) and <strong>{previewPlannerRouteAnchors + previewPlannerBoundaryAnchors}</strong> planner-preview anchor(s) are already being promoted before save.</li>
-              <li style={{ marginBottom: 0 }}>Main blockers: {recoveryPreview.topBlockers.slice(0, 2).join(" • ") || "No major blockers surfaced in this preview."}</li>
-            </ul>
-          </div>
+        <div className="validation-card warning">
+          <strong>Frontend planning authority disabled</strong>
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Save requirements, then review addressing, routing, security, implementation, reports, and diagrams from the backend design-core snapshot. If the backend has not returned a snapshot, those views should show an honest unavailable state instead of a fabricated frontend plan.
+          </p>
         </div>
       </div>
 

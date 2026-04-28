@@ -7,12 +7,10 @@ import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
-import { useDesignCoreSnapshot } from "../features/designCore/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
-import { applyDesignCoreSnapshotToSynthesis } from "../lib/designCoreAdapter";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -35,22 +33,13 @@ export function ProjectAddressingPage() {
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
-  const designCoreQuery = useDesignCoreSnapshot(projectId);
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const localSynthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
-  const designCore = designCoreQuery.data;
-  const synthesized = useMemo(
-    () => applyDesignCoreSnapshotToSynthesis(localSynthesized, designCore),
-    [localSynthesized, designCore],
-  );
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;

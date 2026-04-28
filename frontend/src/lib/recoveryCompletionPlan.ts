@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import { buildDesignAuthorityLedger, type AuthorityDebtItem } from "./designAuthorityLedger";
 import { buildProjectWorkflowReview } from "./projectWorkflow";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "./recoveryRoadmap";

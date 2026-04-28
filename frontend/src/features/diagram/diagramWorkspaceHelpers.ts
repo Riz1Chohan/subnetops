@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../lib/designSynthesis";
+import type { SynthesizedLogicalDesign, TrafficFlowPath } from "../../lib/designSynthesis.types";
 import type { Site, Vlan } from "../../lib/types";
 import type { DeviceFocus, DiagramScope, LabelFocus, LinkFocus } from "./diagramTypes";
 

@@ -205,7 +205,146 @@ run("design core exposes allocator determinism state", () => {
   assert.equal(Array.isArray(snapshot?.allocatorDeterminism.evaluationOrder), true);
 });
 
-console.log("\nDesign core self-test complete.");
-
-
 // Additional backend design-intent checks should assert routing, security, and traceability summaries as this engine grows.
+
+run("design core builds a first-class network object model", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal((snapshot.networkObjectModel.devices.length ?? 0) >= 1, true);
+  assert.equal((snapshot.networkObjectModel.interfaces.length ?? 0) >= 1, true);
+  assert.equal((snapshot.networkObjectModel.routeDomains.length ?? 0) >= 1, true);
+  assert.equal((snapshot.networkObjectModel.securityZones.length ?? 0) >= 1, true);
+});
+
+run("network object model keeps inferred and proposed objects separate from configured truth", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal(typeof snapshot.networkObjectModel.summary.configuredObjectCount, "number");
+  assert.equal(typeof snapshot.networkObjectModel.summary.inferredObjectCount, "number");
+  assert.equal(typeof snapshot.networkObjectModel.summary.proposedObjectCount, "number");
+  assert.equal(snapshot.summary.networkObjectCount >= snapshot.networkObjectModel.summary.deviceCount, true);
+});
+
+
+run("phase 27 design graph connects devices, interfaces, zones, route domains, VLANs, and subnets", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const designGraph = snapshot.networkObjectModel.designGraph;
+  assert.equal(designGraph.summary.nodeCount > 0, true);
+  assert.equal(designGraph.summary.edgeCount > 0, true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "network-device"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "network-interface"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "security-zone"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "route-domain"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "vlan"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "subnet"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "device-owns-interface"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "interface-belongs-to-route-domain"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "security-zone-protects-subnet"), true);
+});
+
+run("phase 27 design graph exposes graph health in the authoritative summary", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal(snapshot.summary.designGraphNodeCount, snapshot.networkObjectModel.designGraph.summary.nodeCount);
+  assert.equal(snapshot.summary.designGraphEdgeCount, snapshot.networkObjectModel.designGraph.summary.edgeCount);
+  assert.equal(snapshot.summary.designGraphIntegrityFindingCount, snapshot.networkObjectModel.designGraph.summary.integrityFindingCount);
+  assert.equal(typeof snapshot.networkObjectModel.designGraph.summary.relationshipCoveragePercent, "number");
+});
+
+
+run("phase 28 builds neutral route intent and segmentation expectation models", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const routingSegmentation = snapshot.networkObjectModel.routingSegmentation;
+  assert.equal(routingSegmentation.summary.routeIntentCount > 0, true);
+  assert.equal(routingSegmentation.routeIntents.some((routeIntent) => routeIntent.routeKind === "connected"), true);
+  assert.equal(routingSegmentation.segmentationExpectations.length > 0, true);
+  assert.equal(typeof routingSegmentation.summary.routingReadiness, "string");
+});
+
+run("phase 28 design graph connects route intents and segmentation flows", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const designGraph = snapshot.networkObjectModel.designGraph;
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "route-intent"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "route-domain-owns-route"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "route-intent-targets-subnet"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "segmentation-flow"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "security-zone-expects-flow"), true);
+});
+
+run("phase 28 exposes routing and segmentation counts in the authoritative summary", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal(snapshot.summary.routeIntentCount, snapshot.networkObjectModel.routingSegmentation.summary.routeIntentCount);
+  assert.equal(snapshot.summary.routingReachabilityFindingCount, snapshot.networkObjectModel.routingSegmentation.summary.reachabilityFindingCount);
+  assert.equal(snapshot.summary.segmentationExpectationCount, snapshot.networkObjectModel.routingSegmentation.summary.segmentationExpectationCount);
+});
+
+run("phase 29 builds explicit security policy flow requirements", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const securityPolicyFlow = snapshot.networkObjectModel.securityPolicyFlow;
+  assert.equal(securityPolicyFlow.summary.flowRequirementCount > 0, true);
+  assert.equal(securityPolicyFlow.flowRequirements.some((flowRequirement) => flowRequirement.sourceZoneId && flowRequirement.destinationZoneId), true);
+  assert.equal(securityPolicyFlow.serviceObjects.length > 0, true);
+  assert.equal(typeof securityPolicyFlow.summary.policyReadiness, "string");
+});
+
+run("phase 29 design graph connects security flows to zones and policy coverage", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const designGraph = snapshot.networkObjectModel.designGraph;
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "security-flow"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "security-zone-initiates-security-flow"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "security-flow-targets-security-zone"), true);
+});
+
+run("phase 29 exposes security policy counts in the authoritative summary", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal(snapshot.summary.securityFlowRequirementCount, snapshot.networkObjectModel.securityPolicyFlow.summary.flowRequirementCount);
+  assert.equal(snapshot.summary.securityPolicyFindingCount, snapshot.networkObjectModel.securityPolicyFlow.summary.findingCount);
+  assert.equal(snapshot.summary.securityPolicyBlockingFindingCount, snapshot.networkObjectModel.securityPolicyFlow.summary.blockingFindingCount);
+});
+
+
+run("phase 30 builds an implementation-neutral plan with ordered steps", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const implementationPlan = snapshot.networkObjectModel.implementationPlan;
+  assert.equal(implementationPlan.summary.stepCount > 0, true);
+  assert.equal(implementationPlan.stages.some((stage) => stage.stageType === "routing"), true);
+  assert.equal(implementationPlan.steps.some((step) => step.targetObjectType === "route-intent"), true);
+  assert.equal(implementationPlan.steps.some((step) => step.targetObjectType === "security-flow"), true);
+  assert.equal(typeof implementationPlan.summary.implementationReadiness, "string");
+});
+
+run("phase 30 includes verification checks and rollback actions", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const implementationPlan = snapshot.networkObjectModel.implementationPlan;
+  assert.equal(implementationPlan.verificationChecks.length > 0, true);
+  assert.equal(implementationPlan.rollbackActions.length > 0, true);
+  assert.equal(implementationPlan.verificationChecks.some((check) => check.checkType === "routing" || check.checkType === "policy"), true);
+});
+
+run("phase 30 exposes implementation-plan counts in the authoritative summary", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  assert.equal(snapshot.summary.implementationPlanStepCount, snapshot.networkObjectModel.implementationPlan.summary.stepCount);
+  assert.equal(snapshot.summary.implementationPlanBlockedStepCount, snapshot.networkObjectModel.implementationPlan.summary.blockedStepCount);
+  assert.equal(snapshot.summary.implementationPlanBlockingFindingCount, snapshot.networkObjectModel.implementationPlan.summary.blockingFindingCount);
+});
+
+run("phase 30 design graph connects implementation stages and steps", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  assert(snapshot);
+  const designGraph = snapshot.networkObjectModel.designGraph;
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "implementation-stage"), true);
+  assert.equal(designGraph.nodes.some((node) => node.objectType === "implementation-step"), true);
+  assert.equal(designGraph.edges.some((edge) => edge.relationship === "implementation-stage-contains-step"), true);
+});
+
+console.log("\nDesign core self-test complete.");

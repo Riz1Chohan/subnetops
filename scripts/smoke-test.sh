@@ -13,10 +13,29 @@ FRONTEND_URL="${FRONTEND_URL%/}"
 BACKEND_URL="${BACKEND_URL%/}"
 API_BASE="$BACKEND_URL/api"
 
+check_json_ok() {
+  local url="$1"
+  local label="$2"
+  local body
+  body="$(curl -fsS "$url")"
+  printf "%s" "$body" | grep -q '"ok"[[:space:]]*:[[:space:]]*true' || {
+    echo "$label did not return ok=true"
+    echo "$body"
+    exit 1
+  }
+}
+
 printf "Checking backend live endpoint...\n"
-curl -fsS "${API_BASE}/health/live" >/dev/null
+check_json_ok "${API_BASE}/health/live" "Backend live endpoint"
+
 printf "Checking backend ready endpoint...\n"
-curl -fsS "${API_BASE}/health/ready" >/dev/null
-printf "Checking frontend...\n"
-curl -fsS "${FRONTEND_URL}" >/dev/null
+check_json_ok "${API_BASE}/health/ready" "Backend ready endpoint"
+
+printf "Checking frontend shell...\n"
+FRONTEND_BODY="$(curl -fsS "${FRONTEND_URL}")"
+printf "%s" "$FRONTEND_BODY" | grep -qi '<html' || {
+  echo "Frontend did not return an HTML shell."
+  exit 1
+}
+
 printf "Smoke test passed. Frontend=%s Backend=%s\n" "$FRONTEND_URL" "$BACKEND_URL"

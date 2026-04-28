@@ -37,8 +37,10 @@ curl -fsS "$FRONTEND_URL" >/dev/null
 echo "Frontend responded."
 
 section "Backend health"
-curl -fsS "$API_BASE/health/live" >/dev/null
-curl -fsS "$API_BASE/health/ready" >/dev/null
+echo "Checking backend live endpoint"
+curl -fsS "$API_BASE/health/live" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'
+echo "Checking backend ready endpoint"
+curl -fsS "$API_BASE/health/ready" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'
 echo "Backend live/ready checks passed."
 
 section "CORS preflight from frontend origin"

@@ -18,6 +18,13 @@ run_ci_install() {
 echo "SubnetOps build verification"
 echo "Root: ${ROOT_DIR}"
 echo "Node: ${CURRENT_NODE}"
+export npm_config_cache="${NPM_CONFIG_CACHE:-${ROOT_DIR}/.npm-cache}"
+mkdir -p "$npm_config_cache"
+echo "npm cache: ${npm_config_cache}"
+
+cd "${ROOT_DIR}"
+chmod +x scripts/*.sh backend/entrypoint.sh 2>/dev/null || true
+bash scripts/clean-generated-artifacts.sh
 
 if [[ "${CURRENT_MAJOR}" != "${EXPECTED_NODE_MAJOR}" ]]; then
   echo "Warning: expected Node 20.x for SubnetOps. Current runtime is ${CURRENT_NODE}."
@@ -25,8 +32,9 @@ fi
 
 echo
 echo "==> Release discipline checks"
-cd "${ROOT_DIR}"
-scripts/assert-release-discipline.sh
+bash scripts/assert-release-discipline.sh
+node scripts/check-release-artifacts.cjs
+node scripts/check-production-readiness.cjs
 
 echo
 echo "==> Static relative import check"
@@ -35,10 +43,23 @@ node scripts/check-relative-imports.cjs backend/src frontend/src
 echo
 echo "==> Backend-authority seam check"
 node scripts/check-design-authority.cjs
+node scripts/check-frontend-authority.cjs
 
 echo
 echo "==> Design-core modularity check"
 node scripts/check-design-core-modularity.cjs
+
+echo
+echo "==> Frontend engine modularity check"
+node scripts/check-frontend-engine-modularity.cjs
+
+echo
+echo "==> Behavioral test matrix seam check"
+node scripts/check-behavioral-test-matrix.cjs
+node scripts/check-engine-test-matrix.cjs
+node scripts/check-routing-engine-upgrade.cjs
+node scripts/check-security-policy-engine-upgrade.cjs
+node scripts/check-implementation-planning-engine-upgrade.cjs
 
 echo
 echo "==> Security hardening seam check"
@@ -58,7 +79,9 @@ cd "${ROOT_DIR}/backend"
 run_ci_install
 npm run prisma:generate
 npm run build
+npm run security:selftest:rate-limit
 npm run engine:selftest:all
+npx tsx ../scripts/selftest-design-authority-overlay.ts
 
 echo
 echo "==> Frontend install + TypeScript/Vite build"
@@ -66,5 +89,6 @@ cd "${ROOT_DIR}/frontend"
 run_ci_install
 npm run build
 
+cd "${ROOT_DIR}"
 echo
-echo "Verification completed."
+echo "Verification completed. Source tree is cleanly buildable from backend/frontend lockfiles."

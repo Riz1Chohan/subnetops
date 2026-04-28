@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { isValidCidr } from "../../../lib/networkValidators";
 import type { Site } from "../../../lib/types";
 
 interface SiteFormProps {
@@ -21,6 +20,13 @@ interface SiteFormProps {
   isSubmitting?: boolean;
 }
 
+/**
+ * Input collection only.
+ *
+ * CIDR validation and address-block authority are backend design-core concerns.
+ * This form deliberately avoids browser-side subnet math so the frontend cannot
+ * become a second planning engine.
+ */
 export function SiteForm({
   projectId,
   initialValues,
@@ -51,9 +57,8 @@ export function SiteForm({
 
   const error = useMemo(() => {
     if (!name.trim()) return "Site name is required.";
-    if (defaultAddressBlock && !isValidCidr(defaultAddressBlock)) return "Default address block must be valid CIDR format.";
     return "";
-  }, [name, defaultAddressBlock]);
+  }, [name]);
 
   return (
     <form
@@ -82,6 +87,9 @@ export function SiteForm({
       <input placeholder="Floor label (optional)" value={floorLabel} onChange={(e) => setFloorLabel(e.target.value)} />
       <input placeholder="Site code" value={siteCode} onChange={(e) => setSiteCode(e.target.value)} />
       <input placeholder="Default address block" value={defaultAddressBlock} onChange={(e) => setDefaultAddressBlock(e.target.value)} />
+      <p className="muted" style={{ margin: 0 }}>
+        Address-block validation is performed by backend design-core after save. The frontend collects the value only.
+      </p>
       <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
       {error ? <p className="error-text">{error}</p> : null}
       <div className="form-actions">

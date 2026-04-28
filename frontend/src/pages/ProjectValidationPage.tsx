@@ -5,20 +5,19 @@ import { useRunValidation, useValidationResults } from "../features/validation/h
 import { useCreateProjectComment, useProjectComments } from "../features/comments/hooks";
 import { useExplainValidationFinding } from "../features/ai/hooks";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import type { ValidationResult } from "../lib/types";
 import { AIValidationInsight } from "../features/ai/components/AIValidationInsight";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
+import { EmptyState } from "../components/app/EmptyState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildValidationReadinessSummary } from "../lib/designReadiness";
-import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
-import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
-import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function categoryForRule(ruleCode: string) {
   if (ruleCode.includes("OVERLAP") || ruleCode.includes("SITE_BLOCK") || ruleCode.includes("NONCANONICAL")) return "Addressing";
@@ -69,22 +68,22 @@ export function ProjectValidationPage() {
   }, [projectId, refreshedFromFix, searchParams, setSearchParams, validationMutation]);
 
   const items = validationQuery.data ?? [];
-  const selectedSection = new URLSearchParams(location.search).get("section");
+  const selectedSection = new URLSearchParams(location.search).get("section") ?? "health";
   const isFocusedSectionView = Boolean(selectedSection);
   const issueNotice = parseWorkspaceIssueNotice(location.search);
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = useMemo(() => parseRequirementsProfile(project?.requirementsJson), [project?.requirementsJson]);
-  const synthesizedDesign = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const { synthesized: synthesizedDesign, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const errorCount = items.filter((item) => item.severity === "ERROR").length;
   const warningCount = items.filter((item) => item.severity === "WARNING").length;
   const infoCount = items.filter((item) => item.severity === "INFO").length;
   const categories = Array.from(new Set(items.map((item) => categoryForRule(item.ruleCode)))).sort();
-  const readinessSummary = useMemo(() => buildValidationReadinessSummary(project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount), [project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount]);
-  const focusPlan = useMemo(() => buildRecoveryFocusPlan(projectId, synthesizedDesign, errorCount), [projectId, synthesizedDesign, errorCount]);
-  const authorityLedger = useMemo(() => buildDesignAuthorityLedger(projectId, synthesizedDesign), [projectId, synthesizedDesign]);
-  const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesizedDesign, errorCount), [projectId, synthesizedDesign, errorCount]);
+  const readinessSummary = useMemo(
+    () => buildValidationReadinessSummary(project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount),
+    [project, sites, vlans, requirementsProfile, synthesizedDesign, errorCount, warningCount],
+  );
 
   const filteredItems = useMemo(() => {
     return [...items]
@@ -114,28 +113,63 @@ export function ProjectValidationPage() {
   }, [filteredItems]);
 
   const openTaskBodies = new Set<string>((commentsQuery.data ?? []).map((comment) => comment.body));
+  const backendSummary = designCore?.networkObjectModel.summary;
 
-  if (!selectedSection) {
+  if (projectQuery.isLoading || validationQuery.isLoading) {
+    return <LoadingState title="Loading validation" message="Loading backend validation results and design-core authority state." />;
+  }
+
+  if (projectQuery.isError || validationQuery.isError) {
     return (
-      <section style={{ display: "grid", gap: 18 }}>
-        <div className="panel workspace-selection-blank">
-          <p className="workspace-detail-kicker">Validation</p>
-          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
-          <p className="muted" style={{ margin: 0 }}>Choose a validation card from the left pane to open that focused review view.</p>
-        </div>
-      </section>
+      <ErrorState
+        title="Unable to load validation"
+        message={
+          projectQuery.error instanceof Error
+            ? projectQuery.error.message
+            : validationQuery.error instanceof Error
+              ? validationQuery.error.message
+              : "SubnetOps could not load validation right now."
+        }
+      />
     );
   }
 
-  const focusedSectionTitle = selectedSection === "focus"
-    ? "Current priorities"
-    : selectedSection === "health"
-      ? "Health summary"
-      : selectedSection === "findings"
-        ? "Findings"
-        : selectedSection === "guidance"
-          ? "Review guidance"
-          : "Validation";
+  if (!project) {
+    return (
+      <EmptyState
+        title="Project not found"
+        message="The requested project could not be loaded."
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
+
+  const focusedSectionTitle = selectedSection === "findings"
+    ? "Findings"
+    : selectedSection === "guidance"
+      ? "Review guidance"
+      : "Health summary";
+
+  const convertToTask = (item: ValidationResult) => {
+    createCommentMutation.mutate({
+      body: `[Validation] ${item.title} — ${item.issue || item.message}`,
+      taskStatus: "OPEN",
+      priority: item.severity === "ERROR" ? "HIGH" : item.severity === "WARNING" ? "MEDIUM" : "LOW",
+      targetType: item.entityType,
+      targetId: item.entityId,
+    });
+  };
+
+  const explainFinding = (item: ValidationResult) => {
+    setSelectedItem(item);
+    explainMutation.mutate({
+      title: item.title,
+      message: item.message,
+      severity: item.severity,
+      entityType: item.entityType,
+    });
+    requestAnimationFrame(() => insightRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -152,81 +186,19 @@ export function ProjectValidationPage() {
           </div>
         </div>
       ) : (
-      <SectionHeader
-        title="Validation"
-        description="Review subnetting, gateway, capacity, and design issues in a more realistic engineering review workspace."
-        actions={
-          <button type="button" onClick={() => validationMutation.mutate()} disabled={validationMutation.isPending}>
-            {validationMutation.isPending ? "Running..." : "Run Validation"}
-          </button>
-        }
-      />
+        <SectionHeader
+          title="Validation"
+          description="Review backend validation findings, authority state, and the design-core signals that affect release readiness."
+          actions={
+            <button type="button" onClick={() => validationMutation.mutate()} disabled={validationMutation.isPending}>
+              {validationMutation.isPending ? "Running..." : "Run Validation"}
+            </button>
+          }
+        />
       )}
 
-      <div data-validation-section="focus" className="panel recovery-focus-panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid" }}>
-        <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>What needs attention first</h2>
-          <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
-        </div>
-        <div className="recovery-focus-grid">
-          <div>
-            <strong style={{ display: "block", marginBottom: 8 }}>{focusPlan.headline}</strong>
-            <div className="form-actions">
-              <Link to={focusPlan.primaryAction.path} className="link-button">{focusPlan.primaryAction.label}</Link>
-              {focusPlan.supportActions.slice(0, 2).map((action) => (
-                <Link key={action.key} to={action.path} className="link-button link-button-subtle">{action.label}</Link>
-              ))}
-            </div>
-          </div>
-          <div>
-            <strong style={{ display: "block", marginBottom: 8 }}>Signals still dragging trust down</strong>
-            <ul className="recovery-focus-signal-list" style={{ margin: 0 }}>
-              {focusPlan.focusSignals.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-
       <WorkspaceIssueBanner notice={issueNotice} />
-
-      <div data-validation-section="focus" className="panel" style={{ display: selectedSection && selectedSection !== "focus" ? "none" : "grid", gap: 12 }}>
-        <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Priority review queue</h2>
-          <p className="muted" style={{ margin: 0 }}>{recoveryCompletion.summary}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Completion {recoveryCompletion.percentComplete}%</span>
-          {recoveryCompletion.mustFinish.length > 0 ? <span className="badge-soft">Must finish {recoveryCompletion.mustFinish.length}</span> : null}
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Must finish before handoff</h3>
-            {recoveryCompletion.mustFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major must-finish recovery tasks are currently surfacing.</p> : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {recoveryCompletion.mustFinish.slice(0, 3).map((task) => (
-                  <li key={task.id} style={{ marginBottom: 8 }}>
-                    <strong>{task.title}:</strong> {task.detail} <Link to={task.path}>{task.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Should finish next</h3>
-            {recoveryCompletion.shouldFinish.length === 0 ? <p className="muted" style={{ margin: 0 }}>No additional cleanup items are currently being surfaced here.</p> : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {recoveryCompletion.shouldFinish.slice(0, 3).map((task) => (
-                  <li key={task.id} style={{ marginBottom: 8 }}>
-                    <strong>{task.title}:</strong> {task.detail}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
+      <DesignAuthorityBanner authority={authority} compact />
 
       {refreshedFromFix ? (
         <div className="panel" style={{ borderColor: "rgba(40,167,69,0.28)", background: "rgba(40,167,69,0.08)" }}>
@@ -235,12 +207,11 @@ export function ProjectValidationPage() {
         </div>
       ) : null}
 
-
-      <div data-validation-section="health" className="panel validation-trust-panel" style={{ display: selectedSection && selectedSection !== "health" ? "none" : "grid" }}>
+      <div data-validation-section="health" className="panel validation-trust-panel" style={{ display: selectedSection !== "health" ? "none" : "grid" }}>
         <div className="validation-trust-header">
           <div>
-            <p className="eyebrow" style={{ margin: 0 }}>v110 trust and readiness</p>
-            <h2 style={{ margin: "4px 0 8px 0" }}>{readinessSummary.label}</h2>
+            <p className="eyebrow" style={{ margin: 0 }}>Backend validation health</p>
+            <h2 style={{ margin: "4px 0 8px 0" }}>{healthLabel(errorCount, warningCount)}</h2>
             <p className="muted" style={{ margin: 0 }}>{readinessSummary.summary}</p>
           </div>
           <div className={`validation-confidence-pill ${readinessSummary.status}`}>
@@ -253,258 +224,103 @@ export function ProjectValidationPage() {
           <span className={readinessSummary.status} style={{ width: `${readinessSummary.score}%` }} />
         </div>
 
-        <div className="validation-trust-grid">
-          <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Missing or weak inputs</h3>
-              <span className="badge-soft">{readinessSummary.missingInfo.length}</span>
-            </div>
-            {readinessSummary.missingInfo.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No major missing-input signals were detected in this review pass.</p>
-            ) : (
-              <div className="validation-signal-list">
-                {readinessSummary.missingInfo.map((item) => (
-                  <div key={item.id} className={`validation-signal-card ${item.level}`}>
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <strong>{item.title}</strong>
-                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
-                    </div>
-                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Contradictions and trust drops</h3>
-              <span className="badge-soft">{readinessSummary.contradictions.length}</span>
-            </div>
-            {readinessSummary.contradictions.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No major requirement contradictions were detected in this pass.</p>
-            ) : (
-              <div className="validation-signal-list">
-                {readinessSummary.contradictions.map((item) => (
-                  <div key={item.id} className={`validation-signal-card ${item.level}`}>
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <strong>{item.title}</strong>
-                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
-                    </div>
-                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
         <div className="grid-2" style={{ alignItems: "start", marginTop: 14 }}>
           <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Authority debt affecting validation</h3>
-              <span className="badge-soft">{authorityLedger.debtItems.length}</span>
+            <h3 style={{ marginTop: 0 }}>Finding counts</h3>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="badge badge-error">errors {errorCount}</span>
+              <span className="badge badge-warning">warnings {warningCount}</span>
+              <span className="badge badge-info">info {infoCount}</span>
             </div>
-            {authorityLedger.debtItems.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No major authority debt is currently being surfaced into validation review.</p>
-            ) : (
-              <div className="validation-signal-list">
-                {authorityLedger.debtItems.slice(0, 4).map((item) => (
-                  <div key={item.id} className={`validation-signal-card ${item.severity === "critical" ? "critical" : item.severity === "warning" ? "warning" : "info"}`}>
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <strong>{item.title}</strong>
-                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
-                    </div>
-                    <Link to={item.fixPath} className="link-button-subtle">{item.actionLabel}</Link>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-
           <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Weakest site authority right now</h3>
-              <span className="badge-soft">{authorityLedger.siteReviews.filter((item) => item.status !== "ready").length}</span>
+            <h3 style={{ marginTop: 0 }}>Design-core signals</h3>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="badge-soft">graph findings {backendSummary?.designGraphIntegrityFindingCount ?? 0}</span>
+              <span className="badge-soft">routing findings {backendSummary?.reachabilityFindingCount ?? 0}</span>
+              <span className="badge-soft">security findings {backendSummary?.securityPolicyFindingCount ?? 0}</span>
+              <span className="badge-soft">implementation blockers {backendSummary?.implementationPlanBlockingFindingCount ?? 0}</span>
             </div>
-            {authorityLedger.siteReviews.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No site authority rows are available yet.</p>
-            ) : (
-              <div className="validation-signal-list">
-                {authorityLedger.siteReviews.slice(0, 3).map((item) => (
-                  <div key={item.siteId} className={`validation-signal-card ${item.status === "pending" ? "critical" : item.status === "partial" ? "warning" : "info"}`}>
-                    <div style={{ display: "grid", gap: 6 }}>
-                      <strong>{item.siteName}</strong>
-                      <p className="muted" style={{ margin: 0 }}>{item.detail}</p>
-                    </div>
-                    <Link to={item.fixPath} className="link-button-subtle">Open Core Model</Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="validation-next-actions">
-          <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Strong signals</h3>
-              <span className="badge-soft">{readinessSummary.strengths.length}</span>
-            </div>
-            {readinessSummary.strengths.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>SubnetOps has not detected strong trust anchors yet.</p>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {readinessSummary.strengths.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            )}
-          </div>
-
-          <div className="panel validation-subpanel">
-            <div className="validation-subpanel-header">
-              <h3 style={{ margin: 0 }}>Recommended next fixes</h3>
-              <span className="badge-soft">{readinessSummary.nextActions.length}</span>
-            </div>
-            {readinessSummary.nextActions.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No immediate jump suggestions are available right now.</p>
-            ) : (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {readinessSummary.nextActions.map((item) => (
-                  <Link key={`${item.label}-${item.path}`} to={item.path} className="link-button-subtle">{item.label}</Link>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      <div data-validation-section="findings" className="grid-2" style={{ display: selectedSection && selectedSection !== "findings" ? "none" : "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Errors</p><h2 style={{ margin: 0 }}>{errorCount}</h2></div>
-        <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Warnings</p><h2 style={{ margin: 0 }}>{warningCount}</h2></div>
-        <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Info</p><h2 style={{ margin: 0 }}>{infoCount}</h2></div>
-        <div className="panel"><p className="muted" style={{ marginBottom: 8 }}>Health</p><h2 style={{ margin: 0 }}>{healthLabel(errorCount, warningCount)}</h2></div>
-      </div>
+      <div data-validation-section="findings" className="panel" style={{ display: selectedSection !== "findings" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Validation findings</h2>
+          <p className="muted" style={{ margin: 0 }}>Filter backend validation results. The frontend is not recalculating subnet, routing, or security truth here.</p>
+        </div>
 
-      <div data-validation-section="findings" className="grid-2" style={{ display: selectedSection && selectedSection !== "findings" ? "none" : "grid", alignItems: "start", gridTemplateColumns: "1.35fr 0.9fr" }}>
-        <div className="panel">
-          <div className="toolbar-row" style={{ marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
-            <input
-              placeholder="Search findings, rules, or messages"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-            />
-            <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value as "all" | "ERROR" | "WARNING" | "INFO") }>
+        <div className="form-grid">
+          <label>
+            Severity
+            <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value as typeof severityFilter)}>
               <option value="all">All severities</option>
               <option value="ERROR">Errors</option>
               <option value="WARNING">Warnings</option>
               <option value="INFO">Info</option>
             </select>
-            <select value={entityFilter} onChange={(event) => setEntityFilter(event.target.value as "all" | "PROJECT" | "SITE" | "VLAN") }>
+          </label>
+          <label>
+            Entity
+            <select value={entityFilter} onChange={(event) => setEntityFilter(event.target.value as typeof entityFilter)}>
               <option value="all">All entities</option>
               <option value="PROJECT">Project</option>
               <option value="SITE">Site</option>
               <option value="VLAN">VLAN</option>
             </select>
+          </label>
+          <label>
+            Category
             <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
               <option value="all">All categories</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
+              {categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            <span className="badge-soft">Showing {filteredItems.length} of {items.length}</span>
-            {severityFilter !== "all" ? <span className="badge-soft">Severity: {severityFilter}</span> : null}
-            {entityFilter !== "all" ? <span className="badge-soft">Entity: {entityFilter}</span> : null}
-            {categoryFilter !== "all" ? <span className="badge-soft">Category: {categoryFilter}</span> : null}
-          </div>
-
-          {validationQuery.isLoading ? (
-            <LoadingState title="Loading validation" message="Gathering validation findings and preparing the review workspace." />
-          ) : validationQuery.isError ? (
-            <ErrorState
-              title="Unable to load validation results"
-              message={validationQuery.error instanceof Error ? validationQuery.error.message : "SubnetOps could not load validation right now."}
-              action={<Link to={`/projects/${projectId}/overview`} className="link-button">Back to Overview</Link>}
-            />
-          ) : (
-            <div style={{ display: "grid", gap: 14 }}>
-              {groupedItems.length === 0 ? (
-                <ValidationList items={[]} emptyTitle="No findings match this view" emptyMessage="Try broadening the filters or run validation again after changing the design." />
-              ) : groupedItems.map(([category, categoryItems]) => (
-                <div key={category} style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ margin: 0 }}>{category}</h3>
-                    <span className="badge-soft">{categoryItems.length} finding{categoryItems.length === 1 ? "" : "s"}</span>
-                  </div>
-                  <ValidationList
-                    items={categoryItems}
-                    openTaskBodies={openTaskBodies}
-                    onConvertToTask={async (item) => {
-                      const body = `[Validation] ${item.title} — ${item.issue || item.message}`;
-                      if (openTaskBodies.has(body)) {
-                        window.alert("A task for this validation finding already exists.");
-                        return;
-                      }
-
-                      await createCommentMutation.mutateAsync({
-                        body,
-                        taskStatus: "OPEN",
-                        targetType: item.entityType === "SITE" ? "SITE" : item.entityType === "VLAN" ? "VLAN" : "PROJECT",
-                        targetId: item.entityId || undefined,
-                      });
-                    }}
-                    onExplain={(item) => {
-                      setSelectedItem(item);
-                      explainMutation.reset();
-                      explainMutation.mutate({
-                        title: item.title,
-                        message: `${item.issue || item.message}\n\nImpact: ${item.impact || "Review impact with the project context."}\n\nRecommendation: ${item.recommendation || "Review and correct the finding before handoff."}`,
-                        severity: item.severity,
-                        entityType: item.entityType,
-                      }, {
-                        onSettled: () => {
-                          setTimeout(() => insightRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-                        },
-                      });
-                    }}
-                    getFixPath={(item) => buildValidationFixPath(projectId, item)}
-                    getFixLabel={(item) => validationFixLabel(item)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          </label>
+          <label>
+            Search
+            <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Search finding text" />
+          </label>
         </div>
 
-        <div ref={insightRef} style={{ display: "grid", gap: 12 }}>
-          <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Review guidance</h2>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Fix errors before treating the logical design as handoff-ready.</li>
-              <li>Warnings usually indicate design debt, growth pressure, or convention drift.</li>
-              <li>Each finding can now jump directly into the related site, VLAN, or requirements area.</li>
-              <li>Convert recurring issues into tasks so they stay visible in the project workflow.</li>
-            </ul>
+        {groupedItems.map(([category, categoryItems]) => (
+          <div key={category} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <h3 style={{ marginTop: 0 }}>{category}</h3>
+            <ValidationList
+              items={categoryItems}
+              onConvertToTask={convertToTask}
+              onExplain={explainFinding}
+              openTaskBodies={openTaskBodies}
+              getFixPath={(item) => buildValidationFixPath(projectId, item)}
+              getFixLabel={validationFixLabel}
+            />
           </div>
+        ))}
 
-          <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI suggest a fix</h2>
-            <p className="muted" style={{ margin: 0 }}>
-              Pick any validation finding and SubnetOps will explain the issue, why it matters, and the most likely fixes to try next.
-            </p>
-          </div>
+        {groupedItems.length === 0 ? (
+          <EmptyState title="No matching findings" message="No validation findings match the current filters." />
+        ) : null}
+      </div>
 
-          {selectedItem ? (
-            <div data-validation-section="guidance" className="panel" style={{ display: selectedSection && selectedSection !== "guidance" ? "none" : "grid" }}>
-              <strong style={{ display: "block", marginBottom: 6 }}>Selected finding</strong>
-              <p className="muted" style={{ margin: 0 }}>{selectedItem.title}</p>
-            </div>
-          ) : null}
-          {explainMutation.isPending ? <div className="panel"><p className="muted">Generating suggested fixes...</p></div> : null}
-          {explainMutation.isError ? <div className="panel"><p className="error-text">{explainMutation.error instanceof Error ? explainMutation.error.message : "Could not generate a suggested fix right now."}</p></div> : null}
-          {selectedItem && explainMutation.data ? <AIValidationInsight item={selectedItem} explanation={explainMutation.data} /> : null}
+      <div data-validation-section="guidance" className="panel" style={{ display: selectedSection !== "guidance" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Review guidance</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Use this only as review support. Backend validation and design-core outputs remain the source of truth.
+          </p>
+        </div>
+        <div className="trust-note">
+          <strong>Release rule</strong>
+          <p className="muted" style={{ margin: "6px 0 0" }}>
+            Do not ship a project while ERROR findings, backend authority gaps, or implementation blockers remain unresolved.
+          </p>
+        </div>
+        <div ref={insightRef}>
+          {selectedItem && explainMutation.data ? (
+            <AIValidationInsight item={selectedItem} explanation={explainMutation.data} />
+          ) : (
+            <EmptyState title="No AI explanation selected" message="Open the findings section and choose Suggest fix on a validation card." />
+          )}
         </div>
       </div>
     </section>

@@ -6,7 +6,8 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 import {
   clearPlatformProfileState,
   emptyPlatformProfileState,
@@ -48,10 +49,7 @@ export function ProjectPlatformBomPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   const updateProjectMutation = useUpdateProject(projectId);
   const [state, setState] = useState<PlatformProfileState>(emptyPlatformProfileState());
@@ -130,6 +128,8 @@ export function ProjectPlatformBomPage() {
           </>
         }
       />
+
+      <DesignAuthorityBanner authority={authority} compact />
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

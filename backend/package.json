@@ -22,9 +22,15 @@
     "engine:selftest:allocator": "tsx src/lib/addressAllocator.selftest.ts",
     "engine:selftest:matrix": "tsx src/lib/proofMatrix.selftest.ts",
     "engine:selftest:boundary": "tsx src/lib/cidrBoundary.selftest.ts",
-    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core",
+    "engine:selftest:behavioral-matrix": "tsx src/lib/behavioralMatrix.selftest.ts",
+    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation",
     "prisma:db:push": "prisma db push",
-    "prisma:baseline:existing": "sh -c 'for d in prisma/migrations/*; do [ -d \"$d\" ] && npx prisma migrate resolve --applied \"$(basename \"$d\")\"; done'"
+    "prisma:baseline:existing": "sh -c 'for d in prisma/migrations/*; do [ -d \"$d\" ] && npx prisma migrate resolve --applied \"$(basename \"$d\")\"; done'",
+    "security:selftest:rate-limit": "tsx src/middleware/rateLimit.selftest.ts",
+    "engine:selftest:phase33-matrix": "tsx src/lib/phase33EngineMatrix.selftest.ts",
+    "engine:selftest:phase34-routing": "tsx src/lib/phase34RoutingEngine.selftest.ts",
+    "engine:selftest:phase35-security": "tsx src/lib/phase35SecurityPolicyEngine.selftest.ts",
+    "engine:selftest:phase36-implementation": "tsx src/lib/phase36ImplementationPlanningEngine.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

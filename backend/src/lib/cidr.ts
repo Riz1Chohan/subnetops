@@ -188,9 +188,15 @@ export function recommendedPrefixForHosts(hosts: number, role: SegmentRole = "OT
 
   const bufferMultiplier = role === "USER" || role === "GUEST" || role === "VOICE" ? 1.3 : 1.2;
   const target = Math.max(2, Math.ceil(hosts * bufferMultiplier));
+  const minimumPrefixByRole: Partial<Record<SegmentRole, number>> = {
+    PRINTER: 29,
+  };
+  const maximumAllowedPrefix = minimumPrefixByRole[role];
 
   for (let prefix = 30; prefix >= 1; prefix -= 1) {
-    if (usableHostCount(parseCidr(`0.0.0.0/${prefix}`), role) >= target) return prefix;
+    if (usableHostCount(parseCidr(`0.0.0.0/`), role) >= target) {
+      return maximumAllowedPrefix === undefined ? prefix : Math.min(prefix, maximumAllowedPrefix);
+    }
   }
   return 1;
 }

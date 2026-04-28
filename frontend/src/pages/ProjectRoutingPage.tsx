@@ -5,11 +5,12 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -38,10 +39,7 @@ export function ProjectRoutingPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading routing and switching design" message="Composing protocol intent, route policy, QoS, and switching controls." />;
@@ -104,6 +102,7 @@ export function ProjectRoutingPage() {
       ) : null}
 
       <WorkspaceIssueBanner notice={issueNotice} />
+      <DesignAuthorityBanner authority={authority} compact />
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

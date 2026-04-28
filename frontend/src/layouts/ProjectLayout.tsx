@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useProjectComments } from "../features/comments/hooks";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildProjectWorkflowReview } from "../lib/projectWorkflow";
 import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 import { buildWorkspaceIssuePath } from "../lib/workspaceIssue";
@@ -80,7 +80,7 @@ export function ProjectLayout() {
   const comments = commentsQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const readiness = planningReadinessSummary(requirementsProfile);
-  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const workflowReview = useMemo(() => buildProjectWorkflowReview(projectId, synthesized, validations.filter((item) => item.severity === "ERROR").length), [projectId, synthesized, validations]);
   const recoveryCompletion = useMemo(() => buildRecoveryCompletionPlan(projectId, synthesized, validations.filter((item) => item.severity === "ERROR").length), [projectId, synthesized, validations]);
   const isDiagramWorkspace = location.pathname.includes("/diagram");

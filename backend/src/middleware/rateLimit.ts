@@ -22,7 +22,7 @@ function normalizeClientIp(req: Request) {
 
 function getClientKey(req: Request, keyPrefix: string) {
   const ip = normalizeClientIp(req);
-  return `:::`;
+  return `${keyPrefix}:${ip}`;
 }
 
 function sweepExpiredBuckets(now: number) {

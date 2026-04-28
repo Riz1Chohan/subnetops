@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { synthesizeLogicalDesign } from "../../../lib/designSynthesis";
-import { parseRequirementsProfile } from "../../../lib/requirementsProfile";
-import type { ProjectComment, ProjectDetail, ValidationResult, Vlan } from "../../../lib/types";
+import type { ProjectComment, ProjectDetail, ValidationResult } from "../../../lib/types";
+import type { SynthesizedLogicalDesign } from "../../../lib/designSynthesis.types";
 import {
   activePresetKeyForState,
   baselineStateForMode,
@@ -54,6 +53,7 @@ import {
 
 interface ProjectDiagramProps {
   project: ProjectDetail;
+  synthesizedDesign: SynthesizedLogicalDesign;
   comments?: ProjectComment[];
   validations?: ValidationResult[];
   onSelectTarget?: (targetType: "SITE" | "VLAN", targetId: string) => void;
@@ -128,7 +128,7 @@ async function exportPng(svgId: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ProjectDiagram({ project, comments = [], validations = [], onSelectTarget, compact = false, minimalWorkspace = false, controls }: ProjectDiagramProps) {
+export function ProjectDiagram({ project, synthesizedDesign, comments = [], validations = [], onSelectTarget, compact = false, minimalWorkspace = false, controls }: ProjectDiagramProps) {
   const sites = (project.sites ?? []) as SiteWithVlans[];
   const svgId = `diagram-${project.id}`;
   const [internalMode, setInternalMode] = useState<DiagramMode>("logical");
@@ -178,9 +178,7 @@ export function ProjectDiagram({ project, comments = [], validations = [], onSel
     setDeviceFocus(baseline.deviceFocus);
     setLinkFocus(baseline.linkFocus);
   };
-  const requirements = parseRequirementsProfile(project.requirementsJson);
-  const allVlans = sites.flatMap((site) => site.vlans ?? []);
-  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, allVlans, requirements), [project, sites, allVlans, requirements]);
+  const synthesized = synthesizedDesign;
   const scopedSites = useMemo(() => sitesForDiagramScope(sites, synthesized, scope, focusedSiteId), [sites, synthesized, scope, focusedSiteId]);
   const focusedSite = useMemo(() => sites.find((site) => site.id === focusedSiteId) || scopedSites[0] || sites[0], [sites, scopedSites, focusedSiteId]);
   const scopeMeta = useMemo(() => diagramScopeMeta(scope, synthesized, focusedSite), [scope, synthesized, focusedSite]);

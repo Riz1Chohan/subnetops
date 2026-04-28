@@ -1,6 +1,6 @@
 import type { Project, Site, Vlan } from './types';
 import type { RequirementsProfile } from './requirementsProfile';
-import type { SynthesizedLogicalDesign } from './designSynthesis';
+import type { SynthesizedLogicalDesign } from './designSynthesis.types';
 
 export interface ValidationTrustSignal {
   id: string;

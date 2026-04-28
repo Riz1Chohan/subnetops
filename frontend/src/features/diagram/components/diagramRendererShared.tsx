@@ -1,4 +1,4 @@
-import { type SitePlacementDevice, type SynthesizedLogicalDesign } from "../../../lib/designSynthesis";
+import { type SitePlacementDevice, type SynthesizedLogicalDesign } from "../../../lib/designSynthesis.types";
 import type { ProjectComment, ValidationResult, Vlan } from "../../../lib/types";
 import type { ActiveOverlayMode, DeviceFocus, DiagramScope, LabelFocus, LinkAnnotationMode, LinkFocus, OverlayMode } from "../diagramTypes";
 import {

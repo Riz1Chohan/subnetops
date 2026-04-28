@@ -1,4 +1,4 @@
-import { type SynthesizedLogicalDesign } from "../../../lib/designSynthesis";
+import { type SynthesizedLogicalDesign } from "../../../lib/designSynthesis.types";
 import { parseRequirementsProfile } from "../../../lib/requirementsProfile";
 import type { ProjectComment, ProjectDetail, ValidationResult } from "../../../lib/types";
 import type { ActiveOverlayMode, DeviceFocus, DiagramLabelMode, DiagramScope, LabelFocus, LinkAnnotationMode, LinkFocus, OverlayMode, SiteWithVlans } from "..";

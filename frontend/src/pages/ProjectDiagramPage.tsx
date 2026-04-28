@@ -24,7 +24,8 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 import { useValidationResults } from "../features/validation/hooks";
 
 export function ProjectDiagramPage() {
@@ -74,13 +75,12 @@ export function ProjectDiagramPage() {
       }
     : null;
 
-  const seedSynthesized = seedProject
-    ? synthesizeLogicalDesign(seedProject, seedProject.sites, baseVlans, requirementsProfile)
-    : null;
+
+  const { synthesized, authority } = useAuthoritativeDesign(projectId, seedProject ?? project, baseSites, baseVlans, requirementsProfile);
 
   const sites = baseSites.length > 0
     ? baseSites
-    : (seedSynthesized?.siteSummaries ?? []).map((site) => ({
+    : (synthesized.siteSummaries ?? []).map((site) => ({
         id: site.id,
         projectId: project?.id || projectId,
         name: site.name,
@@ -92,7 +92,7 @@ export function ProjectDiagramPage() {
 
   const vlans = baseVlans.length > 0
     ? baseVlans
-    : (seedSynthesized?.addressingPlan ?? []).map((row, index) => ({
+    : (synthesized.addressingPlan ?? []).map((row, index) => ({
         id: row.id || `proposed-vlan-${index}`,
         siteId: row.siteId,
         vlanId: row.vlanId ?? 0,
@@ -120,9 +120,6 @@ export function ProjectDiagramPage() {
       }
     : null;
 
-  const synthesized = enrichedProject
-    ? synthesizeLogicalDesign(enrichedProject, enrichedProject.sites, vlans, requirementsProfile)
-    : null;
 
   const activeSiteId = focusedSiteId || enrichedProject?.sites[0]?.id || "";
   const activeSiteName = enrichedProject?.sites.find((site) => site.id === activeSiteId)?.name || "site";
@@ -258,7 +255,7 @@ export function ProjectDiagramPage() {
       />
     );
   }
-  if (!project || !enrichedProject || !synthesized) {
+  if (!project || !enrichedProject) {
     return (
       <EmptyState
         title="Project not found"
@@ -270,6 +267,7 @@ export function ProjectDiagramPage() {
 
   return (
     <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">
+      <DesignAuthorityBanner authority={authority} compact />
       <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
         <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
           <div className="diagram-control-card diagram-control-card-compact diagram-control-card-top">
@@ -397,6 +395,7 @@ export function ProjectDiagramPage() {
               <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
                 <ProjectDiagram
                   project={enrichedProject}
+                  synthesizedDesign={synthesized}
                   comments={comments}
                   validations={validations}
                   compact

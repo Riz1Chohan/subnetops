@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import type { DesignTruthAuthoritySource } from "./designTruthModel";
 
 export interface AuthoritySourceMixItem {
@@ -54,14 +54,14 @@ export interface DesignAuthorityLedger {
 const sourceLabels: Record<DesignTruthAuthoritySource, string> = {
   "saved-design": "Saved design",
   "discovery-derived": "Discovery-backed",
-  "planner-preview": "Planner preview",
+  "backend-unconfirmed": "Backend-unconfirmed",
   inferred: "Still inferred",
 };
 
 const sourceWeights: Record<DesignTruthAuthoritySource, number> = {
   "saved-design": 1,
   "discovery-derived": 0.82,
-  "planner-preview": 0.64,
+  "backend-unconfirmed": 0.64,
   inferred: 0.24,
 };
 
@@ -83,7 +83,7 @@ function sourceRank(source: DesignTruthAuthoritySource | "none") {
       return 4;
     case "discovery-derived":
       return 3;
-    case "planner-preview":
+    case "backend-unconfirmed":
       return 2;
     case "inferred":
       return 1;
@@ -102,15 +102,15 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
   const boundarySources = truth.boundaryDomains.map((item) => item.authoritySource);
   const sources = [...routeSources, ...boundarySources];
   const totalAnchors = Math.max(1, sources.length);
-  const sourceMix: AuthoritySourceMixItem[] = (["saved-design", "discovery-derived", "planner-preview", "inferred"] as DesignTruthAuthoritySource[]).map((source) => {
+  const sourceMix: AuthoritySourceMixItem[] = (["saved-design", "discovery-derived", "backend-unconfirmed", "inferred"] as DesignTruthAuthoritySource[]).map((source) => {
     const count = sources.filter((item) => item === source).length;
     const share = count / totalAnchors;
     const detail = source === "saved-design"
       ? "Directly persisted design objects and shared-project truth."
       : source === "discovery-derived"
         ? "Strength taken from discovery evidence or current-state capture."
-        : source === "planner-preview"
-          ? "Preview truth derived from planner answers before full design save depth exists."
+        : source === "backend-unconfirmed"
+          ? "Backend snapshot marked this object as not fully confirmed yet; keep it out of implementation sign-off until backend evidence improves."
           : "Objects still being inferred because the stronger source is not there yet.";
     return {
       source,
@@ -153,7 +153,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
           id: key,
           severity: "critical" as const,
           title: "Route authority is still partly inferred",
-          detail: `${routeInferred} route domain${routeInferred === 1 ? " is" : "s are"} still inferred instead of coming from stronger saved, discovery, or planner-backed truth.`,
+          detail: `${routeInferred} route domain${routeInferred === 1 ? " is" : "s are"} still inferred instead of coming from stronger saved, discovery, or backend-confirmed truth.`,
           fixPath: `/projects/${projectId}/routing?focus=route-anchors`,
           actionLabel: "Open Routing",
         };
@@ -227,7 +227,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
     const routeSourcesForSite = truth.routeDomains.filter((item) => item.siteId === site.siteId).map((item) => item.authoritySource);
     const boundarySourcesForSite = truth.boundaryDomains.filter((item) => item.siteId === site.siteId || item.siteName === site.siteName).map((item) => item.authoritySource);
     const siteSources = [...routeSourcesForSite, ...boundarySourcesForSite];
-    const strongestSource = (["saved-design", "discovery-derived", "planner-preview", "inferred"] as DesignTruthAuthoritySource[])
+    const strongestSource = (["saved-design", "discovery-derived", "backend-unconfirmed", "inferred"] as DesignTruthAuthoritySource[])
       .filter((source) => siteSources.includes(source))
       .sort((a, b) => sourceRank(b) - sourceRank(a))[0] ?? "none";
     const blockers = unique([...site.authorityNotes, ...site.notes]).slice(0, 4);

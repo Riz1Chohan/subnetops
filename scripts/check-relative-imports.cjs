@@ -67,3 +67,5 @@ if (missing.length) {
 }
 
 console.log('Relative import check passed.');
+
+process.exit(0);

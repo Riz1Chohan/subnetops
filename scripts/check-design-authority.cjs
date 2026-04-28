@@ -3,43 +3,67 @@ const fs = require("fs");
 const path = require("path");
 
 const root = process.cwd();
-const requiredFiles = [
-  "backend/src/routes/designCore.routes.ts",
-  "backend/src/controllers/designCore.controller.ts",
-  "backend/src/services/designCore.service.ts",
-  "backend/src/services/designCore/designCore.helpers.ts",
-  "backend/src/services/designCore/designCore.repository.ts",
-  "frontend/src/features/designCore/api.ts",
-  "frontend/src/features/designCore/hooks.ts",
-  "frontend/src/lib/designCoreSnapshot.ts",
-  "frontend/src/lib/designCoreAdapter.ts",
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+const fail = (message) => {
+  console.error(message);
+  process.exit(1);
+};
+
+const hookPath = "frontend/src/features/designCore/hooks.ts";
+const hook = read(hookPath);
+for (const required of [
+  "export function useAuthoritativeDesign",
+  "buildBackendOnlyDisplayDesign",
+  "applyDesignCoreSnapshotToDisplayDesign",
+  "resolveDesignAuthorityState",
+  "useDesignCoreSnapshot(projectId)",
+]) {
+  if (!hook.includes(required)) {
+    fail(`Backend authority seam failed: ${hookPath} is missing ${required}.`);
+  }
+}
+
+const authoritativeSurfaces = [
+  "frontend/src/layouts/ProjectLayout.tsx",
+  "frontend/src/pages/ProjectOverviewPage.tsx",
+  "frontend/src/pages/ProjectDiscoveryPage.tsx",
+  "frontend/src/pages/ProjectAddressingPage.tsx",
+  "frontend/src/pages/ProjectCoreModelPage.tsx",
+  "frontend/src/pages/ProjectImplementationPage.tsx",
+  "frontend/src/pages/ProjectRoutingPage.tsx",
+  "frontend/src/pages/ProjectSecurityPage.tsx",
+  "frontend/src/pages/ProjectStandardsPage.tsx",
+  "frontend/src/pages/ProjectValidationPage.tsx",
+  "frontend/src/pages/ProjectReportPage.tsx",
+  "frontend/src/pages/ProjectDiagramPage.tsx",
+  "frontend/src/pages/ProjectPlatformBomPage.tsx",
 ];
 
-const missing = requiredFiles.filter((file) => !fs.existsSync(path.join(root, file)));
-if (missing.length) {
-  console.error("Design authority check failed. Missing files:");
-  for (const file of missing) console.error(`- ${file}`);
-  process.exit(1);
-}
-
-const addressingPage = fs.readFileSync(path.join(root, "frontend/src/pages/ProjectAddressingPage.tsx"), "utf8");
-const reportPage = fs.readFileSync(path.join(root, "frontend/src/pages/ProjectReportPage.tsx"), "utf8");
-
-for (const [name, source] of [["ProjectAddressingPage", addressingPage], ["ProjectReportPage", reportPage]]) {
-  if (!source.includes("useDesignCoreSnapshot(projectId)")) {
-    console.error(`${name} does not fetch the backend design-core snapshot.`);
-    process.exit(1);
+for (const surface of authoritativeSurfaces) {
+  const source = read(surface);
+  if (!source.includes("useAuthoritativeDesign")) {
+    fail(`Backend authority seam failed: ${surface} must render through useAuthoritativeDesign.`);
   }
-  if (!source.includes("applyDesignCoreSnapshotToSynthesis")) {
-    console.error(`${name} does not apply backend design-core output to the frontend view model.`);
-    process.exit(1);
+  if (source.includes("../lib/designSynthesis") || source.includes("useDesignCoreSnapshot(projectId)") || source.includes("applyDesignCoreSnapshotToDisplayDesign")) {
+    fail(`Backend authority seam failed: ${surface} is bypassing the shared authority hook.`);
   }
 }
 
-const backendService = fs.readFileSync(path.join(root, "backend/src/services/designCore.service.ts"), "utf8");
-if (!backendService.includes("./designCore/designCore.helpers.js") || !backendService.includes("./designCore/designCore.repository.js")) {
-  console.error("Backend design core service has not been split into helper/repository seams.");
-  process.exit(1);
+const adapter = read("frontend/src/lib/designCoreAdapter.ts");
+for (const required of ["backendCheckedAddressingPlan", "Backend design-core proposal", "backendImplementationPlanSummary", "backendSecurityMatrix", "backendRoutingPlan"]) {
+  if (!adapter.includes(required)) {
+    fail(`Backend authority seam failed: designCoreAdapter must expose ${required}.`);
+  }
 }
 
-console.log("Design authority seam check passed.");
+const authority = read("frontend/src/lib/designAuthority.tsx");
+if (!authority.includes("Backend design-core unavailable") || !authority.includes("DesignAuthorityBanner")) {
+  fail("Backend authority seam failed: frontend authority banner must disclose backend availability state.");
+}
+if (authority.includes("Frontend draft preview only") || authority.includes("frontend-fallback")) {
+  fail("Backend authority seam failed: frontend fallback planning language is banned.");
+}
+
+console.log("Backend authority seam check passed.");
+
+process.exit(0);

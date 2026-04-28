@@ -5,8 +5,9 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -34,10 +35,7 @@ export function ProjectImplementationPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading implementation plan" message="Preparing rollout phases, rollback triggers, validation tests, and cutover guidance." />;
@@ -80,6 +78,8 @@ export function ProjectImplementationPage() {
         }
       />
 
+      <DesignAuthorityBanner authority={authority} />
+
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Phases {synthesized.implementationPhases.length}</span>
@@ -87,10 +87,10 @@ export function ProjectImplementationPage() {
           <span className="badge-soft">Rollback triggers {synthesized.rollbackPlan.length}</span>
           <span className="badge-soft">Validation tests {synthesized.validationPlan.length}</span>
           <span className="badge-soft">Risks {criticalRisks} critical / {warningRisks} warning</span>
+          {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Backend Phase 36C operational-safety implementation plan displayed</span> : <span className="badge badge-warning">Backend plan unavailable</span>}
         </div>
         <p className="muted" style={{ margin: 0 }}>
-          A real design package should not stop at topology and addressing. It should also explain how the network will be introduced safely,
-          what gets validated before and after the cutover, when rollback begins, and what risks still need explicit ownership.
+          A real design package should not stop at topology and addressing. This page renders the backend design-core implementation model when available, including dependencies, blockers, evidence, blast radius, and rollback posture.
         </p>
       </div>
 

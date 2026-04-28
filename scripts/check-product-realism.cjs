@@ -36,7 +36,7 @@ assert(exportService.includes("Validation Findings"), "report/export is missing 
 assert(designCoreService.includes('authority: {') && designCoreService.includes('source: "backend-design-core"') && designCoreService.includes('requiresEngineerReview: true'), "backend design-core snapshot authority metadata is missing.");
 assert(designCoreTypes.includes('source: "backend-design-core"') && designCoreTypes.includes('requiresEngineerReview: true'), "backend design-core type is missing authority metadata.");
 assert(designCoreSnapshot.includes('source: "backend-design-core"') && designCoreSnapshot.includes('requiresEngineerReview: true'), "frontend design-core snapshot type is missing authority metadata.");
-assert(designCoreSnapshot.includes("Frontend preview") && designCoreSnapshot.includes("engineer review required"), "fallback/authority labels are not realistic enough.");
+assert(designCoreSnapshot.includes("Backend snapshot unavailable") && designCoreSnapshot.includes("engineer review required"), "fallback/authority labels are not realistic enough.");
 
 const bannedTerms = [
   "guaranteed",
@@ -71,3 +71,5 @@ for (const file of keyFiles) {
 }
 
 console.log("Product realism check passed.");
+
+process.exit(0);

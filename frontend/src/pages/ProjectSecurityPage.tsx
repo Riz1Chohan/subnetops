@@ -5,11 +5,12 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -44,10 +45,7 @@ export function ProjectSecurityPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading security architecture" message="Composing security zones, control recommendations, and policy intent." />;
@@ -82,6 +80,10 @@ export function ProjectSecurityPage() {
 
   const criticalFindings = synthesized.segmentationReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.segmentationReview.filter((item) => item.severity === "warning").length;
+  const backendSecurityFlow = designCore?.networkObjectModel.securityPolicyFlow;
+  const backendPolicyMatrix = backendSecurityFlow?.policyMatrix ?? [];
+  const backendRuleOrderReviews = backendSecurityFlow?.ruleOrderReviews ?? [];
+  const backendNatReviews = backendSecurityFlow?.natReviews ?? [];
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -110,12 +112,13 @@ export function ProjectSecurityPage() {
       ) : null}
 
       <WorkspaceIssueBanner notice={issueNotice} />
+      <DesignAuthorityBanner authority={authority} compact />
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Security zones {synthesized.securityZones.length}</span>
           <span className="badge-soft">Controls {synthesized.securityControls.length}</span>
-          <span className="badge-soft">Policy flows {synthesized.securityPolicyMatrix.length}</span>
+          <span className="badge-soft">Backend policy rows {backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length}</span>
           <span className="badge-soft">Segmentation review {criticalFindings} critical / {warningFindings} warning</span>
         </div>
         <p className="muted" style={{ margin: 0 }}>
@@ -163,7 +166,7 @@ export function ProjectSecurityPage() {
       <div className="grid-2" style={{ display: selectedSection && selectedSection !== "boundaries" ? "none" : "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Security zones", synthesized.securityZones.length, "Distinct trust boundaries carried in the logical design.")}
         {summaryCard("Required controls", synthesized.securityControls.filter((item) => item.status === "required").length, "Controls that should not be skipped for the saved scope.")}
-        {summaryCard("Policy-intent flows", synthesized.securityPolicyMatrix.length, "Reviewed inter-zone flow expectations before implementation.")}
+        {summaryCard("Backend policy rows", backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length, "Backend security matrix rows carried by the authoritative design-core snapshot.")}
         {summaryCard("Open security findings", synthesized.segmentationReview.filter((item) => item.severity !== "info").length, "Critical and warning findings that still need engineering review.")}
       </div>
 
@@ -289,7 +292,119 @@ export function ProjectSecurityPage() {
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "policy" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Policy-intent matrix</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Backend security policy engine</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            These rows come from the backend design-core security engine. The frontend is only rendering the matrix, rule-order review, and NAT review; it is not creating firewall policy.
+          </p>
+        </div>
+        {backendSecurityFlow ? (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className={backendSecurityFlow.summary.policyReadiness === "blocked" ? "badge badge-error" : backendSecurityFlow.summary.policyReadiness === "review" ? "badge badge-warning" : "badge badge-info"}>policy {backendSecurityFlow.summary.policyReadiness}</span>
+              <span className={backendSecurityFlow.summary.natReadiness === "blocked" ? "badge badge-error" : backendSecurityFlow.summary.natReadiness === "review" ? "badge badge-warning" : "badge badge-info"}>nat {backendSecurityFlow.summary.natReadiness}</span>
+              <span className="badge-soft">implicit deny gaps {backendSecurityFlow.summary.implicitDenyGapCount}</span>
+              <span className="badge-soft">shadowed rules {backendSecurityFlow.summary.shadowedRuleCount}</span>
+              <span className="badge-soft">logging gaps {backendSecurityFlow.summary.loggingGapCount}</span>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th align="left">Source</th>
+                    <th align="left">Destination</th>
+                    <th align="left">Default posture</th>
+                    <th align="left">State</th>
+                    <th align="left">Explicit rules</th>
+                    <th align="left">Required flows</th>
+                    <th align="left">NAT flows</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {backendPolicyMatrix.slice(0, 12).map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.sourceZoneName}</td>
+                      <td>{row.destinationZoneName}</td>
+                      <td>{row.defaultPosture}</td>
+                      <td>{row.state}</td>
+                      <td>{row.explicitPolicyRuleIds.length}</td>
+                      <td>{row.requiredFlowIds.length}</td>
+                      <td>{row.natRequiredFlowIds.length}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div style={{ overflowX: "auto" }}>
+                <h3 style={{ marginTop: 0 }}>Rule-order review</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Seq</th>
+                      <th align="left">Rule</th>
+                      <th align="left">Action</th>
+                      <th align="left">Services</th>
+                      <th align="left">State</th>
+                      <th align="left">Shadowed by</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backendRuleOrderReviews.slice(0, 10).map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.sequence}</td>
+                        <td>{row.ruleName}</td>
+                        <td>{row.action}</td>
+                        <td>{row.services.join(", ")}</td>
+                        <td>{row.state}</td>
+                        <td>{row.shadowedByRuleIds.join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <h3 style={{ marginTop: 0 }}>NAT review</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Rule</th>
+                      <th align="left">Source</th>
+                      <th align="left">Destination</th>
+                      <th align="left">Mode</th>
+                      <th align="left">State</th>
+                      <th align="left">Covered flows</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backendNatReviews.slice(0, 10).map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.natRuleName}</td>
+                        <td>{row.sourceZoneName}</td>
+                        <td>{row.destinationZoneName || "review"}</td>
+                        <td>{row.translatedAddressMode}</td>
+                        <td>{row.state}</td>
+                        <td>{row.coveredFlowRequirementIds.length}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="No backend security engine output"
+            message="SubnetOps cannot render authoritative security policy rows until the backend design-core snapshot is available."
+          />
+        )}
+      </div>
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "policy" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Legacy policy-intent display</h2>
           <p className="muted" style={{ margin: 0 }}>
             This is not a final firewall rulebase. It is the engineering policy intent that should guide detailed access rules, ACLs, and security platform implementation.
           </p>

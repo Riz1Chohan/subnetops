@@ -6,7 +6,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm ci --include=dev --ignore-scripts --no-audit --no-fund && npm run prisma:generate && npm run build
-    startCommand: ./entrypoint.sh
+    startCommand: sh ./entrypoint.sh
     healthCheckPath: /api/health/ready
     autoDeployTrigger: commit
     buildFilter:
@@ -66,7 +66,7 @@ services:
       - key: PRISMA_SYNC_STRATEGY
         value: migrate
       - key: PRISMA_BASELINE_EXISTING_DB
-        value: "true"
+        value: "false"
       - key: ALLOW_UNSAFE_DB_PUSH
         value: "false"
       - key: DB_PUSH_ON_BOOT

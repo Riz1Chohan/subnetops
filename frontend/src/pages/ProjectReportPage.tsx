@@ -9,7 +9,6 @@ import { UsageBanner } from "../components/app/UsageBanner";
 import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import { ValidationList } from "../features/validation/components/ValidationList";
 import { buildNamingPreviewExamples, parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
@@ -17,9 +16,9 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { apiBlob } from "../lib/api";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
-import { useDesignCoreSnapshot } from "../features/designCore/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
-import { applyDesignCoreSnapshotToSynthesis } from "../lib/designCoreAdapter";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -100,7 +99,6 @@ export function ProjectReportPage() {
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
-  const designCoreQuery = useDesignCoreSnapshot(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const project = projectQuery.data;
@@ -111,15 +109,7 @@ export function ProjectReportPage() {
   const selectedSection = new URLSearchParams(location.search).get("section");
   const isFocusedSectionView = Boolean(selectedSection);
   const issueNotice = parseWorkspaceIssueNotice(location.search);
-  const localSynthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
-  const designCore = designCoreQuery.data;
-  const synthesized = useMemo(
-    () => applyDesignCoreSnapshotToSynthesis(localSynthesized, designCore),
-    [localSynthesized, designCore],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -306,6 +296,7 @@ export function ProjectReportPage() {
           </div>
         </div>
         <WorkspaceIssueBanner notice={issueNotice} />
+        <DesignAuthorityBanner authority={authority} compact />
         </>
       ) : (
       <header className="panel report-hero">
@@ -337,7 +328,10 @@ export function ProjectReportPage() {
       </header>
       )}
 
-      {!isFocusedSectionView ? <WorkspaceIssueBanner notice={issueNotice} /> : null}
+      {!isFocusedSectionView ? <>
+        <WorkspaceIssueBanner notice={issueNotice} />
+        <DesignAuthorityBanner authority={authority} compact />
+      </> : null}
 
       {!isFocusedSectionView ? <UsageBanner
         planTier={authQuery.data?.user.planTier}
@@ -800,7 +794,7 @@ export function ProjectReportPage() {
             )}
           </div>
         </div>
-        <ProjectDiagram project={enrichedProject} />
+        <ProjectDiagram project={enrichedProject} synthesizedDesign={synthesized} />
       </div>
     </section>
   );

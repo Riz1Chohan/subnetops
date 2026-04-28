@@ -5,6 +5,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import {
   analyzeDiscoveryWorkspaceState,
   clearDiscoveryWorkspaceState,
@@ -14,7 +15,6 @@ import {
   type DiscoveryWorkspaceState,
 } from "../lib/discoveryFoundation";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
@@ -75,13 +75,13 @@ export function ProjectDiscoveryPage() {
     [project, sites, vlans, state],
   );
   const requirementsProfile = useMemo(() => parseRequirementsProfile(project?.requirementsJson), [project?.requirementsJson]);
-  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const recovery = useMemo(() => buildRecoveryRoadmapStatus(synthesized), [synthesized]);
   const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recovery), [recovery]);
   const discoveryRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived");
   const discoveryBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived");
-  const plannerRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview");
-  const plannerBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview");
+  const backendUnconfirmedRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
+  const backendUnconfirmedBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
 
   const updateState = (patch: Partial<DiscoveryWorkspaceState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -256,8 +256,8 @@ export function ProjectDiscoveryPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Discovery route anchors {discoveryRouteAnchors.length}</span>
           <span className="badge-soft">Discovery boundary anchors {discoveryBoundaryAnchors.length}</span>
-          <span className="badge-soft">Planner route anchors {plannerRouteAnchors.length}</span>
-          <span className="badge-soft">Planner boundary anchors {plannerBoundaryAnchors.length}</span>
+          <span className="badge-soft">Backend-unconfirmed route anchors {backendUnconfirmedRouteAnchors.length}</span>
+          <span className="badge-soft">Backend-unconfirmed boundary anchors {backendUnconfirmedBoundaryAnchors.length}</span>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -272,7 +272,7 @@ export function ProjectDiscoveryPage() {
             )}
           </div>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>Still held by planner-preview truth</strong>
+            <strong style={{ display: "block", marginBottom: 8 }}>Still held by backend-unconfirmed truth</strong>
             <p className="muted" style={{ margin: 0 }}>
               Planner-preview anchors are useful, but the stronger recovery direction is to replace as many of them as possible with discovery-backed or saved design records.
             </p>
