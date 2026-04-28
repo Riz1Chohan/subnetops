@@ -113,7 +113,7 @@ export function ProjectValidationPage() {
   }, [filteredItems]);
 
   const openTaskBodies = new Set<string>((commentsQuery.data ?? []).map((comment) => comment.body));
-  const backendSummary = designCore?.networkObjectModel.summary;
+  const backendSummary = designCore?.networkObjectModel?.summary;
 
   if (projectQuery.isLoading || validationQuery.isLoading) {
     return <LoadingState title="Loading validation" message="Loading backend validation results and design-core authority state." />;

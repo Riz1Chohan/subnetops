@@ -80,7 +80,7 @@ export function ProjectSecurityPage() {
 
   const criticalFindings = synthesized.segmentationReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.segmentationReview.filter((item) => item.severity === "warning").length;
-  const backendSecurityFlow = designCore?.networkObjectModel.securityPolicyFlow;
+  const backendSecurityFlow = designCore?.networkObjectModel?.securityPolicyFlow;
   const backendPolicyMatrix = backendSecurityFlow?.policyMatrix ?? [];
   const backendRuleOrderReviews = backendSecurityFlow?.ruleOrderReviews ?? [];
   const backendNatReviews = backendSecurityFlow?.natReviews ?? [];

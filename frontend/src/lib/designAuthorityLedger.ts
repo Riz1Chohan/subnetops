@@ -55,6 +55,7 @@ const sourceLabels: Record<DesignTruthAuthoritySource, string> = {
   "saved-design": "Saved design",
   "discovery-derived": "Discovery-backed",
   "backend-unconfirmed": "Backend-unconfirmed",
+  "planner-preview": "Planner preview",
   inferred: "Still inferred",
 };
 
@@ -62,6 +63,7 @@ const sourceWeights: Record<DesignTruthAuthoritySource, number> = {
   "saved-design": 1,
   "discovery-derived": 0.82,
   "backend-unconfirmed": 0.64,
+  "planner-preview": 0.36,
   inferred: 0.24,
 };
 
@@ -85,6 +87,8 @@ function sourceRank(source: DesignTruthAuthoritySource | "none") {
       return 3;
     case "backend-unconfirmed":
       return 2;
+    case "planner-preview":
+      return 1.5;
     case "inferred":
       return 1;
     default:
@@ -102,7 +106,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
   const boundarySources = truth.boundaryDomains.map((item) => item.authoritySource);
   const sources = [...routeSources, ...boundarySources];
   const totalAnchors = Math.max(1, sources.length);
-  const sourceMix: AuthoritySourceMixItem[] = (["saved-design", "discovery-derived", "backend-unconfirmed", "inferred"] as DesignTruthAuthoritySource[]).map((source) => {
+  const sourceMix: AuthoritySourceMixItem[] = (["saved-design", "discovery-derived", "backend-unconfirmed", "planner-preview", "inferred"] as DesignTruthAuthoritySource[]).map((source) => {
     const count = sources.filter((item) => item === source).length;
     const share = count / totalAnchors;
     const detail = source === "saved-design"
@@ -111,7 +115,9 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
         ? "Strength taken from discovery evidence or current-state capture."
         : source === "backend-unconfirmed"
           ? "Backend snapshot marked this object as not fully confirmed yet; keep it out of implementation sign-off until backend evidence improves."
-          : "Objects still being inferred because the stronger source is not there yet.";
+          : source === "planner-preview"
+            ? "Legacy planner-preview authority is treated as weak display-only evidence and must be replaced by backend design-core truth before implementation sign-off."
+            : "Objects still being inferred because the stronger source is not there yet.";
     return {
       source,
       label: sourceLabels[source],
@@ -227,7 +233,7 @@ export function buildDesignAuthorityLedger(projectId: string, design: Synthesize
     const routeSourcesForSite = truth.routeDomains.filter((item) => item.siteId === site.siteId).map((item) => item.authoritySource);
     const boundarySourcesForSite = truth.boundaryDomains.filter((item) => item.siteId === site.siteId || item.siteName === site.siteName).map((item) => item.authoritySource);
     const siteSources = [...routeSourcesForSite, ...boundarySourcesForSite];
-    const strongestSource = (["saved-design", "discovery-derived", "backend-unconfirmed", "inferred"] as DesignTruthAuthoritySource[])
+    const strongestSource = (["saved-design", "discovery-derived", "backend-unconfirmed", "planner-preview", "inferred"] as DesignTruthAuthoritySource[])
       .filter((source) => siteSources.includes(source))
       .sort((a, b) => sourceRank(b) - sourceRank(a))[0] ?? "none";
     const blockers = unique([...site.authorityNotes, ...site.notes]).slice(0, 4);

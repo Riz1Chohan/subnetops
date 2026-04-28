@@ -32,7 +32,7 @@ export interface DesignTruthSegmentNode {
   attachedServiceIds: string[];
 }
 
-export type DesignTruthAuthoritySource = "saved-design" | "discovery-derived" | "backend-unconfirmed" | "inferred";
+export type DesignTruthAuthoritySource = "saved-design" | "discovery-derived" | "backend-unconfirmed" | "planner-preview" | "inferred";
 
 export interface DesignTruthRouteDomain {
   id: string;
@@ -164,4 +164,43 @@ export interface UnifiedDesignTruthModel {
     boundaryDomains: number;
   };
   generationNotes: string[];
+}
+
+
+/**
+ * Backward-compatible empty truth-model builder for older checked-in frontend
+ * modules. It does not infer design facts; it only returns a safe empty model
+ * so stale browser synthesis code cannot reintroduce frontend authority.
+ */
+export function buildUnifiedDesignTruthModel(..._args: unknown[]): UnifiedDesignTruthModel {
+  return {
+    summary: "No authoritative backend design snapshot loaded.",
+    topologyType: "backend-unclassified",
+    topologyLabel: "Backend design truth unavailable",
+    servicePlacementModel: "Unavailable until backend design-core returns service-placement data.",
+    internetBreakout: "unknown",
+    siteNodes: [],
+    segments: [],
+    routeDomains: [],
+    boundaryDomains: [],
+    serviceDomains: [],
+    flowContracts: [],
+    wanAdjacencies: [],
+    relationshipEdges: [],
+    unresolvedReferences: [],
+    coverage: [
+      {
+        label: "Backend design-core snapshot",
+        status: "pending",
+        detail: "The frontend is not generating substitute design truth.",
+      },
+    ],
+    inferenceSummary: {
+      routeDomains: 0,
+      boundaryDomains: 0,
+    },
+    generationNotes: [
+      "Compatibility builder returned an empty model; backend design-core remains the authority.",
+    ],
+  };
 }
