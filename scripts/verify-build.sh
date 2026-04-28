@@ -72,6 +72,9 @@ node scripts/check-product-realism.cjs
 echo
 echo "==> Final trust cleanup seam check"
 node scripts/check-final-trust-cleanup.cjs
+node scripts/check-report-diagram-truth.cjs
+node scripts/check-backend-report-diagram-truth.cjs
+node scripts/check-backend-diagram-render-model.cjs
 
 echo
 echo "==> Backend install + Prisma generate + TypeScript build + engine tests"

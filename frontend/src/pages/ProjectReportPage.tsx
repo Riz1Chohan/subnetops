@@ -19,6 +19,7 @@ import { buildValidationFixPath, validationFixLabel } from "../lib/validationFix
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
+import { buildReportTruthModel, truthBadgeClass } from "../lib/reportDiagramTruth";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -110,6 +111,7 @@ export function ProjectReportPage() {
   const isFocusedSectionView = Boolean(selectedSection);
   const issueNotice = parseWorkspaceIssueNotice(location.search);
   const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const reportTruth = useMemo(() => buildReportTruthModel(designCore), [designCore]);
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -303,6 +305,7 @@ export function ProjectReportPage() {
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span className={status.className}>{status.label}</span>
+            <span className={truthBadgeClass(reportTruth.overallReadiness)}>Backend truth {reportTruth.overallReadinessLabel}</span>
             <span className="badge-soft">Requirements {readinessSummary.completionLabel}</span>
             {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
             <span className="badge-soft">Topology {synthesized.topology.topologyLabel}</span>
@@ -343,11 +346,11 @@ export function ProjectReportPage() {
       {!isFocusedSectionView ? <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Sites", designCore?.summary.siteCount ?? synthesized.siteSummaries.length)}
         {summaryCard("Address rows", designCore?.summary.vlanCount ?? synthesized.addressingPlan.length)}
-        {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
-        {summaryCard("Security boundaries", synthesized.securityBoundaries.length)}
-        {summaryCard("Service placements", synthesized.servicePlacements.length)}
-        {summaryCard("Validation blockers", errorCount)}
-        {summaryCard("Warnings", warningCount)}
+        {summaryCard("Route domains", reportTruth.summary.routeDomainCount)}
+        {summaryCard("Security flows", reportTruth.summary.securityFlowCount)}
+        {summaryCard("Implementation steps", reportTruth.summary.implementationStepCount)}
+        {summaryCard("Blocked steps", reportTruth.summary.blockedImplementationStepCount)}
+        {summaryCard("Verification blocked", reportTruth.summary.blockedVerificationCheckCount)}
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div> : null}
 
@@ -716,32 +719,73 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h3>
           <p className="muted" style={{ margin: 0 }}>
-            This section keeps the execution picture visible: rollout model, validation approach, rollback posture, cutover checkpoints, and the interfaces and boundary attachments that matter during review.
+            This section now stays tied to backend truth instead of hand-wavy rollout language alone. It shows what is blocked, what still needs review, which verification gates are missing, and what rollback posture exists before handoff.
           </p>
         </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className={truthBadgeClass(reportTruth.overallReadiness)}>Overall {reportTruth.overallReadinessLabel}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.routing)}>Routing {reportTruth.readiness.routing}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.security)}>Security {reportTruth.readiness.security}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.nat)}>NAT {reportTruth.readiness.nat}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.implementation)}>Implementation {reportTruth.readiness.implementation}</span>
+        </div>
+
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+          {summaryCard("Devices", reportTruth.summary.deviceCount)}
+          {summaryCard("Links", reportTruth.summary.linkCount)}
+          {summaryCard("Route domains", reportTruth.summary.routeDomainCount)}
+          {summaryCard("Security zones", reportTruth.summary.securityZoneCount)}
+          {summaryCard("Route intents", reportTruth.summary.routeIntentCount)}
+          {summaryCard("Security flows", reportTruth.summary.securityFlowCount)}
+          {summaryCard("Implementation steps", reportTruth.summary.implementationStepCount)}
+          {summaryCard("Blocked verification", reportTruth.summary.blockedVerificationCheckCount)}
+        </div>
+
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Implementation summary</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li style={{ marginBottom: 8 }}><strong>Rollout:</strong> {synthesized.implementationPlan.rolloutStrategy}</li>
-              <li style={{ marginBottom: 8 }}><strong>Migration:</strong> {synthesized.implementationPlan.migrationStrategy}</li>
-              <li style={{ marginBottom: 8 }}><strong>Validation:</strong> {synthesized.implementationPlan.validationApproach}</li>
-              <li style={{ marginBottom: 8 }}><strong>Rollback:</strong> {synthesized.implementationPlan.rollbackPosture}</li>
-              <li style={{ marginBottom: 0 }}><strong>Handoff:</strong> {synthesized.implementationPlan.handoffPackage}</li>
-            </ul>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Blocking findings</h3>
+            {reportTruth.blockedFindings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No backend blocking findings are currently open.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.blockedFindings.map((item, index) => <li key={`${item.source}-${index}`} style={{ marginBottom: 8 }}><strong>{item.source} — {item.title}:</strong> {item.detail}</li>)}</ul>
+            )}
           </div>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Engineer review checklist</h3>
-            {sectionList(ENGINEER_REVIEW_CHECKLIST, "No checklist items available.")}
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Review findings</h3>
+            {reportTruth.reviewFindings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No backend review findings are currently open.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.reviewFindings.map((item, index) => <li key={`${item.source}-${index}`} style={{ marginBottom: 8 }}><strong>{item.source} — {item.title}:</strong> {item.detail}</li>)}</ul>
+            )}
           </div>
         </div>
+
         <div>
-          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Cutover checkpoints</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {synthesized.cutoverChecklist.slice(0, 8).map((item) => (
-              <li key={`${item.stage}-${item.item}`} style={{ marginBottom: 8 }}><strong>{item.stage}:</strong> {item.item}</li>
-            ))}
-          </ul>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Implementation review queue</h3>
+          {reportTruth.topImplementationSteps.length === 0 ? <p className="muted" style={{ margin: 0 }}>No implementation steps are currently available from backend truth.</p> : (
+            <div className="table-wrap"><table><thead><tr><th>Step</th><th>Category</th><th>Readiness</th><th>Evidence / blockers</th><th>Rollback</th></tr></thead><tbody>
+              {reportTruth.topImplementationSteps.map((step) => <tr key={step.id}><td><strong>{step.title}</strong><div className="muted">{step.expectedOutcome}</div></td><td>{step.category}</td><td><span className={truthBadgeClass(step.readiness)}>{step.readiness}</span></td><td>{step.blockers[0] ?? step.requiredEvidence[0] ?? step.readinessReasons[0] ?? "—"}</td><td>{step.rollbackIntent || "—"}</td></tr>)}
+            </tbody></table></div>
+          )}
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Verification coverage</h3>
+            {reportTruth.verificationChecksByType.length === 0 ? <p className="muted" style={{ margin: 0 }}>No verification checks are currently available.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.verificationChecksByType.map((item) => <li key={item.checkType} style={{ marginBottom: 8 }}><strong>{item.checkType}:</strong> {item.totalCount} total · {item.blockedCount} blocked · {item.reviewCount} review · {item.readyCount} ready</li>)}</ul>
+            )}
+            <div style={{ marginTop: 12 }}><h4 style={{ margin: "0 0 8px 0" }}>Priority verification checks</h4>{reportTruth.verificationChecks.length === 0 ? <p className="muted" style={{ margin: 0 }}>No verification checks available.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.verificationChecks.slice(0, 8).map((check) => <li key={check.id} style={{ marginBottom: 8 }}><strong>{check.name}:</strong> {check.expectedResult} ({check.readiness})</li>)}</ul>}</div>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Rollback and review checklist</h3>
+            {reportTruth.rollbackActions.length === 0 ? <p className="muted" style={{ margin: 0 }}>No explicit rollback actions are currently modeled.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.rollbackActions.map((item) => <li key={item.id} style={{ marginBottom: 8 }}><strong>{item.name}:</strong> {item.triggerCondition}</li>)}</ul>
+            )}
+            <div style={{ marginTop: 12 }}><h4 style={{ margin: "0 0 8px 0" }}>Engineer review checklist</h4>{sectionList(ENGINEER_REVIEW_CHECKLIST, "No checklist items available.")}</div>
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Proof boundary and limitations</h3>
+          {sectionList(reportTruth.limitations, "No additional limitations were recorded.")}
         </div>
       </div>
 

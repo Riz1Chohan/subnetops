@@ -4,6 +4,28 @@ function asString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function asArray(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function joinText(value: unknown, fallback = "—") {
+  if (Array.isArray(value)) {
+    const joined = value.map((item) => String(item ?? "").trim()).filter(Boolean).join("; ");
+    return joined || fallback;
+  }
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return text || fallback;
+}
+
+function isBlocked(value: unknown) {
+  return asString(value).toLowerCase() === "blocked";
+}
+
+function compactRows(rows: string[][], fallback: string[][]) {
+  return rows.length > 0 ? rows : fallback;
+}
+
 export function applyBackendDesignCoreToReport(report: ProfessionalReport, designCore: any) {
   if (!designCore || typeof designCore !== "object") return report;
 
@@ -15,6 +37,9 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const transitPlan = Array.isArray(designCore.transitPlan) ? designCore.transitPlan : [];
   const loopbackPlan = Array.isArray(designCore.loopbackPlan) ? designCore.loopbackPlan : [];
   const networkObjectModel = designCore.networkObjectModel && typeof designCore.networkObjectModel === "object" ? designCore.networkObjectModel : null;
+  const reportTruth = designCore.reportTruth && typeof designCore.reportTruth === "object" ? designCore.reportTruth : null;
+  const diagramTruth = designCore.diagramTruth && typeof designCore.diagramTruth === "object" ? designCore.diagramTruth : null;
+  const vendorNeutralTemplates = designCore.vendorNeutralImplementationTemplates && typeof designCore.vendorNeutralImplementationTemplates === "object" ? designCore.vendorNeutralImplementationTemplates : null;
   const networkDevices = Array.isArray(networkObjectModel?.devices) ? networkObjectModel.devices : [];
   const networkInterfaces = Array.isArray(networkObjectModel?.interfaces) ? networkObjectModel.interfaces : [];
   const securityZones = Array.isArray(networkObjectModel?.securityZones) ? networkObjectModel.securityZones : [];
@@ -43,6 +68,15 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const designGraphFindings = Array.isArray(designGraph?.integrityFindings) ? designGraph.integrityFindings : [];
   const authority = designCore.authority && typeof designCore.authority === "object" ? designCore.authority : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
+  const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
+  const backendReviewFindings = asArray(reportTruth?.reviewFindings);
+  const implementationReviewQueue = asArray(reportTruth?.implementationReviewQueue).length > 0 ? asArray(reportTruth?.implementationReviewQueue) : implementationSteps.filter((step: any) => step.readiness !== "ready" || step.riskLevel === "high");
+  const verificationChecks = asArray(reportTruth?.verificationChecks).length > 0 ? asArray(reportTruth?.verificationChecks) : implementationVerificationChecks;
+  const rollbackActions = asArray(reportTruth?.rollbackActions).length > 0 ? asArray(reportTruth?.rollbackActions) : implementationRollbackActions;
+  const reportTruthLimitations = asArray(reportTruth?.limitations);
+  const implementationReadiness = asString(reportTruth?.readiness?.implementation, asString(implementationPlan?.summary?.implementationReadiness, "review"));
+  const overallReadiness = asString(reportTruth?.overallReadiness, asString(reportTruth?.overallReadinessLabel, "review"));
+  const blockedDesign = isBlocked(implementationReadiness) || isBlocked(overallReadiness);
 
   if (addressingSection) {
     addressingSection.tables = addressingSection.tables ?? [];
@@ -160,6 +194,120 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
 
   if (routingSection) {
     routingSection.tables = routingSection.tables ?? [];
+
+    if (reportTruth) {
+      routingSection.tables.push({
+        title: "Phase 38 Backend Report Truth Summary",
+        headers: ["Overall", "Routing", "Security", "NAT", "Implementation", "Blocked Findings", "Review Findings"],
+        rows: [[
+          asString(reportTruth.overallReadinessLabel, asString(reportTruth.overallReadiness, "review")),
+          asString(reportTruth.readiness?.routing, "review"),
+          asString(reportTruth.readiness?.security, "review"),
+          asString(reportTruth.readiness?.nat, "review"),
+          asString(reportTruth.readiness?.implementation, "review"),
+          String(Array.isArray(reportTruth.blockedFindings) ? reportTruth.blockedFindings.length : 0),
+          String(Array.isArray(reportTruth.reviewFindings) ? reportTruth.reviewFindings.length : 0),
+        ]],
+      });
+
+      if (Array.isArray(reportTruth.implementationReviewQueue) && reportTruth.implementationReviewQueue.length > 0) {
+        routingSection.tables.push({
+          title: "Phase 38 Backend Implementation Review Queue",
+          headers: ["Step", "Category", "Readiness", "Risk", "Rollback"],
+          rows: reportTruth.implementationReviewQueue.slice(0, 20).map((step: any) => [
+            asString(step.title, "—"),
+            asString(step.category, "review"),
+            asString(step.readiness, "review"),
+            asString(step.riskLevel, "medium"),
+            asString(step.rollbackIntent, "Review rollback before change."),
+          ]),
+        });
+      }
+
+      if (Array.isArray(reportTruth.verificationCoverage) && reportTruth.verificationCoverage.length > 0) {
+        routingSection.tables.push({
+          title: "Phase 38 Backend Verification Coverage",
+          headers: ["Check Type", "Total", "Blocked", "Review", "Ready"],
+          rows: reportTruth.verificationCoverage.map((item: any) => [
+            asString(item.checkType, "review"),
+            String(item.totalCount ?? 0),
+            String(item.blockedCount ?? 0),
+            String(item.reviewCount ?? 0),
+            String(item.readyCount ?? 0),
+          ]),
+        });
+      }
+
+      if (Array.isArray(reportTruth.rollbackActions) && reportTruth.rollbackActions.length > 0) {
+        routingSection.tables.push({
+          title: "Phase 38 Backend Rollback Truth",
+          headers: ["Rollback", "Trigger", "Intent"],
+          rows: reportTruth.rollbackActions.slice(0, 20).map((item: any) => [
+            asString(item.name, "—"),
+            asString(item.triggerCondition, "Review rollback trigger."),
+            asString(item.rollbackIntent, "Review rollback intent."),
+          ]),
+        });
+      }
+    }
+
+    if (diagramTruth) {
+      routingSection.tables.push({
+        title: "Phase 39 Backend Diagram Render Truth Summary",
+        headers: ["Overall", "Modeled Topology", "Devices", "Interfaces", "Links", "Route Domains", "Security Zones"],
+        rows: [[
+          asString(diagramTruth.overallReadiness, "review"),
+          diagramTruth.hasModeledTopology ? "Yes" : "No",
+          String(diagramTruth.topologySummary?.deviceCount ?? 0),
+          String(diagramTruth.topologySummary?.interfaceCount ?? 0),
+          String(diagramTruth.topologySummary?.linkCount ?? 0),
+          String(diagramTruth.topologySummary?.routeDomainCount ?? 0),
+          String(diagramTruth.topologySummary?.securityZoneCount ?? 0),
+        ]],
+      });
+
+
+      if (diagramTruth.renderModel && typeof diagramTruth.renderModel === "object") {
+        routingSection.tables.push({
+          title: "Phase 39 Backend Diagram Render Model",
+          headers: ["Nodes", "Edges", "Groups", "Overlays", "Backend Authored", "Layout"],
+          rows: [[
+            String(diagramTruth.renderModel.summary?.nodeCount ?? 0),
+            String(diagramTruth.renderModel.summary?.edgeCount ?? 0),
+            String(diagramTruth.renderModel.summary?.groupCount ?? 0),
+            String(diagramTruth.renderModel.summary?.overlayCount ?? 0),
+            diagramTruth.renderModel.summary?.backendAuthored ? "Yes" : "No",
+            asString(diagramTruth.renderModel.summary?.layoutMode, "backend-deterministic-grid"),
+          ]],
+        });
+      }
+
+      if (Array.isArray(diagramTruth.overlaySummaries) && diagramTruth.overlaySummaries.length > 0) {
+        routingSection.tables.push({
+          title: "Phase 39 Backend Diagram Overlay Truth",
+          headers: ["Overlay", "Readiness", "Count", "Detail"],
+          rows: diagramTruth.overlaySummaries.map((item: any) => [
+            asString(item.label, asString(item.key, "overlay")),
+            asString(item.readiness, "review"),
+            String(item.count ?? 0),
+            asString(item.detail, "Review overlay truth."),
+          ]),
+        });
+      }
+
+      if (Array.isArray(diagramTruth.hotspots) && diagramTruth.hotspots.length > 0) {
+        routingSection.tables.push({
+          title: "Phase 39 Backend Diagram Hotspots",
+          headers: ["Scope", "Hotspot", "Readiness", "Detail"],
+          rows: diagramTruth.hotspots.slice(0, 20).map((item: any) => [
+            asString(item.scopeLabel, "diagram"),
+            asString(item.title, "—"),
+            asString(item.readiness, "review"),
+            asString(item.detail, "Review diagram hotspot."),
+          ]),
+        });
+      }
+    }
 
     if (routeDomains.length > 0) {
       routingSection.tables.push({
@@ -455,6 +603,266 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       });
     }
   }
+
+  const phase40Section: any = {
+    title: "13. Phase 40 Export Truth / DOCX-PDF Substance Hardening",
+    paragraphs: [
+      "This export section is backend-authored. It preserves the same reportTruth, diagramTruth, implementationPlan, verificationChecks, rollbackActions, blocking findings, review findings, and limitations that exist inside the backend design-core snapshot.",
+      blockedDesign
+        ? "This design is not implementation-ready. Export output must not soften a blocked backend implementation posture into fake confidence."
+        : "The backend does not currently mark implementation readiness as blocked, but engineer review is still required before production change approval.",
+      "The proof boundary below separates what SubnetOps modeled, what it inferred from saved planning inputs, what it proposed, what is not proven, and what still requires engineer review.",
+    ],
+    tables: [
+      {
+        title: "Phase 40 Backend Readiness Status",
+        headers: ["Truth Source", "Overall", "Routing", "Security", "NAT", "Implementation", "Blocked Findings", "Review Findings"],
+        rows: [[
+          "backend design-core snapshot",
+          asString(reportTruth?.overallReadinessLabel, overallReadiness),
+          asString(reportTruth?.readiness?.routing, "review"),
+          asString(reportTruth?.readiness?.security, "review"),
+          asString(reportTruth?.readiness?.nat, "review"),
+          implementationReadiness,
+          String(backendBlockedFindings.length),
+          String(backendReviewFindings.length),
+        ]],
+      },
+      {
+        title: "Phase 40 Blocking Findings",
+        headers: ["Source", "Severity", "Finding", "Detail"],
+        rows: compactRows(
+          [
+            ...backendBlockedFindings.map((finding: any) => [
+              asString(finding.source, "backend"),
+              asString(finding.severity, "ERROR"),
+              asString(finding.title, "Blocking backend finding"),
+              asString(finding.detail, "Resolve before implementation approval."),
+            ]),
+            ...implementationFindings.filter((finding: any) => finding.severity === "ERROR").map((finding: any) => [
+              "implementation",
+              asString(finding.severity, "ERROR"),
+              asString(finding.title, "Implementation blocker"),
+              asString(finding.detail, asString(finding.remediation, "Resolve before implementation approval.")),
+            ]),
+          ].slice(0, 30),
+          [["backend", "INFO", "No blocking findings exported", "No backend blocking finding is currently present in reportTruth or implementation findings."]],
+        ),
+      },
+      {
+        title: "Phase 40 Review Findings",
+        headers: ["Source", "Severity", "Finding", "Detail"],
+        rows: compactRows(
+          backendReviewFindings.slice(0, 30).map((finding: any) => [
+            asString(finding.source, "backend"),
+            asString(finding.severity, "WARNING"),
+            asString(finding.title, "Backend review finding"),
+            asString(finding.detail, "Engineer review required."),
+          ]),
+          [["backend", "INFO", "No review findings exported", "No backend review finding is currently present in reportTruth."]],
+        ),
+      },
+      {
+        title: "Phase 40 Implementation Review Queue",
+        headers: ["Step", "Category", "Readiness", "Risk", "Blockers", "Required evidence", "Acceptance criteria", "Rollback intent"],
+        rows: compactRows(
+          implementationReviewQueue.slice(0, 30).map((step: any) => [
+            asString(step.title, "—"),
+            asString(step.category, "review"),
+            asString(step.readiness, "review"),
+            asString(step.riskLevel, "medium"),
+            joinText(step.blockers, "No explicit blockers recorded"),
+            joinText(step.requiredEvidence, "Evidence requirement not modeled"),
+            joinText(step.acceptanceCriteria, "Acceptance criteria not modeled"),
+            asString(step.rollbackIntent, "Rollback intent not modeled"),
+          ]),
+          [["No implementation review queue", "implementation", "review", "medium", "No step queue exported", "Evidence still requires engineer review", "Acceptance criteria still require engineer review", "Rollback must be reviewed before implementation"]],
+        ),
+      },
+      {
+        title: "Phase 40 Verification Matrix",
+        headers: ["Check type", "Scope", "Source engine", "Readiness", "Expected result", "Required evidence", "Acceptance criteria", "Blocking steps", "Failure impact"],
+        rows: compactRows(
+          verificationChecks.slice(0, 40).map((check: any) => [
+            asString(check.checkType, "review"),
+            asString(check.verificationScope, "cross-cutting"),
+            asString(check.sourceEngine, "implementation"),
+            asString(check.readiness, "review"),
+            asString(check.expectedResult, asString(check.name, "Expected result requires review")),
+            joinText(check.requiredEvidence, "Evidence requirement not modeled"),
+            joinText(check.acceptanceCriteria, "Acceptance criteria not modeled"),
+            joinText(check.blockingStepIds, "No blocking steps recorded"),
+            asString(check.failureImpact, "Failure impact requires engineer review"),
+          ]),
+          [["documentation", "cross-cutting", "implementation", "review", "No verification checks exported", "Engineer evidence required", "Engineer acceptance required", "—", "Missing verification weakens implementation confidence"]],
+        ),
+      },
+      {
+        title: "Phase 40 Rollback Actions",
+        headers: ["Rollback action", "Trigger condition", "Related steps", "Rollback intent", "Notes"],
+        rows: compactRows(
+          rollbackActions.slice(0, 30).map((action: any) => [
+            asString(action.name, "—"),
+            asString(action.triggerCondition, "Review rollback trigger."),
+            joinText(action.relatedStepIds, "No related steps recorded"),
+            asString(action.rollbackIntent, "Rollback intent requires review."),
+            joinText(action.notes, "Review before change window."),
+          ]),
+          [["No rollback action exported", "Rollback trigger not modeled", "—", "Engineer must define rollback before implementation", "Do not approve risky changes without rollback proof"]],
+        ),
+      },
+      {
+        title: "Phase 40 Diagram Truth and Render Model Summary",
+        headers: ["Modeled devices", "Modeled interfaces", "Modeled links", "Route domains", "Security zones", "Render nodes", "Render edges", "Overlay readiness", "Hotspots", "Empty-state reason"],
+        rows: [[
+          String(diagramTruth?.topologySummary?.deviceCount ?? networkDevices.length),
+          String(diagramTruth?.topologySummary?.interfaceCount ?? networkInterfaces.length),
+          String(diagramTruth?.topologySummary?.linkCount ?? (Array.isArray(networkObjectModel?.links) ? networkObjectModel.links.length : 0)),
+          String(diagramTruth?.topologySummary?.routeDomainCount ?? routeDomains.length),
+          String(diagramTruth?.topologySummary?.securityZoneCount ?? securityZones.length),
+          String(diagramTruth?.renderModel?.summary?.nodeCount ?? 0),
+          String(diagramTruth?.renderModel?.summary?.edgeCount ?? 0),
+          joinText(asArray(diagramTruth?.overlaySummaries).map((overlay: any) => `${asString(overlay.label, asString(overlay.key, "overlay"))}: ${asString(overlay.readiness, "review")}`), "No overlay readiness exported"),
+          String(asArray(diagramTruth?.hotspots).length),
+          asString(diagramTruth?.emptyStateReason, asString(diagramTruth?.renderModel?.emptyState?.reason, "Topology render model present or no empty-state reason recorded")),
+        ]],
+      },
+      {
+        title: "Phase 40 Diagram Render Model Nodes and Edges",
+        headers: ["Type", "Label", "Readiness", "Layer / Relationship", "Notes"],
+        rows: compactRows(
+          [
+            ...asArray(diagramTruth?.renderModel?.nodes).slice(0, 20).map((node: any) => [
+              asString(node.objectType, "node"),
+              asString(node.label, asString(node.id, "—")),
+              asString(node.readiness, "review"),
+              asString(node.layer, "diagram"),
+              joinText(node.notes, asString(node.sourceEngine, "backend render node")),
+            ]),
+            ...asArray(diagramTruth?.renderModel?.edges).slice(0, 20).map((edge: any) => [
+              "edge",
+              asString(edge.label, asString(edge.id, "—")),
+              asString(edge.readiness, "review"),
+              asString(edge.relationship, "relationship"),
+              joinText(edge.notes, joinText(edge.overlayKeys, "backend render edge")),
+            ]),
+          ].slice(0, 40),
+          [["empty-state", "No backend render nodes or edges exported", "review", "backend-deterministic-grid", "Diagram render model requires modeled topology inputs"]],
+        ),
+      },
+      {
+        title: "Phase 40 Proof Boundary and Limitations",
+        headers: ["Boundary", "Exported truth"],
+        rows: [
+          ["Modeled", `Backend object counts: ${networkDevices.length} devices, ${networkInterfaces.length} interfaces, ${Array.isArray(networkObjectModel?.links) ? networkObjectModel.links.length : 0} links, ${routeDomains.length} route domains, ${securityZones.length} security zones.`],
+          ["Inferred", "Routing, security, NAT, implementation readiness, and diagram overlays are inferred from saved requirements, modeled objects, graph edges, and backend engine findings."],
+          ["Proposed", `Addressing proposals: ${proposedRows.length}; transit rows: ${transitPlan.length}; loopback rows: ${loopbackPlan.length}; implementation steps: ${implementationSteps.length}.`],
+          ["Not proven", "Live device state, cabling, vendor CLI syntax, production firewall rulebase, provider WAN behavior, and change-window operational success are not proven by this export."],
+          ["Engineer review", "A qualified engineer must review blockers, review findings, verification evidence, rollback proof, and vendor-specific implementation details before production deployment."],
+          ...reportTruthLimitations.slice(0, 12).map((limitation: any) => ["Limitation", joinText(limitation, "Review limitation")]),
+        ],
+      },
+    ],
+  };
+
+
+  const phase42Section: any = {
+    title: "14. Phase 42 Vendor-Neutral Implementation Templates",
+    paragraphs: [
+      "This export section is backend-authored from vendorNeutralImplementationTemplates. It converts the implementationPlan into human execution templates without generating vendor-specific commands.",
+      "Phase 42 deliberately forbids Cisco, Palo Alto, Fortinet, Juniper, Aruba, Linux, cloud, or other platform command syntax. Vendor-specific command generation remains a later gated phase.",
+      "Templates preserve readiness, risk, dependencies, verification evidence, rollback evidence, blocker reasons, blast radius, and proof boundaries from the backend design-core snapshot.",
+    ],
+    tables: [
+      {
+        title: "Phase 42 Template Summary",
+        headers: ["Source", "Templates", "Groups", "Ready", "Review", "Blocked", "High Risk", "Verification Linked", "Rollback Linked", "Vendor Commands"],
+        rows: [[
+          asString(vendorNeutralTemplates?.summary?.source, "backend-implementation-plan"),
+          String(vendorNeutralTemplates?.summary?.templateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.groupCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.readyTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.reviewTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.blockedTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.highRiskTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.verificationLinkedTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.rollbackLinkedTemplateCount ?? 0),
+          String(vendorNeutralTemplates?.summary?.vendorSpecificCommandCount ?? 0),
+        ]],
+      },
+      {
+        title: "Phase 42 Template Groups",
+        headers: ["Group", "Readiness", "Templates", "Objective", "Exit Criteria"],
+        rows: compactRows(
+          asArray(vendorNeutralTemplates?.groups).slice(0, 12).map((group: any) => [
+            asString(group.name, "—"),
+            asString(group.readiness, "review"),
+            String(asArray(group.templateIds).length),
+            asString(group.objective, "Review group objective."),
+            joinText(group.exitCriteria, "Exit criteria require review"),
+          ]),
+          [["No template groups", "review", "0", "Vendor-neutral template groups were not generated.", "Review implementation plan generation."]],
+        ),
+      },
+      {
+        title: "Phase 42 Vendor-Neutral Templates",
+        headers: ["Template", "Category", "Readiness", "Risk", "Target", "Intent", "Pre-checks", "Neutral actions"],
+        rows: compactRows(
+          asArray(vendorNeutralTemplates?.templates).slice(0, 35).map((template: any) => [
+            asString(template.title, "—"),
+            asString(template.category, "review"),
+            asString(template.readiness, "review"),
+            asString(template.riskLevel, "medium"),
+            `${asString(template.targetObjectType, "object")}${template.targetObjectId ? `:${template.targetObjectId}` : ""}`,
+            asString(template.vendorNeutralIntent, "Review template intent."),
+            joinText(template.preChecks, "Pre-checks require review"),
+            joinText(template.neutralActions, "Neutral actions require review"),
+          ]),
+          [["No vendor-neutral templates", "implementation", "review", "medium", "—", "Templates were not generated.", "Review implementation plan.", "Do not generate vendor commands yet."]],
+        ),
+      },
+      {
+        title: "Phase 42 Evidence and Rollback Linkage",
+        headers: ["Template", "Verification evidence", "Rollback evidence", "Blocker reasons", "Blast radius"],
+        rows: compactRows(
+          asArray(vendorNeutralTemplates?.templates).slice(0, 35).map((template: any) => [
+            asString(template.title, "—"),
+            joinText(template.verificationEvidence, "No verification evidence linked"),
+            joinText(template.rollbackEvidence, "No rollback evidence linked"),
+            joinText(template.blockerReasons, "No blockers recorded"),
+            joinText(template.blastRadius, "Blast radius not modeled"),
+          ]),
+          [["No vendor-neutral templates", "No verification evidence linked", "No rollback evidence linked", "Review required", "Blast radius not modeled"]],
+        ),
+      },
+      {
+        title: "Phase 42 Template Variables",
+        headers: ["Variable", "Required", "Source", "Example", "Notes"],
+        rows: compactRows(
+          asArray(vendorNeutralTemplates?.variables).map((variable: any) => [
+            asString(variable.name, "—"),
+            variable.required ? "yes" : "no",
+            asString(variable.source, "backend design-core"),
+            asString(variable.exampleValue, "—"),
+            joinText(variable.notes, "Review variable before implementation"),
+          ]),
+          [["No variables", "yes", "backend design-core", "—", "Template variables were not generated."]],
+        ),
+      },
+      {
+        title: "Phase 42 Template Proof Boundary",
+        headers: ["Boundary", "Truth"],
+        rows: compactRows(
+          asArray(vendorNeutralTemplates?.proofBoundary).map((boundary: any, index: number) => [
+            `Boundary ${index + 1}`,
+            joinText(boundary, "Review proof boundary"),
+          ]),
+          [["Not proven", "Live device state, platform syntax, production behavior, cabling, provider behavior, and actual change-window success are not proven by vendor-neutral templates."]],
+        ),
+      },
+    ],
+  };
+  report.sections.push(phase40Section, phase42Section);
 
   return report;
 }

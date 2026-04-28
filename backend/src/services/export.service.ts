@@ -79,6 +79,13 @@ function sortUnique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
+function joinCsvList(value: unknown, fallback = "") {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean).join("; ") || fallback;
+  }
+  return asString(value, fallback);
+}
+
 const PLANNING_ASSUMPTIONS = [
   "Inputs were provided by the user and are not live-discovered network facts.",
   "Subnet allocations are based on declared host counts, saved site blocks, and planning growth buffers.",
@@ -694,6 +701,170 @@ export async function getCsvRows(projectId: string) {
         Value: loopback.subnetCidr ?? loopback.endpointIp ?? "Pending",
         Notes: loopback.notes.join(" "),
       });
+    }
+
+    rows.push({
+      Section: "Backend Truth",
+      Scope: "Project",
+      Name: designCore.projectName,
+      Key: "Implementation readiness",
+      Value: designCore.reportTruth.readiness.implementation,
+      Notes: designCore.reportTruth.readiness.implementation === "blocked" ? "This design is not implementation-ready." : "Engineer review is still required before production change approval.",
+    });
+    rows.push({
+      Section: "Backend Truth",
+      Scope: "Project",
+      Name: designCore.projectName,
+      Key: "Report truth",
+      Value: designCore.reportTruth.overallReadinessLabel,
+      Notes: `Routing ${designCore.reportTruth.readiness.routing} | Security ${designCore.reportTruth.readiness.security} | NAT ${designCore.reportTruth.readiness.nat} | Blocked findings ${designCore.reportTruth.blockedFindings.length} | Review findings ${designCore.reportTruth.reviewFindings.length}`,
+    });
+    rows.push({
+      Section: "Diagram Truth",
+      Scope: "Project",
+      Name: designCore.projectName,
+      Key: "Diagram render model summary",
+      Value: `${designCore.diagramTruth.renderModel.summary.nodeCount} render nodes / ${designCore.diagramTruth.renderModel.summary.edgeCount} render edges`,
+      Notes: `Modeled devices ${designCore.diagramTruth.topologySummary.deviceCount} | Interfaces ${designCore.diagramTruth.topologySummary.interfaceCount} | Links ${designCore.diagramTruth.topologySummary.linkCount} | Route domains ${designCore.diagramTruth.topologySummary.routeDomainCount} | Security zones ${designCore.diagramTruth.topologySummary.securityZoneCount} | Empty-state ${designCore.diagramTruth.emptyStateReason ?? designCore.diagramTruth.renderModel.emptyState?.reason ?? "none"}`,
+    });
+
+    for (const finding of designCore.reportTruth.blockedFindings) {
+      rows.push({
+        Section: "Blocking Findings",
+        Scope: finding.source,
+        Name: finding.title,
+        Key: finding.severity,
+        Value: finding.detail,
+        Notes: "Must be resolved or formally accepted before implementation approval",
+      });
+    }
+
+    for (const finding of designCore.reportTruth.reviewFindings) {
+      rows.push({
+        Section: "Review Findings",
+        Scope: finding.source,
+        Name: finding.title,
+        Key: finding.severity,
+        Value: finding.detail,
+        Notes: "Engineer review required",
+      });
+    }
+
+    for (const step of designCore.reportTruth.implementationReviewQueue) {
+      rows.push({
+        Section: "Implementation Review Queue",
+        Scope: step.stageId,
+        Name: step.title,
+        Key: `${step.category} | ${step.readiness} | ${step.riskLevel}`,
+        Value: joinCsvList(step.blockers, "No blockers recorded"),
+        Notes: `Required evidence: ${joinCsvList(step.requiredEvidence, "not modeled")} | Acceptance criteria: ${joinCsvList(step.acceptanceCriteria, "not modeled")} | Rollback intent: ${step.rollbackIntent || "not modeled"}`,
+      });
+    }
+
+    for (const check of designCore.reportTruth.verificationChecks) {
+      rows.push({
+        Section: "Verification Matrix",
+        Scope: check.verificationScope,
+        Name: check.name,
+        Key: `${check.checkType} | ${check.sourceEngine} | ${check.readiness}`,
+        Value: check.expectedResult,
+        Notes: `Required evidence: ${joinCsvList(check.requiredEvidence, "not modeled")} | Acceptance criteria: ${joinCsvList(check.acceptanceCriteria, "not modeled")} | Blocking steps: ${joinCsvList(check.blockingStepIds, "none")} | Failure impact: ${check.failureImpact}`,
+      });
+    }
+
+    for (const action of designCore.reportTruth.rollbackActions) {
+      rows.push({
+        Section: "Rollback Actions",
+        Scope: "Implementation",
+        Name: action.name,
+        Key: action.triggerCondition,
+        Value: action.rollbackIntent,
+        Notes: `Related steps: ${joinCsvList(action.relatedStepIds, "none")} | Notes: ${joinCsvList(action.notes, "review before change window")}`,
+      });
+    }
+
+    for (const overlay of designCore.diagramTruth.overlaySummaries) {
+      rows.push({
+        Section: "Diagram Truth",
+        Scope: "Overlay readiness",
+        Name: overlay.label,
+        Key: overlay.readiness,
+        Value: String(overlay.count),
+        Notes: overlay.detail,
+      });
+    }
+
+    for (const hotspot of designCore.diagramTruth.hotspots) {
+      rows.push({
+        Section: "Diagram Truth",
+        Scope: hotspot.scopeLabel,
+        Name: hotspot.title,
+        Key: hotspot.readiness,
+        Value: hotspot.detail,
+        Notes: "Backend diagram hotspot",
+      });
+    }
+
+
+    if (designCore.vendorNeutralImplementationTemplates) {
+      const templateModel = designCore.vendorNeutralImplementationTemplates;
+      rows.push({
+        Section: "Vendor-Neutral Implementation Templates",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: "Template summary",
+        Value: `${templateModel.summary.templateCount} templates / ${templateModel.summary.groupCount} groups / readiness ${templateModel.summary.templateReadiness}`,
+        Notes: `Vendor-specific commands ${templateModel.summary.vendorSpecificCommandCount}; command generation allowed ${templateModel.summary.commandGenerationAllowed ? "yes" : "no"}`,
+      });
+
+      for (const group of templateModel.groups) {
+        rows.push({
+          Section: "Vendor-Neutral Template Groups",
+          Scope: group.stageId,
+          Name: group.name,
+          Key: group.readiness,
+          Value: group.objective,
+          Notes: `Templates: ${joinCsvList(group.templateIds, "none")} | Exit criteria: ${joinCsvList(group.exitCriteria, "review required")}`,
+        });
+      }
+
+      for (const template of templateModel.templates) {
+        rows.push({
+          Section: "Vendor-Neutral Templates",
+          Scope: template.stageName,
+          Name: template.title,
+          Key: `${template.category} | ${template.readiness} | ${template.riskLevel}`,
+          Value: template.vendorNeutralIntent,
+          Notes: `Command generation allowed: ${template.commandGenerationAllowed ? "yes" : "no"} | Pre-checks: ${joinCsvList(template.preChecks, "review required")} | Neutral actions: ${joinCsvList(template.neutralActions, "review required")}`,
+        });
+        rows.push({
+          Section: "Vendor-Neutral Template Evidence",
+          Scope: template.title,
+          Name: "Verification and rollback evidence",
+          Key: template.readiness,
+          Value: `Verification: ${joinCsvList(template.verificationEvidence, "not linked")}`,
+          Notes: `Rollback: ${joinCsvList(template.rollbackEvidence, "not linked")} | Blockers: ${joinCsvList(template.blockerReasons, "none recorded")} | Blast radius: ${joinCsvList(template.blastRadius, "not modeled")}`,
+        });
+      }
+
+      for (const boundary of templateModel.proofBoundary) {
+        rows.push({ Section: "Vendor-Neutral Template Proof Boundary", Scope: "Project", Name: "Proof boundary", Key: "Boundary", Value: boundary, Notes: templateModel.safetyNotice });
+      }
+    }
+    const proofBoundaryRows = [
+      ["Modeled", `Backend object counts: ${designCore.networkObjectModel.devices.length} devices, ${designCore.networkObjectModel.interfaces.length} interfaces, ${designCore.networkObjectModel.links.length} links, ${designCore.networkObjectModel.routeDomains.length} route domains, ${designCore.networkObjectModel.securityZones.length} security zones.`],
+      ["Inferred", "Routing, security, NAT, implementation readiness, and diagram overlays are inferred from saved planning inputs, modeled objects, graph edges, and backend engine findings."],
+      ["Proposed", `Addressing proposals: ${designCore.proposedRows.length}; transit rows: ${designCore.transitPlan.length}; loopback rows: ${designCore.loopbackPlan.length}; implementation steps: ${designCore.networkObjectModel.implementationPlan.steps.length}.`],
+      ["Not proven", "Live device state, cabling, vendor CLI syntax, production firewall rulebase, provider WAN behavior, and change-window operational success are not proven by this export."],
+      ["Engineer review", "Engineer review is required for blockers, review findings, verification evidence, rollback proof, and vendor-specific implementation details."],
+    ];
+
+    for (const [boundary, value] of proofBoundaryRows) {
+      rows.push({ Section: "Proof Boundary / Limitations", Scope: "Project", Name: boundary, Key: boundary, Value: value, Notes: "Phase 40 export truth boundary" });
+    }
+
+    for (const limitation of designCore.reportTruth.limitations) {
+      rows.push({ Section: "Proof Boundary / Limitations", Scope: "Report truth", Name: "Limitation", Key: "Limitation", Value: limitation, Notes: "Backend truth limitation" });
     }
   }
 

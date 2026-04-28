@@ -1,13 +1,19 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.34.0",
+  "version": "0.42.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
     "clean:generated": "bash scripts/clean-generated-artifacts.sh",
     "preflight": "bash scripts/final-preflight.sh",
     "verify": "bash scripts/verify-build.sh",
-    "package:release": "npm run preflight && node scripts/check-release-artifacts.cjs --archive-self"
+    "package:release": "npm run preflight && node scripts/check-release-artifacts.cjs --archive-self",
+    "check:report-diagram-truth": "node scripts/check-report-diagram-truth.cjs",
+    "check:backend-report-diagram-truth": "node scripts/check-backend-report-diagram-truth.cjs",
+    "check:backend-diagram-render-model": "node scripts/check-backend-diagram-render-model.cjs",
+    "check:export-truth-hardening": "node scripts/check-export-truth-hardening.cjs",
+    "check:phase41-scenario-matrix": "node scripts/check-phase41-scenario-matrix.cjs",
+    "check:phase42-vendor-neutral-templates": "node scripts/check-phase42-vendor-neutral-templates.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",

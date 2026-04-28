@@ -779,6 +779,181 @@ export interface ImplementationPlanModel {
   findings: ImplementationPlanFinding[];
 }
 
+
+
+export type VendorNeutralImplementationTemplateReadiness = "ready" | "review" | "blocked";
+
+export interface VendorNeutralImplementationTemplateSummary {
+  source: "backend-implementation-plan";
+  templateCount: number;
+  groupCount: number;
+  variableCount: number;
+  readyTemplateCount: number;
+  reviewTemplateCount: number;
+  blockedTemplateCount: number;
+  highRiskTemplateCount: number;
+  verificationLinkedTemplateCount: number;
+  rollbackLinkedTemplateCount: number;
+  vendorSpecificCommandCount: 0;
+  commandGenerationAllowed: false;
+  templateReadiness: VendorNeutralImplementationTemplateReadiness;
+  notes: string[];
+}
+
+export interface VendorNeutralImplementationTemplateVariable {
+  id: string;
+  name: string;
+  required: boolean;
+  source: string;
+  exampleValue: string;
+  notes: string[];
+}
+
+export interface VendorNeutralImplementationTemplateGroup {
+  id: string;
+  stageId: string;
+  name: string;
+  objective: string;
+  readiness: VendorNeutralImplementationTemplateReadiness;
+  templateIds: string[];
+  exitCriteria: string[];
+  notes: string[];
+}
+
+export interface VendorNeutralImplementationTemplate {
+  id: string;
+  stepId: string;
+  stageId: string;
+  stageName: string;
+  title: string;
+  category: ImplementationPlanStepCategory;
+  sequence: number;
+  targetObjectType: ImplementationPlanTargetObjectType;
+  targetObjectId?: string;
+  readiness: VendorNeutralImplementationTemplateReadiness;
+  riskLevel: ImplementationPlanStep["riskLevel"];
+  engineerReviewRequired: boolean;
+  vendorNeutralIntent: string;
+  commandGenerationAllowed: false;
+  commandGenerationReason: string;
+  variableIds: string[];
+  preChecks: string[];
+  neutralActions: string[];
+  verificationEvidence: string[];
+  rollbackEvidence: string[];
+  acceptanceCriteria: string[];
+  linkedVerificationCheckIds: string[];
+  linkedRollbackActionIds: string[];
+  dependencyStepIds: string[];
+  dependencyObjectIds: string[];
+  graphDependencyEdgeIds: string[];
+  blastRadius: string[];
+  blockerReasons: string[];
+  proofBoundary: string[];
+  notes: string[];
+}
+
+export interface VendorNeutralImplementationTemplateModel {
+  summary: VendorNeutralImplementationTemplateSummary;
+  safetyNotice: string;
+  groups: VendorNeutralImplementationTemplateGroup[];
+  variables: VendorNeutralImplementationTemplateVariable[];
+  templates: VendorNeutralImplementationTemplate[];
+  proofBoundary: string[];
+}
+export type BackendDesignTruthReadiness = "ready" | "review" | "blocked" | "unknown";
+export interface BackendTruthFinding { title: string; detail: string; severity: "ERROR" | "WARNING" | "INFO"; source: "design-graph" | "routing" | "security" | "implementation" | "validation"; }
+export interface BackendReportTruthVerificationSummary { checkType: string; totalCount: number; blockedCount: number; reviewCount: number; readyCount: number; }
+export interface BackendReportTruthModel {
+  overallReadiness: BackendDesignTruthReadiness;
+  overallReadinessLabel: string;
+  summary: { deviceCount: number; linkCount: number; routeDomainCount: number; securityZoneCount: number; routeIntentCount: number; securityFlowCount: number; implementationStepCount: number; blockedImplementationStepCount: number; blockedVerificationCheckCount: number; };
+  readiness: { routing: BackendDesignTruthReadiness; security: BackendDesignTruthReadiness; nat: BackendDesignTruthReadiness; implementation: BackendDesignTruthReadiness; };
+  blockedFindings: BackendTruthFinding[];
+  reviewFindings: BackendTruthFinding[];
+  implementationReviewQueue: ImplementationPlanStep[];
+  verificationChecks: ImplementationPlanVerificationCheck[];
+  verificationCoverage: BackendReportTruthVerificationSummary[];
+  rollbackActions: ImplementationPlanRollbackAction[];
+  limitations: string[];
+}
+export interface BackendDiagramTruthHotspot { title: string; detail: string; readiness: BackendDesignTruthReadiness; scopeLabel: string; }
+export interface BackendDiagramTruthOverlaySummary { key: "addressing" | "routing" | "security" | "nat" | "implementation" | "verification" | "operational-safety"; label: string; readiness: BackendDesignTruthReadiness; detail: string; count: number; }
+export interface BackendDiagramTruthNode { id: string; objectType: "site" | "network-device" | "network-interface" | "network-link" | "route-domain" | "security-zone"; label: string; readiness: BackendDesignTruthReadiness; notes: string[]; }
+export interface BackendDiagramTruthEdge { id: string; relationship: string; sourceId: string; targetId: string; readiness: BackendDesignTruthReadiness; notes: string[]; }
+export type BackendDiagramRenderLayer = "site" | "device" | "interface" | "routing" | "security" | "implementation" | "verification";
+export type BackendDiagramRenderOverlayKey = "addressing" | "routing" | "security" | "nat" | "implementation" | "verification" | "operational-safety";
+export interface BackendDiagramRenderNode {
+  id: string;
+  objectId: string;
+  objectType: DesignGraphNodeObjectType;
+  label: string;
+  groupId?: string;
+  siteId?: string;
+  layer: BackendDiagramRenderLayer;
+  readiness: BackendDesignTruthReadiness;
+  truthState: NetworkObjectTruthState;
+  x: number;
+  y: number;
+  sourceEngine: "design-graph" | "object-model" | "routing" | "security" | "implementation";
+  relatedFindingIds: string[];
+  notes: string[];
+}
+export interface BackendDiagramRenderEdge {
+  id: string;
+  relationship: DesignGraphRelationship | "implementation-dependency" | "verification-target";
+  sourceNodeId: string;
+  targetNodeId: string;
+  label: string;
+  readiness: BackendDesignTruthReadiness;
+  overlayKeys: BackendDiagramRenderOverlayKey[];
+  relatedObjectIds: string[];
+  notes: string[];
+}
+export interface BackendDiagramRenderGroup {
+  id: string;
+  groupType: "site" | "route-domain" | "security-zone" | "implementation-stage";
+  label: string;
+  readiness: BackendDesignTruthReadiness;
+  nodeIds: string[];
+  notes: string[];
+}
+export interface BackendDiagramRenderOverlay {
+  key: BackendDiagramRenderOverlayKey;
+  label: string;
+  readiness: BackendDesignTruthReadiness;
+  nodeIds: string[];
+  edgeIds: string[];
+  hotspotIndexes: number[];
+  detail: string;
+}
+export interface BackendDiagramRenderModel {
+  summary: {
+    nodeCount: number;
+    edgeCount: number;
+    groupCount: number;
+    overlayCount: number;
+    backendAuthored: true;
+    layoutMode: "backend-deterministic-grid";
+  };
+  nodes: BackendDiagramRenderNode[];
+  edges: BackendDiagramRenderEdge[];
+  groups: BackendDiagramRenderGroup[];
+  overlays: BackendDiagramRenderOverlay[];
+  emptyState?: { reason: string; requiredInputs: string[]; };
+}
+export interface BackendDiagramTruthModel {
+  overallReadiness: BackendDesignTruthReadiness;
+  hasModeledTopology: boolean;
+  emptyStateReason?: string;
+  topologySummary: { siteCount: number; deviceCount: number; interfaceCount: number; linkCount: number; routeDomainCount: number; securityZoneCount: number; };
+  nodes: BackendDiagramTruthNode[];
+  edges: BackendDiagramTruthEdge[];
+  overlaySummaries: BackendDiagramTruthOverlaySummary[];
+  hotspots: BackendDiagramTruthHotspot[];
+  renderModel: BackendDiagramRenderModel;
+}
+
 export interface NetworkObjectModel {
   summary: NetworkObjectModelSummary;
   routeDomains: RouteDomain[];
@@ -874,6 +1049,9 @@ export interface DesignCoreSnapshot {
   siteBlocks: DesignCoreSiteBlock[];
   addressingRows: DesignCoreAddressRow[];
   networkObjectModel?: NetworkObjectModel;
+  reportTruth?: BackendReportTruthModel;
+  diagramTruth?: BackendDiagramTruthModel;
+  vendorNeutralImplementationTemplates?: VendorNeutralImplementationTemplateModel;
   proposedRows: unknown[];
   issues: DesignCoreIssue[];
 }
