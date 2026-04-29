@@ -92,8 +92,8 @@ for (const fragment of ['Section: "Requirement Impact Closure"', 'Section: "Requ
 }
 
 const pkg = JSON.parse(read('package.json'));
-assert(pkg.version === '0.66.0', 'root package version must be 0.66.0');
-assert(pkg.scripts['check:phase66-runtime-ui-report-proof'] === 'node scripts/check-phase66-runtime-ui-report-proof.cjs', 'package script must expose Phase 66 proof check');
+assert(/^0\.(66|67)\.0$/.test(pkg.version), 'root package version must be Phase 66 or later for runtime UI report proof');
+assert(pkg.scripts['check:phase66-runtime-ui-report-proof'].startsWith('node scripts/check-phase66-runtime-ui-report-proof.cjs'), 'package script must expose Phase 66 proof check');
 assert(pkg.scripts['check:phase65-requirement-scenario-proof'].includes('check:phase66-runtime-ui-report-proof'), 'Phase 65 chain must continue into Phase 66');
 
 console.log('Phase 66 runtime/UI/report proof check passed.');

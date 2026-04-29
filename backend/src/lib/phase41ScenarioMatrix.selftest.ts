@@ -43,7 +43,7 @@ function assertScenario(scenario: Phase41ScenarioFixture) {
 
   const expected = scenario.expected;
   const findingCodes = collectFindingCodes(snapshot);
-  const zoneRoles = new Set(snapshot.networkObjectModel.securityZones.map((zone) => zone.zoneRole));
+  const zoneRoles = new Set<string>(snapshot.networkObjectModel.securityZones.map((zone) => zone.zoneRole));
   const overlayKeys = new Set(snapshot.diagramTruth.renderModel.overlays.map((overlay) => overlay.key));
   const standardsViolations = new Set(snapshot.standardsAlignment.violatedRuleIds);
 
