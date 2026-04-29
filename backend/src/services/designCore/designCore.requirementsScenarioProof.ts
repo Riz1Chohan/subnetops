@@ -149,7 +149,7 @@ export function buildRequirementsScenarioProofSummary(input: ScenarioProofInput)
     concreteFragments: multiSite ? ["materialized site", "VLAN/segment row"] : ["materialized site"],
     objectCheck: multiSite ? () => {
       const routeIntents = model?.routingSegmentation?.routeIntents?.length ?? 0;
-      const wanLinks = model?.links?.filter((link) => String(link.linkType ?? link.name ?? "").toLowerCase().includes("wan")).length ?? 0;
+      const wanLinks = model?.links?.filter((link) => String(link.linkRole ?? link.name ?? "").toLowerCase().includes("wan")).length ?? 0;
       const hits: string[] = [];
       if (routeIntents > 0) hits.push(`${routeIntents} route intent(s)`);
       if (wanLinks > 0) hits.push(`${wanLinks} WAN link object(s)`);
@@ -179,7 +179,7 @@ export function buildRequirementsScenarioProofSummary(input: ScenarioProofInput)
       concreteFragments: ["VLAN/segment row"],
       flowFragments: true,
       objectCheck: () => {
-        const interfaces = model?.interfaces?.filter((iface) => String(iface.purpose ?? iface.name ?? "").toLowerCase().includes("management")).length ?? 0;
+        const interfaces = model?.interfaces?.filter((iface) => String(iface.interfaceRole ?? iface.name ?? "").toLowerCase().includes("management")).length ?? 0;
         return interfaces > 0 ? [`${interfaces} management interface object(s)`] : [];
       },
       severity: "blocker",

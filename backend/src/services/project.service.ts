@@ -226,10 +226,10 @@ export async function getProjectVlans(projectId: string, userId: string) {
 export async function updateProject(projectId: string, userId: string, data: Record<string, unknown>, actorLabel?: string) {
   const project = await ensureCanEditProject(userId, projectId);
   const organizationId = await ensureOrganizationAssignable(userId, (data.organizationId as string | undefined) || project.organizationId || null);
-  const normalizedData = { ...data, organizationId: organizationId || undefined };
+  const normalizedData: Record<string, unknown> = { ...data, organizationId: organizationId || undefined };
   return prisma.$transaction(async (tx: any) => {
     const result = await tx.project.updateMany({ where: { id: projectId }, data: normalizedData });
-    const requirementsMaterialization = typeof normalizedData.requirementsJson === "string"
+    const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
       ? await materializeRequirementsForProject(tx, projectId, actorLabel)
       : null;
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);

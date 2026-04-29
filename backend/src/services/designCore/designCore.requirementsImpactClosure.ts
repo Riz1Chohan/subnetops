@@ -17,10 +17,10 @@ type SiteLike = {
 
 type NetworkObjectModelLike = {
   securityZones?: Array<{ name?: string; zoneRole?: string; notes?: string[] }>;
-  devices?: Array<{ name?: string; role?: string; notes?: string[] }>;
-  dhcpPools?: Array<{ name?: string; vlanId?: string; subnetCidr?: string; notes?: string[] }>;
-  interfaces?: Array<{ name?: string; purpose?: string; notes?: string[] }>;
-  links?: Array<{ name?: string; linkType?: string; notes?: string[] }>;
+  devices?: Array<{ name?: string; deviceRole?: string; role?: string; notes?: string[] }>;
+  dhcpPools?: Array<{ name?: string; vlanId?: string | number; subnetCidr?: string; notes?: string[] }>;
+  interfaces?: Array<{ name?: string; interfaceRole?: string; purpose?: string; notes?: string[] }>;
+  links?: Array<{ name?: string; linkRole?: string; linkType?: string; notes?: string[] }>;
   policyRules?: Array<{ name?: string; services?: string[]; notes?: string[] }>;
   natRules?: Array<{ name?: string; notes?: string[] }>;
   securityPolicyFlow?: {
