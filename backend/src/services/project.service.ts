@@ -2,6 +2,7 @@ import type { PlanTier } from "../lib/domainTypes.js";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
+import { materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
 
 type TemplateKey = "small-office" | "branch-office" | "clinic-starter";
@@ -66,8 +67,11 @@ export async function createProject(
       data: { userId, ...data, organizationId: organizationId || undefined },
     });
 
+    const requirementsMaterialization = data.requirementsJson
+      ? await materializeRequirementsForProject(tx, project.id, actorLabel)
+      : null;
     await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
-    return project;
+    return { ...project, requirementsMaterialization };
   });
 }
 
@@ -225,8 +229,11 @@ export async function updateProject(projectId: string, userId: string, data: Rec
   const normalizedData = { ...data, organizationId: organizationId || undefined };
   return prisma.$transaction(async (tx: any) => {
     const result = await tx.project.updateMany({ where: { id: projectId }, data: normalizedData });
+    const requirementsMaterialization = typeof normalizedData.requirementsJson === "string"
+      ? await materializeRequirementsForProject(tx, projectId, actorLabel)
+      : null;
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
-    return result;
+    return { ...result, requirementsMaterialization };
   });
 }
 

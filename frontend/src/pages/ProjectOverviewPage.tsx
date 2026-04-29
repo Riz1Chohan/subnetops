@@ -255,7 +255,7 @@ export function ProjectOverviewPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            v108 turns requirements into explicit placement, path, boundary, and addressing objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine foundation.
+            Requirements should become explicit placement, path, boundary, and addressing evidence instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine foundation.
           </p>
         </div>
         <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
@@ -293,7 +293,7 @@ export function ProjectOverviewPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Unified design truth layer</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This recovery pass adds a shared model that links site topology, route domains, service placement, security boundaries, WAN adjacencies, and flow contracts so later workspaces can read from one connected engineering layer.
+            This workspace uses a shared model that links site topology, route domains, service placement, security boundaries, WAN adjacencies, and flow contracts so every review area reads from one connected engineering layer.
           </p>
         </div>
         <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
@@ -309,7 +309,7 @@ export function ProjectOverviewPage() {
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li style={{ marginBottom: 8 }}>Diagram, routing, security, and report work can now point to the same linked design objects.</li>
               <li style={{ marginBottom: 8 }}>Site, zone, and service drift become easier to detect before implementation details are written.</li>
-              <li style={{ marginBottom: 0 }}>The next roadmap step can focus on strengthening this model instead of stacking more disconnected review helpers.</li>
+              <li style={{ marginBottom: 0 }}>The next engineering step should strengthen this model instead of stacking more disconnected review helpers.</li>
             </ul>
           </div>
           <div>
@@ -737,6 +737,114 @@ export function ProjectOverviewPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
+          {designCore?.requirementsImpactClosure ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Status", designCore.requirementsImpactClosure.completionStatus)}
+                {summaryCard("Captured fields", `${designCore.requirementsImpactClosure.capturedFieldCount}/${designCore.requirementsImpactClosure.totalFieldCount}`)}
+                {summaryCard("Concrete outputs", designCore.requirementsImpactClosure.concreteFieldCount)}
+                {summaryCard("Policy consequences", designCore.requirementsImpactClosure.policyFieldCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This closes the gap between selected requirements and actual plan evidence. Direct requirements should appear as sites, VLANs, policy flows, object-model evidence, or explicit review evidence.
+              </p>
+              {designCore.requirementsImpactClosure.directCapturedTraceableOnlyKeys.length > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Direct fields still needing deeper concrete output</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.requirementsImpactClosure.directCapturedTraceableOnlyKeys.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Captured direct requirements have concrete or policy evidence.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Status</th>
+                      <th align="left">Concrete evidence</th>
+                      <th align="left">Visible in</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.requirementsImpactClosure.fieldOutcomes.slice(0, 16).map((item) => (
+                      <tr key={item.key}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.reflectionStatus}</td>
+                        <td>{item.concreteOutputs.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{item.visibleIn.slice(0, 4).join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirement impact closure is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement scenario proof</h2>
+          {designCore?.requirementsScenarioProof ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Scenario", designCore.requirementsScenarioProof.scenarioName)}
+                {summaryCard("Status", designCore.requirementsScenarioProof.status)}
+                {summaryCard("Passed signals", `${designCore.requirementsScenarioProof.passedSignalCount}/${designCore.requirementsScenarioProof.expectedSignalCount}`)}
+                {summaryCard("Missing", designCore.requirementsScenarioProof.missingSignalCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This proves selected high-impact requirements are reflected in the actual backend evidence model, not just stored in the requirements form.
+              </p>
+              {designCore.requirementsScenarioProof.status === "passed" ? (
+                <div className="trust-note success">
+                  <strong>Scenario drivers have backend-visible design evidence.</strong>
+                </div>
+              ) : (
+                <div className="trust-note warning">
+                  <strong>Scenario proof still has gaps.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.requirementsScenarioProof.blockerCount} blocker signal(s), {designCore.requirementsScenarioProof.reviewCount} review signal(s).
+                  </p>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Signal</th>
+                      <th align="left">Result</th>
+                      <th align="left">Requirement keys</th>
+                      <th align="left">Evidence</th>
+                      <th align="left">Missing evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.requirementsScenarioProof.signals.map((signal) => (
+                      <tr key={signal.id}>
+                        <td>{signal.label}</td>
+                        <td>{signal.passed ? "pass" : signal.severity}</td>
+                        <td>{signal.requirementKeys.join(", ")}</td>
+                        <td>{signal.evidence.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{signal.missingEvidence.join("; ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirement scenario proof is not available in this backend snapshot yet.</p>
+          )}
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>

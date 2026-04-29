@@ -68,6 +68,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const designGraphFindings = Array.isArray(designGraph?.integrityFindings) ? designGraph.integrityFindings : [];
   const authority = designCore.authority && typeof designCore.authority === "object" ? designCore.authority : null;
   const enterpriseAllocatorPosture = designCore.enterpriseAllocatorPosture && typeof designCore.enterpriseAllocatorPosture === "object" ? designCore.enterpriseAllocatorPosture : null;
+  const requirementsImpactClosure = designCore.requirementsImpactClosure && typeof designCore.requirementsImpactClosure === "object" ? designCore.requirementsImpactClosure : null;
+  const requirementsScenarioProof = designCore.requirementsScenarioProof && typeof designCore.requirementsScenarioProof === "object" ? designCore.requirementsScenarioProof : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -78,6 +80,50 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const implementationReadiness = asString(reportTruth?.readiness?.implementation, asString(implementationPlan?.summary?.implementationReadiness, "review"));
   const overallReadiness = asString(reportTruth?.overallReadiness, asString(reportTruth?.overallReadinessLabel, "review"));
   const blockedDesign = isBlocked(implementationReadiness) || isBlocked(overallReadiness);
+
+  if (requirementsImpactClosure || requirementsScenarioProof) {
+    const closureRows = asArray(requirementsImpactClosure?.fieldOutcomes)
+      .filter((item: any) => item?.captured)
+      .slice(0, 35)
+      .map((item: any) => [
+        asString(item.label, asString(item.key, "Requirement")),
+        asString(item.key, "—"),
+        asString(item.reflectionStatus, "review"),
+        joinText(asArray(item.concreteOutputs).slice(0, 4), "—"),
+        joinText(asArray(item.visibleIn).slice(0, 4), "—"),
+      ]);
+
+    const scenarioRows = asArray(requirementsScenarioProof?.signals)
+      .slice(0, 20)
+      .map((signal: any) => [
+        asString(signal.label, "Scenario signal"),
+        signal.passed ? "pass" : asString(signal.severity, "review"),
+        joinText(asArray(signal.requirementKeys), "—"),
+        joinText(asArray(signal.evidence).slice(0, 5), "—"),
+        joinText(asArray(signal.missingEvidence), "—"),
+      ]);
+
+    report.sections.push({
+      title: "Requirement Traceability and Scenario Proof",
+      paragraphs: [
+        `Requirement impact closure status: ${asString(requirementsImpactClosure?.completionStatus, "unavailable")} • captured fields: ${requirementsImpactClosure?.capturedFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0}.`,
+        `Scenario proof: ${asString(requirementsScenarioProof?.scenarioName, "unavailable")} • status: ${asString(requirementsScenarioProof?.status, "unavailable")} • passed signals: ${requirementsScenarioProof?.passedSignalCount ?? 0}/${requirementsScenarioProof?.expectedSignalCount ?? 0}.`,
+        "This section is included so exported reports show where selected requirements changed the actual plan evidence instead of hiding requirement selections as unverified form data.",
+      ],
+      tables: [
+        {
+          title: "Requirement Impact Closure",
+          headers: ["Requirement", "Key", "Status", "Concrete Evidence", "Visible In"],
+          rows: compactRows(closureRows, [["No captured requirement closure rows", "—", "review", "—", "—"]]),
+        },
+        {
+          title: "Requirement Scenario Proof",
+          headers: ["Signal", "Result", "Requirement Keys", "Evidence", "Missing Evidence"],
+          rows: compactRows(scenarioRows, [["No scenario proof rows", "—", "—", "—", "—"]]),
+        },
+      ],
+    });
+  }
 
   if (addressingSection) {
     addressingSection.tables = addressingSection.tables ?? [];

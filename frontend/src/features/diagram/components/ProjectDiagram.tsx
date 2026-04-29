@@ -236,7 +236,7 @@ export function ProjectDiagram({ project, synthesizedDesign, comments = [], vali
       <div className="diagram-toolbar" style={{ marginBottom: 12 }}>
         <div>
           <h2 style={{ marginBottom: 6 }}>{compact ? "Topology canvas" : "Generated Topology Diagram"}</h2>
-          <p className="muted" style={{ margin: 0 }}>{compact ? "Use the canvas as the main workspace. Switch view, overlay, scope, and focus from the control strip, then review the supporting details from the diagram navigator." : "This recovery pass keeps the diagram work tied to the roadmap: real layout modes, guided-vs-expanded density control, stronger link semantics, and clearer label discipline so the workspace behaves more like a real topology review surface."}</p>
+          <p className="muted" style={{ margin: 0 }}>{compact ? "Use the canvas as the main workspace. Switch view, overlay, scope, and focus from the control strip, then review the supporting details from the diagram navigator." : "Use this workspace to review topology, density, link semantics, and label discipline from one engineering canvas."}</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div className="diagram-toggle">
@@ -316,7 +316,7 @@ export function ProjectDiagram({ project, synthesizedDesign, comments = [], vali
                 <button key={preset.key} type="button" className={activePresetKey === preset.key ? "active" : ""} onClick={() => applyPreset(preset.key)}>{preset.label}</button>
               ))}
             </div>
-            <p style={{ margin: "10px 0 0 0", color: "#61758f" }}>{activePreset?.detail || "Review presets align scope, overlay, and mode around the main engineering checks that still matter most in the recovery roadmap."}</p>
+            <p style={{ margin: "10px 0 0 0", color: "#61758f" }}>{activePreset?.detail || "Review presets align scope, overlay, and mode around the main engineering checks for this design."}</p>
           </div>
           <div className="diagram-note-card">
             <strong style={{ display: "block", marginBottom: 6 }}>{scopeMeta.title}</strong>
@@ -328,7 +328,7 @@ export function ProjectDiagram({ project, synthesizedDesign, comments = [], vali
           </div>
           <div className="diagram-note-card">
             <strong style={{ display: "block", marginBottom: 6 }}>Recovery direction</strong>
-            <p style={{ margin: 0, color: "#61758f" }}>Use global for overall architecture, per-site for local LLD review, WAN / cloud for transport posture, and boundaries for trust enforcement. This keeps the diagram stage closer to the roadmap’s real topology-engine target.</p>
+            <p style={{ margin: 0, color: "#61758f" }}>Use global for overall architecture, per-site for local LLD review, WAN / cloud for transport posture, and boundaries for trust enforcement. This keeps the diagram stage tied to the actual topology and security model.</p>
           </div>
           <div className="diagram-note-card">
             <strong style={{ display: "block", marginBottom: 6 }}>Topology-specific rendering check</strong>

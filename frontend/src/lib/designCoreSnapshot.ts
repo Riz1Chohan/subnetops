@@ -569,6 +569,7 @@ export interface SecurityFlowRequirement {
   loggingRequired: boolean;
   rationale: string;
   truthState: NetworkObjectTruthState;
+  requirementKeys?: string[];
   notes: string[];
 }
 
@@ -1093,6 +1094,107 @@ export interface EnterpriseAllocatorPostureSummary {
   reviewQueue: string[];
 }
 
+
+export interface BackendTraceabilityItem {
+  sourceArea: "requirements" | "discovery" | "platform";
+  sourceKey: string;
+  sourceLabel: string;
+  sourceValue: string;
+  impacts: string[];
+  outputAreas?: string[];
+  materializationTargets?: string[];
+  designConsequence?: string;
+  validationEvidence?: string;
+  diagramEvidence?: string;
+  reportEvidence?: string;
+  confidence: "high" | "medium" | "advisory";
+}
+
+export interface RequirementImpactInventoryItem {
+  key: string;
+  label: string;
+  category: string;
+  impact: "direct" | "indirect" | "evidence";
+  sourceValue: string;
+  captured: boolean;
+  outputAreas: string[];
+  materializationTargets: string[];
+  designConsequence: string;
+}
+
+export interface RequirementsCoverageSummary {
+  areas: Array<{
+    id: string;
+    title: string;
+    status: "implemented" | "partial" | "missing";
+    signals: string[];
+    notes: string[];
+  }>;
+  implementedCount: number;
+  partialCount: number;
+  missingCount: number;
+  missingAreaIds: string[];
+  fieldInventory: RequirementImpactInventoryItem[];
+  totalFieldCount: number;
+  capturedFieldCount: number;
+  directFieldCount: number;
+  indirectFieldCount: number;
+  evidenceFieldCount: number;
+  notes: string[];
+}
+
+export interface RequirementsImpactClosureItem {
+  key: string;
+  label: string;
+  category: string;
+  impact: "direct" | "indirect" | "evidence";
+  sourceValue: string;
+  captured: boolean;
+  reflectionStatus: "concrete-output" | "policy-consequence" | "review-evidence" | "traceable-only" | "not-captured";
+  concreteOutputs: string[];
+  visibleIn: string[];
+  missingEvidence: string[];
+}
+
+export interface RequirementsImpactClosureSummary {
+  totalFieldCount: number;
+  capturedFieldCount: number;
+  concreteFieldCount: number;
+  policyFieldCount: number;
+  reviewEvidenceFieldCount: number;
+  traceableOnlyFieldCount: number;
+  notCapturedFieldCount: number;
+  directCapturedTraceableOnlyKeys: string[];
+  completionStatus: "complete" | "review-required";
+  fieldOutcomes: RequirementsImpactClosureItem[];
+  notes: string[];
+}
+
+export interface RequirementsScenarioProofSignal {
+  id: string;
+  label: string;
+  requirementKeys: string[];
+  expectedEvidence: string[];
+  passed: boolean;
+  evidence: string[];
+  missingEvidence: string[];
+  severity: "blocker" | "review" | "info";
+}
+
+export interface RequirementsScenarioProofSummary {
+  status: "passed" | "review-required" | "blocked";
+  scenarioName: string;
+  selectedDrivers: string[];
+  expectedSignalCount: number;
+  passedSignalCount: number;
+  missingSignalCount: number;
+  blockerCount: number;
+  reviewCount: number;
+  signals: RequirementsScenarioProofSignal[];
+  notes: string[];
+}
+
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -1185,6 +1287,10 @@ export interface DesignCoreSnapshot {
   diagramTruth?: BackendDiagramTruthModel;
   vendorNeutralImplementationTemplates?: VendorNeutralImplementationTemplateModel;
   proposedRows: DesignCoreProposalRow[];
+  traceability?: BackendTraceabilityItem[];
+  requirementsCoverage?: RequirementsCoverageSummary;
+  requirementsImpactClosure?: RequirementsImpactClosureSummary;
+  requirementsScenarioProof?: RequirementsScenarioProofSummary;
   issues: DesignCoreIssue[];
 }
 

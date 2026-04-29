@@ -55,6 +55,10 @@ export function useUpdateProject(projectId: string) {
     onSuccess: async () => {
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["project-sites", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["project-vlans", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["design-core", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["enterprise-ipam", projectId] });
       try {
         await runValidation(projectId);
       } catch {}

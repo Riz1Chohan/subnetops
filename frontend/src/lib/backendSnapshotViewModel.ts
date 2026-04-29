@@ -264,7 +264,7 @@ export function backendDesignEngineFoundation(snapshot: DesignCoreSnapshot): Des
       trafficFlows: snapshot.networkObjectModel?.securityPolicyFlow.flowRequirements.length ?? 0,
       routingIdentities: snapshot.networkObjectModel?.routeDomains.length ?? 0,
       wanLinks: snapshot.networkObjectModel?.links.length ?? 0,
-      traceabilityItems: snapshot.summary.traceabilityCount,
+      traceabilityItems: snapshot.traceability?.length ?? snapshot.summary.traceabilityCount,
       openIssues: snapshot.summary.issueCount,
     },
     strongestLayer: "backend-design-core",
@@ -414,6 +414,14 @@ function zoneIdsForSite(zones: SecurityZone[], siteId: string) {
   return new Set(zones.filter((zone) => zone.siteIds.includes(siteId)).map((zone) => zone.id));
 }
 
+function backendTraceabilityRows(snapshot: DesignCoreSnapshot) {
+  return (snapshot.traceability ?? []).map((item) => ({
+    title: item.sourceLabel,
+    requirement: `${item.sourceKey}: ${item.sourceValue}`,
+    designOutcome: item.designConsequence || item.outputAreas?.join(", ") || item.impacts.join(", "),
+  }));
+}
+
 export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addressingRows: AddressingPlanRow[]): Partial<SynthesizedLogicalDesign> {
   const sites = backendSiteSummaries(snapshot, addressingRows);
   const siteHierarchy = backendSiteHierarchy(sites, addressingRows);
@@ -441,8 +449,11 @@ export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addr
     highLevelDesign: backendHighLevelDesign(snapshot, topology),
     designTruthModel: backendTruthModel(snapshot, topology, addressingRows),
     designEngineFoundation: backendDesignEngineFoundation(snapshot),
+    traceability: backendTraceabilityRows(snapshot),
     designSummary: [
       `${snapshot.projectName} backend design-core snapshot contains ${snapshot.summary.networkObjectCount || snapshot.summary.vlanCount} modeled object(s).`,
+      `Requirement impact traceability covers ${(snapshot.traceability ?? []).filter((item) => item.sourceArea === "requirements").length} requirement field(s).`,
+      snapshot.requirementsImpactClosure ? `Requirement impact closure status: ${snapshot.requirementsImpactClosure.completionStatus} with ${snapshot.requirementsImpactClosure.concreteFieldCount} concrete field(s) and ${snapshot.requirementsImpactClosure.policyFieldCount} policy-driven field(s).` : "Requirement impact closure is not available in this snapshot.",
       `Frontend planning authority is disabled; this is a backend snapshot view model.`,
     ],
   };

@@ -272,7 +272,7 @@ export function SupportDeviceRealismDirectionPanel() {
       <div>
         <strong style={{ display: "block", marginBottom: 6 }}>Device realism direction</strong>
         <p className="muted" style={{ margin: 0 }}>
-          v117-v120 continues the shift away from generic circles and plain rectangles. The diagram should increasingly use network-style symbols that look like firewalls, routers, switch stacks, wireless devices, servers, cloud edges, and internet boundaries.
+          The diagram should use network-style symbols that look like firewalls, routers, switch stacks, wireless devices, servers, cloud edges, and internet boundaries.
         </p>
       </div>
       <div className="diagram-realism-grid">

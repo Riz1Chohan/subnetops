@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.60.0",
+  "version": "0.66.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -27,7 +27,13 @@
     "check:phase57-brownfield-conflict-review": "node scripts/check-phase57-brownfield-conflict-review.cjs && npm run check:phase58-brownfield-conflict-resolution",
     "check:phase58-brownfield-conflict-resolution": "node scripts/check-phase58-brownfield-conflict-resolution.cjs && npm run check:phase59-engine2-ui-edit-build-proof",
     "check:phase59-engine2-ui-edit-build-proof": "node scripts/check-phase59-engine2-ui-edit-build-proof.cjs && npm run check:phase60-deploy-compile-fixes",
-    "check:phase60-deploy-compile-fixes": "node scripts/check-phase60-deploy-compile-fixes.cjs"
+    "check:phase60-deploy-compile-fixes": "node scripts/check-phase60-deploy-compile-fixes.cjs && npm run check:phase61-requirements-materialization",
+    "check:phase61-requirements-materialization": "node scripts/check-phase61-requirements-materialization.cjs && npm run check:phase62-requirements-impact-traceability",
+    "check:phase62-requirements-impact-traceability": "node scripts/check-phase62-requirements-impact-traceability.cjs && npm run check:phase63-requirements-policy-consequences",
+    "check:phase63-requirements-policy-consequences": "node scripts/check-phase63-requirements-policy-consequences.cjs && npm run check:phase64-requirements-completion-closure",
+    "check:phase64-requirements-completion-closure": "node scripts/check-phase64-requirements-completion-closure.cjs && npm run check:phase65-requirement-scenario-proof",
+    "check:phase65-requirement-scenario-proof": "node scripts/check-phase65-requirement-scenario-proof.cjs && npm run check:phase66-runtime-ui-report-proof",
+    "check:phase66-runtime-ui-report-proof": "node scripts/check-phase66-runtime-ui-report-proof.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",

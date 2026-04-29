@@ -1458,7 +1458,7 @@ export function ProjectRequirementsPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Requirements"
-        description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. This v109 workspace now uses a clearer step-by-step planner with stronger focus, fewer distractions, and more obvious next moves based on the scenario you define."
+        description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. The planner now keeps each requirement tied to downstream design impact instead of collecting disconnected form data."
         actions={
           <>
             <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>

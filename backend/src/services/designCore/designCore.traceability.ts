@@ -1,5 +1,6 @@
 import { parseJsonMap, valueAsBoolean, valueAsString } from "./designCore.helpers.js";
 import type { DesignTraceabilityItem } from "../designCore.types.js";
+import { buildRequirementImpactInventory } from "../requirementsImpactRegistry.js";
 
 type ProjectTraceabilityInput = {
   requirementsJson?: string | null;
@@ -7,11 +8,35 @@ type ProjectTraceabilityInput = {
   platformProfileJson?: string | null;
 };
 
+function confidenceForRequirement(impact: "direct" | "indirect" | "evidence", captured: boolean): DesignTraceabilityItem["confidence"] {
+  if (!captured) return "advisory";
+  if (impact === "direct") return "high";
+  if (impact === "indirect") return "medium";
+  return "advisory";
+}
+
 export function buildTraceability(project: ProjectTraceabilityInput): DesignTraceabilityItem[] {
   const requirements = parseJsonMap(project.requirementsJson);
   const discovery = parseJsonMap(project.discoveryJson);
   const platform = parseJsonMap(project.platformProfileJson);
   const traceability: DesignTraceabilityItem[] = [];
+
+  for (const item of buildRequirementImpactInventory(requirements)) {
+    traceability.push({
+      sourceArea: "requirements",
+      sourceKey: item.key,
+      sourceLabel: item.label,
+      sourceValue: item.sourceValue,
+      impacts: item.outputAreas,
+      outputAreas: item.outputAreas,
+      materializationTargets: item.materializationTargets,
+      designConsequence: item.designConsequence,
+      validationEvidence: item.validationConsequence,
+      diagramEvidence: item.diagramConsequence,
+      reportEvidence: item.reportConsequence,
+      confidence: confidenceForRequirement(item.impact, item.captured),
+    });
+  }
 
   const addTrace = (
     sourceArea: DesignTraceabilityItem["sourceArea"],
@@ -29,51 +54,16 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
       sourceLabel,
       sourceValue: text,
       impacts,
+      outputAreas: impacts,
+      materializationTargets: ["Design-core traceability", "Review notes"],
+      designConsequence: impacts.join("; "),
+      validationEvidence: "Captured outside the requirements workflow and reflected in design review summaries where available.",
+      diagramEvidence: "Displayed when the backend render model exposes a matching object or relationship.",
+      reportEvidence: "Included in backend design-core traceability and report truth sections.",
       confidence,
     });
   };
 
-  addTrace("requirements", "planningFor", "Planning objective", requirements.planningFor, [
-    "Architecture pattern selection",
-    "Documentation tone and output package",
-  ], "high");
-  addTrace("requirements", "primaryGoal", "Primary design goal", requirements.primaryGoal, [
-    "Validation emphasis",
-    "Segmentation and routing tradeoffs",
-  ], "high");
-  addTrace("requirements", "usersPerSite", "Users per site", requirements.usersPerSite, [
-    "Subnet sizing",
-    "Growth buffer calculations",
-    "Wireless and access-layer assumptions",
-  ], "high");
-  addTrace("requirements", "remoteAccess", "Remote access requirement", requirements.remoteAccess, [
-    "Security architecture",
-    "VPN and identity boundary planning",
-  ], valueAsBoolean(requirements.remoteAccess) ? "high" : "advisory");
-  addTrace("requirements", "guestWifi", "Guest access requirement", requirements.guestWifi, [
-    "Guest segmentation",
-    "Firewall and policy boundaries",
-  ], valueAsBoolean(requirements.guestWifi) ? "high" : "advisory");
-  addTrace("requirements", "voice", "Voice requirement", requirements.voice, [
-    "Voice VLAN planning",
-    "QoS intent",
-  ], valueAsBoolean(requirements.voice) ? "high" : "advisory");
-  addTrace("requirements", "iot", "IoT / OT requirement", requirements.iot, [
-    "Specialty segmentation",
-    "Trust boundary hardening",
-  ], valueAsBoolean(requirements.iot) ? "high" : "advisory");
-  addTrace("requirements", "serverPlacement", "Server placement", requirements.serverPlacement, [
-    "Shared services placement",
-    "WAN dependency assumptions",
-  ], "medium");
-  addTrace("requirements", "internetModel", "Internet breakout model", requirements.internetModel, [
-    "WAN edge design",
-    "Firewall placement intent",
-  ], "medium");
-  addTrace("requirements", "complianceProfile", "Compliance profile", requirements.complianceProfile, [
-    "Security control strictness",
-    "Logging and segmentation requirements",
-  ], "medium");
   addTrace("discovery", "topologyBaseline", "Current topology baseline", discovery.topologyBaseline, [
     "Current-state mapping readiness",
     "Brownfield reconciliation",
@@ -109,4 +99,3 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
 
   return traceability;
 }
-

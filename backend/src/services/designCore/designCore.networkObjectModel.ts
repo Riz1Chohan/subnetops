@@ -24,6 +24,7 @@ import type {
 type NetworkObjectProject = {
   id: string;
   name: string;
+  requirementsJson?: string | null;
   sites: Array<{
     id: string;
     name: string;
@@ -120,7 +121,7 @@ function zoneRoleFromAddressRow(addressRow: DesignCoreAddressRow): SecurityZoneR
   if (addressRow.role === "GUEST") return "guest";
   if (addressRow.role === "MANAGEMENT") return "management";
   if (addressRow.role === "VOICE") return "voice";
-  if (addressRow.role === "IOT" || addressRow.role === "CAMERA") return "iot";
+  if (addressRow.role === "IOT" || addressRow.role === "CAMERA" || addressRow.role === "PRINTER") return "iot";
   if (addressRow.role === "WAN_TRANSIT") return "transit";
   if (addressRow.role === "SERVER" && descriptiveText.includes("dmz")) return "dmz";
   if (addressRow.role === "LOOPBACK") return "transit";
@@ -655,7 +656,7 @@ export function buildNetworkObjectModel(params: {
     ipReservations: ipReservations.sort((left, right) => left.id.localeCompare(right.id)),
     integrityNotes: [
       ...integrityNotes,
-      "This object model is backend-generated from current planning inputs, Phase 28 routing/segmentation relationships, and Phase 29 security flow requirements.",
+      "This object model is backend-generated from current planning inputs, routing/segmentation relationships, security flow requirements, and requirement-driven policy consequences.",
     ],
   };
 
@@ -669,6 +670,7 @@ export function buildNetworkObjectModel(params: {
   const securityPolicyFlow = buildSecurityPolicyFlowModel({
     networkObjectModel: modelWithoutSummaryOrGraph,
     routingSegmentation,
+    requirementsJson: project.requirementsJson,
   });
 
   const temporaryDesignGraph = buildBackendDesignGraph({

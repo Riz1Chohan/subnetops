@@ -805,6 +805,28 @@ export async function getCsvRows(projectId: string) {
       });
     }
 
+    for (const item of designCore.requirementsImpactClosure.fieldOutcomes.filter((field) => field.captured).slice(0, 60)) {
+      rows.push({
+        Section: "Requirement Impact Closure",
+        Scope: item.category,
+        Name: item.label,
+        Key: item.reflectionStatus,
+        Value: joinCsvList(item.concreteOutputs, "No concrete evidence recorded"),
+        Notes: `Requirement key ${item.key} | Impact ${item.impact} | Visible in ${joinCsvList(item.visibleIn, "not recorded")} | Missing ${joinCsvList(item.missingEvidence, "none")}`,
+      });
+    }
+
+    for (const signal of designCore.requirementsScenarioProof.signals) {
+      rows.push({
+        Section: "Requirement Scenario Proof",
+        Scope: designCore.requirementsScenarioProof.scenarioName,
+        Name: signal.label,
+        Key: signal.passed ? "pass" : signal.severity,
+        Value: joinCsvList(signal.evidence, "No evidence recorded"),
+        Notes: `Requirement keys ${joinCsvList(signal.requirementKeys, "not linked")} | Expected ${joinCsvList(signal.expectedEvidence, "not recorded")} | Missing ${joinCsvList(signal.missingEvidence, "none")}`,
+      });
+    }
+
 
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;

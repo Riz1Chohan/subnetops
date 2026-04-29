@@ -39,6 +39,7 @@ type BaseFlowRequirementInput = {
   severityIfMissing: SecurityFlowRequirement["severityIfMissing"];
   rationale: string;
   truthState: NetworkObjectTruthState;
+  requirementKeys?: string[];
   notes: string[];
 };
 
@@ -48,6 +49,73 @@ const HIGH_RISK_SOURCE_ROLES = new Set<SecurityZone["zoneRole"]>(["guest", "wan"
 const HIGH_VALUE_DESTINATION_ROLES = new Set<SecurityZone["zoneRole"]>(["internal", "management"]);
 const TRUSTED_INTERNAL_ROLES = new Set<SecurityZone["zoneRole"]>(["internal", "management"]);
 const NAT_EGRESS_ROLES = new Set<SecurityZone["zoneRole"]>(["internal", "guest", "management", "voice", "iot", "dmz"]);
+
+type RequirementInputMap = Record<string, unknown>;
+
+function parseRequirementsJson(requirementsJson?: string | null): RequirementInputMap {
+  if (!requirementsJson) return {};
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as RequirementInputMap;
+  } catch {
+    return {};
+  }
+}
+
+function requirementText(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return "";
+}
+
+function requirementBool(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  return value === true || String(value ?? "").toLowerCase() === "true";
+}
+
+function requirementMentions(requirements: RequirementInputMap, key: string, patterns: string[]) {
+  const text = requirementText(requirements, key).toLowerCase();
+  return patterns.some((pattern) => text.includes(pattern));
+}
+
+function requirementNumber(requirements: RequirementInputMap, key: string) {
+  const raw = requirements[key];
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw.trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function requirementCountPositive(requirements: RequirementInputMap, key: string) {
+  return requirementNumber(requirements, key) > 0;
+}
+
+function requirementEnabled(requirements: RequirementInputMap, key: string, patterns: string[] = []) {
+  return requirementBool(requirements, key) || requirementMentions(requirements, key, patterns);
+}
+
+function dedupeFlowInputs(flowInputs: BaseFlowRequirementInput[]) {
+  const byId = new Map<string, BaseFlowRequirementInput>();
+  for (const flowInput of flowInputs) {
+    const existing = byId.get(flowInput.id);
+    if (!existing) {
+      byId.set(flowInput.id, flowInput);
+      continue;
+    }
+    const requirementKeys = Array.from(new Set([...(existing.requirementKeys ?? []), ...(flowInput.requirementKeys ?? [])])).sort();
+    byId.set(flowInput.id, {
+      ...existing,
+      requirementKeys,
+      notes: Array.from(new Set([...existing.notes, ...flowInput.notes])),
+    });
+  }
+  return Array.from(byId.values());
+}
 
 function normalizeIdentifierSegment(value: string) {
   const normalized = value
@@ -309,8 +377,12 @@ function createFlowRequirement(params: {
     loggingRequired: flowLoggingRequired,
     rationale: params.flowInput.rationale,
     truthState: params.flowInput.truthState,
+    requirementKeys: params.flowInput.requirementKeys ?? [],
     notes: [
       ...params.flowInput.notes,
+      (params.flowInput.requirementKeys ?? []).length > 0
+        ? `Requirement-driven flow evidence: ${(params.flowInput.requirementKeys ?? []).join(", ")}.`
+        : "Flow evidence is derived from modeled topology, routing, or baseline security posture.",
       observedPolicyRule
         ? `First matching policy rule is ${observedPolicyRule.name} at sequence ${observedPolicyRule.sequence} with action ${observedPolicyRule.action}.`
         : "No matching policy rule was modeled for this flow requirement.",
@@ -345,10 +417,186 @@ function flowInputFromSegmentationExpectation(expectation: SegmentationFlowExpec
     severityIfMissing: expectation.severityIfMissing,
     rationale: expectation.rationale,
     truthState: "proposed",
+    requirementKeys: ["routingSegmentation"],
     notes: [
       "Derived from the Phase 28 segmentation expectation so security policy coverage can be evaluated as a first-class flow requirement.",
     ],
   };
+}
+
+function pushRequirementFlow(flowInputs: BaseFlowRequirementInput[], flowInput: BaseFlowRequirementInput) {
+  if (!flowInputs.some((item) => item.id === flowInput.id)) flowInputs.push(flowInput);
+}
+
+function buildRequirementDrivenFlowInputs(model: SecurityPolicyNetworkObjectModel, requirements: RequirementInputMap): BaseFlowRequirementInput[] {
+  const flowInputs: BaseFlowRequirementInput[] = [];
+  const internalZone = findZoneByRole(model.securityZones, "internal");
+  const managementZone = findZoneByRole(model.securityZones, "management");
+  const dmzZone = findZoneByRole(model.securityZones, "dmz");
+  const guestZone = findZoneByRole(model.securityZones, "guest");
+  const wideAreaNetworkZone = findZoneByRole(model.securityZones, "wan");
+  const transitZone = findZoneByRole(model.securityZones, "transit");
+  const voiceZone = findZoneByRole(model.securityZones, "voice");
+  const iotZone = findZoneByRole(model.securityZones, "iot");
+  const cloudOrHybrid = requirementEnabled(requirements, "cloudConnected")
+    || requirementMentions(requirements, "environmentType", ["cloud", "hybrid"])
+    || requirementMentions(requirements, "cloudConnectivity", ["vpn", "express", "direct", "private", "cloud"]);
+
+  if (requirementEnabled(requirements, "guestWifi") && guestZone && internalZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-guest-to-internal-default-deny",
+      name: "Guest requirement blocks internal reachability",
+      sourceZone: guestZone,
+      destinationZone: internalZone,
+      expectedAction: "deny",
+      serviceNames: ["any"],
+      natRequired: false,
+      severityIfMissing: "ERROR",
+      rationale: "The guest Wi-Fi requirement is only trustworthy if guest clients are explicitly isolated from internal user, server, and shared-device networks.",
+      truthState: "proposed",
+      requirementKeys: ["guestWifi", "guestPolicy", "trustBoundaryModel", "securityPosture"],
+      notes: ["This turns the guest checkbox into a concrete deny-flow requirement, not just a guest VLAN label."],
+    });
+  }
+
+  if (requirementEnabled(requirements, "management") && internalZone && managementZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-admin-to-management-plane-review",
+      name: "Administrative access to management plane must be explicit",
+      sourceZone: internalZone,
+      destinationZone: managementZone,
+      expectedAction: "review",
+      serviceNames: Array.from(MANAGEMENT_SERVICES),
+      natRequired: false,
+      severityIfMissing: "WARNING",
+      rationale: "The management-network requirement needs a deliberate admin-source decision instead of allowing normal user networks to reach device administration surfaces by accident.",
+      truthState: "proposed",
+      requirementKeys: ["management", "managementAccess", "managementIpPolicy", "adminBoundary", "identityModel"],
+      notes: ["Implementation should narrow the source to admin workstations, jump hosts, or identity-aware access paths."],
+    });
+  }
+
+  if (requirementEnabled(requirements, "remoteAccess") && wideAreaNetworkZone && dmzZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-wan-to-remote-access-edge-review",
+      name: "Remote-access edge publishing must be explicit",
+      sourceZone: wideAreaNetworkZone,
+      destinationZone: dmzZone,
+      expectedAction: "review",
+      serviceNames: ["https", "ssl-vpn", "ipsec"],
+      natRequired: false,
+      severityIfMissing: "WARNING",
+      rationale: "The remote-access requirement should create a reviewed VPN/application edge rather than silently trusting inbound WAN traffic.",
+      truthState: "proposed",
+      requirementKeys: ["remoteAccess", "remoteAccessMethod", "identityModel", "securityPosture"],
+      notes: ["MFA, identity provider, tunnel mode, and permitted destination groups remain implementation review items."],
+    });
+  }
+
+  if (requirementEnabled(requirements, "remoteAccess") && dmzZone && internalZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-remote-access-edge-to-internal-review",
+      name: "Remote-access users require scoped internal access",
+      sourceZone: dmzZone,
+      destinationZone: internalZone,
+      expectedAction: "review",
+      serviceNames: ["application-specific", "dns", "https"],
+      natRequired: false,
+      severityIfMissing: "WARNING",
+      rationale: "Remote-access users should receive scoped application access, not broad trusted-network reachability.",
+      truthState: "proposed",
+      requirementKeys: ["remoteAccess", "remoteAccessMethod", "identityModel", "trustBoundaryModel"],
+      notes: ["Replace this review flow with application groups and least-privilege destination groups before implementation."],
+    });
+  }
+
+  if (cloudOrHybrid && internalZone && (transitZone || wideAreaNetworkZone)) {
+    const destinationZone = transitZone ?? wideAreaNetworkZone!;
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-internal-to-cloud-edge-review",
+      name: "Cloud or hybrid application reachability must be reviewed",
+      sourceZone: internalZone,
+      destinationZone,
+      expectedAction: "review",
+      serviceNames: ["application-specific", "dns", "https"],
+      natRequired: destinationZone.zoneRole === "wan",
+      severityIfMissing: "WARNING",
+      rationale: "Cloud-connected and hybrid requirements need an explicit private/public cloud boundary instead of being hidden under generic internet egress.",
+      truthState: "proposed",
+      requirementKeys: ["cloudConnected", "environmentType", "cloudConnectivity", "cloudNetworkModel", "cloudRoutingModel", "cloudTrafficBoundary"],
+      notes: ["Private route exchange, cloud prefix ownership, DNS, and security inspection must be confirmed before implementation."],
+    });
+  }
+
+  if ((requirementEnabled(requirements, "voice") || requirementCountPositive(requirements, "phoneCount")) && voiceZone && (internalZone || wideAreaNetworkZone)) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-voice-services-qos-review",
+      name: "Voice services require scoped QoS and call-control reachability",
+      sourceZone: voiceZone,
+      destinationZone: internalZone ?? wideAreaNetworkZone!,
+      expectedAction: "review",
+      serviceNames: ["sip", "rtp", "dns"],
+      natRequired: !internalZone,
+      severityIfMissing: "WARNING",
+      rationale: "The voice requirement affects policy and QoS; it cannot be treated as only another DHCP VLAN.",
+      truthState: "proposed",
+      requirementKeys: ["voice", "voiceQos", "phoneCount", "qosModel", "latencySensitivity"],
+      notes: ["Call manager, SBC, emergency calling, and QoS marking trust boundaries remain engineer-review items."],
+    });
+  }
+
+  if ((requirementEnabled(requirements, "iot") || requirementCountPositive(requirements, "iotDeviceCount") || requirementEnabled(requirements, "cameras") || requirementCountPositive(requirements, "cameraCount") || requirementEnabled(requirements, "printers") || requirementCountPositive(requirements, "printerCount")) && iotZone && internalZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-shared-device-to-internal-default-deny",
+      name: "Shared-device and IoT networks default-deny into trusted internal networks",
+      sourceZone: iotZone,
+      destinationZone: internalZone,
+      expectedAction: "deny",
+      serviceNames: ["any"],
+      natRequired: false,
+      severityIfMissing: "ERROR",
+      rationale: "Printers, cameras, and IoT devices should not inherit broad internal network access just because they are inside the building.",
+      truthState: "proposed",
+      requirementKeys: ["printers", "printerCount", "iot", "iotDeviceCount", "cameras", "cameraCount", "trustBoundaryModel", "securityPosture"],
+      notes: ["Allow flows should be modeled from trusted users/services toward these device networks, not broad east-west access from devices to users."],
+    });
+  }
+
+  if ((requirementEnabled(requirements, "iot") || requirementCountPositive(requirements, "iotDeviceCount") || requirementEnabled(requirements, "cameras") || requirementCountPositive(requirements, "cameraCount") || requirementEnabled(requirements, "printers") || requirementCountPositive(requirements, "printerCount")) && internalZone && iotZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-internal-to-shared-device-review",
+      name: "Trusted access to shared-device networks must be scoped",
+      sourceZone: internalZone,
+      destinationZone: iotZone,
+      expectedAction: "review",
+      serviceNames: ["application-specific", "icmp"],
+      natRequired: false,
+      severityIfMissing: "WARNING",
+      rationale: "Users or services may need to reach printers, cameras, or IoT controllers, but those paths should be intentionally scoped.",
+      truthState: "proposed",
+      requirementKeys: ["printers", "printerCount", "iot", "iotDeviceCount", "cameras", "cameraCount"],
+      notes: ["Replace this review flow with print, camera-management, or IoT-controller service groups before implementation."],
+    });
+  }
+
+  if ((requirementMentions(requirements, "complianceProfile", ["pci", "hipaa", "sox", "regulated", "compliance"]) || requirementEnabled(requirements, "management") || Boolean(requirementText(requirements, "monitoringModel")) || Boolean(requirementText(requirements, "loggingModel")) || Boolean(requirementText(requirements, "backupPolicy")) || Boolean(requirementText(requirements, "operationsOwnerModel"))) && managementZone && internalZone) {
+    pushRequirementFlow(flowInputs, {
+      id: "requirement-flow-management-to-internal-operations-review",
+      name: "Operations tooling access must be scoped and logged",
+      sourceZone: managementZone,
+      destinationZone: internalZone,
+      expectedAction: "review",
+      serviceNames: ["snmp", "ssh", "https", "icmp"],
+      natRequired: false,
+      severityIfMissing: "WARNING",
+      rationale: "Monitoring, logging, backups, and compliance evidence require controlled operations-plane reachability.",
+      truthState: "proposed",
+      requirementKeys: ["complianceProfile", "monitoringModel", "loggingModel", "backupPolicy", "operationsOwnerModel", "management"],
+      notes: ["Logging and evidence collection should be validated with management-plane source restrictions before handoff."],
+    });
+  }
+
+  return flowInputs;
 }
 
 function buildAdditionalFlowInputs(model: SecurityPolicyNetworkObjectModel): BaseFlowRequirementInput[] {
@@ -981,8 +1229,10 @@ function buildPolicyReadiness(params: {
 export function buildSecurityPolicyFlowModel(params: {
   networkObjectModel: SecurityPolicyNetworkObjectModel;
   routingSegmentation: RoutingSegmentationModel;
+  requirementsJson?: string | null;
 }): SecurityPolicyFlowModel {
   const { networkObjectModel, routingSegmentation } = params;
+  const requirements = parseRequirementsJson(params.requirementsJson);
   const policyRules = networkObjectModel.policyRules.map<SequencedPolicyRule>((rule, index) => ({ ...rule, sequence: index + 10 }));
   const baseFlowInputs: BaseFlowRequirementInput[] = [];
 
@@ -992,8 +1242,11 @@ export function buildSecurityPolicyFlowModel(params: {
   }
 
   baseFlowInputs.push(...buildAdditionalFlowInputs(networkObjectModel));
+  baseFlowInputs.push(...buildRequirementDrivenFlowInputs(networkObjectModel, requirements));
 
-  const flowRequirements = baseFlowInputs
+  const dedupedFlowInputs = dedupeFlowInputs(baseFlowInputs);
+
+  const flowRequirements = dedupedFlowInputs
     .map((flowInput) => createFlowRequirement({
       flowInput,
       policyRules,
@@ -1001,8 +1254,8 @@ export function buildSecurityPolicyFlowModel(params: {
     }))
     .sort((left, right) => left.id.localeCompare(right.id));
 
-  const serviceGroups = buildServiceGroups(baseFlowInputs, networkObjectModel.policyRules);
-  const serviceObjects = buildServiceObjects(baseFlowInputs, networkObjectModel.policyRules, serviceGroups);
+  const serviceGroups = buildServiceGroups(dedupedFlowInputs, networkObjectModel.policyRules);
+  const serviceObjects = buildServiceObjects(dedupedFlowInputs, networkObjectModel.policyRules, serviceGroups);
   const policyMatrix = buildPolicyMatrix({
     securityZones: networkObjectModel.securityZones,
     policyRules,
@@ -1066,9 +1319,9 @@ export function buildSecurityPolicyFlowModel(params: {
       policyReadiness,
       natReadiness: missingNatCount > 0 || natReviews.some((review) => review.state === "blocked") ? "blocked" : natReviews.some((review) => review.state === "review") ? "review" : "ready",
       notes: [
-        "Phase 35 evaluates security as an ordered, zone-to-zone, service-aware backend policy model instead of a shallow flow checklist.",
-        "The engine now exposes a policy matrix, service groups, rule-order/shadowing reviews, implicit-deny gaps, NAT reviews, and logging evidence requirements.",
-        "This is still vendor-neutral security intent. Firewall syntax, platform profiles, address objects, and final command generation remain later implementation phases.",
+        "Captured requirements feed the security-flow model so guest, management, remote access, cloud/hybrid, voice, IoT, camera, printer, monitoring, and compliance selections become reviewable policy consequences.",
+        "The engine exposes requirement keys on generated flows, making selected requirements traceable into zone-to-zone policy, NAT, logging, and blocker/review evidence.",
+        "This remains vendor-neutral design intent; final firewall syntax and platform-specific command generation still require implementation review.",
       ],
     },
     serviceObjects,

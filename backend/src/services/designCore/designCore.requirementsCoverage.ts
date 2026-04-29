@@ -1,5 +1,6 @@
 import { parseJsonMap, valueAsBoolean, valueAsString } from "./designCore.helpers.js";
 import type { RequirementsCoverageArea, RequirementsCoverageSummary } from "../designCore.types.js";
+import { buildRequirementImpactInventory, summarizeRequirementImpactInventory } from "../requirementsImpactRegistry.js";
 
 type VlanInput = {
   estimatedHosts?: number | null;
@@ -18,6 +19,8 @@ type ProjectRequirementsCoverageInput = {
 
 export function buildRequirementsCoverageSummary(project: ProjectRequirementsCoverageInput): RequirementsCoverageSummary {
   const requirements = parseJsonMap(project.requirementsJson);
+  const requirementImpactInventory = buildRequirementImpactInventory(requirements);
+  const requirementImpactSummary = summarizeRequirementImpactInventory(requirements);
   const discovery = parseJsonMap(project.discoveryJson);
   const platform = parseJsonMap(project.platformProfileJson);
   const sites = project.sites;
@@ -55,9 +58,9 @@ export function buildRequirementsCoverageSummary(project: ProjectRequirementsCov
     {
       id: "applications-services",
       title: "Applications and service placement",
-      status: text(requirements.serverPlacement) && text(requirements.businessApps) ? "implemented" : text(requirements.serverPlacement) ? "partial" : "missing",
-      signals: [text(requirements.serverPlacement), text(requirements.businessApps)].filter(Boolean),
-      notes: ["Server placement is already used by WAN and security summaries, but application dependency depth still needs improvement."],
+      status: text(requirements.serverPlacement) && (text(requirements.applicationProfile) || text(requirements.criticalServicesModel)) ? "implemented" : text(requirements.serverPlacement) || text(requirements.applicationProfile) || text(requirements.criticalServicesModel) ? "partial" : "missing",
+      signals: [text(requirements.serverPlacement), text(requirements.applicationProfile), text(requirements.criticalServicesModel)].filter(Boolean),
+      notes: ["Server placement, application profile, and critical-service requirements should drive service VLANs, service-zone policy, and handoff assumptions."],
     },
     {
       id: "wan-internet",
@@ -86,9 +89,9 @@ export function buildRequirementsCoverageSummary(project: ProjectRequirementsCov
     {
       id: "routing-transport",
       title: "Routing and transport posture",
-      status: text(platform.routingPosture) && text(discovery.routingTransportBaseline) ? "implemented" : text(platform.routingPosture) || text(discovery.routingTransportBaseline) ? "partial" : "missing",
-      signals: [text(platform.routingPosture), text(discovery.routingTransportBaseline)].filter(Boolean),
-      notes: ["Routing posture should drive summarization, loopback, transit, and future migration planning."],
+      status: text(platform.routingPosture) && (text(discovery.routingTransportBaseline) || text(requirements.addressHierarchyModel) || text(requirements.cloudRoutingModel)) ? "implemented" : text(platform.routingPosture) || text(discovery.routingTransportBaseline) || text(requirements.addressHierarchyModel) || text(requirements.cloudRoutingModel) ? "partial" : "missing",
+      signals: [text(platform.routingPosture), text(discovery.routingTransportBaseline), text(requirements.addressHierarchyModel), text(requirements.cloudRoutingModel)].filter(Boolean),
+      notes: ["Routing posture should drive summarization, loopback, transit, site-block, and cloud-routing expectations."],
     },
     {
       id: "operations-management",
@@ -115,13 +118,13 @@ export function buildRequirementsCoverageSummary(project: ProjectRequirementsCov
     {
       id: "implementation-constraints",
       title: "Implementation and migration constraints",
-      status: text(requirements.cutoverWindow) && (text(requirements.rollbackNeed) || text(requirements.outageTolerance))
-        ? "partial"
-        : text(requirements.cutoverWindow) || text(requirements.rollbackNeed) || text(requirements.outageTolerance)
+      status: text(requirements.implementationTimeline) && (text(requirements.rolloutModel) || text(requirements.downtimeConstraint) || text(requirements.outageTolerance))
+        ? "implemented"
+        : text(requirements.implementationTimeline) || text(requirements.rolloutModel) || text(requirements.downtimeConstraint) || text(requirements.outageTolerance)
           ? "partial"
           : "missing",
-      signals: [text(requirements.cutoverWindow), text(requirements.rollbackNeed), text(requirements.outageTolerance)].filter(Boolean),
-      notes: ["Constraint capture exists, but deeper implementation-planning synthesis still needs more engine work."],
+      signals: [text(requirements.implementationTimeline), text(requirements.rolloutModel), text(requirements.downtimeConstraint), text(requirements.outageTolerance)].filter(Boolean),
+      notes: ["Implementation timeline, rollout, downtime, and outage-tolerance constraints must be visible before any plan is treated as implementation-ready."],
     },
     {
       id: "brownfield-baseline",
@@ -133,8 +136,8 @@ export function buildRequirementsCoverageSummary(project: ProjectRequirementsCov
     {
       id: "handoff-reporting",
       title: "Handoff and reporting readiness",
-      status: text(requirements.reportAudience) && text(requirements.documentationDepth) ? "implemented" : text(requirements.reportAudience) || text(requirements.documentationDepth) ? "partial" : "missing",
-      signals: [text(requirements.reportAudience), text(requirements.documentationDepth)].filter(Boolean),
+      status: text(requirements.outputPackage) && text(requirements.primaryAudience) ? "implemented" : text(requirements.outputPackage) || text(requirements.primaryAudience) ? "partial" : "missing",
+      signals: [text(requirements.outputPackage), text(requirements.primaryAudience)].filter(Boolean),
       notes: ["Export and handoff expectations should be explicit so the output package matches who will consume it."],
     },
   ];
@@ -161,6 +164,22 @@ export function buildRequirementsCoverageSummary(project: ProjectRequirementsCov
     partialCount,
     missingCount,
     missingAreaIds,
+    fieldInventory: requirementImpactInventory.map((item) => ({
+      key: item.key,
+      label: item.label,
+      category: item.category,
+      impact: item.impact,
+      sourceValue: item.sourceValue,
+      captured: item.captured,
+      outputAreas: item.outputAreas,
+      materializationTargets: item.materializationTargets,
+      designConsequence: item.designConsequence,
+    })),
+    totalFieldCount: requirementImpactSummary.totalFieldCount,
+    capturedFieldCount: requirementImpactSummary.capturedFieldCount,
+    directFieldCount: requirementImpactSummary.directFieldCount,
+    indirectFieldCount: requirementImpactSummary.indirectFieldCount,
+    evidenceFieldCount: requirementImpactSummary.evidenceFieldCount,
     notes,
   };
 }
