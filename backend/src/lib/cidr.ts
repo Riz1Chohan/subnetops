@@ -16,33 +16,57 @@ export type SegmentRole =
   | "PRINTER"
   | "IOT"
   | "CAMERA"
+  | "DMZ"
   | "WAN_TRANSIT"
   | "LOOPBACK"
   | "OTHER";
 
+export interface RecommendedCapacityPlan {
+  requestedHosts: number;
+  role: SegmentRole;
+  bufferMultiplier: number;
+  requiredUsableHosts: number;
+  recommendedPrefix: number;
+  recommendedUsableHosts: number;
+  notes: string[];
+}
+
+function assertValidPrefix(prefix: number): void {
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
+    throw new Error(`Invalid prefix: ${prefix}`);
+  }
+}
+
 export function isValidIpv4(ip: string): boolean {
-  const parts = ip.split(".");
+  const value = ip.trim();
+  const parts = value.split(".");
   if (parts.length !== 4) return false;
 
   return parts.every((part) => {
     if (!/^\d+$/.test(part)) return false;
-    const value = Number(part);
-    return value >= 0 && value <= 255;
+    if (part.length > 1 && part.startsWith("0")) return false;
+    const octet = Number(part);
+    return Number.isInteger(octet) && octet >= 0 && octet <= 255;
   });
 }
 
 export function ipv4ToInt(ip: string): number {
-  if (!isValidIpv4(ip)) {
+  const value = ip.trim();
+  if (!isValidIpv4(value)) {
     throw new Error(`Invalid IPv4 address: ${ip}`);
   }
 
-  return ip
+  return value
     .split(".")
     .map(Number)
     .reduce((acc, octet) => ((acc << 8) | octet) >>> 0, 0);
 }
 
 export function intToIpv4(value: number): string {
+  if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
+    throw new Error(`Invalid IPv4 integer: ${value}`);
+  }
+
   return [
     (value >>> 24) & 255,
     (value >>> 16) & 255,
@@ -52,10 +76,17 @@ export function intToIpv4(value: number): string {
 }
 
 export function parseCidr(input: string): ParsedCidr {
-  const [ip, prefixText] = input.split("/");
-  const prefix = Number(prefixText);
+  const trimmed = input.trim();
+  const parts = trimmed.split("/");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid CIDR: ${input}`);
+  }
 
-  if (!ip || prefixText === undefined || !isValidIpv4(ip) || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
+  const [ipText, prefixText] = parts;
+  const ip = ipText.trim();
+  const prefix = Number(prefixText.trim());
+
+  if (!ip || !isValidIpv4(ip) || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
     throw new Error(`Invalid CIDR: ${input}`);
   }
 
@@ -80,25 +111,19 @@ export function canonicalCidr(input: string): string {
 }
 
 export function dottedMaskFromPrefix(prefix: number): string {
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
-    throw new Error(`Invalid prefix: ${prefix}`);
-  }
+  assertValidPrefix(prefix);
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
   return intToIpv4(mask);
 }
 
 export function wildcardMaskFromPrefix(prefix: number): string {
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
-    throw new Error(`Invalid prefix: ${prefix}`);
-  }
+  assertValidPrefix(prefix);
   const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
   return intToIpv4((~mask >>> 0) >>> 0);
 }
 
 export function totalAddressCount(prefix: number): number {
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
-    throw new Error(`Invalid prefix: ${prefix}`);
-  }
+  assertValidPrefix(prefix);
   return 2 ** (32 - prefix);
 }
 
@@ -115,7 +140,8 @@ export function classifySegmentRole(input?: string): SegmentRole {
   const text = (input || "").toLowerCase();
   if (!text.trim()) return "OTHER";
   if (text.includes("guest")) return "GUEST";
-  if (text.includes("server") || text.includes("dmz")) return "SERVER";
+  if (text.includes("dmz")) return "DMZ";
+  if (text.includes("server")) return "SERVER";
   if (text.includes("management") || text.includes("mgmt") || text.includes("admin-mgmt")) return "MANAGEMENT";
   if (text.includes("voice") || text.includes("voip")) return "VOICE";
   if (text.includes("printer") || text.includes("print")) return "PRINTER";
@@ -156,7 +182,8 @@ export function isBroadcastAddress(cidr: ParsedCidr, ip: string): boolean {
 }
 
 export function suggestedGatewayPattern(ip: string): boolean {
-  const lastOctet = Number(ip.split(".").at(-1));
+  if (!isValidIpv4(ip)) return false;
+  const lastOctet = Number(ip.trim().split(".").at(-1));
   return lastOctet === 1 || lastOctet === 254;
 }
 
@@ -167,6 +194,7 @@ export function describeRange(cidr: ParsedCidr): string {
 export function describeSubnet(cidr: ParsedCidr, role: SegmentRole = "OTHER") {
   return {
     canonicalCidr: `${intToIpv4(cidr.network)}/${cidr.prefix}`,
+    prefix: cidr.prefix,
     networkAddress: intToIpv4(cidr.network),
     broadcastAddress: intToIpv4(cidr.broadcast),
     firstUsableIp: firstUsableIp(cidr, role),
@@ -178,25 +206,86 @@ export function describeSubnet(cidr: ParsedCidr, role: SegmentRole = "OTHER") {
   };
 }
 
-export function recommendedPrefixForHosts(hosts: number, role: SegmentRole = "OTHER") {
+export function growthBufferMultiplierForRole(role: SegmentRole = "OTHER"): number {
+  if (role === "LOOPBACK" || role === "WAN_TRANSIT") return 1;
+  if (role === "USER" || role === "GUEST" || role === "VOICE") return 1.3;
+  return 1.2;
+}
+
+export function recommendedCapacityPlanForHosts(hosts: number, role: SegmentRole = "OTHER"): RecommendedCapacityPlan {
   if (!Number.isFinite(hosts) || hosts < 0) {
     throw new Error(`Invalid host count: ${hosts}`);
   }
 
-  if (role === "LOOPBACK") return 32;
-  if (role === "WAN_TRANSIT") return hosts <= 2 ? 31 : 30;
+  const requestedHosts = Math.ceil(hosts);
+  const notes: string[] = [];
 
-  const bufferMultiplier = role === "USER" || role === "GUEST" || role === "VOICE" ? 1.3 : 1.2;
-  const target = Math.max(2, Math.ceil(hosts * bufferMultiplier));
+  if (role === "LOOPBACK") {
+    const requiredUsableHosts = requestedHosts <= 1 ? 1 : requestedHosts;
+    const recommendedPrefix = requestedHosts <= 1 ? 32 : smallestPrefixForUsableHosts(requiredUsableHosts, "OTHER");
+    notes.push(requestedHosts <= 1
+      ? "Loopback role uses a single /32 host address."
+      : "Multiple loopback endpoints should normally be modeled as separate /32 objects; a larger holding block is shown only because requested host count is greater than one.");
+    return {
+      requestedHosts,
+      role,
+      bufferMultiplier: 1,
+      requiredUsableHosts,
+      recommendedPrefix,
+      recommendedUsableHosts: usableHostCount(parseCidr(`0.0.0.0/${recommendedPrefix}`), requestedHosts <= 1 ? "LOOPBACK" : "OTHER"),
+      notes,
+    };
+  }
+
+  if (role === "WAN_TRANSIT" && requestedHosts <= 2) {
+    notes.push("Point-to-point WAN transit uses /31 addressing when both endpoints support RFC 3021 behavior.");
+    return {
+      requestedHosts,
+      role,
+      bufferMultiplier: 1,
+      requiredUsableHosts: 2,
+      recommendedPrefix: 31,
+      recommendedUsableHosts: 2,
+      notes,
+    };
+  }
+
+  const bufferMultiplier = growthBufferMultiplierForRole(role);
+  const requiredUsableHosts = Math.max(2, Math.ceil(requestedHosts * bufferMultiplier));
+  const recommendedPrefix = smallestPrefixForUsableHosts(requiredUsableHosts, role);
+
+  notes.push(
+    bufferMultiplier === 1
+      ? `Recommended prefix covers ${requiredUsableHosts} required usable host address(es).`
+      : `Recommended prefix covers ${requestedHosts} requested host(s) with ${Math.round((bufferMultiplier - 1) * 100)}% growth buffer: ${requiredUsableHosts} required usable addresses.`,
+  );
+
+  return {
+    requestedHosts,
+    role,
+    bufferMultiplier,
+    requiredUsableHosts,
+    recommendedPrefix,
+    recommendedUsableHosts: usableHostCount(parseCidr(`0.0.0.0/${recommendedPrefix}`), role),
+    notes,
+  };
+}
+
+function smallestPrefixForUsableHosts(requiredUsableHosts: number, role: SegmentRole = "OTHER"): number {
   const minimumPrefixByRole: Partial<Record<SegmentRole, number>> = {
     PRINTER: 29,
   };
   const maximumAllowedPrefix = minimumPrefixByRole[role];
 
-  for (let prefix = 30; prefix >= 1; prefix -= 1) {
-    if (usableHostCount(parseCidr(`0.0.0.0/`), role) >= target) {
+  for (let prefix = 32; prefix >= 1; prefix -= 1) {
+    const usable = usableHostCount(parseCidr(`0.0.0.0/${prefix}`), role);
+    if (usable >= requiredUsableHosts) {
       return maximumAllowedPrefix === undefined ? prefix : Math.min(prefix, maximumAllowedPrefix);
     }
   }
   return 1;
+}
+
+export function recommendedPrefixForHosts(hosts: number, role: SegmentRole = "OTHER") {
+  return recommendedCapacityPlanForHosts(hosts, role).recommendedPrefix;
 }

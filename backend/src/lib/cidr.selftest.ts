@@ -11,6 +11,7 @@ import {
   lastUsableIp,
   parseCidr,
   recommendedPrefixForHosts,
+  recommendedCapacityPlanForHosts,
   usableHostCount,
   wildcardMaskFromPrefix,
 } from "./cidr.js";
@@ -79,6 +80,19 @@ run("recommended prefix keeps WAN and loopback special cases", () => {
   assert.equal(recommendedPrefixForHosts(200, "USER"), 23);
 });
 
+
+run("recommended capacity plan exposes buffered usable-host target", () => {
+  const plan = recommendedCapacityPlanForHosts(50, "USER");
+  assert.equal(plan.requiredUsableHosts, 65);
+  assert.equal(plan.recommendedPrefix, 25);
+  assert.equal(plan.recommendedUsableHosts, 126);
+});
+
+run("WAN transit sizing grows beyond /31 only when more than two endpoints are requested", () => {
+  assert.equal(recommendedPrefixForHosts(2, "WAN_TRANSIT"), 31);
+  assert.equal(recommendedPrefixForHosts(3, "WAN_TRANSIT"), 29);
+});
+
 run("subnet description stays coherent", () => {
   const facts = describeSubnet(parseCidr("172.16.10.0/24"), "SERVER");
   assert.equal(facts.canonicalCidr, "172.16.10.0/24");
@@ -88,3 +102,27 @@ run("subnet description stays coherent", () => {
 });
 
 console.log("\nCIDR engine self-test complete.");
+
+run("strict CIDR parsing rejects malformed, leading-zero, and extra-slash input", () => {
+  assert.throws(() => parseCidr("10.0.0.0"));
+  assert.throws(() => parseCidr("10.0.0.0/33"));
+  assert.throws(() => parseCidr("10.0.0.0/24/extra"));
+  assert.throws(() => parseCidr("010.0.0.0/24"));
+  assert.throws(() => parseCidr("256.0.0.1/24"));
+});
+
+run("CIDR boundary prefixes /0 and /1 remain unsigned-safe", () => {
+  assert.equal(canonicalCidr("255.255.255.255/0"), "0.0.0.0/0");
+  assert.equal(describeSubnet(parseCidr("128.0.0.1/1"), "USER").canonicalCidr, "128.0.0.0/1");
+});
+
+run("/30 /31 /32 usable behavior is role-aware and canonical", () => {
+  assert.equal(usableHostCount(parseCidr("10.0.0.4/30"), "USER"), 2);
+  assert.equal(usableHostCount(parseCidr("10.0.0.4/31"), "WAN_TRANSIT"), 2);
+  assert.equal(usableHostCount(parseCidr("10.0.0.4/31"), "USER"), 0);
+  assert.equal(usableHostCount(parseCidr("10.0.0.4/32"), "LOOPBACK"), 1);
+});
+
+run("adjacent subnets that only touch at boundaries do not overlap", () => {
+  assert.equal(cidrsOverlap(parseCidr("10.0.0.0/25"), parseCidr("10.0.0.128/25")), false);
+});

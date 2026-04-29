@@ -12,6 +12,7 @@ interface VlanFormProps {
     vlanId: number;
     vlanName: string;
     purpose?: string;
+    segmentRole?: string;
     subnetCidr: string;
     gatewayIp: string;
     dhcpEnabled: boolean;
@@ -21,6 +22,21 @@ interface VlanFormProps {
   }) => void | Promise<void>;
   isSubmitting?: boolean;
 }
+
+const SEGMENT_ROLE_OPTIONS = [
+  { value: "USER", label: "Users" },
+  { value: "SERVER", label: "Servers" },
+  { value: "GUEST", label: "Guest" },
+  { value: "MANAGEMENT", label: "Management" },
+  { value: "DMZ", label: "DMZ" },
+  { value: "VOICE", label: "Voice" },
+  { value: "PRINTER", label: "Printers" },
+  { value: "IOT", label: "IoT / OT" },
+  { value: "CAMERA", label: "Cameras / CCTV" },
+  { value: "WAN_TRANSIT", label: "WAN Transit" },
+  { value: "LOOPBACK", label: "Loopback" },
+  { value: "OTHER", label: "Unknown / Other" },
+];
 
 const PURPOSE_OPTIONS = [
   { value: "User Access", label: "User Access" },
@@ -56,6 +72,7 @@ export function VlanForm({
   const [vlanId, setVlanId] = useState("10");
   const [vlanName, setVlanName] = useState("");
   const [purpose, setPurpose] = useState("User Access");
+  const [segmentRole, setSegmentRole] = useState("USER");
   const [subnetCidr, setSubnetCidr] = useState("");
   const [gatewayIp, setGatewayIp] = useState("");
   const [estimatedHosts, setEstimatedHosts] = useState("");
@@ -68,6 +85,7 @@ export function VlanForm({
     setVlanId(initialValues?.vlanId ? String(initialValues.vlanId) : "10");
     setVlanName(initialValues?.vlanName ?? "");
     setPurpose(initialValues?.purpose ?? "User Access");
+    setSegmentRole(initialValues?.segmentRole ?? "USER");
     setSubnetCidr(initialValues?.subnetCidr ?? "");
     setGatewayIp(initialValues?.gatewayIp ?? "");
     setEstimatedHosts(initialValues?.estimatedHosts !== undefined ? String(initialValues.estimatedHosts) : "");
@@ -97,6 +115,7 @@ export function VlanForm({
           vlanId: Number(vlanId),
           vlanName: vlanName.trim(),
           purpose,
+          segmentRole,
           subnetCidr: subnetCidr.trim(),
           gatewayIp: gatewayIp.trim(),
           dhcpEnabled,
@@ -118,11 +137,18 @@ export function VlanForm({
         <input placeholder="VLAN ID" value={vlanId} onChange={(e) => setVlanId(e.target.value)} required />
         <input placeholder="VLAN Name" value={vlanName} onChange={(e) => setVlanName(e.target.value)} required />
       </div>
-      <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
-        {PURPOSE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
+      <div className="grid-2">
+        <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
+          {PURPOSE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <select value={segmentRole} onChange={(e) => setSegmentRole(e.target.value)} aria-label="Authoritative segment role">
+          {SEGMENT_ROLE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
       <div className="grid-2">
         <input placeholder="Subnet CIDR" value={subnetCidr} onChange={(e) => setSubnetCidr(e.target.value)} required />
         <input placeholder="Gateway IP" value={gatewayIp} onChange={(e) => setGatewayIp(e.target.value)} required />

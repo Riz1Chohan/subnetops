@@ -14,7 +14,11 @@ export interface AllocationCandidate {
   vlanId: number;
   vlanName: string;
   role: SegmentRole;
+  roleSource?: "explicit" | "inferred" | "unknown";
+  roleConfidence?: "high" | "medium" | "low";
+  roleEvidence?: string;
   recommendedPrefix?: number;
+  requiredUsableHosts?: number;
   capacityState: "unknown" | "fits" | "undersized";
   inSiteBlock: boolean | null;
   parsed?: ParsedCidr;
@@ -25,10 +29,42 @@ export interface UsedRange {
   end: number;
 }
 
-export function normalizeUsedRanges(ranges: UsedRange[]): UsedRange[] {
-  const sorted = [...ranges].sort((left, right) => left.start - right.start);
-  const merged: UsedRange[] = [];
+export interface FreeRange {
+  start: number;
+  end: number;
+  totalAddresses: number;
+  rangeSummary: string;
+}
 
+export interface AllocationCapacitySummary {
+  parentCidr: string;
+  parentTotalAddresses: number;
+  usedRangeCount: number;
+  freeRangeCount: number;
+  usedAddresses: number;
+  freeAddresses: number;
+  utilizationPercent: number;
+  largestFreeRange?: FreeRange;
+  requestedPrefix?: number;
+  requestedBlockSize?: number;
+  canFitRequestedPrefix?: boolean;
+  normalizedUsedRanges: UsedRange[];
+  freeRanges: FreeRange[];
+}
+
+export function normalizeUsedRanges(ranges: UsedRange[]): UsedRange[] {
+  const sorted = ranges
+    .filter((range) =>
+      Number.isInteger(range.start) &&
+      Number.isInteger(range.end) &&
+      range.start >= 0 &&
+      range.end <= 0xffffffff &&
+      range.start <= range.end,
+    )
+    .map((range) => ({ start: range.start >>> 0, end: range.end >>> 0 }))
+    .sort((left, right) => left.start - right.start);
+
+  const merged: UsedRange[] = [];
   for (const current of sorted) {
     const previous = merged[merged.length - 1];
     if (!previous) {
@@ -37,7 +73,7 @@ export function normalizeUsedRanges(ranges: UsedRange[]): UsedRange[] {
     }
 
     if (current.start <= previous.end + 1) {
-      previous.end = Math.max(previous.end, current.end);
+      previous.end = Math.max(previous.end, current.end) >>> 0;
       continue;
     }
 
@@ -47,23 +83,42 @@ export function normalizeUsedRanges(ranges: UsedRange[]): UsedRange[] {
   return merged;
 }
 
-
-
 export function clipUsedRangesToParent(parent: ParsedCidr, ranges: UsedRange[]): UsedRange[] {
   const clipped: UsedRange[] = [];
-
   for (const current of ranges) {
-    const start = Math.max(current.start, parent.network);
-    const end = Math.min(current.end, parent.broadcast);
+    const start = Math.max(current.start, parent.network) >>> 0;
+    const end = Math.min(current.end, parent.broadcast) >>> 0;
+    if (start <= end) clipped.push({ start, end });
+  }
+  return normalizeUsedRanges(clipped);
+}
 
-    if (start > end) {
-      continue;
+export function summarizeContiguousRange(start: number, end: number): string {
+  if (start === end) return `${intToIpv4(start)}/32`;
+  return `${intToIpv4(start)} - ${intToIpv4(end)}`;
+}
+
+export function calculateFreeRanges(parent: ParsedCidr, ranges: UsedRange[]): FreeRange[] {
+  const normalized = clipUsedRangesToParent(parent, ranges);
+  const freeRanges: FreeRange[] = [];
+  let cursor = parent.network;
+
+  for (const used of normalized) {
+    if (cursor < used.start) {
+      const start = cursor >>> 0;
+      const end = (used.start - 1) >>> 0;
+      freeRanges.push({ start, end, totalAddresses: end - start + 1, rangeSummary: summarizeContiguousRange(start, end) });
     }
-
-    clipped.push({ start, end });
+    cursor = Math.max(cursor, used.end + 1);
   }
 
-  return normalizeUsedRanges(clipped);
+  if (cursor <= parent.broadcast) {
+    const start = cursor >>> 0;
+    const end = parent.broadcast >>> 0;
+    freeRanges.push({ start, end, totalAddresses: end - start + 1, rangeSummary: summarizeContiguousRange(start, end) });
+  }
+
+  return freeRanges;
 }
 
 export interface SiteAllocationCandidate {
@@ -78,11 +133,9 @@ export function sortSiteAllocationCandidates(candidates: SiteAllocationCandidate
   return [...candidates].sort((left, right) => {
     if (left.recommendedPrefix !== right.recommendedPrefix) return left.recommendedPrefix - right.recommendedPrefix;
     if (left.requiredAddresses !== right.requiredAddresses) return right.requiredAddresses - left.requiredAddresses;
-
     const leftSite = `${left.siteCode ?? ""}|${left.siteName}`.toLowerCase();
     const rightSite = `${right.siteCode ?? ""}|${right.siteName}`.toLowerCase();
     if (leftSite !== rightSite) return leftSite.localeCompare(rightSite);
-
     return left.siteId.localeCompare(right.siteId);
   });
 }
@@ -103,6 +156,8 @@ export interface AllocationAttemptResult {
   reason?: AllocationFailureReason;
   proposed?: ParsedCidr;
   normalizedUsedRangeCount: number;
+  allocatorExplanation: string;
+  capacitySummary: AllocationCapacitySummary;
 }
 
 const ROLE_PRIORITY: Record<SegmentRole, number> = {
@@ -111,33 +166,55 @@ const ROLE_PRIORITY: Record<SegmentRole, number> = {
   SERVER: 3,
   VOICE: 4,
   CAMERA: 5,
-  USER: 6,
-  PRINTER: 7,
-  IOT: 8,
-  GUEST: 9,
-  LOOPBACK: 10,
-  OTHER: 11,
+  DMZ: 6,
+  USER: 7,
+  PRINTER: 8,
+  IOT: 9,
+  GUEST: 10,
+  LOOPBACK: 11,
+  OTHER: 12,
 };
 
 export function nextBlockSize(prefix: number): number {
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) throw new Error(`Invalid prefix: ${prefix}`);
   return 2 ** (32 - prefix);
+}
+
+export function summarizeAllocationCapacity(parent: ParsedCidr, ranges: UsedRange[], requestedPrefix?: number): AllocationCapacitySummary {
+  const normalizedUsedRanges = clipUsedRangesToParent(parent, ranges);
+  const freeRanges = calculateFreeRanges(parent, normalizedUsedRanges);
+  const parentTotalAddresses = parent.broadcast - parent.network + 1;
+  const usedAddresses = normalizedUsedRanges.reduce((total, range) => total + (range.end - range.start + 1), 0);
+  const freeAddresses = Math.max(0, parentTotalAddresses - usedAddresses);
+  const largestFreeRange = [...freeRanges].sort((left, right) => right.totalAddresses - left.totalAddresses)[0];
+  const requestedBlockSize = typeof requestedPrefix === "number" && Number.isInteger(requestedPrefix) && requestedPrefix >= 0 && requestedPrefix <= 32
+    ? nextBlockSize(requestedPrefix)
+    : undefined;
+
+  return {
+    parentCidr: `${intToIpv4(parent.network)}/${parent.prefix}`,
+    parentTotalAddresses,
+    usedRangeCount: normalizedUsedRanges.length,
+    freeRangeCount: freeRanges.length,
+    usedAddresses,
+    freeAddresses,
+    utilizationPercent: parentTotalAddresses > 0 ? Math.round((usedAddresses / parentTotalAddresses) * 10000) / 100 : 0,
+    largestFreeRange,
+    requestedPrefix,
+    requestedBlockSize,
+    canFitRequestedPrefix: requestedBlockSize ? freeRanges.some((range) => range.totalAddresses >= requestedBlockSize) : undefined,
+    normalizedUsedRanges,
+    freeRanges,
+  };
 }
 
 export function chooseSiteGatewayPreference(inputs: GatewayPreferenceInput[]): Exclude<GatewayConvention, "custom" | "not-applicable"> | "first-usable" {
   const counts = new Map<"first-usable" | "last-usable", number>();
-
   for (const input of inputs) {
-    if (input.gatewayConvention !== "first-usable" && input.gatewayConvention !== "last-usable") {
-      continue;
-    }
+    if (input.gatewayConvention !== "first-usable" && input.gatewayConvention !== "last-usable") continue;
     counts.set(input.gatewayConvention, (counts.get(input.gatewayConvention) ?? 0) + 1);
   }
-
-  const firstUsableCount = counts.get("first-usable") ?? 0;
-  const lastUsableCount = counts.get("last-usable") ?? 0;
-
-  if (lastUsableCount > firstUsableCount) return "last-usable";
-  return "first-usable";
+  return (counts.get("last-usable") ?? 0) > (counts.get("first-usable") ?? 0) ? "last-usable" : "first-usable";
 }
 
 export function chooseGatewayForSubnet(
@@ -146,19 +223,8 @@ export function chooseGatewayForSubnet(
   preferredConvention: Exclude<GatewayConvention, "custom" | "not-applicable"> | "first-usable",
 ): string | undefined {
   const detail = describeSubnet(parsed, role);
-
-  if (role === "LOOPBACK") {
-    return detail.firstUsableIp ?? undefined;
-  }
-
-  if (role === "WAN_TRANSIT") {
-    return detail.firstUsableIp ?? undefined;
-  }
-
-  if (preferredConvention === "last-usable" && detail.lastUsableIp) {
-    return detail.lastUsableIp;
-  }
-
+  if (role === "LOOPBACK" || role === "WAN_TRANSIT") return detail.firstUsableIp ?? undefined;
+  if (preferredConvention === "last-usable" && detail.lastUsableIp) return detail.lastUsableIp;
   return detail.firstUsableIp ?? undefined;
 }
 
@@ -167,52 +233,47 @@ export function sortAllocationCandidates(candidates: AllocationCandidate[]): All
     const leftPrefix = left.recommendedPrefix ?? 32;
     const rightPrefix = right.recommendedPrefix ?? 32;
     if (leftPrefix !== rightPrefix) return leftPrefix - rightPrefix;
-
     const leftRole = ROLE_PRIORITY[left.role] ?? 999;
     const rightRole = ROLE_PRIORITY[right.role] ?? 999;
     if (leftRole !== rightRole) return leftRole - rightRole;
-
     const leftSite = `${left.siteCode ?? ""}|${left.siteName}`.toLowerCase();
     const rightSite = `${right.siteCode ?? ""}|${right.siteName}`.toLowerCase();
     if (leftSite !== rightSite) return leftSite.localeCompare(rightSite);
-
     if (left.vlanId !== right.vlanId) return left.vlanId - right.vlanId;
-
     return left.id.localeCompare(right.id);
   });
 }
 
-export function findNextAvailableNetworkDetailed(
-  parent: ParsedCidr,
-  prefix: number,
-  usedRanges: UsedRange[],
-): AllocationAttemptResult {
-  if (prefix < parent.prefix) {
+export function findNextAvailableNetworkDetailed(parent: ParsedCidr, prefix: number, usedRanges: UsedRange[]): AllocationAttemptResult {
+  const capacitySummary = summarizeAllocationCapacity(parent, usedRanges, prefix);
+
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32 || prefix < parent.prefix) {
     return {
       status: "blocked",
       reason: "prefix-outside-parent",
-      normalizedUsedRangeCount: 0,
+      normalizedUsedRangeCount: capacitySummary.usedRangeCount,
+      allocatorExplanation: `Requested /${prefix} cannot fit inside parent ${capacitySummary.parentCidr}. Parent utilization is ${capacitySummary.utilizationPercent}%.`,
+      capacitySummary,
     };
   }
 
-  const parentBlockSize = nextBlockSize(parent.prefix);
   const requestedBlockSize = nextBlockSize(prefix);
-  if (requestedBlockSize > parentBlockSize) {
+  if (requestedBlockSize > nextBlockSize(parent.prefix)) {
     return {
       status: "blocked",
       reason: "prefix-outside-parent",
-      normalizedUsedRangeCount: 0,
+      normalizedUsedRangeCount: capacitySummary.usedRangeCount,
+      allocatorExplanation: `Requested /${prefix} is larger than parent block ${capacitySummary.parentCidr}.`,
+      capacitySummary,
     };
   }
 
-  const blockSize = requestedBlockSize;
   let candidateNetwork = parent.network;
-  const normalizedRanges = clipUsedRangesToParent(parent, usedRanges);
+  const normalizedRanges = capacitySummary.normalizedUsedRanges;
 
-  while (candidateNetwork + blockSize - 1 <= parent.broadcast) {
+  while (candidateNetwork + requestedBlockSize - 1 <= parent.broadcast) {
     const candidateStart = candidateNetwork;
-    const candidateEnd = candidateNetwork + blockSize - 1;
-
+    const candidateEnd = candidateNetwork + requestedBlockSize - 1;
     const overlappingRange = normalizedRanges.find((used) => candidateStart <= used.end && used.start <= candidateEnd);
 
     if (!overlappingRange) {
@@ -220,33 +281,31 @@ export function findNextAvailableNetworkDetailed(
         status: "allocated",
         proposed: parseCidr(`${intToIpv4(candidateNetwork)}/${prefix}`),
         normalizedUsedRangeCount: normalizedRanges.length,
+        allocatorExplanation: `Selected first available /${prefix} inside ${capacitySummary.parentCidr} after checking ${normalizedRanges.length} normalized used range(s). Parent utilization before placement: ${capacitySummary.utilizationPercent}%. Largest free range before placement: ${capacitySummary.largestFreeRange?.rangeSummary ?? "none"}.`,
+        capacitySummary,
       };
     }
 
-    const nextAlignedNetwork = Math.floor((overlappingRange.end + 1 + blockSize - 1) / blockSize) * blockSize;
-    candidateNetwork = Math.max(candidateNetwork + blockSize, nextAlignedNetwork);
+    const nextAlignedNetwork = Math.floor((overlappingRange.end + 1 + requestedBlockSize - 1) / requestedBlockSize) * requestedBlockSize;
+    candidateNetwork = Math.max(candidateNetwork + requestedBlockSize, nextAlignedNetwork);
   }
 
   return {
     status: "blocked",
     reason: "parent-exhausted",
     normalizedUsedRangeCount: normalizedRanges.length,
+    allocatorExplanation: `No aligned /${prefix} block remains inside ${capacitySummary.parentCidr} after checking ${normalizedRanges.length} normalized used range(s). Parent utilization is ${capacitySummary.utilizationPercent}%. Largest free range: ${capacitySummary.largestFreeRange?.rangeSummary ?? "none"}.`,
+    capacitySummary,
   };
 }
 
-export function findNextAvailableNetwork(
-  parent: ParsedCidr,
-  prefix: number,
-  usedRanges: UsedRange[],
-): ParsedCidr | null {
-  const result = findNextAvailableNetworkDetailed(parent, prefix, usedRanges);
-  return result.proposed ?? null;
+export function findNextAvailableNetwork(parent: ParsedCidr, prefix: number, usedRanges: UsedRange[]): ParsedCidr | null {
+  return findNextAvailableNetworkDetailed(parent, prefix, usedRanges).proposed ?? null;
 }
 
 export function canChildFitInsideParent(parent: ParsedCidr, childPrefix: number): boolean {
   return childPrefix >= parent.prefix && nextBlockSize(childPrefix) <= nextBlockSize(parent.prefix);
 }
-
 
 export interface BlockAllocationRequest {
   requestId: string;
@@ -261,6 +320,13 @@ export interface BlockAllocationResult {
   proposedSubnetCidr?: string;
   proposedGatewayIp?: string;
   normalizedUsedRangeCount: number;
+  allocatorExplanation?: string;
+  allocatorParentCidr?: string;
+  allocatorUsedRangeCount?: number;
+  allocatorFreeRangeCount?: number;
+  allocatorLargestFreeRange?: string;
+  allocatorUtilizationPercent?: number;
+  allocatorCanFitRequestedPrefix?: boolean;
 }
 
 export interface BlockAllocationBatchResult {
@@ -270,6 +336,17 @@ export interface BlockAllocationBatchResult {
 
 export interface BlockAllocationOptions {
   preferredGatewayConvention?: Exclude<GatewayConvention, "custom" | "not-applicable"> | "first-usable";
+}
+
+function allocationResultTelemetry(attempt: AllocationAttemptResult) {
+  return {
+    allocatorParentCidr: attempt.capacitySummary.parentCidr,
+    allocatorUsedRangeCount: attempt.capacitySummary.usedRangeCount,
+    allocatorFreeRangeCount: attempt.capacitySummary.freeRangeCount,
+    allocatorLargestFreeRange: attempt.capacitySummary.largestFreeRange?.rangeSummary,
+    allocatorUtilizationPercent: attempt.capacitySummary.utilizationPercent,
+    allocatorCanFitRequestedPrefix: attempt.capacitySummary.canFitRequestedPrefix,
+  };
 }
 
 export function allocateRequestedBlocks(
@@ -283,24 +360,21 @@ export function allocateRequestedBlocks(
 
   for (const request of requests) {
     const attempt = findNextAvailableNetworkDetailed(parent, request.prefix, workingRanges);
-
     if (attempt.status !== "allocated" || !attempt.proposed) {
       results.push({
         requestId: request.requestId,
         status: "blocked",
         reason: attempt.reason,
         normalizedUsedRangeCount: attempt.normalizedUsedRangeCount,
+        allocatorExplanation: attempt.allocatorExplanation,
+        ...allocationResultTelemetry(attempt),
       });
       continue;
     }
 
     const proposedSubnetCidr = `${intToIpv4(attempt.proposed.network)}/${attempt.proposed.prefix}`;
     const proposedGatewayIp = request.role
-      ? chooseGatewayForSubnet(
-          attempt.proposed,
-          request.role,
-          options.preferredGatewayConvention ?? "first-usable",
-        )
+      ? chooseGatewayForSubnet(attempt.proposed, request.role, options.preferredGatewayConvention ?? "first-usable")
       : undefined;
 
     results.push({
@@ -309,13 +383,12 @@ export function allocateRequestedBlocks(
       proposedSubnetCidr,
       proposedGatewayIp,
       normalizedUsedRangeCount: attempt.normalizedUsedRangeCount,
+      allocatorExplanation: attempt.allocatorExplanation,
+      ...allocationResultTelemetry(attempt),
     });
 
     workingRanges.push({ start: attempt.proposed.network, end: attempt.proposed.broadcast });
   }
 
-  return {
-    results,
-    finalUsedRanges: normalizeUsedRanges(workingRanges),
-  };
+  return { results, finalUsedRanges: normalizeUsedRanges(workingRanges) };
 }

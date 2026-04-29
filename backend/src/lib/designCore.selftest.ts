@@ -205,6 +205,45 @@ run("design core exposes allocator determinism state", () => {
   assert.equal(Array.isArray(snapshot?.allocatorDeterminism.evaluationOrder), true);
 });
 
+
+run("design core uses buffered CIDR capacity, not raw host fit only", () => {
+  const fixture = {
+    ...projectFixture,
+    sites: [
+      {
+        ...projectFixture.sites[0],
+        vlans: [
+          {
+            ...projectFixture.sites[0].vlans[0],
+            id: "vlan-buffer",
+            subnetCidr: "10.10.0.0/26",
+            gatewayIp: "10.10.0.1",
+            estimatedHosts: 50,
+          },
+        ],
+      },
+    ],
+  };
+  const snapshot = buildDesignCoreSnapshot(fixture as never);
+  const row = snapshot?.addressingRows.find((item) => item.id === "vlan-buffer");
+  assert.equal(row?.requiredUsableHosts, 65);
+  assert.equal(row?.recommendedPrefix, 25);
+  assert.equal(row?.capacityState, "undersized");
+  assert.ok(row?.proposedSubnetCidr);
+});
+
+run("design core exposes CIDR facts for frontend consumption", () => {
+  const snapshot = buildDesignCoreSnapshot(projectFixture as never);
+  const row = snapshot?.addressingRows[0];
+  assert.equal(row?.dottedMask, "255.255.255.192");
+  assert.equal(row?.wildcardMask, "0.0.0.63");
+  assert.equal(row?.networkAddress, "10.10.0.0");
+  assert.equal(row?.broadcastAddress, "10.10.0.63");
+  assert.equal(typeof snapshot?.organizationBlock?.totalAddresses, "number");
+  assert.equal(typeof snapshot?.siteBlocks[0]?.totalAddresses, "number");
+});
+
+
 // Additional backend design-intent checks should assert routing, security, and traceability summaries as this engine grows.
 
 run("design core builds a first-class network object model", () => {

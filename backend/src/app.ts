@@ -10,6 +10,7 @@ import {
   commentRoutes,
   designCoreRoutes,
   exportRoutes,
+  enterpriseIpamRoutes,
   notificationPreferenceRoutes,
   notificationRoutes,
   organizationRoutes,
@@ -67,6 +68,7 @@ app.use("/api/sites", siteRoutes);
 app.use("/api/vlans", vlanRoutes);
 app.use("/api/validation", validationRoutes);
 app.use("/api/export", exportRoutes);
+app.use("/api/enterprise-ipam", enterpriseIpamRoutes);
 app.use("/api/organizations", organizationRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/design-core", designCoreRoutes);

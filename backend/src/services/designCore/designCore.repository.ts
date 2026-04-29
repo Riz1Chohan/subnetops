@@ -12,6 +12,15 @@ export async function getProjectDesignData(projectId: string) {
         },
         orderBy: [{ name: "asc" }],
       },
+      routeDomains: { orderBy: [{ name: "asc" }] },
+      ipPools: { orderBy: [{ name: "asc" }] },
+      ipAllocations: { orderBy: [{ createdAt: "asc" }] },
+      dhcpScopes: { orderBy: [{ createdAt: "asc" }] },
+      ipReservations: { orderBy: [{ createdAt: "asc" }] },
+      brownfieldImports: { orderBy: [{ importedAt: "desc" }] },
+      brownfieldNetworks: { orderBy: [{ createdAt: "asc" }] },
+      allocationApprovals: { orderBy: [{ createdAt: "desc" }] },
+      allocationLedger: { orderBy: [{ createdAt: "desc" }] },
     },
   });
 }

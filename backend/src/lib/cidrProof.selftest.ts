@@ -9,6 +9,7 @@ import {
   isNetworkAddress,
   parseCidr,
   recommendedPrefixForHosts,
+  recommendedCapacityPlanForHosts,
   suggestedGatewayPattern,
   usableHostCount,
 } from "./cidr.js";
@@ -51,6 +52,13 @@ run("containsIp respects subnet boundaries", () => {
   const subnet = parseCidr("10.0.1.0/24");
   assert.equal(containsIp(subnet, "10.0.1.20"), true);
   assert.equal(containsIp(subnet, "10.0.2.20"), false);
+});
+
+
+run("recommended capacity plan does not mark raw-fit but buffer-short subnets as healthy", () => {
+  const plan = recommendedCapacityPlanForHosts(50, "USER");
+  assert.equal(plan.requiredUsableHosts, 65);
+  assert.equal(plan.recommendedPrefix, 25);
 });
 
 run("recommended prefix grows by role-aware buffer", () => {

@@ -29,5 +29,5 @@ run("172.16/12 private block boundaries are correct", () => {
 run("WAN transit and loopback sizing are not inflated by growth buffers", () => {
   assert.equal(recommendedPrefixForHosts(1, "LOOPBACK"), 32);
   assert.equal(recommendedPrefixForHosts(2, "WAN_TRANSIT"), 31);
-  assert.equal(recommendedPrefixForHosts(3, "WAN_TRANSIT"), 30);
+  assert.equal(recommendedPrefixForHosts(3, "WAN_TRANSIT"), 29);
 });

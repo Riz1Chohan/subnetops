@@ -51,18 +51,24 @@ export function ProjectDiagramPage() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
 
   const project = projectQuery.data;
-  const isWorkspaceLoading = projectQuery.isLoading || sitesQuery.isLoading;
+  const isWorkspaceLoading = projectQuery.isLoading || sitesQuery.isLoading || vlansQuery.isLoading;
   const workspaceError = projectQuery.isError
     ? projectQuery.error
     : sitesQuery.isError
       ? sitesQuery.error
-      : null;
+      : vlansQuery.isError
+        ? vlansQuery.error
+        : null;
   const projectSites = project?.sites ?? [];
   const fetchedSites = sitesQuery.data ?? [];
-  const baseSites = fetchedSites.length >= projectSites.length ? fetchedSites : projectSites;
   const projectVlans = projectSites.flatMap((site) => site.vlans ?? []);
   const fetchedVlans = vlansQuery.data ?? [];
-  const baseVlans = fetchedVlans.length > 0 ? fetchedVlans : projectVlans;
+  const siteMap = new Map(projectSites.map((site) => [site.id, site]));
+  for (const site of fetchedSites) siteMap.set(site.id, { ...siteMap.get(site.id), ...site });
+  const baseSites = Array.from(siteMap.values());
+  const vlanMap = new Map(projectVlans.map((vlan) => [vlan.id, vlan]));
+  for (const vlan of fetchedVlans) vlanMap.set(vlan.id, { ...vlanMap.get(vlan.id), ...vlan });
+  const baseVlans = Array.from(vlanMap.values());
   const comments = commentsQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
@@ -101,6 +107,7 @@ export function ProjectDiagramPage() {
         vlanId: row.vlanId ?? 0,
         vlanName: row.segmentName,
         purpose: row.purpose,
+        segmentRole: row.role,
         subnetCidr: row.subnetCidr,
         gatewayIp: row.gatewayIp,
         dhcpEnabled: row.dhcpEnabled,
@@ -248,7 +255,7 @@ export function ProjectDiagramPage() {
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
-  if (isWorkspaceLoading) return <LoadingState title="Loading diagram" message="Preparing the topology canvas." />;
+  if (isWorkspaceLoading) return <LoadingState title="Loading diagram" message="Preparing project, site, VLAN, and backend Engine 1 inputs before rendering the canvas." />;
   if (workspaceError) {
     return (
       <ErrorState
@@ -418,7 +425,7 @@ export function ProjectDiagramPage() {
                   <div style={{ display: "grid", gap: 12 }}>
                     <div className="panel" style={{ padding: 14 }}>
                       <strong>Legacy diagram fallback is active.</strong>
-                      <p className="muted" style={{ margin: "8px 0 0 0" }}>Backend diagram render model is unavailable, so this canvas is only a display fallback and must not be treated as topology truth.</p>
+                      <p className="muted" style={{ margin: "8px 0 0 0" }}>Backend diagram render model is unavailable or stale. Site/VLAN records are present in the workspace, so this is a renderer-input problem, not proof that the project has no sites or VLANs.</p>
                     </div>
                     <ProjectDiagram
                       project={enrichedProject}

@@ -14,8 +14,26 @@ import {
   recommendedPrefixForHosts,
   suggestedGatewayPattern,
   usableHostCount,
+  type SegmentRole,
 } from "../lib/cidr.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
+
+function normalizeValidationSegmentRole(value?: string | null): SegmentRole | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized === "USERS") return "USER";
+  if (normalized === "SERVERS") return "SERVER";
+  if (normalized === "MGMT") return "MANAGEMENT";
+  if (normalized === "TRANSIT") return "WAN_TRANSIT";
+  if (["USER", "SERVER", "GUEST", "MANAGEMENT", "DMZ", "VOICE", "PRINTER", "IOT", "CAMERA", "WAN_TRANSIT", "LOOPBACK", "OTHER"].includes(normalized)) return normalized as SegmentRole;
+  return null;
+}
+
+function resolveValidationSegmentRole(vlan: { segmentRole?: string | null; purpose?: string | null; vlanName: string; department?: string | null; notes?: string | null }): SegmentRole {
+  const explicitRole = normalizeValidationSegmentRole(vlan.segmentRole);
+  if (explicitRole) return explicitRole;
+  return classifySegmentRole(`${vlan.purpose || ""} ${vlan.vlanName} ${vlan.department || ""} ${vlan.notes || ""}`);
+}
 
 interface ValidationItem {
   projectId: string;
@@ -218,7 +236,7 @@ export async function runValidation(projectId: string) {
     siteBlock?: string | null;
     vlanId: number;
     vlanName: string;
-    role: ReturnType<typeof classifySegmentRole>;
+    role: SegmentRole;
     parsed: ReturnType<typeof parseCidr>;
   }> = [];
 
@@ -292,7 +310,7 @@ export async function runValidation(projectId: string) {
     })() : null;
 
     for (const vlan of site.vlans) {
-      const role = classifySegmentRole(`${vlan.purpose || ""} ${vlan.vlanName} ${vlan.department || ""} ${vlan.notes || ""}`);
+      const role = resolveValidationSegmentRole(vlan);
       let parsedCidr: ReturnType<typeof parseCidr> | null = null;
 
       try {

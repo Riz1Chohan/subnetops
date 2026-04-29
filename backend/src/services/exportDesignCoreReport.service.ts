@@ -67,6 +67,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const designGraphEdges = Array.isArray(designGraph?.edges) ? designGraph.edges : [];
   const designGraphFindings = Array.isArray(designGraph?.integrityFindings) ? designGraph.integrityFindings : [];
   const authority = designCore.authority && typeof designCore.authority === "object" ? designCore.authority : null;
+  const enterpriseAllocatorPosture = designCore.enterpriseAllocatorPosture && typeof designCore.enterpriseAllocatorPosture === "object" ? designCore.enterpriseAllocatorPosture : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -85,17 +86,67 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       `Backend design-core snapshot source: ${asString(authority?.source, "backend-design-core")} • mode: ${asString(authority?.mode, "authoritative")} • generated: ${generatedAt} • engineer review required.`,
     ];
 
+    if (enterpriseAllocatorPosture) {
+      addressingSection.tables.push({
+        title: "Enterprise Address Allocator Readiness",
+        headers: ["Gate", "Status", "Evidence"],
+        rows: [
+          ["Source-of-truth model", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), `${enterpriseAllocatorPosture.durablePoolCount ?? 0} pool(s); ${enterpriseAllocatorPosture.durableAllocationCount ?? 0} durable allocation(s); ${enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0} ledger entrie(s)`],
+          ["Dual-stack IPv6", asString(enterpriseAllocatorPosture.dualStackReadiness, "review"), `${enterpriseAllocatorPosture.ipv6ConfiguredPrefixCount ?? 0} IPv6 prefix(es); ${enterpriseAllocatorPosture.ipv6AllocationCount ?? 0} IPv6 allocation/proposal(s); ${enterpriseAllocatorPosture.ipv6ReviewFindingCount ?? 0} IPv6 finding(s)`],
+          ["VRF / route-domain allocation", asString(enterpriseAllocatorPosture.vrfReadiness, "review"), `${enterpriseAllocatorPosture.vrfDomainCount ?? 0} route domain(s); ${enterpriseAllocatorPosture.vrfOverlapFindingCount ?? 0} overlap finding(s)`],
+          ["Brownfield/IPAM import", asString(enterpriseAllocatorPosture.brownfieldReadiness, "review"), `${asString(enterpriseAllocatorPosture.brownfieldEvidenceState, "import-required")}; ${enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0} imported network(s); ${enterpriseAllocatorPosture.brownfieldConflictCount ?? 0} conflict(s)`],
+          ["DHCP scopes/reservations", asString(enterpriseAllocatorPosture.dhcpReadiness, "review"), `${enterpriseAllocatorPosture.dhcpScopeCount ?? 0} DHCP scope(s); ${enterpriseAllocatorPosture.reservationPolicyCount ?? 0} reservation object(s); ${enterpriseAllocatorPosture.dhcpFindingCount ?? 0} finding(s)`],
+          ["Growth reserve policy", asString(enterpriseAllocatorPosture.reservePolicyReadiness, "review"), `${enterpriseAllocatorPosture.reservePolicyFindingCount ?? 0} reserve policy finding(s); reserve is explicit and not silently assumed`],
+          ["Approval workflow", asString(enterpriseAllocatorPosture.approvalReadiness, "review"), `${enterpriseAllocatorPosture.allocationApprovalCount ?? 0} approval(s); ${enterpriseAllocatorPosture.staleAllocationCount ?? 0} stale allocation(s); input hash ${asString(enterpriseAllocatorPosture.currentInputHash, "unknown")}`],
+        ],
+      });
+      if (Array.isArray(enterpriseAllocatorPosture.allocationPlanRows) && enterpriseAllocatorPosture.allocationPlanRows.length > 0) {
+        addressingSection.tables.push({
+          title: "Phase 50 Dual-Stack Allocation Plan",
+          headers: ["Family", "Pool", "Route Domain", "Target", "Requested", "Proposed", "Status", "Proof"],
+          rows: enterpriseAllocatorPosture.allocationPlanRows.slice(0, 20).map((row: any) => [
+            asString(row.family, "—"),
+            asString(row.poolName, "—"),
+            asString(row.routeDomainKey, "default"),
+            asString(row.target, "—"),
+            row.requestedPrefix ? `/${row.requestedPrefix}` : "—",
+            asString(row.proposedCidr, "—"),
+            asString(row.status, "review"),
+            asString(row.explanation, "—"),
+          ]),
+        });
+      }
+      if (Array.isArray(enterpriseAllocatorPosture.reviewFindings) && enterpriseAllocatorPosture.reviewFindings.length > 0) {
+        addressingSection.tables.push({
+          title: "Phase 51–53 Enterprise Allocator Findings",
+          headers: ["Severity", "Code", "Finding", "Detail"],
+          rows: enterpriseAllocatorPosture.reviewFindings.slice(0, 30).map((finding: any) => [asString(finding.severity, "review"), asString(finding.code, "—"), asString(finding.title, "—"), asString(finding.detail, "—")]),
+        });
+      }
+      if (Array.isArray(enterpriseAllocatorPosture.reviewQueue) && enterpriseAllocatorPosture.reviewQueue.length > 0) {
+        addressingSection.tables.push({
+          title: "Enterprise Allocator Review Queue",
+          headers: ["Review Item"],
+          rows: enterpriseAllocatorPosture.reviewQueue.slice(0, 20).map((item: any) => [joinText(item, "Review allocator evidence")]),
+        });
+      }
+    }
+
     if (proposedRows.length > 0) {
       addressingSection.tables.push({
         title: "Addressing Recommendations",
-        headers: ["Site", "VLAN", "Segment", "Recommended Subnet", "Recommended Gateway", "Reason"],
+        headers: ["Site", "VLAN", "Role Truth", "Recommended Subnet", "Gateway", "Proposed Range", "Headroom", "Reason", "Allocator Explanation", "Allocator Proof"],
         rows: proposedRows.slice(0, 20).map((row: any) => [
           asString(row.siteName, "—"),
           String(row.vlanId ?? "—"),
-          asString(row.vlanName, "—"),
+          `${asString(row.role, "UNKNOWN")} / ${asString(row.roleSource, "unknown")} / ${asString(row.roleConfidence, "low")}`,
           asString(row.proposedSubnetCidr, row.recommendedPrefix ? `/${row.recommendedPrefix}` : "Pending"),
           asString(row.proposedGatewayIp, "Pending"),
+          row.proposedNetworkAddress && row.proposedBroadcastAddress ? `${row.proposedNetworkAddress} → ${row.proposedBroadcastAddress}` : "Pending",
+          String(row.proposedCapacityHeadroom ?? "—"),
           asString(row.reason, "Review before implementation"),
+          asString(row.allocatorExplanation, "—"),
+          row.allocatorParentCidr ? `${row.allocatorParentCidr}; used ${row.allocatorUsedRangeCount ?? "—"}; free ${row.allocatorFreeRangeCount ?? "—"}; largest ${row.allocatorLargestFreeRange ?? "—"}; util ${row.allocatorUtilizationPercent ?? "—"}%` : "—",
         ]),
       });
     }

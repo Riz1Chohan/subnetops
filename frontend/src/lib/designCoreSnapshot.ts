@@ -21,6 +21,13 @@ export interface DesignCoreSiteBlock {
   proposedCidr?: string;
   truthState: DesignCoreTruthState;
   validationState: "valid" | "invalid";
+  prefix?: number;
+  networkAddress?: string;
+  broadcastAddress?: string;
+  dottedMask?: string;
+  wildcardMask?: string;
+  totalAddresses?: number;
+  usableAddresses?: number;
   rangeSummary?: string;
   inOrganizationBlock: boolean | null;
   overlapsWithSiteIds: string[];
@@ -35,6 +42,9 @@ export interface DesignCoreAddressRow {
   vlanId: number;
   vlanName: string;
   role: SegmentRole;
+  roleSource?: "explicit" | "inferred" | "unknown";
+  roleConfidence?: "high" | "medium" | "low";
+  roleEvidence?: string;
   truthState: DesignCoreTruthState;
   sourceSubnetCidr: string;
   canonicalSubnetCidr?: string;
@@ -46,14 +56,70 @@ export interface DesignCoreAddressRow {
   inSiteBlock: boolean | null;
   estimatedHosts: number | null;
   recommendedPrefix?: number;
+  requiredUsableHosts?: number;
+  recommendedUsableHosts?: number;
+  bufferMultiplier?: number;
+  capacityHeadroom?: number;
   usableHosts?: number;
+  totalAddresses?: number;
+  networkAddress?: string;
+  broadcastAddress?: string;
+  firstUsableIp?: string | null;
+  lastUsableIp?: string | null;
+  dottedMask?: string;
+  wildcardMask?: string;
   capacityState: "unknown" | "fits" | "undersized";
+  capacityBasis?: string;
+  capacityExplanation?: string;
+  allocatorExplanation?: string;
+  allocatorParentCidr?: string;
+  allocatorUsedRangeCount?: number;
+  allocatorFreeRangeCount?: number;
+  allocatorLargestFreeRange?: string;
+  allocatorUtilizationPercent?: number;
+  allocatorCanFitRequestedPrefix?: boolean;
+  allocationReason?: string;
+  engine1Explanation?: string;
   gatewayState: "valid" | "invalid" | "fallback";
   gatewayConvention: "first-usable" | "last-usable" | "custom" | "not-applicable";
   dhcpEnabled: boolean;
   notes: string[];
 }
 
+
+export interface DesignCoreProposalRow {
+  siteId: string;
+  siteName: string;
+  siteCode?: string | null;
+  vlanId: number;
+  vlanName: string;
+  role: SegmentRole;
+  roleSource?: "explicit" | "inferred" | "unknown";
+  roleConfidence?: "high" | "medium" | "low";
+  roleEvidence?: string;
+  allocatorExplanation?: string;
+  allocatorParentCidr?: string;
+  allocatorUsedRangeCount?: number;
+  allocatorFreeRangeCount?: number;
+  allocatorLargestFreeRange?: string;
+  allocatorUtilizationPercent?: number;
+  allocatorCanFitRequestedPrefix?: boolean;
+  reason: string;
+  recommendedPrefix: number;
+  requiredUsableHosts?: number;
+  proposedSubnetCidr?: string;
+  proposedGatewayIp?: string;
+  proposedNetworkAddress?: string;
+  proposedBroadcastAddress?: string;
+  proposedFirstUsableIp?: string | null;
+  proposedLastUsableIp?: string | null;
+  proposedDottedMask?: string;
+  proposedWildcardMask?: string;
+  proposedTotalAddresses?: number;
+  proposedUsableHosts?: number;
+  proposedCapacityHeadroom?: number;
+  notes: string[];
+}
 
 export type NetworkObjectTruthState = "configured" | "inferred" | "proposed" | "discovered";
 
@@ -972,6 +1038,61 @@ export interface NetworkObjectModel {
   integrityNotes: string[];
 }
 
+
+export interface EnterpriseAllocatorPlanRowSummary {
+  family: "ipv4" | "ipv6";
+  poolId: string;
+  poolName: string;
+  routeDomainKey: string;
+  target: string;
+  siteId?: string;
+  vlanId?: number;
+  requestedPrefix: number;
+  proposedCidr?: string;
+  status: "allocated" | "blocked" | "skipped";
+  explanation: string;
+}
+
+export interface EnterpriseAllocatorReviewFindingSummary {
+  code: string;
+  severity: "info" | "review" | "blocked";
+  title: string;
+  detail: string;
+}
+
+export interface EnterpriseAllocatorPostureSummary {
+  sourceOfTruthReadiness: "ready" | "review" | "blocked";
+  dualStackReadiness: "ready" | "review" | "blocked";
+  vrfReadiness: "ready" | "review" | "blocked";
+  brownfieldReadiness: "ready" | "review" | "blocked";
+  dhcpReadiness: "ready" | "review" | "blocked";
+  reservePolicyReadiness: "ready" | "review" | "blocked";
+  approvalReadiness: "ready" | "review" | "blocked";
+  ipv4ConfiguredSubnetCount: number;
+  ipv6ConfiguredPrefixCount: number;
+  ipv6ReviewFindingCount: number;
+  vrfDomainCount: number;
+  dhcpScopeCount: number;
+  reservationPolicyCount: number;
+  brownfieldEvidenceState: "configured" | "proposed" | "import-required" | "unsupported";
+  durablePoolCount: number;
+  durableAllocationCount: number;
+  durableBrownfieldNetworkCount: number;
+  allocationApprovalCount: number;
+  allocationLedgerEntryCount: number;
+  ipv6AllocationCount: number;
+  vrfOverlapFindingCount: number;
+  brownfieldConflictCount: number;
+  dhcpFindingCount: number;
+  reservePolicyFindingCount: number;
+  staleAllocationCount: number;
+  currentInputHash: string;
+  allocationPlanRows: EnterpriseAllocatorPlanRowSummary[];
+  reviewFindings: EnterpriseAllocatorReviewFindingSummary[];
+  notes: string[];
+  reviewQueue: string[];
+}
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -986,6 +1107,13 @@ export interface DesignCoreSnapshot {
     sourceValue?: string | null;
     canonicalCidr?: string;
     validationState: "valid" | "invalid" | "missing";
+    prefix?: number;
+    networkAddress?: string;
+    broadcastAddress?: string;
+    dottedMask?: string;
+    wildcardMask?: string;
+    totalAddresses?: number;
+    usableAddresses?: number;
     notes: string[];
   };
   summary: {
@@ -996,6 +1124,9 @@ export interface DesignCoreSnapshot {
     issueCount: number;
     proposedSiteBlockCount: number;
     proposalCount: number;
+    enterpriseAllocatorReadiness: "ready" | "review" | "blocked";
+    ipv6ConfiguredPrefixCount: number;
+    enterpriseAllocatorReviewQueueCount: number;
     planningInputNotReflectedCount: number;
     traceabilityCount: number;
     summarizationReviewCount: number;
@@ -1046,13 +1177,14 @@ export interface DesignCoreSnapshot {
     blockingConditions: string[];
     notes: string[];
   };
+  enterpriseAllocatorPosture?: EnterpriseAllocatorPostureSummary;
   siteBlocks: DesignCoreSiteBlock[];
   addressingRows: DesignCoreAddressRow[];
   networkObjectModel?: NetworkObjectModel;
   reportTruth?: BackendReportTruthModel;
   diagramTruth?: BackendDiagramTruthModel;
   vendorNeutralImplementationTemplates?: VendorNeutralImplementationTemplateModel;
-  proposedRows: unknown[];
+  proposedRows: DesignCoreProposalRow[];
   issues: DesignCoreIssue[];
 }
 

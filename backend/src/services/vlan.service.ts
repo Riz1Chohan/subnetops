@@ -4,7 +4,7 @@ import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { ensureCanEditProject } from "./access.service.js";
 
-export async function createVlan(userId: string, planTier: PlanTier, data: { siteId: string; vlanId: number; vlanName: string; purpose?: string; subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; estimatedHosts?: number; department?: string; notes?: string }, actorLabel?: string) {
+export async function createVlan(userId: string, planTier: PlanTier, data: { siteId: string; vlanId: number; vlanName: string; purpose?: string; segmentRole?: string; subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; estimatedHosts?: number; department?: string; notes?: string }, actorLabel?: string) {
   const site = await prisma.site.findFirst({ where: { id: data.siteId }, include: { project: true } });
   if (!site) throw new ApiError(404, "Site not found");
   await ensureCanEditProject(userId, site.projectId);

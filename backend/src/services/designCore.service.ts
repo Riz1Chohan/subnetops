@@ -51,6 +51,7 @@ import {
   isValidIpv4,
   parseCidr,
   recommendedPrefixForHosts,
+  recommendedCapacityPlanForHosts,
   suggestedGatewayPattern,
   usableHostCount,
   type ParsedCidr,
@@ -65,6 +66,7 @@ import {
   sortAllocationCandidates,
   sortSiteAllocationCandidates,
 } from "../lib/addressAllocator.js";
+import { buildEnterpriseAllocatorPosture, extractEnterpriseAllocatorSource, overallEnterpriseAllocatorReadiness } from "../lib/enterpriseAddressAllocator.js";
 import {
   NETWORK_STANDARDS_RULEBOOK,
 } from "../lib/networkStandardsRulebook.js";
@@ -85,7 +87,134 @@ type ProposedSubnetAssignment = {
   vlanId: number;
   proposedSubnetCidr?: string;
   proposedGatewayIp?: string;
+  allocatorExplanation?: string;
+  allocatorParentCidr?: string;
+  allocatorUsedRangeCount?: number;
+  allocatorFreeRangeCount?: number;
+  allocatorLargestFreeRange?: string;
+  allocatorUtilizationPercent?: number;
+  allocatorCanFitRequestedPrefix?: boolean;
 };
+
+function cidrFacts(parsed: ParsedCidr, role: SegmentRole = "OTHER") {
+  const detail = describeSubnet(parsed, role);
+  return {
+    prefix: detail.prefix,
+    networkAddress: detail.networkAddress,
+    broadcastAddress: detail.broadcastAddress,
+    firstUsableIp: detail.firstUsableIp,
+    lastUsableIp: detail.lastUsableIp,
+    dottedMask: detail.dottedMask,
+    wildcardMask: detail.wildcardMask,
+    totalAddresses: detail.totalAddresses,
+    usableHosts: detail.usableAddresses,
+  };
+}
+
+function siteBlockFacts(parsed: ParsedCidr) {
+  const detail = describeSubnet(parsed, "OTHER");
+  return {
+    prefix: detail.prefix,
+    networkAddress: detail.networkAddress,
+    broadcastAddress: detail.broadcastAddress,
+    dottedMask: detail.dottedMask,
+    wildcardMask: detail.wildcardMask,
+    totalAddresses: detail.totalAddresses,
+    usableAddresses: detail.usableAddresses,
+    rangeSummary: rangeSummary(parsed),
+  };
+}
+
+function proposalFacts(parsed: ParsedCidr, role: SegmentRole, requiredUsableHosts?: number) {
+  const facts = cidrFacts(parsed, role);
+  return {
+    proposedNetworkAddress: facts.networkAddress,
+    proposedBroadcastAddress: facts.broadcastAddress,
+    proposedFirstUsableIp: facts.firstUsableIp,
+    proposedLastUsableIp: facts.lastUsableIp,
+    proposedDottedMask: facts.dottedMask,
+    proposedWildcardMask: facts.wildcardMask,
+    proposedTotalAddresses: facts.totalAddresses,
+    proposedUsableHosts: facts.usableHosts,
+    proposedCapacityHeadroom: typeof requiredUsableHosts === "number" ? facts.usableHosts - requiredUsableHosts : undefined,
+  };
+}
+
+
+type SegmentRoleResolution = {
+  role: SegmentRole;
+  roleSource: "explicit" | "inferred" | "unknown";
+  roleConfidence: "high" | "medium" | "low";
+  roleEvidence: string;
+};
+
+const EXPLICIT_SEGMENT_ROLE_VALUES: SegmentRole[] = [
+  "USER",
+  "SERVER",
+  "GUEST",
+  "MANAGEMENT",
+  "VOICE",
+  "PRINTER",
+  "IOT",
+  "CAMERA",
+  "DMZ",
+  "WAN_TRANSIT",
+  "LOOPBACK",
+  "OTHER",
+];
+
+function normalizeExplicitSegmentRole(value?: string | null): SegmentRole | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized === "USERS") return "USER";
+  if (normalized === "SERVERS") return "SERVER";
+  if (normalized === "MGMT") return "MANAGEMENT";
+  if (normalized === "TRANSIT") return "WAN_TRANSIT";
+  if (normalized === "UNKNOWN") return "OTHER";
+  return EXPLICIT_SEGMENT_ROLE_VALUES.includes(normalized as SegmentRole) ? normalized as SegmentRole : null;
+}
+
+function resolveVlanSegmentRole(vlan: { segmentRole?: string | null; purpose?: string | null; vlanName: string; department?: string | null; notes?: string | null }): SegmentRoleResolution {
+  const explicitRole = normalizeExplicitSegmentRole(vlan.segmentRole);
+  if (explicitRole && explicitRole !== "OTHER") {
+    return {
+      role: explicitRole,
+      roleSource: "explicit",
+      roleConfidence: "high",
+      roleEvidence: `User selected ${explicitRole.replace(/_/g, " ")} in the VLAN form.`,
+    };
+  }
+
+  const evidenceText = `${vlan.purpose || ""} ${vlan.vlanName} ${vlan.department || ""} ${vlan.notes || ""}`;
+  const inferredRole = classifySegmentRole(evidenceText);
+  if (inferredRole !== "OTHER") {
+    return {
+      role: inferredRole,
+      roleSource: "inferred",
+      roleConfidence: "medium",
+      roleEvidence: `Matched saved VLAN text: ${evidenceText.trim() || "no text"}.`,
+    };
+  }
+
+  return {
+    role: "OTHER",
+    roleSource: explicitRole === "OTHER" ? "explicit" : "unknown",
+    roleConfidence: explicitRole === "OTHER" ? "high" : "low",
+    roleEvidence: explicitRole === "OTHER" ? "User selected Unknown / Other in the VLAN form." : "No explicit role or recognizable naming evidence was saved.",
+  };
+}
+
+function buildEngine1Explanation(row: AddressRowRecord): string {
+  const parts = [
+    `Role ${row.role} is ${row.roleSource ?? "unknown"} confidence because ${row.roleEvidence ?? "no role evidence was available"}`,
+  ];
+  if (row.capacityExplanation) parts.push(row.capacityExplanation);
+  if (row.gatewayState === "valid") parts.push(`Gateway ${row.effectiveGatewayIp ?? row.sourceGatewayIp} is usable in ${row.canonicalSubnetCidr ?? row.sourceSubnetCidr}.`);
+  if (row.gatewayState === "fallback") parts.push(`Gateway ${row.sourceGatewayIp} is unusable; backend proposed ${row.proposedGatewayIp ?? "a replacement gateway"}.`);
+  if (row.gatewayState === "invalid") parts.push(`Gateway ${row.sourceGatewayIp} is invalid or could not be proven usable.`);
+  if (row.allocatorExplanation) parts.push(row.allocatorExplanation);
+  return parts.join(" ");
+}
 
 function evaluateOrganizationBlock(project: ProjectWithDesignData, issues: DesignCoreIssue[]) {
   const notes: string[] = [];
@@ -182,6 +311,19 @@ function buildSiteBlockRecords(
       if (canonical !== site.defaultAddressBlock) {
         notes.push(`Saved site block canonicalized to ${canonical}.`);
       }
+      const bufferedDemand = estimateSiteCapacityDemand(site);
+      const availableSiteAddresses = nextBlockSize(parsed.prefix);
+      if (availableSiteAddresses < bufferedDemand) {
+        notes.push(`Site block is valid CIDR, but too tight for buffered VLAN demand: ${availableSiteAddresses} addresses available, ${bufferedDemand} estimated required.`);
+        pushIssue(issues, {
+          severity: "WARNING",
+          code: "SITE_BLOCK_BUFFERED_DEMAND_TIGHT",
+          title: `Site block is too tight for buffered demand on ${site.name}`,
+          detail: `${canonical} has ${availableSiteAddresses} addresses, but Engine 1 estimates ${bufferedDemand} addresses are needed after VLAN capacity buffers.`,
+          entityType: "SITE",
+          entityId: site.id,
+        });
+      }
       return {
         siteId: site.id,
         siteName: site.name,
@@ -190,7 +332,7 @@ function buildSiteBlockRecords(
         canonicalCidr: canonical,
         truthState: "configured",
         validationState: "valid",
-        rangeSummary: rangeSummary(parsed),
+        ...siteBlockFacts(parsed),
         inOrganizationBlock,
         overlapsWithSiteIds: [],
         notes,
@@ -250,7 +392,7 @@ function estimateSiteCapacityDemand(site: ProjectWithDesignData["sites"][number]
   let requiredAddresses = 0;
 
   for (const vlan of site.vlans) {
-    const role = classifySegmentRole(`${vlan.purpose || ""} ${vlan.vlanName} ${vlan.department || ""} ${vlan.notes || ""}`);
+    const role = resolveVlanSegmentRole(vlan).role;
     const estimatedHosts = typeof vlan.estimatedHosts === "number" && vlan.estimatedHosts > 0 ? vlan.estimatedHosts : 0;
     if (estimatedHosts > 0) {
       const recommendedPrefix = recommendedPrefixForHosts(estimatedHosts, role);
@@ -348,6 +490,13 @@ function proposeSiteBlocks(
     }
 
     siteBlock.proposedCidr = allocation.proposedSubnetCidr;
+    siteBlock.truthState = "proposed";
+    try {
+      const proposedSiteBlock = parseCidr(allocation.proposedSubnetCidr);
+      Object.assign(siteBlock, siteBlockFacts(proposedSiteBlock));
+    } catch {
+      // Allocation already came from the CIDR allocator; keep the proposal text even if later parsing changes.
+    }
     siteBlock.notes.push(`Backend proposal available: ${siteBlock.proposedCidr}.`);
     siteBlock.notes.push(`Proposal order uses largest-demand site allocation first to reduce fragmentation. Estimated demand: ${candidate.requiredAddresses} addresses.`);
   }
@@ -365,7 +514,8 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
     const siteBlock = siteBlockBySiteId.get(site.id);
 
     for (const vlan of site.vlans) {
-      const role = classifySegmentRole(`${vlan.purpose || ""} ${vlan.vlanName} ${vlan.department || ""} ${vlan.notes || ""}`);
+      const roleResolution = resolveVlanSegmentRole(vlan);
+      const role = roleResolution.role;
       const notes: string[] = [];
       const baseRow: AddressRowRecord = {
         id: vlan.id,
@@ -375,6 +525,9 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
         vlanId: vlan.vlanId,
         vlanName: vlan.vlanName,
         role,
+        roleSource: roleResolution.roleSource,
+        roleConfidence: roleResolution.roleConfidence,
+        roleEvidence: roleResolution.roleEvidence,
         truthState: "configured",
         sourceSubnetCidr: vlan.subnetCidr,
         sourceGatewayIp: vlan.gatewayIp,
@@ -388,11 +541,29 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
         notes,
       };
 
+      if (typeof vlan.estimatedHosts === "number" && vlan.estimatedHosts > 0) {
+        const capacityPlan = recommendedCapacityPlanForHosts(vlan.estimatedHosts, role);
+        baseRow.recommendedPrefix = capacityPlan.recommendedPrefix;
+        baseRow.requiredUsableHosts = capacityPlan.requiredUsableHosts;
+        baseRow.recommendedUsableHosts = capacityPlan.recommendedUsableHosts;
+        baseRow.bufferMultiplier = capacityPlan.bufferMultiplier;
+        baseRow.capacityBasis = capacityPlan.notes.join(" ");
+        baseRow.capacityExplanation = capacityPlan.notes.join(" ");
+      }
+
       try {
         const parsed = parseCidr(vlan.subnetCidr);
         baseRow.parsed = parsed;
         baseRow.canonicalSubnetCidr = canonicalCidr(vlan.subnetCidr);
-        baseRow.usableHosts = usableHostCount(parsed, role);
+        const facts = cidrFacts(parsed, role);
+        baseRow.networkAddress = facts.networkAddress;
+        baseRow.broadcastAddress = facts.broadcastAddress;
+        baseRow.firstUsableIp = facts.firstUsableIp;
+        baseRow.lastUsableIp = facts.lastUsableIp;
+        baseRow.dottedMask = facts.dottedMask;
+        baseRow.wildcardMask = facts.wildcardMask;
+        baseRow.totalAddresses = facts.totalAddresses;
+        baseRow.usableHosts = facts.usableHosts;
 
         if (baseRow.canonicalSubnetCidr !== vlan.subnetCidr) {
           notes.push(`Saved subnet canonicalized to ${baseRow.canonicalSubnetCidr}.`);
@@ -407,17 +578,26 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
         }
 
         if (typeof vlan.estimatedHosts === "number" && vlan.estimatedHosts > 0) {
-          baseRow.recommendedPrefix = recommendedPrefixForHosts(vlan.estimatedHosts, role);
-          if (baseRow.usableHosts >= vlan.estimatedHosts) {
+          const capacityPlan = recommendedCapacityPlanForHosts(vlan.estimatedHosts, role);
+          baseRow.recommendedPrefix = capacityPlan.recommendedPrefix;
+          baseRow.requiredUsableHosts = capacityPlan.requiredUsableHosts;
+          baseRow.recommendedUsableHosts = capacityPlan.recommendedUsableHosts;
+          baseRow.bufferMultiplier = capacityPlan.bufferMultiplier;
+          baseRow.capacityHeadroom = baseRow.usableHosts - capacityPlan.requiredUsableHosts;
+          baseRow.capacityBasis = capacityPlan.notes.join(" ");
+        baseRow.capacityExplanation = capacityPlan.notes.join(" ");
+
+          if (baseRow.usableHosts >= capacityPlan.requiredUsableHosts) {
             baseRow.capacityState = "fits";
+            notes.push(`Capacity checked against buffered demand: ${baseRow.usableHosts} usable addresses for ${capacityPlan.requiredUsableHosts} required usable addresses.`);
           } else {
             baseRow.capacityState = "undersized";
-            notes.push(`Estimated host demand of ${vlan.estimatedHosts} exceeds usable hosts in ${baseRow.canonicalSubnetCidr}.`);
+            notes.push(`Estimated host demand of ${vlan.estimatedHosts} requires ${capacityPlan.requiredUsableHosts} usable addresses after role-aware buffer; ${baseRow.canonicalSubnetCidr} provides ${baseRow.usableHosts}.`);
             pushIssue(issues, {
               severity: "ERROR",
               code: "SUBNET_UNDERSIZED",
               title: `Undersized subnet on VLAN ${vlan.vlanId}`,
-              detail: `${baseRow.canonicalSubnetCidr} provides ${baseRow.usableHosts} usable addresses, which is below the estimated host count of ${vlan.estimatedHosts}.`,
+              detail: `${baseRow.canonicalSubnetCidr} provides ${baseRow.usableHosts} usable addresses, which is below the buffered requirement of ${capacityPlan.requiredUsableHosts} usable addresses for ${vlan.estimatedHosts} estimated host(s). Recommended prefix is /${capacityPlan.recommendedPrefix}.`,
               entityType: "VLAN",
               entityId: vlan.id,
             });
@@ -482,6 +662,7 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
         });
       }
 
+      baseRow.engine1Explanation = buildEngine1Explanation(baseRow);
       siteRows.push(baseRow);
       rows.push(baseRow);
     }
@@ -581,8 +762,12 @@ function proposeSubnetRows(siteBlocks: SiteBlockRecord[], addressingRows: Addres
         vlanId: row.vlanId,
         vlanName: row.vlanName,
         role: row.role,
+        roleSource: row.roleSource,
+        roleConfidence: row.roleConfidence,
+        roleEvidence: row.roleEvidence,
         reason: "proposal blocked by site block size",
         recommendedPrefix,
+        requiredUsableHosts: row.requiredUsableHosts,
         notes,
       });
     }
@@ -633,8 +818,19 @@ function proposeSubnetRows(siteBlocks: SiteBlockRecord[], addressingRows: Addres
           vlanId: row.vlanId,
           vlanName: row.vlanName,
           role: row.role,
+          roleSource: row.roleSource,
+          roleConfidence: row.roleConfidence,
+          roleEvidence: row.roleEvidence,
+          allocatorExplanation: allocation.allocatorExplanation,
+          allocatorParentCidr: allocation.allocatorParentCidr,
+          allocatorUsedRangeCount: allocation.allocatorUsedRangeCount,
+          allocatorFreeRangeCount: allocation.allocatorFreeRangeCount,
+          allocatorLargestFreeRange: allocation.allocatorLargestFreeRange,
+          allocatorUtilizationPercent: allocation.allocatorUtilizationPercent,
+          allocatorCanFitRequestedPrefix: allocation.allocatorCanFitRequestedPrefix,
           reason: allocation.reason === "prefix-outside-parent" ? "proposal blocked by site block size" : "no free aligned space available",
           recommendedPrefix,
+          requiredUsableHosts: row.requiredUsableHosts,
           notes,
         });
         continue;
@@ -651,6 +847,7 @@ function proposeSubnetRows(siteBlocks: SiteBlockRecord[], addressingRows: Addres
         notes.push(`Proposed gateway follows the site preference of ${siteGatewayPreference}: ${allocation.proposedGatewayIp}.`);
       }
 
+      const parsedProposal = parseCidr(allocation.proposedSubnetCidr);
       proposals.push({
         siteId: row.siteId,
         siteName: row.siteName,
@@ -658,10 +855,22 @@ function proposeSubnetRows(siteBlocks: SiteBlockRecord[], addressingRows: Addres
         vlanId: row.vlanId,
         vlanName: row.vlanName,
         role: row.role,
+        roleSource: row.roleSource,
+        roleConfidence: row.roleConfidence,
+        roleEvidence: row.roleEvidence,
+        allocatorExplanation: allocation.allocatorExplanation,
+        allocatorParentCidr: allocation.allocatorParentCidr,
+        allocatorUsedRangeCount: allocation.allocatorUsedRangeCount,
+        allocatorFreeRangeCount: allocation.allocatorFreeRangeCount,
+        allocatorLargestFreeRange: allocation.allocatorLargestFreeRange,
+        allocatorUtilizationPercent: allocation.allocatorUtilizationPercent,
+        allocatorCanFitRequestedPrefix: allocation.allocatorCanFitRequestedPrefix,
         reason: reasonParts.join("; "),
         recommendedPrefix,
+        requiredUsableHosts: row.requiredUsableHosts,
         proposedSubnetCidr: allocation.proposedSubnetCidr,
         proposedGatewayIp: allocation.proposedGatewayIp,
+        ...proposalFacts(parsedProposal, row.role, row.requiredUsableHosts),
         notes,
       });
 
@@ -670,6 +879,13 @@ function proposeSubnetRows(siteBlocks: SiteBlockRecord[], addressingRows: Addres
         vlanId: row.vlanId,
         proposedSubnetCidr: allocation.proposedSubnetCidr,
         proposedGatewayIp: allocation.proposedGatewayIp,
+        allocatorExplanation: allocation.allocatorExplanation,
+        allocatorParentCidr: allocation.allocatorParentCidr,
+        allocatorUsedRangeCount: allocation.allocatorUsedRangeCount,
+        allocatorFreeRangeCount: allocation.allocatorFreeRangeCount,
+        allocatorLargestFreeRange: allocation.allocatorLargestFreeRange,
+        allocatorUtilizationPercent: allocation.allocatorUtilizationPercent,
+        allocatorCanFitRequestedPrefix: allocation.allocatorCanFitRequestedPrefix,
       });
     }
   }
@@ -683,7 +899,17 @@ function attachProposalAssignments(addressingRows: AddressRowRecord[], assignmen
     if (!assignment) continue;
     row.proposedSubnetCidr = assignment.proposedSubnetCidr;
     row.proposedGatewayIp = assignment.proposedGatewayIp;
+    row.allocatorExplanation = assignment.allocatorExplanation ?? row.allocatorExplanation;
+    row.allocatorParentCidr = assignment.allocatorParentCidr;
+    row.allocatorUsedRangeCount = assignment.allocatorUsedRangeCount;
+    row.allocatorFreeRangeCount = assignment.allocatorFreeRangeCount;
+    row.allocatorLargestFreeRange = assignment.allocatorLargestFreeRange;
+    row.allocatorUtilizationPercent = assignment.allocatorUtilizationPercent;
+    row.allocatorCanFitRequestedPrefix = assignment.allocatorCanFitRequestedPrefix;
     row.notes.push(`Backend proposal available: ${assignment.proposedSubnetCidr}${assignment.proposedGatewayIp ? ` via ${assignment.proposedGatewayIp}` : ""}.`);
+    if (assignment.allocatorParentCidr) {
+      row.notes.push(`Allocator parent ${assignment.allocatorParentCidr}; used ranges ${assignment.allocatorUsedRangeCount ?? "—"}; largest free range ${assignment.allocatorLargestFreeRange ?? "—"}.`);
+    }
   }
 }
 
@@ -1057,6 +1283,19 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   const requirementsCoverage = buildRequirementsCoverageSummary(project);
   const engineConfidence = buildEngineConfidenceSummary(traceabilityCoverage, allocatorConfidence, brownfieldReadiness, implementationReadiness, routeDomain, standardsAlignment, planningInputCoverage, requirementsCoverage);
   const allocatorDeterminism = buildAllocatorDeterminismSummary(issues, siteBlocks, proposals);
+  const enterpriseAllocatorPosture = buildEnterpriseAllocatorPosture(addressingRows.map((row) => ({
+    id: row.id,
+    siteId: row.siteId,
+    siteName: row.siteName,
+    vlanId: row.vlanId,
+    vlanName: row.vlanName,
+    role: row.role,
+    subnetCidr: row.canonicalSubnetCidr ?? row.sourceSubnetCidr,
+    proposedSubnetCidr: row.proposedSubnetCidr,
+    dhcpEnabled: row.dhcpEnabled,
+    estimatedHosts: row.estimatedHosts,
+  })), extractEnterpriseAllocatorSource(project));
+  const enterpriseAllocatorReadiness = overallEnterpriseAllocatorReadiness(enterpriseAllocatorPosture);
 
   const generatedAt = new Date().toISOString();
 
@@ -1068,6 +1307,9 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     issueCount: issues.length,
     proposedSiteBlockCount: siteBlocks.filter((item) => Boolean(item.proposedCidr)).length,
     proposalCount: proposals.length,
+    enterpriseAllocatorReadiness,
+    ipv6ConfiguredPrefixCount: enterpriseAllocatorPosture.ipv6ConfiguredPrefixCount,
+    enterpriseAllocatorReviewQueueCount: enterpriseAllocatorPosture.reviewQueue.length,
     planningInputNotReflectedCount: planningInputDiscipline.notReflectedCount,
     traceabilityCount: traceability.length,
     summarizationReviewCount: siteSummaries.length,
@@ -1129,6 +1371,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
       sourceValue: organizationBlock.sourceValue,
       canonicalCidr: organizationBlock.canonicalCidr,
       validationState: organizationBlock.validationState,
+      ...(organizationBlock.parsed ? siteBlockFacts(organizationBlock.parsed) : {}),
       notes: organizationBlock.notes,
     },
     summary,
@@ -1147,6 +1390,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     implementationReadiness,
     engineConfidence,
     allocatorDeterminism,
+    enterpriseAllocatorPosture,
     standardsAlignment,
     planningInputCoverage,
     planningInputDiscipline,

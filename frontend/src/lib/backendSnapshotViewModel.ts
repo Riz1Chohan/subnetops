@@ -19,12 +19,6 @@ function uniqueStrings(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 }
 
-function backendProvidedCapacityOnly() {
-  // Capacity math is intentionally not performed in the browser.
-  // When the backend snapshot includes numeric capacity fields, map them here.
-  return 0;
-}
-
 function siteRows(siteId: string, rows: AddressingPlanRow[]) {
   return rows.filter((row) => row.siteId === siteId);
 }
@@ -51,7 +45,12 @@ export function backendSiteSummaries(snapshot: DesignCoreSnapshot, addressingRow
       siteCode: site.siteCode || "",
       source: site.truthState === "configured" ? "configured" as const : "proposed" as const,
       siteBlockCidr: site.canonicalCidr || site.proposedCidr || undefined,
-      plannedDemandAddresses: rows.reduce((sum, row) => sum + row.usableHosts, 0),
+      summaryPrefix: site.prefix,
+      siteBlockTotalAddresses: site.totalAddresses,
+      siteBlockUsableAddresses: site.usableAddresses,
+      siteBlockNetworkAddress: site.networkAddress,
+      siteBlockBroadcastAddress: site.broadcastAddress,
+      plannedDemandAddresses: rows.reduce((sum, row) => sum + (row.totalAddresses ?? row.usableHosts), 0),
       plannedDemandHosts: rows.reduce((sum, row) => sum + row.estimatedHosts, 0),
       note: site.notes.join(" ") || "Backend design-core site block.",
     };
@@ -62,7 +61,7 @@ export function backendSiteSummaries(snapshot: DesignCoreSnapshot, addressingRow
   const seen = new Map<string, PlannedSiteSummary>();
   for (const row of addressingRows) {
     const current = seen.get(row.siteId);
-    const nextDemandAddresses = (current?.plannedDemandAddresses ?? 0) + row.usableHosts;
+    const nextDemandAddresses = (current?.plannedDemandAddresses ?? 0) + (row.totalAddresses ?? row.usableHosts);
     const nextDemandHosts = (current?.plannedDemandHosts ?? 0) + row.estimatedHosts;
     seen.set(row.siteId, {
       id: row.siteId,
@@ -81,8 +80,8 @@ export function backendSiteSummaries(snapshot: DesignCoreSnapshot, addressingRow
 export function backendSiteHierarchy(sites: PlannedSiteSummary[], addressingRows: AddressingPlanRow[]): SiteHierarchyItem[] {
   return sites.map((site) => {
     const rows = siteRows(site.id, addressingRows);
-    const blockCapacity = backendProvidedCapacityOnly();
-    const allocatedSegmentAddresses = rows.reduce((sum, row) => sum + row.usableHosts, 0);
+    const blockCapacity = site.siteBlockTotalAddresses ?? 0;
+    const allocatedSegmentAddresses = rows.reduce((sum, row) => sum + (row.totalAddresses ?? row.usableHosts), 0);
     return {
       ...site,
       blockCapacity,
@@ -109,7 +108,10 @@ export function backendSegmentModel(addressingRows: AddressingPlanRow[]): Segmen
     configuredCount: rows.filter((row) => row.source === "configured").length,
     proposedCount: rows.filter((row) => row.source === "proposed").length,
     totalEstimatedHosts: rows.reduce((sum, row) => sum + row.estimatedHosts, 0),
-    recommendedPrefix: 0,
+    recommendedPrefix: rows
+      .map((row) => row.recommendedPrefix)
+      .filter((prefix): prefix is number => typeof prefix === "number" && prefix > 0)
+      .sort((left, right) => left - right)[0] ?? 0,
   }));
 }
 

@@ -179,7 +179,7 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
 
       if (sourceSite.vlans.length > 0) {
         await tx.vlan.createMany({
-          data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
+          data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, segmentRole: vlan.segmentRole, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
         });
       }
     }

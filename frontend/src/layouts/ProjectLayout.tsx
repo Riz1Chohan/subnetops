@@ -113,7 +113,7 @@ export function ProjectLayout() {
       label: "Design Package",
       path: `/projects/${projectId}/logical-design`,
       summary: "Logical design views and engineering truth.",
-      matchers: ["/logical-design", "/overview", "/core-model", "/addressing", "/security", "/routing", "/implementation", "/standards", "/platform", "/sites", "/vlans"],
+      matchers: ["/logical-design", "/overview", "/core-model", "/addressing", "/enterprise-ipam", "/security", "/routing", "/implementation", "/standards", "/platform", "/sites", "/vlans"],
     },
     {
       key: "validation",
@@ -164,6 +164,7 @@ export function ProjectLayout() {
     { key: "core-sites", label: "Site truth", path: `/projects/${projectId}/core-model?section=sites`, description: "Per-site unification, unresolved refs, and linkage." },
     { key: "addressing-hierarchy", label: "Address hierarchy", path: `/projects/${projectId}/addressing?section=hierarchy`, description: "Organization/site blocks, route domains, and transit plan." },
     { key: "addressing-table", label: "Address table", path: `/projects/${projectId}/addressing?section=table`, description: "Implementation-ready logical addressing rows only." },
+    { key: "engine2-ipam", label: "Engine 2 IPAM", path: `/projects/${projectId}/enterprise-ipam`, description: "VRFs, pools, allocations, DHCP, brownfield imports, approvals, and ledger." },
     { key: "security-boundaries", label: "Security boundaries", path: `/projects/${projectId}/security?section=boundaries`, description: "Boundary truth, zones, and trust model." },
     { key: "security-policy", label: "Policy matrix", path: `/projects/${projectId}/security?section=policy`, description: "Controls, segmentation review, and policy-intent flows." },
     { key: "routing-intent", label: "Routing intent", path: `/projects/${projectId}/routing?section=intent`, description: "Protocols, transport, summarization, switching, and QoS." },

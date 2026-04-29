@@ -14,6 +14,7 @@ export type SegmentRole =
   | "PRINTER"
   | "IOT"
   | "CAMERA"
+  | "DMZ"
   | "WAN_TRANSIT"
   | "LOOPBACK"
   | "OTHER";

@@ -3,6 +3,7 @@ export * from "./auth.controller.js";
 export * from "./comment.controller.js";
 export * from "./designCore.controller.js";
 export * from "./export.controller.js";
+export * from "./enterpriseIpam.controller.js";
 export * from "./notification.controller.js";
 export * from "./notificationPreference.controller.js";
 export * from "./organization.controller.js";

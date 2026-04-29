@@ -104,6 +104,16 @@ model Project {
   changeLogs       ChangeLog[]
   comments         ProjectComment[]
   watches          ProjectWatch[]
+  routeDomains     DesignRouteDomain[]
+  ipPools          DesignIpPool[]
+  ipAllocations    DesignIpAllocation[]
+  dhcpScopes       DesignDhcpScope[]
+  ipReservations   DesignIpReservation[]
+  brownfieldImports DesignBrownfieldImport[]
+  brownfieldNetworks DesignBrownfieldNetwork[]
+  brownfieldConflictResolutions DesignBrownfieldConflictResolution[]
+  allocationApprovals DesignAllocationApproval[]
+  allocationLedger DesignAllocationLedgerEntry[]
 }
 
 model Site {
@@ -121,6 +131,10 @@ model Site {
   updatedAt           DateTime @updatedAt
   project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   vlans               Vlan[]
+  ipPools             DesignIpPool[]
+  ipAllocations       DesignIpAllocation[]
+  dhcpScopes          DesignDhcpScope[]
+  ipReservations      DesignIpReservation[]
 
   @@index([projectId])
 }
@@ -131,6 +145,7 @@ model Vlan {
   vlanId         Int
   vlanName       String
   purpose        String?
+  segmentRole    String?
   subnetCidr     String
   gatewayIp      String
   dhcpEnabled    Boolean  @default(true)
@@ -140,6 +155,9 @@ model Vlan {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   site           Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  ipAllocations  DesignIpAllocation[]
+  dhcpScopes     DesignDhcpScope[]
+  ipReservations DesignIpReservation[]
 
   @@index([siteId])
   @@index([vlanId])
@@ -340,4 +358,313 @@ model NotificationPreference {
 enum DigestFrequency {
   DAILY
   WEEKLY
+}
+
+
+enum AddressFamily {
+  IPV4
+  IPV6
+}
+
+enum IpPoolScope {
+  ORGANIZATION
+  SITE
+  SEGMENT
+  TRANSIT
+  LOOPBACK
+  RESERVED
+}
+
+enum IpPoolStatus {
+  ACTIVE
+  RESERVED
+  DEPRECATED
+}
+
+enum IpAllocationStatus {
+  PROPOSED
+  REVIEW_REQUIRED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  IMPLEMENTED
+}
+
+enum BrownfieldImportStatus {
+  IMPORTED
+  REVIEWED
+  SUPERSEDED
+}
+
+enum BrownfieldObjectKind {
+  NETWORK
+  VLAN
+  DHCP_SCOPE
+  RESERVATION
+  ROUTE
+  FIREWALL_POLICY
+  UNKNOWN
+}
+
+enum AllocationApprovalDecision {
+  APPROVED
+  REJECTED
+  NEEDS_CHANGES
+}
+
+enum AllocationLedgerAction {
+  CREATED
+  UPDATED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  IMPLEMENTED
+  STALE_DETECTED
+  IMPORTED
+}
+
+model DesignRouteDomain {
+  id                    String   @id @default(uuid())
+  projectId             String
+  routeDomainKey        String
+  name                  String
+  vrfName               String?
+  routeDistinguisher    String?
+  description           String?
+  allowOverlappingCidrs Boolean  @default(false)
+  sourceState           String   @default("configured")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ipPools               DesignIpPool[]
+  ipAllocations         DesignIpAllocation[]
+  dhcpScopes            DesignDhcpScope[]
+
+  @@unique([projectId, routeDomainKey])
+  @@index([projectId])
+}
+
+model DesignIpPool {
+  id            String        @id @default(uuid())
+  projectId     String
+  routeDomainId String?
+  siteId        String?
+  name          String
+  addressFamily AddressFamily
+  scope         IpPoolScope    @default(SITE)
+  cidr          String
+  status        IpPoolStatus   @default(ACTIVE)
+  purpose       String?
+  ownerLabel    String?
+  businessUnit  String?
+  reservePercent Int          @default(20)
+  noAllocate    Boolean       @default(false)
+  sourceState   String        @default("configured")
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  routeDomain   DesignRouteDomain? @relation(fields: [routeDomainId], references: [id], onDelete: SetNull)
+  site          Site?         @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  allocations   DesignIpAllocation[]
+
+  @@index([projectId])
+  @@index([routeDomainId])
+  @@index([siteId])
+}
+
+model DesignIpAllocation {
+  id            String             @id @default(uuid())
+  projectId     String
+  poolId        String?
+  routeDomainId String?
+  siteId        String?
+  vlanId        String?
+  addressFamily AddressFamily
+  cidr          String
+  gatewayIp     String?
+  purpose       String?
+  status        IpAllocationStatus @default(PROPOSED)
+  source        String             @default("engine2")
+  confidence    String             @default("proposed")
+  inputHash     String?
+  approvedAt    DateTime?
+  implementedAt DateTime?
+  supersededByAllocationId String?
+  supersessionReason String?
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pool          DesignIpPool?      @relation(fields: [poolId], references: [id], onDelete: SetNull)
+  routeDomain   DesignRouteDomain? @relation(fields: [routeDomainId], references: [id], onDelete: SetNull)
+  site          Site?              @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  vlan          Vlan?              @relation(fields: [vlanId], references: [id], onDelete: SetNull)
+  dhcpScopes    DesignDhcpScope[]
+  reservations  DesignIpReservation[]
+  approvals     DesignAllocationApproval[]
+  ledgerEntries DesignAllocationLedgerEntry[]
+
+  @@index([projectId])
+  @@index([poolId])
+  @@index([routeDomainId])
+  @@index([siteId])
+  @@index([vlanId])
+}
+
+model DesignDhcpScope {
+  id               String        @id @default(uuid())
+  projectId        String
+  siteId           String?
+  vlanId           String?
+  routeDomainId    String?
+  allocationId     String?
+  addressFamily    AddressFamily @default(IPV4)
+  scopeCidr        String
+  defaultGateway   String?
+  dnsServersJson   String?
+  leaseSeconds     Int?
+  excludedRangesJson String?
+  optionsJson      String?
+  relayTargetsJson String?
+  serverLocation   String?
+  source           String        @default("configured")
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  site             Site?         @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  vlan             Vlan?         @relation(fields: [vlanId], references: [id], onDelete: SetNull)
+  routeDomain      DesignRouteDomain? @relation(fields: [routeDomainId], references: [id], onDelete: SetNull)
+  allocation       DesignIpAllocation? @relation(fields: [allocationId], references: [id], onDelete: SetNull)
+  reservations     DesignIpReservation[]
+
+  @@index([projectId])
+  @@index([siteId])
+  @@index([vlanId])
+  @@index([routeDomainId])
+}
+
+model DesignIpReservation {
+  id            String        @id @default(uuid())
+  projectId     String
+  siteId        String?
+  vlanId        String?
+  dhcpScopeId   String?
+  allocationId  String?
+  addressFamily AddressFamily @default(IPV4)
+  ipAddress     String
+  macAddress    String?
+  hostname      String?
+  ownerLabel    String?
+  purpose       String?
+  source        String        @default("configured")
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  site          Site?         @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  vlan          Vlan?         @relation(fields: [vlanId], references: [id], onDelete: SetNull)
+  dhcpScope     DesignDhcpScope? @relation(fields: [dhcpScopeId], references: [id], onDelete: SetNull)
+  allocation    DesignIpAllocation? @relation(fields: [allocationId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([dhcpScopeId])
+  @@index([allocationId])
+}
+
+model DesignBrownfieldImport {
+  id           String                 @id @default(uuid())
+  projectId    String
+  sourceType   String
+  sourceName   String?
+  status       BrownfieldImportStatus @default(IMPORTED)
+  importedAt   DateTime               @default(now())
+  notes        String?
+  project      Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  networks     DesignBrownfieldNetwork[]
+
+  @@index([projectId])
+}
+
+model DesignBrownfieldNetwork {
+  id               String               @id @default(uuid())
+  projectId         String
+  importId          String?
+  routeDomainKey    String?
+  addressFamily     AddressFamily
+  cidr              String
+  vlanNumber        Int?
+  siteName          String?
+  ownerLabel        String?
+  sourceObjectKind  BrownfieldObjectKind @default(NETWORK)
+  sourceObjectId    String?
+  confidence        String               @default("imported")
+  notes             String?
+  createdAt         DateTime             @default(now())
+  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  import            DesignBrownfieldImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([importId])
+  @@index([routeDomainKey])
+}
+
+model DesignBrownfieldConflictResolution {
+  id                 String   @id @default(uuid())
+  projectId          String
+  conflictKey        String
+  code               String
+  routeDomainKey     String?
+  addressFamily      AddressFamily
+  importedCidr       String
+  proposedCidr       String?
+  existingObjectType String
+  existingObjectId   String?
+  decision           String
+  reviewerLabel      String?
+  reason             String
+  designInputHash    String?
+  supersededAllocationId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, conflictKey])
+  @@index([projectId])
+  @@index([decision])
+  @@index([designInputHash])
+}
+
+model DesignAllocationApproval {
+  id             String                     @id @default(uuid())
+  projectId      String
+  allocationId   String
+  decision       AllocationApprovalDecision
+  reviewerLabel  String?
+  reason         String?
+  designInputHash String?
+  createdAt      DateTime                   @default(now())
+  project        Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  allocation     DesignIpAllocation         @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([allocationId])
+  @@index([designInputHash])
+}
+
+model DesignAllocationLedgerEntry {
+  id              String                 @id @default(uuid())
+  projectId       String
+  allocationId    String?
+  action          AllocationLedgerAction
+  actorLabel      String?
+  summary         String
+  designInputHash String?
+  createdAt       DateTime               @default(now())
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  allocation      DesignIpAllocation?    @relation(fields: [allocationId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([allocationId])
 }

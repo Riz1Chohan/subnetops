@@ -38,6 +38,7 @@ export function VlanTable({
             <th align="left">VLAN ID</th>
             <th align="left">Name</th>
             <th align="left">Purpose</th>
+            <th align="left">Explicit role</th>
             <th align="left">Subnet input</th>
             <th align="left">Gateway input</th>
             <th align="left">Estimated hosts</th>
@@ -52,6 +53,7 @@ export function VlanTable({
               <td>{vlan.vlanId}</td>
               <td>{vlan.vlanName}</td>
               <td>{vlan.purpose || "—"}</td>
+              <td>{vlan.segmentRole || "—"}</td>
               <td>{vlan.subnetCidr}</td>
               <td>{vlan.gatewayIp}</td>
               <td>{vlan.estimatedHosts ?? "—"}</td>

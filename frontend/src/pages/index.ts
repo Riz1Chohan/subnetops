@@ -10,6 +10,7 @@ export * from "./LoginPage";
 export * from "./MyTasksPage";
 export * from "./NewProjectPage";
 export * from "./ProjectAddressingPage";
+export * from "./ProjectEnterpriseIpamPage";
 export * from "./ProjectCoreModelPage";
 export * from "./ProjectDiagramPage";
 export * from "./ProjectDiscoveryPage";

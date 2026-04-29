@@ -37,7 +37,14 @@ function toAddressingPlanRow(row: DesignCoreAddressRow): AddressingPlanRow {
   const subnetCidr = effectiveSubnet(row);
   const usableHosts = row.usableHosts ?? 0;
   const estimatedHosts = row.estimatedHosts ?? 0;
-  const utilization = usableHosts > 0 ? Math.min(1, estimatedHosts / usableHosts) : 0;
+  const requiredUsableHosts = row.requiredUsableHosts ?? estimatedHosts;
+  const utilizationDenominator = requiredUsableHosts > 0 ? requiredUsableHosts : usableHosts;
+  const utilization = utilizationDenominator > 0 ? Math.min(1, estimatedHosts / utilizationDenominator) : 0;
+  const headroom = typeof row.capacityHeadroom === "number"
+    ? row.capacityHeadroom
+    : requiredUsableHosts > 0
+      ? usableHosts - requiredUsableHosts
+      : Math.max(0, usableHosts - estimatedHosts);
 
   return {
     id: row.id,
@@ -52,19 +59,59 @@ function toAddressingPlanRow(row: DesignCoreAddressRow): AddressingPlanRow {
     role: row.role,
     roleLabel: row.role.replace(/_/g, " "),
     subnetCidr,
-    mask: "",
+    configuredSubnetCidr: row.canonicalSubnetCidr || row.sourceSubnetCidr,
+    proposedSubnetCidr: row.proposedSubnetCidr,
+    mask: row.dottedMask || "",
+    wildcardMask: row.wildcardMask,
+    networkAddress: row.networkAddress,
+    broadcastAddress: row.broadcastAddress,
+    firstUsableIp: row.firstUsableIp,
+    lastUsableIp: row.lastUsableIp,
     gatewayIp: effectiveGateway(row),
+    sourceGatewayIp: row.sourceGatewayIp,
+    proposedGatewayIp: row.proposedGatewayIp,
+    gatewayState: row.gatewayState,
+    gatewayConvention: row.gatewayConvention,
     dhcpEnabled: row.dhcpEnabled,
+    totalAddresses: row.totalAddresses,
     usableHosts,
     estimatedHosts,
-    headroom: Math.max(0, usableHosts - estimatedHosts),
+    requiredUsableHosts: row.requiredUsableHosts,
+    recommendedUsableHosts: row.recommendedUsableHosts,
+    recommendedPrefix: row.recommendedPrefix,
+    bufferMultiplier: row.bufferMultiplier,
+    capacityState: row.capacityState,
+    capacityBasis: row.capacityBasis,
+    roleSource: row.roleSource,
+    roleConfidence: row.roleConfidence,
+    roleEvidence: row.roleEvidence,
+    capacityExplanation: row.capacityExplanation,
+    allocatorExplanation: row.allocatorExplanation,
+    allocatorParentCidr: row.allocatorParentCidr,
+    allocatorUsedRangeCount: row.allocatorUsedRangeCount,
+    allocatorFreeRangeCount: row.allocatorFreeRangeCount,
+    allocatorLargestFreeRange: row.allocatorLargestFreeRange,
+    allocatorUtilizationPercent: row.allocatorUtilizationPercent,
+    allocatorCanFitRequestedPrefix: row.allocatorCanFitRequestedPrefix,
+    addressFamily: (row.canonicalSubnetCidr ?? row.sourceSubnetCidr ?? row.proposedSubnetCidr ?? "").includes(":") ? "ipv6" : "ipv4",
+    vrfName: "default",
+    brownfieldEvidenceState: "import-required",
+    dhcpScopeReview: row.dhcpEnabled ? "DHCP enabled; options, exclusions, and reservations require explicit review before implementation." : "No DHCP scope enabled for this row.",
+    reservePolicyReview: "No durable reservation policy model is attached to this row yet.",
+    approvalState: "review-required",
+    allocationReason: row.allocationReason,
+    engine1Explanation: row.engine1Explanation,
+    headroom,
     utilization,
     insideSiteBlock: row.inSiteBlock,
     notes: [
       ...row.notes,
-      "CIDR canonicalization, capacity, gateway, and containment facts are backend design-core outputs; this adapter does not run browser-side subnet math.",
+      row.capacityBasis ? `Capacity basis: ${row.capacityBasis}` : "",
+      row.proposedSubnetCidr ? `Backend recommended subnet correction: ${row.proposedSubnetCidr}${row.proposedGatewayIp ? ` via ${row.proposedGatewayIp}` : ""}.` : "",
+      row.allocatorParentCidr ? `Allocator proof: parent ${row.allocatorParentCidr}; used ranges ${row.allocatorUsedRangeCount ?? "—"}; free ranges ${row.allocatorFreeRangeCount ?? "—"}; largest free range ${row.allocatorLargestFreeRange ?? "—"}; utilization ${row.allocatorUtilizationPercent ?? "—"}%.` : "",
+      "CIDR canonicalization, masks, usable ranges, capacity, gateway, and containment facts are backend design-core outputs; this adapter does not run browser-side subnet math.",
       row.truthState !== "configured" ? "Backend design-core proposal; engineer review required before implementation." : "Backend design-core checked configured input.",
-    ],
+    ].filter((note): note is string => Boolean(note)),
   };
 }
 
@@ -285,11 +332,23 @@ export function applyDesignCoreSnapshotToDisplayDesign(
   const backendSecurityFindings = securityPolicyFlow ? backendSegmentationReview(securityPolicyFlow.findings, localDesign.segmentationReview) : localDesign.segmentationReview;
   const backendViewModel = buildBackendSnapshotViewModel(snapshot, backendCheckedAddressingPlan);
 
+  const organizationCapacity = snapshot.organizationBlock?.totalAddresses ?? localDesign.organizationHierarchy.organizationCapacity;
+  const allocatedSiteAddresses = snapshot.siteBlocks.reduce((sum, site) => sum + (site.totalAddresses ?? 0), 0);
+  const plannedSiteDemandAddresses = backendCheckedAddressingPlan.reduce((sum, row) => sum + (row.totalAddresses ?? row.usableHosts), 0);
+  const organizationHeadroom = organizationCapacity > 0 ? Math.max(0, organizationCapacity - allocatedSiteAddresses) : 0;
+
   return {
     ...localDesign,
     ...backendViewModel,
     organizationBlock: snapshot.organizationBlock?.canonicalCidr || localDesign.organizationBlock,
     organizationBlockAssumed: snapshot.organizationBlock?.validationState === "missing" || localDesign.organizationBlockAssumed,
+    organizationHierarchy: {
+      organizationCapacity,
+      allocatedSiteAddresses,
+      plannedSiteDemandAddresses,
+      organizationHeadroom,
+      organizationUtilization: organizationCapacity > 0 ? Math.min(1, allocatedSiteAddresses / organizationCapacity) : 0,
+    },
     addressingPlan: backendCheckedAddressingPlan.length > 0 ? backendCheckedAddressingPlan : localDesign.addressingPlan,
     routingPlan: backendRoutingPlanRows,
     routePlan: backendRoutingPlanRows,

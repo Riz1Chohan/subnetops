@@ -32,7 +32,8 @@
     "engine:selftest:phase35-security": "tsx src/lib/phase35SecurityPolicyEngine.selftest.ts",
     "engine:selftest:phase36-implementation": "tsx src/lib/phase36ImplementationPlanningEngine.selftest.ts",
     "engine:selftest:phase41-scenarios": "tsx src/lib/phase41ScenarioMatrix.selftest.ts",
-    "engine:selftest:phase42-templates": "tsx src/lib/phase42VendorNeutralTemplates.selftest.ts"
+    "engine:selftest:phase42-templates": "tsx src/lib/phase42VendorNeutralTemplates.selftest.ts",
+    "engine:selftest:cidr-core": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:boundary && npm run engine:selftest:design-core"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

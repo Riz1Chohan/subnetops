@@ -28,3 +28,4 @@ export * from "./projectWatch.service.js";
 export * from "./site.service.js";
 export * from "./validation.service.js";
 export * from "./vlan.service.js";
+export * from "./enterpriseIpam.service.js";

@@ -85,6 +85,7 @@ export interface Vlan {
   vlanId: number;
   vlanName: string;
   purpose?: string;
+  segmentRole?: string;
   subnetCidr: string;
   gatewayIp: string;
   dhcpEnabled: boolean;

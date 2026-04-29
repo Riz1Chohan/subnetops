@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.42.0",
+  "version": "0.59.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -13,7 +13,20 @@
     "check:backend-diagram-render-model": "node scripts/check-backend-diagram-render-model.cjs",
     "check:export-truth-hardening": "node scripts/check-export-truth-hardening.cjs",
     "check:phase41-scenario-matrix": "node scripts/check-phase41-scenario-matrix.cjs",
-    "check:phase42-vendor-neutral-templates": "node scripts/check-phase42-vendor-neutral-templates.cjs"
+    "check:phase42-vendor-neutral-templates": "node scripts/check-phase42-vendor-neutral-templates.cjs",
+    "check:engine1-cidr": "npm run check:engine1-cidr-output && cd backend && npm run engine:selftest:cidr-core",
+    "check:engine1-cidr-output": "node scripts/check-engine1-cidr-output.cjs && node -e \"require('./scripts/check-engine1-final-trust.cjs')\"",
+    "check:engine1-final-trust": "node -e \"require('./scripts/check-engine1-final-trust.cjs')\" && npm run check:engine1-exit-audit",
+    "check:engine1-exit-audit": "node scripts/check-engine1-exit-audit.cjs",
+    "check:engine2-address-allocator-trust": "node scripts/check-engine2-address-allocator-trust.cjs",
+    "check:engine2-enterprise-allocator": "node scripts/check-engine2-enterprise-allocator.cjs && npm run check:engine2-enterprise-source-truth",
+    "check:engine2-enterprise-source-truth": "node scripts/check-engine2-enterprise-source-truth.cjs && npm run check:phase54-engine2-management-interface",
+    "check:phase54-engine2-management-interface": "node scripts/check-phase54-engine2-management-interface.cjs && npm run check:phase55-engine2-management-hardening",
+    "check:phase55-engine2-management-hardening": "node scripts/check-phase55-engine2-management-hardening.cjs && npm run check:phase56-engine2-write-integrity",
+    "check:phase56-engine2-write-integrity": "node scripts/check-phase56-engine2-write-integrity.cjs && npm run check:phase57-brownfield-conflict-review",
+    "check:phase57-brownfield-conflict-review": "node scripts/check-phase57-brownfield-conflict-review.cjs && npm run check:phase58-brownfield-conflict-resolution",
+    "check:phase58-brownfield-conflict-resolution": "node scripts/check-phase58-brownfield-conflict-resolution.cjs && npm run check:phase59-engine2-ui-edit-build-proof",
+    "check:phase59-engine2-ui-edit-build-proof": "node scripts/check-phase59-engine2-ui-edit-build-proof.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",
