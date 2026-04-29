@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.59.0",
+  "version": "0.60.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -26,7 +26,8 @@
     "check:phase56-engine2-write-integrity": "node scripts/check-phase56-engine2-write-integrity.cjs && npm run check:phase57-brownfield-conflict-review",
     "check:phase57-brownfield-conflict-review": "node scripts/check-phase57-brownfield-conflict-review.cjs && npm run check:phase58-brownfield-conflict-resolution",
     "check:phase58-brownfield-conflict-resolution": "node scripts/check-phase58-brownfield-conflict-resolution.cjs && npm run check:phase59-engine2-ui-edit-build-proof",
-    "check:phase59-engine2-ui-edit-build-proof": "node scripts/check-phase59-engine2-ui-edit-build-proof.cjs"
+    "check:phase59-engine2-ui-edit-build-proof": "node scripts/check-phase59-engine2-ui-edit-build-proof.cjs && npm run check:phase60-deploy-compile-fixes",
+    "check:phase60-deploy-compile-fixes": "node scripts/check-phase60-deploy-compile-fixes.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",

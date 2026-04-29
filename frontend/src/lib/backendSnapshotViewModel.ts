@@ -421,7 +421,7 @@ export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addr
   const topology = backendTopology(snapshot, sites);
   return {
     organizationHierarchy: {
-      organizationCapacity: backendProvidedCapacityOnly(),
+      organizationCapacity: snapshot.organizationBlock?.totalAddresses ?? 0,
       allocatedSiteAddresses: siteHierarchy.reduce((sum, site) => sum + site.allocatedSegmentAddresses, 0),
       plannedSiteDemandAddresses: siteHierarchy.reduce((sum, site) => sum + site.plannedDemandHosts, 0),
       organizationHeadroom: 0,

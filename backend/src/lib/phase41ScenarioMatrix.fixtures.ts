@@ -1,3 +1,4 @@
+import type { SecurityZone } from "../services/designCore.types.js";
 export type Phase41ScenarioRiskClass = "baseline" | "security" | "routing" | "addressing" | "implementation" | "known-gap";
 export type Phase41ExpectedReadiness = "ready" | "review" | "blocked" | "unknown";
 
@@ -6,7 +7,7 @@ export interface Phase41ScenarioExpectation {
   requiredCodes?: string[];
   forbiddenCodes?: string[];
   requiredStandardsViolations?: string[];
-  requiredZoneRoles?: string[];
+  requiredZoneRoles?: Array<SecurityZone["zoneRole"]>;
   requiredOverlayKeys?: string[];
   minSites?: number;
   minVlans?: number;

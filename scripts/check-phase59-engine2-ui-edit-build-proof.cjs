@@ -59,7 +59,7 @@ assertIncludes('backend/src/services/enterpriseIpam.service.ts', 'function asCon
 assertIncludes('backend/src/services/enterpriseIpam.service.ts', 'reduce((sum: bigint, range: NumericRange)', 'bigint reserve calculation typing');
 assertIncludes('docs/doc/PHASE59-ENGINE2-UI-EDIT-BUILD-PROOF.md', 'Phase 59', 'Phase 59 documentation');
 assertIncludes('docs/doc/PHASE59-ENGINE2-UI-EDIT-BUILD-PROOF.md', 'Full backend/frontend build proof remains environment-dependent', 'honest build-proof caveat');
-assertJsonVersion('package.json', '0.59.0');
+assertJsonVersion('package.json', '0.60.0');
 assertIncludes('package.json', 'check:phase59-engine2-ui-edit-build-proof', 'root Phase 59 check script');
 assertIncludes('package.json', 'node scripts/check-phase58-brownfield-conflict-resolution.cjs && npm run check:phase59-engine2-ui-edit-build-proof', 'Phase 58 chains into Phase 59');
 
