@@ -1411,4 +1411,273 @@ export function ProjectRequirementsPage() {
     return (
       <ErrorState
         title="Unable to load requirements"
-        message={projectQuery.error instanceof Error ? projectQuery
+        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load the requirements workspace right now."}
+        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+      />
+    );
+  }
+
+  if (!project) {
+    return <EmptyState title="Project not found" message="The requirements workspace could not be loaded for this project." action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>} />;
+  }
+
+  if (!requestedStep) {
+    return (
+      <section style={{ display: "grid", gap: 18 }}>
+        <div className="panel workspace-selection-blank">
+          <p className="workspace-detail-kicker">Requirements</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
+          <p className="muted" style={{ margin: 0 }}>Choose a requirements card from the left pane to open that focused workspace.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (isFocusedStepView) {
+    return (
+      <section className="workspace-detail-shell">
+        <div className="panel workspace-detail-hero">
+          <div>
+            <p className="workspace-detail-kicker">Requirements</p>
+            <h1 style={{ margin: "0 0 8px 0" }}>{currentStep.title}</h1>
+            <p className="muted" style={{ margin: 0 }}>{currentStep.summary}</p>
+          </div>
+          <div className="workspace-detail-actions">
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
+            </button>
+          </div>
+        </div>
+
+        <div className="panel workspace-detail-status-strip">
+          <span className={`badge-soft ${hasUnsavedChanges ? "workspace-detail-warning" : ""}`.trim()}>{hasUnsavedChanges ? "Unsaved changes" : "Saved to project"}</span>
+          <span className="badge-soft">{readinessSummary.completionLabel}</span>
+          <span className="badge-soft">Step {currentStepIndex + 1} of {stepDefinitions.length}</span>
+          {draftSavedAt ? <span className="badge-soft">Draft {new Date(draftSavedAt).toLocaleString()}</span> : null}
+        </div>
+
+        <WorkspaceIssueBanner notice={issueNotice} />
+
+        <div className={`panel planner-step-panel planner-step-panel-frame ${issueNotice ? "workspace-focus-target active" : ""}`.trim()} style={{ display: "grid", gap: 12 }}>
+          {currentStep.panel}
+        </div>
+
+        <div className="panel workspace-detail-footer">
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {previousStep ? (
+              <Link to={`/projects/${projectId}/requirements?step=${previousStep.key}`} className="button-nav">Back: {previousStep.title}</Link>
+            ) : (
+              <span className="muted">You are at the first visible requirements card.</span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
+            </button>
+            {nextStep ? (
+              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary button-flow-next">Next: {nextStep.title}</Link>
+            ) : (
+              <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={{ display: "grid", gap: 18 }}>
+      <SectionHeader
+        title="Requirements"
+        description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. The planner now keeps each requirement tied to downstream design impact instead of collecting disconnected form data."
+        actions={
+          <>
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
+            </button>
+            <Link to={`/projects/${projectId}/logical-design`} className="link-button link-button-subtle">Open Logical Design</Link>
+          </>
+        }
+      />
+
+      <WorkspaceIssueBanner notice={issueNotice} />
+
+      <div className="panel save-confidence-panel">
+        <div>
+          <strong style={{ display: "block", marginBottom: 6 }}>Save confidence</strong>
+          <p className="muted" style={{ margin: 0 }}>This workspace now keeps a browser draft while you edit, warns before accidental refresh or close, and makes it clearer whether the current plan is only local or already saved to project data.</p>
+        </div>
+        <div className="save-confidence-grid">
+          <div className={`save-confidence-pill ${hasUnsavedChanges ? "warning" : "ok"}`.trim()}>
+            <strong>{hasUnsavedChanges ? "Unsaved changes" : "Project version up to date"}</strong>
+            <span>{hasUnsavedChanges ? "This browser currently has edits that are newer than the shared saved version." : "No newer browser-only edits are waiting to be saved."}</span>
+          </div>
+          <div className="save-confidence-pill">
+            <strong>Local draft</strong>
+            <span>{draftSavedAt ? `Browser draft updated ${new Date(draftSavedAt).toLocaleString()}.` : "No newer browser draft is waiting right now."}</span>
+          </div>
+          <div className="save-confidence-pill">
+            <strong>Shared project data</strong>
+            <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later stages."}</span>
+          </div>
+          <div className={`save-confidence-pill ${lastRuntimeProof?.status === "blocker" ? "warning" : lastRuntimeProof?.status === "pass" ? "ok" : ""}`.trim()}>
+            <strong>Backend runtime proof</strong>
+            <span>
+              {lastRuntimeProof
+                ? `${lastRuntimeProof.release?.phase ?? "unknown backend phase"}: ${lastRuntimeProof.status}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
+                : "No Phase 79 runtime proof has been returned by the backend in this browser session."}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+            {saveRequirementsMutation.isPending ? "Saving..." : "Save to Project"}
+          </button>
+          <button type="button" className="button-nav" onClick={clearLocalDraft} disabled={!draftSavedAt && !hasUnsavedChanges}>Restore Last Saved Version</button>
+        </div>
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Backend design-core required</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This page collects and saves requirements only. It no longer generates an early browser-side design preview from unsaved planner answers.
+          </p>
+        </div>
+        <div className="validation-card warning">
+          <strong>Frontend planning authority disabled</strong>
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Save requirements, then review addressing, routing, security, implementation, reports, and diagrams from the backend design-core snapshot. If the backend has not returned a snapshot, those views should show an honest unavailable state instead of a fabricated frontend plan.
+          </p>
+        </div>
+      </div>
+
+      <div className="planner-page-grid planner-page-grid-v109">
+        <aside className="planner-sidebar">
+          <div className="panel planner-progress-card">
+            <div className="planner-progress-card-header">
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Planner flow</h3>
+                <p className="muted" style={{ margin: 0 }}>
+                  Earlier choices now decide which steps appear. Hidden steps are treated as out of scope for the current scenario.
+                </p>
+              </div>
+              <span className="badge-soft">{readinessPercent}% ready</span>
+            </div>
+            <div className="planner-progress-meter" aria-hidden="true">
+              <span style={{ width: `${readinessPercent}%` }} />
+            </div>
+            <div className="planner-progress-meta">
+              <span>{readinessSummary.readyCount} ready</span>
+              <span>{readinessSummary.reviewCount} need review</span>
+              <span>{stepDefinitions.length} visible steps</span>
+            </div>
+            <div className="planner-step-list">
+              {stepDefinitions.map((step, index) => {
+                const isCurrent = step.key === currentStepKey;
+                const isComplete = index < currentStepIndex;
+                return (
+                  <button
+                    key={step.key}
+                    type="button"
+                    className={`planner-step-link ${isCurrent ? "current" : isComplete ? "complete" : ""}`.trim()}
+                    onClick={() => setCurrentStepKey(step.key)}
+                  >
+                    <span className="planner-step-number">{index + 1}</span>
+                    <span>
+                      <strong>{step.title}</strong>
+                      <small>{step.summary}</small>
+                    </span>
+                    <span className={`planner-step-state ${isCurrent ? "current" : isComplete ? "complete" : "upcoming"}`.trim()}>
+                      {isCurrent ? "Current" : isComplete ? "Done" : "Next"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <details className="panel planner-track-summary" open>
+            <summary className="planner-details-summary">Scenario snapshot</summary>
+            <p className="muted" style={{ marginTop: 0 }}>These tracks are active right now.</p>
+            {activeTracks.map((track) => (
+              <div key={track} className="planner-track-row">
+                <strong>{track}</strong>
+                <span className="badge-soft">Active</span>
+              </div>
+            ))}
+          </details>
+
+          <div className="panel planner-snapshot-list">
+            <div className="planner-snapshot-row"><span>Readiness</span><strong>{readinessSummary.completionLabel}</strong></div>
+            <div className="planner-snapshot-row"><span>Visible steps</span><strong>{stepDefinitions.length}</strong></div>
+            <div className="planner-snapshot-row"><span>Review tracks</span><strong>{readinessSummary.reviewCount}</strong></div>
+          </div>
+        </aside>
+
+        <div style={{ display: "grid", gap: 16 }}>
+          <div className="panel planner-step-shell">
+            <div className="planner-step-shell-topbar">
+              <div>
+                <strong style={{ display: "block", marginBottom: 4 }}>Current focus</strong>
+                <p className="muted" style={{ margin: 0 }}>
+                  Work one strong section at a time, then move forward. The planner now keeps the current step, progress, and next move visible without forcing you to scan the whole page.
+                </p>
+              </div>
+              <div className="planner-inline-stats">
+                <span className="badge-soft">Step {currentStepIndex + 1} of {stepDefinitions.length}</span>
+                <span className="badge-soft">{readinessSummary.completionLabel}</span>
+              </div>
+            </div>
+
+            {nextReviewSteps.length > 0 ? (
+              <div className="planner-next-review-row">
+                <strong>Recommended next review areas</strong>
+                <div className="planner-next-review-links">
+                  {nextReviewSteps.map((item) => (
+                    <button key={item.key} type="button" className="button-secondary planner-chip-button" onClick={() => setCurrentStepKey(item.key)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <WorkspaceIssueBanner notice={issueNotice} />
+
+        <div className={`panel planner-step-panel planner-step-panel-frame ${issueNotice ? "workspace-focus-target active" : ""}`.trim()} style={{ display: "grid", gap: 12 }}>
+              <div className="planner-step-heading">
+                <div>
+                  <h2 style={{ margin: 0 }}>{currentStep.title}</h2>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>{currentStep.summary}</p>
+                </div>
+                <span className="badge-soft">Step {currentStepIndex + 1} of {stepDefinitions.length}</span>
+              </div>
+              {currentStep.panel}
+            </div>
+          </div>
+
+          <div className="panel planner-footer-actions planner-footer-actions-v109">
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {previousStep ? (
+                <button type="button" className="button-nav button-flow-back" onClick={() => setCurrentStepKey(previousStep.key)}>Back: {previousStep.title}</button>
+              ) : (
+                <span className="muted">You are at the first visible step.</span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+                {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
+              </button>
+              {nextStep ? (
+                <button type="button" className="button-primary button-flow-next" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
+              ) : (
+                <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

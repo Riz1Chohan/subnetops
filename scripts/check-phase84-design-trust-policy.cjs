@@ -6,7 +6,7 @@ function read(rel) { return fs.readFileSync(path.join(root, rel), 'utf8'); }
 function assert(condition, message) { if (!condition) { console.error(`Phase 84 check failed: ${message}`); process.exit(1); } }
 const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts');
 assert(runtime.includes('PHASE_84_DESIGN_TRUST_SNAPSHOT_POLICY_RECONCILIATION'), 'runtime marker missing');
-assert(runtime.includes('version: "0.84.1"'), 'runtime version missing');
+assert(runtime.includes('version: "0.86.0"') || runtime.includes('version: "0.84.1"'), 'runtime version missing');
 const hooks = read('frontend/src/features/designCore/hooks.ts');
 assert(hooks.includes('keepPreviousData') && hooks.includes('placeholderData: keepPreviousData'), 'snapshot hydration does not preserve previous backend data');
 const readiness = read('frontend/src/lib/designReadiness.ts');
