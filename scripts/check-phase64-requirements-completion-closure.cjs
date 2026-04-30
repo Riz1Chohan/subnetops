@@ -68,6 +68,6 @@ for (const banned of ["Phase 62 requirement materialization", "Phase 62 inventor
 const registrySource = read("backend/src/services/requirementsImpactRegistry.ts");
 if (registrySource.includes("Phase 62 must show")) fail("registry still exposes Phase 62 validation wording");
 const packageJson = JSON.parse(read("package.json"));
-if (packageJson.version !== '0.66.0') fail(`expected package version 0.66.0, found ${packageJson.version}`);
+if (!/^0\.(6[6-9]|7[0-9])\.0$/.test(packageJson.version)) fail(`expected package version 0.66.0 or later, found ${packageJson.version}`);
 if (!packageJson.scripts["check:phase64-requirements-completion-closure"]) fail("package script missing phase64 check");
 console.log(`Phase 64 requirements completion closure check passed (${profileKeys.length} fields covered).`);

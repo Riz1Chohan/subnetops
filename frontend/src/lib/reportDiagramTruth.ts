@@ -299,6 +299,16 @@ export function buildDiagramTruthModel(designCore: DesignCoreSnapshot | undefine
   const natReadiness = normalizeReadiness(nom.securityPolicyFlow.summary.natReadiness);
   const implementationReadiness = normalizeReadiness(nom.implementationPlan.summary.implementationReadiness);
   const hasModeledTopology = nom.devices.length > 0 || nom.interfaces.length > 0 || nom.links.length > 0;
+  const missingTopologyInputs = [
+    designCore.summary.siteCount <= 0 ? "materialized Site rows" : null,
+    designCore.summary.validSubnetCount <= 0 ? "VLAN/addressing rows from the allocator" : null,
+    nom.devices.length <= 0 ? "modeled network devices" : null,
+    nom.interfaces.length <= 0 ? "modeled network interfaces" : null,
+    nom.links.length <= 0 ? "modeled network links or WAN/site relationships" : null,
+  ].filter(Boolean);
+  const emptyStateReason = hasModeledTopology
+    ? undefined
+    : `Diagram blocked because backend authoritative topology is missing: ${missingTopologyInputs.join(", ")}. Fix requirement materialization and design-core topology generation before treating the diagram as usable.`;
   const overlaySummaries: DiagramTruthOverlaySummary[] = [
     { key: "addressing", label: "Addressing", readiness: nom.summary.orphanedAddressRowCount > 0 ? "review" : "ready", detail: nom.summary.orphanedAddressRowCount > 0 ? `${nom.summary.orphanedAddressRowCount} addressing row(s) are not fully anchored to modeled objects.` : "Addressing rows are anchored to modeled network objects.", count: designCore.summary.validSubnetCount },
     { key: "routing", label: "Routing", readiness: routingReadiness, detail: `${nom.routingSegmentation.summary.routeIntentCount} route intents, ${nom.routingSegmentation.summary.reachabilityFindingCount} reachability finding(s), ${nom.routingSegmentation.summary.nextHopReviewCount} next-hop review item(s).`, count: nom.routingSegmentation.summary.routeIntentCount },
@@ -310,7 +320,7 @@ export function buildDiagramTruthModel(designCore: DesignCoreSnapshot | undefine
   ];
   const hotspots = [...collectImplementationHotspots(nom.implementationPlan), ...collectRoutingHotspots(nom.routingSegmentation.reachabilityFindings), ...collectSecurityHotspots(nom.securityPolicyFlow.flowRequirements)].slice(0, 12);
   const overallReadiness = rollupReadiness(overlaySummaries.map((item) => item.readiness));
-  return { overallReadiness, hasModeledTopology, emptyStateReason: hasModeledTopology ? undefined : "Diagram unavailable because no modeled devices, interfaces, or links exist yet in backend authoritative truth.", topologySummary: { siteCount: designCore.summary.siteCount, deviceCount: nom.devices.length, interfaceCount: nom.interfaces.length, linkCount: nom.links.length, routeDomainCount: nom.routeDomains.length, securityZoneCount: nom.securityZones.length }, overlaySummaries, hotspots };
+  return { overallReadiness, hasModeledTopology, emptyStateReason, topologySummary: { siteCount: designCore.summary.siteCount, deviceCount: nom.devices.length, interfaceCount: nom.interfaces.length, linkCount: nom.links.length, routeDomainCount: nom.routeDomains.length, securityZoneCount: nom.securityZones.length }, overlaySummaries, hotspots };
 }
 
 export function truthBadgeClass(readiness: TruthReadiness | "deferred" | string) {

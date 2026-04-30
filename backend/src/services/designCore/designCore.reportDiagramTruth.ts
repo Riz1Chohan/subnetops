@@ -51,6 +51,22 @@ function addFinding(target: BackendTruthFinding[], finding: BackendTruthFinding,
   if (target.length < limit) target.push(finding);
 }
 
+function buildDiagramEmptyStateReason(summary: SnapshotSummaryForTruth, networkObjectModel: NetworkObjectModel) {
+  const missing: string[] = [];
+
+  if (summary.siteCount <= 0) missing.push("materialized Site rows");
+  if (summary.validSubnetCount <= 0) missing.push("VLAN/addressing rows from the allocator");
+  if (networkObjectModel.devices.length <= 0) missing.push("modeled network devices");
+  if (networkObjectModel.interfaces.length <= 0) missing.push("modeled network interfaces");
+  if (networkObjectModel.links.length <= 0) missing.push("modeled network links or WAN/site relationships");
+  if (networkObjectModel.designGraph.edges.length <= 0) missing.push("backend design graph relationships");
+
+  return {
+    reason: `Diagram blocked because backend authoritative topology is missing: ${missing.join(", ")}. Fix requirement materialization and design-core topology generation before treating the diagram as usable.`,
+    requiredInputs: missing.map((item) => `Generate ${item}`),
+  };
+}
+
 function compareStepPriority(left: ImplementationPlanStep, right: ImplementationPlanStep) {
   const readinessRank: Record<ImplementationPlanStep["readiness"], number> = { blocked: 0, review: 1, deferred: 2, ready: 3 };
   const riskRank: Record<ImplementationPlanStep["riskLevel"], number> = { high: 0, medium: 1, low: 2 };
@@ -282,10 +298,18 @@ function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, 
     };
   });
 
-  const emptyState = renderNodes.length === 0 || !networkObjectModel.devices.length
+  const missingRenderInputs = [
+    networkObjectModel.devices.length <= 0 ? "modeled network devices" : null,
+    networkObjectModel.interfaces.length <= 0 ? "modeled network interfaces" : null,
+    networkObjectModel.links.length <= 0 ? "modeled network links or WAN/site relationships" : null,
+    networkObjectModel.designGraph.edges.length <= 0 ? "backend design graph relationships" : null,
+    renderNodes.length === 0 ? "backend render nodes" : null,
+  ].filter(Boolean) as string[];
+
+  const emptyState = missingRenderInputs.length > 0
     ? {
-        reason: "Backend diagram render model cannot prove topology because modeled devices/interfaces/links are missing or incomplete.",
-        requiredInputs: ["Modeled network devices", "Modeled interfaces", "Modeled links or route-domain relationships", "Backend design graph edges"],
+        reason: `Backend diagram render model is blocked because these inputs are missing: ${missingRenderInputs.join(", ")}.`,
+        requiredInputs: missingRenderInputs.map((item) => `Generate ${item}`),
       }
     : undefined;
 
@@ -428,11 +452,12 @@ export function buildBackendDiagramTruthModel(params: { summary: SnapshotSummary
   const hotspots = [...collectImplementationHotspots(networkObjectModel), ...collectRoutingHotspots(networkObjectModel), ...collectSecurityHotspots(networkObjectModel)].slice(0, 12);
   const overallReadiness = rollupReadiness(overlaySummaries.map((item) => item.readiness));
   const renderModel = buildBackendDiagramRenderModel(networkObjectModel, overlaySummaries, hotspots);
+  const diagramEmptyState = hasModeledTopology ? undefined : buildDiagramEmptyStateReason(summary, networkObjectModel);
 
   return {
     overallReadiness,
     hasModeledTopology,
-    emptyStateReason: hasModeledTopology ? undefined : "Diagram unavailable because no modeled devices, interfaces, or links exist yet in backend authoritative truth.",
+    emptyStateReason: diagramEmptyState?.reason,
     topologySummary: {
       siteCount: summary.siteCount,
       deviceCount: networkObjectModel.devices.length,

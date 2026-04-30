@@ -38,6 +38,91 @@ type SecurityZoneRole = SecurityZone["zoneRole"];
 const CORPORATE_ROUTE_DOMAIN_ID = "route-domain-corporate";
 const WIDE_AREA_NETWORK_ZONE_ID = "security-zone-wide-area-network";
 
+type RequirementInputMap = Record<string, unknown>;
+
+function parseRequirementsJson(requirementsJson?: string | null): RequirementInputMap {
+  if (!requirementsJson) return {};
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as RequirementInputMap;
+  } catch {
+    return {};
+  }
+}
+
+function requirementText(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return "";
+}
+
+function requirementBool(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  return value === true || String(value ?? "").toLowerCase() === "true";
+}
+
+function requirementNumber(requirements: RequirementInputMap, key: string) {
+  const raw = requirements[key];
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw.trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function requirementMentions(requirements: RequirementInputMap, key: string, patterns: string[]) {
+  const text = requirementText(requirements, key).toLowerCase();
+  return patterns.some((pattern) => text.includes(pattern));
+}
+
+function requirementEnabled(requirements: RequirementInputMap, key: string, patterns: string[] = []) {
+  return requirementBool(requirements, key) || requirementMentions(requirements, key, patterns);
+}
+
+function requirementCountPositive(requirements: RequirementInputMap, key: string) {
+  return requirementNumber(requirements, key) > 0;
+}
+
+function hasRequirementText(requirements: RequirementInputMap, key: string) {
+  const text = requirementText(requirements, key).toLowerCase();
+  return Boolean(text) && !text.includes("not applicable") && !text.includes("not required");
+}
+
+function phase72RequirementSummary(requirements: RequirementInputMap) {
+  return [
+    `Planning requirement consequence model: ${requirementText(requirements, "planningFor") || "unspecified"}`,
+    `Internet/WAN model: ${requirementText(requirements, "internetModel") || "unspecified"}`,
+    `Security posture: ${requirementText(requirements, "securityPosture") || "unspecified"}`,
+    `Trust boundary model: ${requirementText(requirements, "trustBoundaryModel") || "unspecified"}`,
+    `Remote access method: ${requirementText(requirements, "remoteAccessMethod") || "unspecified"}`,
+    `Cloud provider/connectivity: ${requirementText(requirements, "cloudProvider") || "unspecified"}; ${requirementText(requirements, "cloudConnectivity") || "unspecified"}`,
+    `Inter-site traffic/resilience: ${requirementText(requirements, "interSiteTrafficModel") || "unspecified"}; ${requirementText(requirements, "resilienceTarget") || "unspecified"}`,
+  ];
+}
+
+function cloudOrHybridRequired(requirements: RequirementInputMap) {
+  return requirementEnabled(requirements, "cloudConnected")
+    || requirementMentions(requirements, "environmentType", ["cloud", "hybrid"])
+    || hasRequirementText(requirements, "cloudProvider")
+    || hasRequirementText(requirements, "cloudConnectivity")
+    || hasRequirementText(requirements, "cloudNetworkModel")
+    || hasRequirementText(requirements, "cloudRoutingModel")
+    || hasRequirementText(requirements, "cloudTrafficBoundary");
+}
+
+function multiSiteOrWanRequired(project: NetworkObjectProject, requirements: RequirementInputMap) {
+  return project.sites.length > 1
+    || requirementNumber(requirements, "siteCount") > 1
+    || requirementEnabled(requirements, "dualIsp")
+    || hasRequirementText(requirements, "interSiteTrafficModel")
+    || hasRequirementText(requirements, "resilienceTarget")
+    || requirementMentions(requirements, "internetModel", ["wan", "central", "hub", "site"]);
+}
+
 function normalizeIdentifierSegment(value: string) {
   const normalized = value
     .toLowerCase()
@@ -254,16 +339,24 @@ function createSecurityBoundaryDevice(project: NetworkObjectProject): NetworkDev
   };
 }
 
-function buildPolicyRules(securityZones: SecurityZone[]): PolicyRule[] {
+function addPolicyRule(policyRules: PolicyRule[], rule: PolicyRule) {
+  if (policyRules.some((existing) => existing.id === rule.id)) return;
+  policyRules.push(rule);
+}
+
+function buildPolicyRules(securityZones: SecurityZone[], requirements: RequirementInputMap): PolicyRule[] {
   const policyRules: PolicyRule[] = [];
   const zoneIds = new Set(securityZones.map((zone) => zone.id));
   const internalZoneId = securityZoneIdForRole("internal");
   const guestZoneId = securityZoneIdForRole("guest");
   const managementZoneId = securityZoneIdForRole("management");
   const dmzZoneId = securityZoneIdForRole("dmz");
+  const voiceZoneId = securityZoneIdForRole("voice");
+  const iotZoneId = securityZoneIdForRole("iot");
+  const transitZoneId = securityZoneIdForRole("transit");
 
   if (zoneIds.has(guestZoneId) && zoneIds.has(internalZoneId)) {
-    policyRules.push({
+    addPolicyRule(policyRules, {
       id: "policy-deny-guest-to-internal",
       name: "Deny Guest Access to Corporate Internal Networks",
       sourceZoneId: guestZoneId,
@@ -272,12 +365,15 @@ function buildPolicyRules(securityZones: SecurityZone[]): PolicyRule[] {
       services: ["any"],
       truthState: "proposed",
       rationale: "Guest networks should not reach trusted user, server, or management networks.",
-      notes: ["Phase 27 records the intended policy relationship; rule ordering and firewall vendor syntax remain future implementation work."],
+      notes: [
+        "Phase 72 keeps guest isolation as a concrete requirement-driven policy consequence, not just a VLAN label.",
+        `Requirement keys: guestWifi, guestPolicy, trustBoundaryModel, securityPosture. Guest policy: ${requirementText(requirements, "guestPolicy") || "unspecified"}.`,
+      ],
     });
   }
 
   if (zoneIds.has(guestZoneId) && zoneIds.has(WIDE_AREA_NETWORK_ZONE_ID)) {
-    policyRules.push({
+    addPolicyRule(policyRules, {
       id: "policy-allow-guest-to-internet",
       name: "Allow Guest Internet Access",
       sourceZoneId: guestZoneId,
@@ -286,12 +382,15 @@ function buildPolicyRules(securityZones: SecurityZone[]): PolicyRule[] {
       services: ["dns", "http", "https"],
       truthState: "proposed",
       rationale: "Guest networks normally require internet-only access through NAT.",
-      notes: ["Confirm content filtering, DNS enforcement, and captive portal requirements before implementation."],
+      notes: [
+        "Confirm content filtering, DNS enforcement, captive portal, and logging requirements before implementation.",
+        `Requirement keys: guestWifi, guestPolicy, internetModel. Internet model: ${requirementText(requirements, "internetModel") || "unspecified"}.`,
+      ],
     });
   }
 
   if (zoneIds.has(managementZoneId)) {
-    policyRules.push({
+    addPolicyRule(policyRules, {
       id: "policy-allow-management-to-network-devices",
       name: "Allow Management Plane to Network Devices",
       sourceZoneId: managementZoneId,
@@ -300,12 +399,49 @@ function buildPolicyRules(securityZones: SecurityZone[]): PolicyRule[] {
       services: ["ssh", "https", "snmp", "icmp"],
       truthState: "proposed",
       rationale: "Management networks need controlled access to device administration services.",
-      notes: ["Restrict source hosts and add logging before treating this as implementable firewall policy."],
+      notes: [
+        "Restrict source hosts and add logging before treating this as implementable firewall policy.",
+        `Requirement keys: management, managementAccess, managementIpPolicy, adminBoundary. Management access: ${requirementText(requirements, "managementAccess") || "unspecified"}.`,
+      ],
+    });
+  }
+
+  if (zoneIds.has(internalZoneId) && zoneIds.has(managementZoneId) && (requirementEnabled(requirements, "management") || hasRequirementText(requirements, "managementAccess") || hasRequirementText(requirements, "adminBoundary"))) {
+    addPolicyRule(policyRules, {
+      id: "policy-review-admin-to-management-plane",
+      name: "Review Admin Access to Management Plane",
+      sourceZoneId: internalZoneId,
+      destinationZoneId: managementZoneId,
+      action: "review",
+      services: ["ssh", "https", "snmp", "icmp"],
+      truthState: "proposed",
+      rationale: "The management requirement must become an explicit admin-plane access decision rather than broad user-to-device reachability.",
+      notes: [
+        "Phase 72 requires the implementation owner to narrow admin sources to jump hosts, admin workstations, or identity-aware management paths.",
+        `Requirement keys: management, managementAccess, managementIpPolicy, adminBoundary, identityModel. Identity model: ${requirementText(requirements, "identityModel") || "unspecified"}.`,
+      ],
+    });
+  }
+
+  if (zoneIds.has(managementZoneId) && zoneIds.has(internalZoneId) && (hasRequirementText(requirements, "monitoringModel") || hasRequirementText(requirements, "loggingModel") || hasRequirementText(requirements, "backupPolicy") || hasRequirementText(requirements, "operationsOwnerModel") || requirementEnabled(requirements, "management"))) {
+    addPolicyRule(policyRules, {
+      id: "policy-review-operations-plane-to-internal",
+      name: "Review Operations Plane Access to Internal Networks",
+      sourceZoneId: managementZoneId,
+      destinationZoneId: internalZoneId,
+      action: "review",
+      services: ["snmp", "ssh", "https", "icmp"],
+      truthState: "proposed",
+      rationale: "Monitoring, logging, backup, and compliance requirements need controlled operations-plane reachability and evidence collection.",
+      notes: [
+        "Phase 72 turns operations selections into policy review evidence instead of report-only text.",
+        `Requirement keys: monitoringModel, loggingModel, backupPolicy, operationsOwnerModel, complianceProfile. Monitoring/logging: ${requirementText(requirements, "monitoringModel") || "unspecified"}; ${requirementText(requirements, "loggingModel") || "unspecified"}.`,
+      ],
     });
   }
 
   if (zoneIds.has(dmzZoneId) && zoneIds.has(internalZoneId)) {
-    policyRules.push({
+    addPolicyRule(policyRules, {
       id: "policy-review-dmz-to-internal",
       name: "Review DMZ to Internal Access",
       sourceZoneId: dmzZoneId,
@@ -315,6 +451,85 @@ function buildPolicyRules(securityZones: SecurityZone[]): PolicyRule[] {
       truthState: "proposed",
       rationale: "DMZ systems should not have broad access into internal networks.",
       notes: ["Replace this review rule with explicit application flows in the security policy engine phase."],
+    });
+  }
+
+  if (zoneIds.has(WIDE_AREA_NETWORK_ZONE_ID) && zoneIds.has(dmzZoneId) && requirementEnabled(requirements, "remoteAccess")) {
+    addPolicyRule(policyRules, {
+      id: "policy-review-wan-to-remote-access-edge",
+      name: "Review WAN to Remote Access Edge Publishing",
+      sourceZoneId: WIDE_AREA_NETWORK_ZONE_ID,
+      destinationZoneId: dmzZoneId,
+      action: "review",
+      services: ["https", "ssl-vpn", "ipsec"],
+      truthState: "proposed",
+      rationale: "Remote access must be published as a reviewed edge service, not as broad WAN trust.",
+      notes: [
+        "Phase 72 turns remote-access selection into an explicit edge-publishing consequence.",
+        `Requirement keys: remoteAccess, remoteAccessMethod, identityModel, securityPosture. Remote access method: ${requirementText(requirements, "remoteAccessMethod") || "unspecified"}.`,
+      ],
+    });
+  }
+
+  if (zoneIds.has(transitZoneId) && zoneIds.has(internalZoneId) && cloudOrHybridRequired(requirements)) {
+    addPolicyRule(policyRules, {
+      id: "policy-review-internal-to-cloud-edge",
+      name: "Review Internal Reachability to Cloud Edge",
+      sourceZoneId: internalZoneId,
+      destinationZoneId: transitZoneId,
+      action: "review",
+      services: ["application-specific", "dns", "https"],
+      truthState: "proposed",
+      rationale: "Cloud/hybrid requirements must create an explicit cloud boundary and route/security review path.",
+      notes: [
+        "Phase 72 makes cloud provider, connectivity, routing, and traffic-boundary selections visible in policy evidence.",
+        `Requirement keys: cloudConnected, environmentType, cloudProvider, cloudConnectivity, cloudNetworkModel, cloudRoutingModel, cloudTrafficBoundary. Cloud model: ${requirementText(requirements, "cloudProvider") || "unspecified"}; ${requirementText(requirements, "cloudConnectivity") || "unspecified"}.`,
+      ],
+    });
+  }
+
+  if (zoneIds.has(voiceZoneId) && (zoneIds.has(internalZoneId) || zoneIds.has(WIDE_AREA_NETWORK_ZONE_ID)) && (requirementEnabled(requirements, "voice") || requirementCountPositive(requirements, "phoneCount"))) {
+    addPolicyRule(policyRules, {
+      id: "policy-review-voice-services-qos",
+      name: "Review Voice Services and QoS Reachability",
+      sourceZoneId: voiceZoneId,
+      destinationZoneId: zoneIds.has(internalZoneId) ? internalZoneId : WIDE_AREA_NETWORK_ZONE_ID,
+      action: "review",
+      services: ["sip", "rtp", "dns"],
+      truthState: "proposed",
+      rationale: "Voice requirements affect call-control, QoS, and security policy; they cannot remain only VLAN evidence.",
+      notes: [
+        "Phase 72 surfaces call-control and QoS as implementation review evidence.",
+        `Requirement keys: voice, phoneCount, voiceQos, qosModel, latencySensitivity. QoS: ${requirementText(requirements, "qosModel") || "unspecified"}.`,
+      ],
+    });
+  }
+
+  if (zoneIds.has(iotZoneId) && zoneIds.has(internalZoneId) && (requirementEnabled(requirements, "iot") || requirementCountPositive(requirements, "iotDeviceCount") || requirementEnabled(requirements, "cameras") || requirementCountPositive(requirements, "cameraCount") || requirementEnabled(requirements, "printers") || requirementCountPositive(requirements, "printerCount"))) {
+    addPolicyRule(policyRules, {
+      id: "policy-deny-shared-devices-to-internal",
+      name: "Deny Shared Device Networks to Corporate Internal",
+      sourceZoneId: iotZoneId,
+      destinationZoneId: internalZoneId,
+      action: "deny",
+      services: ["any"],
+      truthState: "proposed",
+      rationale: "Printer, camera, and IoT networks should not inherit broad internal access.",
+      notes: [
+        "Phase 72 turns shared-device selections into default-deny east-west policy posture.",
+        "Requirement keys: printers, printerCount, iot, iotDeviceCount, cameras, cameraCount, trustBoundaryModel, securityPosture.",
+      ],
+    });
+    addPolicyRule(policyRules, {
+      id: "policy-review-internal-to-shared-devices",
+      name: "Review Trusted Access to Shared Device Networks",
+      sourceZoneId: internalZoneId,
+      destinationZoneId: iotZoneId,
+      action: "review",
+      services: ["application-specific", "icmp"],
+      truthState: "proposed",
+      rationale: "Users and services may need scoped access to printers, camera systems, or IoT controllers, but not broad east-west access.",
+      notes: ["Replace this review rule with exact print, camera-management, or IoT-controller services before implementation."],
     });
   }
 
@@ -342,6 +557,46 @@ function buildNatRules(securityZones: SecurityZone[]): NatRule[] {
         "Confirm public egress interface, NAT exemption, and logging requirements before implementation.",
       ],
     }));
+}
+
+function ensureRequirementDrivenZones(
+  project: NetworkObjectProject,
+  requirements: RequirementInputMap,
+  securityZonesById: Map<string, SecurityZone>,
+) {
+  const addRequirementZone = (zoneRole: SecurityZoneRole, requirementKeys: string[], reason: string) => {
+    const zone = ensureSecurityZone(securityZonesById, zoneRole, reason);
+    zone.truthState = zone.subnetCidrs.length > 0 ? zone.truthState : "proposed";
+    for (const site of project.sites) addUnique(zone.siteIds, site.id);
+    for (const note of [
+      reason,
+      `Phase 72 requirement-driven zone evidence from: ${requirementKeys.join(", ")}.`,
+    ]) {
+      addUnique(zone.notes, note);
+    }
+  };
+
+  if (project.sites.length > 0 || requirementNumber(requirements, "usersPerSite") > 0) {
+    addRequirementZone("internal", ["usersPerSite", "primaryGoal", "securityPosture"], "Corporate internal zone required by user population and design objective requirements.");
+  }
+  if (requirementEnabled(requirements, "guestWifi") || hasRequirementText(requirements, "guestPolicy")) {
+    addRequirementZone("guest", ["guestWifi", "guestPolicy", "wirelessModel"], "Guest zone required by guest Wi-Fi and guest access policy requirements.");
+  }
+  if (requirementEnabled(requirements, "management") || hasRequirementText(requirements, "managementAccess") || hasRequirementText(requirements, "managementIpPolicy") || hasRequirementText(requirements, "adminBoundary")) {
+    addRequirementZone("management", ["management", "managementAccess", "managementIpPolicy", "adminBoundary"], "Management zone required by management-plane and privileged-admin requirements.");
+  }
+  if (requirementEnabled(requirements, "remoteAccess") || hasRequirementText(requirements, "remoteAccessMethod")) {
+    addRequirementZone("dmz", ["remoteAccess", "remoteAccessMethod", "identityModel"], "Remote-access edge/DMZ zone required by VPN and identity-boundary requirements.");
+  }
+  if (cloudOrHybridRequired(requirements) || multiSiteOrWanRequired(project, requirements)) {
+    addRequirementZone("transit", ["cloudConnected", "cloudConnectivity", "cloudNetworkModel", "cloudRoutingModel", "internetModel", "interSiteTrafficModel", "dualIsp", "resilienceTarget"], "Cloud/WAN transit zone required by cloud, inter-site, WAN, or resilience requirements.");
+  }
+  if (requirementEnabled(requirements, "voice") || requirementCountPositive(requirements, "phoneCount")) {
+    addRequirementZone("voice", ["voice", "phoneCount", "voiceQos", "qosModel", "latencySensitivity"], "Voice zone required by voice and QoS requirements.");
+  }
+  if (requirementEnabled(requirements, "iot") || requirementCountPositive(requirements, "iotDeviceCount") || requirementEnabled(requirements, "cameras") || requirementCountPositive(requirements, "cameraCount") || requirementEnabled(requirements, "printers") || requirementCountPositive(requirements, "printerCount")) {
+    addRequirementZone("iot", ["printers", "printerCount", "iot", "iotDeviceCount", "cameras", "cameraCount"], "Shared-device/IoT zone required by printer, camera, or IoT requirements.");
+  }
 }
 
 function buildObjectModelSummary(model: Omit<NetworkObjectModel, "summary">): NetworkObjectModel["summary"] {
@@ -407,7 +662,9 @@ export function buildNetworkObjectModel(params: {
   loopbackPlan: LoopbackPlanRow[];
 }): NetworkObjectModel {
   const { project, addressingRows, siteSummaries, transitPlan, loopbackPlan } = params;
+  const requirements = parseRequirementsJson(project.requirementsJson);
   const routeDomain = createInitialRouteDomain(project, siteSummaries);
+  routeDomain.notes.push(...phase72RequirementSummary(requirements));
   const devicesById = new Map<string, NetworkDevice>();
   const interfaces: NetworkInterface[] = [];
   const links: NetworkLink[] = [];
@@ -425,6 +682,7 @@ export function buildNetworkObjectModel(params: {
     "wan",
     "Proposed external/WAN zone used for internet policy and NAT intent. Confirm the actual carrier, firewall, or edge device during implementation.",
   );
+  wideAreaNetworkZone.notes.push(...phase72RequirementSummary(requirements));
 
   for (const addressRow of addressingRows) {
     const siteGateway = devicesById.get(siteGatewayDeviceId(addressRow.siteId));
@@ -639,9 +897,11 @@ export function buildNetworkObjectModel(params: {
     addUnique(device.securityZoneIds, wideAreaNetworkZone.id);
   }
 
+  ensureRequirementDrivenZones(project, requirements, securityZonesById);
+
   const securityZones = Array.from(securityZonesById.values()).sort((left, right) => left.name.localeCompare(right.name));
   const devices = Array.from(devicesById.values()).sort((left, right) => left.name.localeCompare(right.name));
-  const policyRules = buildPolicyRules(securityZones);
+  const policyRules = buildPolicyRules(securityZones, requirements);
   const natRules = buildNatRules(securityZones);
 
   const modelWithoutSummaryOrGraph: Omit<NetworkObjectModel, "summary" | "designGraph" | "routingSegmentation" | "securityPolicyFlow" | "implementationPlan"> = {

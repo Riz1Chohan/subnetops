@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createProject, createTemplateProject, deleteProject, duplicateProject, getProject, getProjects, getProjectSites, getProjectVlans, updateProject } from "./api";
+import { createProject, createTemplateProject, deleteProject, duplicateProject, getProject, getProjects, getProjectSites, getProjectVlans, saveProjectRequirements, updateProject } from "./api";
 import { runValidation } from "../validation/api";
 
 export function useProjects() {
@@ -52,6 +52,26 @@ export function useUpdateProject(projectId: string) {
 
   return useMutation({
     mutationFn: (values: Parameters<typeof updateProject>[1]) => updateProject(projectId, values),
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["project-sites", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["project-vlans", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["design-core", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["enterprise-ipam", projectId] });
+      try {
+        await runValidation(projectId);
+      } catch {}
+      void queryClient.invalidateQueries({ queryKey: ["validation", projectId] });
+    },
+  });
+}
+
+export function useSaveProjectRequirements(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (values: Parameters<typeof saveProjectRequirements>[1]) => saveProjectRequirements(projectId, values),
     onSuccess: async () => {
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       void queryClient.invalidateQueries({ queryKey: ["project", projectId] });

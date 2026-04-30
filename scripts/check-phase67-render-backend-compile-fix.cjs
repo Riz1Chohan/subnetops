@@ -31,7 +31,7 @@ expect(
   'Missing Phase 67 documentation under docs/doc.'
 );
 
-expect(/^0\.(67|68)\.0$/.test(packageJson.version), 'Root package version must be 0.67.0 or later for Phase 67.');
+expect(/^0\.(6[7-9]|7[0-9])\.0$/.test(packageJson.version), 'Root package version must be 0.67.0 or later for Phase 67.');
 expect(
   packageJson.scripts?.['check:phase67-render-backend-compile-fix']?.startsWith('node scripts/check-phase67-render-backend-compile-fix.cjs'),
   'Missing check:phase67-render-backend-compile-fix script.'

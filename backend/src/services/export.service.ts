@@ -86,6 +86,67 @@ function joinCsvList(value: unknown, fallback = "") {
   return asString(value, fallback);
 }
 
+function includesAny(value: unknown, terms: string[]) {
+  const text = Array.isArray(value) ? value.join(" ").toLowerCase() : String(value ?? "").toLowerCase();
+  return terms.some((term) => text.includes(term));
+}
+
+function hasVlanMatching(sites: SiteWithVlans[], terms: string[]) {
+  return sites.some((site) => site.vlans.some((vlan) => includesAny(`${vlan.vlanName} ${vlan.purpose ?? ""}`, terms)));
+}
+
+function collectRequirementOutputGaps(params: {
+  requirements: JsonMap;
+  sites: SiteWithVlans[];
+  requestedSiteCount: number | null;
+  usersPerSite: number | null;
+  multiSiteRequired: boolean;
+}) {
+  const { requirements, sites, requestedSiteCount, usersPerSite, multiSiteRequired } = params;
+  const actualSiteCount = sites.length;
+  const actualVlanCount = sites.reduce((sum, site) => sum + site.vlans.length, 0);
+  const gaps: string[] = [];
+
+  if (requestedSiteCount && requestedSiteCount > actualSiteCount) {
+    gaps.push(`Requirement selected ${requestedSiteCount} site(s), but only ${actualSiteCount} materialized Site row(s) exist.`);
+  }
+  if (usersPerSite && usersPerSite > 0 && actualVlanCount === 0) {
+    gaps.push(`Users per site is ${usersPerSite}, but no user/access VLAN or addressing row exists.`);
+  }
+  if (isEnabled(requirements.guestWifi) && !hasVlanMatching(sites, ["guest"])) {
+    gaps.push("Guest Wi-Fi is selected, but no guest segment/addressing row exists.");
+  }
+  if (isEnabled(requirements.management) && !hasVlanMatching(sites, ["management", "mgmt"])) {
+    gaps.push("Management network is selected, but no management segment/addressing row exists.");
+  }
+  if (isEnabled(requirements.printers) && !hasVlanMatching(sites, ["printer", "shared-device", "shared device"])) {
+    gaps.push("Printers are selected, but no printer/shared-device segment exists.");
+  }
+  if (isEnabled(requirements.iot) && !hasVlanMatching(sites, ["iot"])) {
+    gaps.push("IoT is selected, but no IoT segment exists.");
+  }
+  if (isEnabled(requirements.cameras) && !hasVlanMatching(sites, ["camera", "security device", "surveillance"])) {
+    gaps.push("Cameras/security devices are selected, but no camera/security-device segment exists.");
+  }
+  if (isEnabled(requirements.voice) && !hasVlanMatching(sites, ["voice", "voip"])) {
+    gaps.push("Voice is selected, but no voice segment exists.");
+  }
+  if (isEnabled(requirements.wireless) && !hasVlanMatching(sites, ["wireless", "wi-fi", "wifi", "staff access", "user access", "guest"])) {
+    gaps.push("Wireless is selected, but no wireless/staff/guest access segment exists.");
+  }
+  if (isEnabled(requirements.remoteAccess) && actualVlanCount === 0) {
+    gaps.push("Remote access is selected, but no VPN/security-edge or addressing evidence exists.");
+  }
+  if (isEnabled(requirements.cloudConnected) && actualVlanCount === 0) {
+    gaps.push("Cloud/hybrid connectivity is selected, but no cloud boundary, transit, or addressing evidence exists.");
+  }
+  if (multiSiteRequired && actualSiteCount <= 1) {
+    gaps.push("Multi-site planning is selected, but the generated design does not contain multiple materialized sites.");
+  }
+
+  return gaps;
+}
+
 const PLANNING_ASSUMPTIONS = [
   "Inputs were provided by the user and are not live-discovered network facts.",
   "Subnet allocations are based on declared host counts, saved site blocks, and planning growth buffers.",
@@ -203,12 +264,20 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
   ].filter(Boolean) as string[];
 
   const usersPerSite = asNumber(requirements.usersPerSite);
+  const requestedSiteCount = asNumber(requirements.siteCount);
   const environment = asString(project.environmentType, "custom");
   const planningFor = asString(requirements.planningFor);
   const primaryGoal = asString(requirements.primaryGoal);
   const serverPlacement = asString(requirements.serverPlacement);
   const internetModel = asString(requirements.internetModel);
-  const routingPosture = siteCount > 1 ? "multi-site summarized routed design" : "single-site routed access design";
+  const multiSiteRequired =
+    (requestedSiteCount ?? 0) > 1
+    || includesAny(planningFor, ["multi-site", "multisite", "branch", "branches"])
+    || includesAny(internetModel, ["site", "wan", "branch"])
+    || includesAny(requirements.interSiteTrafficModel, ["site", "branch", "wan"]);
+  const requirementOutputGaps = collectRequirementOutputGaps({ requirements, sites, requestedSiteCount, usersPerSite, multiSiteRequired });
+  const outputTruthBlocked = requirementOutputGaps.length > 0;
+  const routingPosture = multiSiteRequired ? "multi-site summarized routed design" : siteCount > 1 ? "multi-site summarized routed design" : "single-site routed access design";
 
   return {
     project,
@@ -218,6 +287,10 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
     sites,
     validations,
     siteCount,
+    requestedSiteCount,
+    multiSiteRequired,
+    requirementOutputGaps,
+    outputTruthBlocked,
     vlanCount,
     errors,
     warnings,
@@ -243,9 +316,15 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const generatedAt = new Date().toLocaleString();
   const projectEnvironment = titleCase(exportContext.environment || "custom");
   const architecturePattern =
-    exportContext.siteCount > 1
-      ? "a multi-site architecture with per-site addressing boundaries, summarized routing, and shared design standards"
-      : "a compact single-site architecture with segmented trust boundaries, routed gateway control, and centralized review artifacts";
+    exportContext.multiSiteRequired
+      ? exportContext.outputTruthBlocked
+        ? "a declared multi-site architecture whose generated site, addressing, and topology evidence is incomplete"
+        : "a multi-site architecture with per-site addressing boundaries, summarized routing, and shared design standards"
+      : exportContext.siteCount > 1
+        ? "a multi-site architecture with per-site addressing boundaries, summarized routing, and shared design standards"
+        : exportContext.outputTruthBlocked
+          ? "an incomplete generated design that cannot yet prove the selected requirements"
+          : "a compact single-site architecture with segmented trust boundaries, routed gateway control, and centralized review artifacts";
 
   const narrativeScope = humanJoin(
     [
@@ -257,13 +336,15 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   );
 
   const executiveSummary = [
-    `${exportContext.project.name} is presented as a ${projectEnvironment.toLowerCase()} technical design report covering ${exportContext.siteCount || 0} site${exportContext.siteCount === 1 ? "" : "s"}, ${exportContext.vlanCount || 0} current addressing row${exportContext.vlanCount === 1 ? "" : "s"}, and a structured package of architecture, security, routing, implementation, and platform-planning outputs. The report is intended to serve as a review-ready planning document rather than a raw export of application screens.`,
-    `The current design direction follows ${architecturePattern}. This approach was selected to keep the package supportable for implementation teams while still preserving segmentation, growth headroom, and clearer operational boundaries before production configuration work begins.`,
-    exportContext.errors.length > 0
-      ? `The present validation posture includes ${exportContext.errors.length} error-level blocker${exportContext.errors.length === 1 ? "" : "s"} and ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
-      : exportContext.warnings.length > 0
-        ? `The current design contains ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"} but no active error-level blockers. The package can be reviewed professionally now, although the warning items should still be addressed during technical sign-off.`
-        : "The current design is in a clean validation state with no active error-level or warning-level blockers recorded in the latest validation cycle.",
+    `${exportContext.project.name} is presented as a ${projectEnvironment.toLowerCase()} technical design report with ${exportContext.siteCount || 0} materialized site${exportContext.siteCount === 1 ? "" : "s"}, ${exportContext.vlanCount || 0} current addressing row${exportContext.vlanCount === 1 ? "" : "s"}, and ${exportContext.requestedSiteCount ?? "unconfirmed"} declared site${exportContext.requestedSiteCount === 1 ? "" : "s"} from requirements. The report is a truth-locked planning document: it must expose missing generated evidence instead of polishing an empty design as review-ready.`,
+    `The current design direction follows ${architecturePattern}. This wording is tied to saved requirements and generated evidence; it must not fall back to single-site language when the requirements declare a multi-site design.`,
+    exportContext.outputTruthBlocked
+      ? `Requirement-output truth is blocked: ${exportContext.requirementOutputGaps.slice(0, 4).join(" ")}${exportContext.requirementOutputGaps.length > 4 ? " Additional gaps are listed in the Requirement Output Truth Lock section." : ""}`
+      : exportContext.errors.length > 0
+        ? `The present validation posture includes ${exportContext.errors.length} error-level blocker${exportContext.errors.length === 1 ? "" : "s"} and ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
+        : exportContext.warnings.length > 0
+          ? `The current design contains ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"} but no active error-level blockers. The package can be reviewed professionally now, although the warning items should still be addressed during technical sign-off.`
+          : "The current design has no saved validation blockers and no detected requirement-output truth gaps in this export cycle.",
     `At this stage, the package is best used for design review, addressing confirmation, security and routing discussion, implementation planning, and stakeholder handoff. Procurement, platform-specific engineering, and migration approval should still be tied to the remaining assumptions and open review items documented later in the report.`,
   ];
 
@@ -304,10 +385,31 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     bullets: PLANNING_ASSUMPTIONS,
   };
 
+  const requirementOutputTruthSection: ReportSection = {
+    title: "4. Requirement Output Truth Lock",
+    paragraphs: [
+      exportContext.outputTruthBlocked
+        ? "Selected requirements have not produced all required engineering evidence. This report must remain blocked until the missing generated objects are created, validated, and reflected in design-core."
+        : "Selected requirements have generated the minimum direct evidence checked by this export truth lock.",
+      "This section exists to stop polished reports from hiding a broken requirements-to-design pipeline.",
+    ],
+    tables: [
+      {
+        title: "Requirement-to-Output Gaps",
+        headers: ["Status", "Requirement / Expected Output", "Observed Evidence"],
+        rows: exportContext.requirementOutputGaps.length > 0
+          ? exportContext.requirementOutputGaps.map((gap) => ["BLOCKED", gap, `${exportContext.siteCount} site row(s); ${exportContext.vlanCount} addressing row(s)`])
+          : [["PASS", "No export-level requirement-output gap detected", `${exportContext.siteCount} site row(s); ${exportContext.vlanCount} addressing row(s)`]],
+      },
+    ],
+  };
+
   const hldBullets = [
     `Architecture direction: ${architecturePattern}`,
     `Base private range: ${asString(exportContext.project.basePrivateRange) || "working range still needs explicit confirmation"}`,
-    `Site count in scope: ${exportContext.siteCount}`,
+    `Materialized site rows: ${exportContext.siteCount}`,
+    exportContext.requestedSiteCount != null ? `Requirement-selected site count: ${exportContext.requestedSiteCount}` : null,
+    exportContext.outputTruthBlocked ? `Requirement-output truth gaps: ${exportContext.requirementOutputGaps.length}` : null,
     `Logical security domains in scope: ${humanJoin(exportContext.securityZones) || "to be finalized"}`,
     exportContext.internetModel ? `Internet or edge posture: ${exportContext.internetModel}` : null,
     exportContext.serverPlacement ? `Server or service placement: ${exportContext.serverPlacement}` : null,
@@ -317,12 +419,16 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   ].filter(Boolean) as string[];
 
   const hldSection: ReportSection = {
-    title: "4. High-Level Design Overview",
+    title: "5. High-Level Design Overview",
     paragraphs: [
       `The proposed high-level design follows ${architecturePattern}. For the current scope, that means the design package is aiming for clear trust boundaries, manageable operational control, and an addressing hierarchy that can grow without forcing redesign after the first implementation cycle.`,
-      exportContext.siteCount > 1
-        ? "Because multiple sites are present, the architecture assumes a parent organizational block, per-site summary blocks, and transport logic that can be summarized cleanly at site boundaries. This reduces route sprawl and makes later expansion easier to reason about."
-        : "Because the saved scope currently centers on a single site, the architecture stays intentionally compact. The priority is to establish good segmentation, disciplined gateway placement, and supportable controls before introducing complexity that the environment does not yet require.",
+      exportContext.multiSiteRequired
+        ? exportContext.siteCount > 1
+          ? "Because multiple sites are present, the architecture assumes a parent organizational block, per-site summary blocks, and transport logic that can be summarized cleanly at site boundaries. This reduces route sprawl and makes later expansion easier to reason about."
+          : "The requirements declare a multi-site design, but the generated project evidence does not yet contain multiple materialized Site rows. The report must treat this as a blocked generation gap, not as a compact single-site design."
+        : exportContext.siteCount > 1
+          ? "Because multiple sites are present, the architecture assumes a parent organizational block, per-site summary blocks, and transport logic that can be summarized cleanly at site boundaries. This reduces route sprawl and makes later expansion easier to reason about."
+          : "Because the saved generated scope currently centers on a single site, the architecture stays intentionally compact. The priority is to establish good segmentation, disciplined gateway placement, and supportable controls before introducing complexity that the environment does not yet require.",
     ],
     bullets: hldBullets,
   };
@@ -335,7 +441,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   });
 
   const securitySection: ReportSection = {
-    title: "5. Security Architecture and Segmentation Model",
+    title: "6. Security Architecture and Segmentation Model",
     paragraphs: [
       "The security design should be interpreted as a structural zone model that shapes addressing, routing, and implementation review. The current package is not yet pretending to be a fully vendor-specific firewall rulebase. Instead, it is defining the security boundaries that the implementation team will need to preserve when real devices, policies, and access controls are configured.",
       exportContext.securityZones.includes("Guest")
@@ -382,7 +488,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   );
 
   const addressingSection: ReportSection = {
-    title: "6. Logical Design and Addressing Plan",
+    title: "7. Logical Design and Addressing Plan",
     paragraphs: [
       `The low-level design currently contains ${exportContext.vlanCount} addressing row${exportContext.vlanCount === 1 ? "" : "s"}. These rows act as the main implementation artifact for subnet ownership, gateway placement, DHCP posture, and segmented trust boundaries.`,
       "The addressing schedule should be reviewed carefully before implementation because it affects gateway conventions, helper policies, firewall and ACL placement, and the cleanliness of later summarization. This section is therefore intended to function as a true design artifact rather than an afterthought or status card.",
@@ -410,7 +516,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   ].filter(Boolean) as string[];
 
   const routingSection: ReportSection = {
-    title: "7. Routing, Switching, and Transport Intent",
+    title: "8. Routing, Switching, and Transport Intent",
     paragraphs: [
       `The routing and switching design is currently framed as ${exportContext.routingPosture}. The package is intentionally trying to keep control-plane ownership obvious, site boundaries reviewable, and gateway behavior stable before platform-specific configuration is generated.`,
       "Switching intent should reinforce segmentation rather than hide it. Trunking, VLAN propagation, loop prevention, and first-hop placement should all be reviewed against the addressing hierarchy so that the final implementation does not undermine the logical model presented in this report.",
@@ -426,7 +532,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     : [["INFO", "No validation findings saved", "No saved findings are available in the current export.", "A stale validation state can hide recent design changes.", "Run validation after changes if a fresh technical review is required."]];
 
   const implementationSection: ReportSection = {
-    title: "8. Implementation, Testing, and Validation Strategy",
+    title: "9. Implementation, Testing, and Validation Strategy",
     paragraphs: [
       "Implementation should proceed in controlled phases so that addressing, gateway ownership, service reachability, security boundary enforcement, and rollback conditions can be verified without expanding the blast radius of each change window.",
       exportContext.errors.length > 0
@@ -460,7 +566,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const platformRows = exportContext.platformHighlights.map((line) => [line, "Review during final engineering and procurement alignment"]);
 
   const platformSection: ReportSection = {
-    title: "9. Platform Profile and Bill of Materials Foundation",
+    title: "10. Platform Profile and Bill of Materials Foundation",
     paragraphs: [
       "The current platform section should be read as a role-based engineering and procurement foundation rather than a final quote or SKU-specific bill of materials. Its value is in making the deployment posture explicit early, which helps prevent the logical design from drifting too far away from operational reality.",
       "Final model selection, exact licensing, optics, accessories, and commercial pricing still require engineering and procurement review. Even so, the present platform foundation is useful because it documents the posture that the technical design currently assumes.",
@@ -475,24 +581,29 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   };
 
   const risksSection: ReportSection = {
-    title: "10. Risks and Open Review Items",
+    title: "11. Risks and Open Review Items",
     paragraphs: [
       "Professional design packages should make uncertainty visible rather than bury it. The items below are not necessarily design failures; they are remaining risks or review points that should be acknowledged before the package is treated as change-ready.",
     ],
     bullets: [
+      ...exportContext.requirementOutputGaps.map((gap) => `Requirement-output blocker: ${gap}`),
       ...exportContext.openItems,
       ...exportContext.warnings.slice(0, 6).map((item) => `Validation review item: ${item.title} — ${item.message}`),
     ],
   };
 
   const conclusionSection: ReportSection = {
-    title: "12. Conclusion and Handoff Notes",
+    title: "13. Conclusion and Handoff Notes",
     paragraphs: [
       ENGINEER_REVIEW_STATEMENT,
-      `${exportContext.project.name} now has a structured network design package that translates saved requirements and synthesized planning data into a more formal handoff document. The report provides enough structure for technical review, addressing confirmation, security discussion, routing review, implementation planning, and platform alignment without pretending that the remaining open items do not exist.`,
-      exportContext.errors.length > 0
-        ? `The next priority should be to resolve the remaining ${exportContext.errors.length} blocker${exportContext.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the final handoff reflects a cleaner implementation posture.`
-        : "The next priority should be to tighten discovery detail, confirm platform and compliance assumptions, and carry the approved design into platform-specific implementation artifacts, diagrams, and change-control evidence.",
+      exportContext.outputTruthBlocked
+        ? `${exportContext.project.name} does not yet have a complete generated network design package. Requirements are present, but one or more required downstream outputs are missing; this report is a blocked diagnostic handoff until the requirements-to-design pipeline generates the missing objects.`
+        : `${exportContext.project.name} now has a structured network design package that translates saved requirements and synthesized planning data into a more formal handoff document. The report provides enough structure for technical review, addressing confirmation, security discussion, routing review, implementation planning, and platform alignment without pretending that the remaining open items do not exist.`,
+      exportContext.outputTruthBlocked
+        ? "The next priority should be to fix materialization/design-core propagation, rerun validation, and regenerate this export only after Sites, VLANs, addressing rows, topology, and scenario proof reflect the selected requirements."
+        : exportContext.errors.length > 0
+          ? `The next priority should be to resolve the remaining ${exportContext.errors.length} blocker${exportContext.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the final handoff reflects a cleaner implementation posture.`
+          : "The next priority should be to tighten discovery detail, confirm platform and compliance assumptions, and carry the approved design into platform-specific implementation artifacts, diagrams, and change-control evidence.",
     ],
   };
 
@@ -556,10 +667,10 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const reportMetadata: ReportMetadata = {
     organizationName: asString(exportContext.project.organizationName, "To be confirmed"),
     environment: projectEnvironment,
-    reportVersion: "Version 0.93",
-    revisionStatus: exportContext.errors.length > 0 ? "Draft - blockers present" : exportContext.warnings.length > 0 ? "Review draft" : "Review-ready draft",
+    reportVersion: "Version 0.94 Phase 74 truth-locked",
+    revisionStatus: exportContext.outputTruthBlocked ? "Blocked - requirement outputs missing" : exportContext.errors.length > 0 ? "Draft - blockers present" : exportContext.warnings.length > 0 ? "Review draft" : "Review-ready draft",
     documentOwner: asString(exportContext.project.ownerName, "SubnetOps project owner"),
-    approvalStatus: exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
+    approvalStatus: exportContext.outputTruthBlocked || exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
     projectPhase: asString(exportContext.requirements.projectPhase, "To be confirmed"),
     planningFocus: asString(exportContext.planningFor, "To be confirmed"),
     primaryObjective: asString(exportContext.primaryGoal, "To be confirmed"),
@@ -568,16 +679,18 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
 
   const visualSnapshot: ReportVisualSnapshot = {
     metrics: [
-      ["Sites in scope", String(exportContext.siteCount)],
+      ["Materialized sites", String(exportContext.siteCount)],
+      ["Requirement-selected sites", exportContext.requestedSiteCount != null ? String(exportContext.requestedSiteCount) : "Unconfirmed"],
       ["Addressing rows", String(exportContext.vlanCount)],
+      ["Requirement-output gaps", String(exportContext.requirementOutputGaps.length)],
       ["Security zones", String(exportContext.securityZones.length)],
       ["Validation blockers", String(exportContext.errors.length)],
       ["Validation warnings", String(exportContext.warnings.length)],
       ["Base range", asString(exportContext.project.basePrivateRange, "Working range pending confirmation")],
     ],
     topologyRows: [
-      ["Edge / Internet", exportContext.internetModel || "Single internet edge pending refinement", exportContext.siteCount > 1 ? "Prefer explicit WAN summaries between sites" : "Keep the routed edge intentionally simple"],
-      ["Core / Distribution", exportContext.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
+      ["Edge / Internet", exportContext.internetModel || "Internet/edge model pending refinement", exportContext.multiSiteRequired ? "Multi-site edge/WAN intent must produce site and transport evidence" : "Keep the routed edge intentionally simple"],
+      ["Core / Distribution", exportContext.multiSiteRequired ? "Primary/branch site structure required by saved requirements" : exportContext.siteCount > 1 ? "Primary site coordinates shared services and route summaries" : "Collapsed core/access edge with local Layer 3 gateways", "Do not let Layer 2 sprawl undermine segmentation"],
       ["Services", exportContext.serverPlacement || "Small centralized service block", "Keep shared services separated from users and guest access"],
       ["Security", humanJoin(exportContext.securityZones) || "Users and services", "Apply default-deny principles between unlike trust boundaries"],
     ],
@@ -588,7 +701,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     subtitle: `${exportContext.project.name} — Professional Network Planning Package`,
     generatedAt,
     executiveSummary,
-    sections: [introSection, discoverySection, planningAssumptionsSection, hldSection, securitySection, addressingSection, routingSection, implementationSection, platformSection, risksSection, engineerChecklistSection, conclusionSection],
+    sections: [introSection, discoverySection, planningAssumptionsSection, requirementOutputTruthSection, hldSection, securitySection, addressingSection, routingSection, implementationSection, platformSection, risksSection, engineerChecklistSection, conclusionSection],
     appendices,
     metadata: reportMetadata,
     visualSnapshot,

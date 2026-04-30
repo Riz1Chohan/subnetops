@@ -17,9 +17,9 @@ const scenarioProof = read('backend/src/services/designCore/designCore.requireme
 const projectService = read('backend/src/services/project.service.ts');
 const phase68Doc = 'docs/doc/PHASE68-RENDER-TYPE-ALIGNMENT.md';
 
-expect(packageJson.version === '0.68.0', 'root package version must be 0.68.0.');
+expect(/^0\.(68|69|7[0-9])\.0$/.test(packageJson.version), 'root package version must be 0.68.0 or later.');
 expect(
-  packageJson.scripts?.['check:phase68-render-type-alignment'] === 'node scripts/check-phase68-render-type-alignment.cjs',
+  packageJson.scripts?.['check:phase68-render-type-alignment']?.includes('node scripts/check-phase68-render-type-alignment.cjs'),
   'missing check:phase68-render-type-alignment script.'
 );
 expect(

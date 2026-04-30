@@ -44,6 +44,6 @@ if (!/export interface SecurityFlowRequirement[\s\S]*requirementKeys\?: string\[
   fail('frontend SecurityFlowRequirement does not expose requirementKeys');
 }
 const packageJson = JSON.parse(read('package.json'));
-if (packageJson.version !== '0.66.0') fail(`expected package version 0.66.0, found ${packageJson.version}`);
+if (!/^0\.(6[6-9]|7[0-9])\.0$/.test(packageJson.version)) fail(`expected package version 0.66.0 or later, found ${packageJson.version}`);
 if (!packageJson.scripts['check:phase63-requirements-policy-consequences']) fail('package script missing check:phase63-requirements-policy-consequences');
 console.log('Phase 63 requirements policy consequence check passed.');

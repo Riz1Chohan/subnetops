@@ -12,9 +12,15 @@ export const createProjectSchema = z.object({
   reportFooter: z.string().max(160).optional(),
   approvalStatus: z.enum(["DRAFT", "IN_REVIEW", "APPROVED"]).optional(),
   reviewerNotes: z.string().max(1200).optional(),
-  requirementsJson: z.string().max(12000).optional(),
+  requirementsJson: z.string().max(50000).optional(),
   discoveryJson: z.string().max(50000).optional(),
   platformProfileJson: z.string().max(50000).optional(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial();
+
+export const saveProjectRequirementsSchema = z.object({
+  requirementsJson: z.string().min(2).max(50000),
+  environmentType: z.string().max(50).optional(),
+  description: z.string().max(4000).optional(),
+});

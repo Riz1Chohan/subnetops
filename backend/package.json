@@ -23,7 +23,7 @@
     "engine:selftest:matrix": "tsx src/lib/proofMatrix.selftest.ts",
     "engine:selftest:boundary": "tsx src/lib/cidrBoundary.selftest.ts",
     "engine:selftest:behavioral-matrix": "tsx src/lib/behavioralMatrix.selftest.ts",
-    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates",
+    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates && npm run engine:selftest:phase75-golden-requirements",
     "prisma:db:push": "prisma db push",
     "prisma:baseline:existing": "sh -c 'for d in prisma/migrations/*; do [ -d \"$d\" ] && npx prisma migrate resolve --applied \"$(basename \"$d\")\"; done'",
     "security:selftest:rate-limit": "tsx src/middleware/rateLimit.selftest.ts",
@@ -33,7 +33,8 @@
     "engine:selftest:phase36-implementation": "tsx src/lib/phase36ImplementationPlanningEngine.selftest.ts",
     "engine:selftest:phase41-scenarios": "tsx src/lib/phase41ScenarioMatrix.selftest.ts",
     "engine:selftest:phase42-templates": "tsx src/lib/phase42VendorNeutralTemplates.selftest.ts",
-    "engine:selftest:cidr-core": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:boundary && npm run engine:selftest:design-core"
+    "engine:selftest:cidr-core": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:boundary && npm run engine:selftest:design-core",
+    "engine:selftest:phase75-golden-requirements": "tsx src/services/requirementsGoldenScenarios.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -3,9 +3,56 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
+import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
 
 type TemplateKey = "small-office" | "branch-office" | "clinic-starter";
+
+type RequirementsFieldCoverage = {
+  expectedFields: number;
+  capturedFields: number;
+  capturedFieldKeys: string[];
+  missingFields: string[];
+  unexpectedFields: string[];
+  status: "complete" | "incomplete";
+};
+
+function buildRequirementsFieldCoverage(requirementsJson: string): RequirementsFieldCoverage {
+  const expected = new Set(REQUIREMENT_FIELD_KEYS);
+  const captured = new Set<string>();
+
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const key of Object.keys(parsed)) {
+        captured.add(key);
+      }
+    }
+  } catch {
+    return {
+      expectedFields: REQUIREMENT_FIELD_KEYS.length,
+      capturedFields: 0,
+      capturedFieldKeys: [],
+      missingFields: [...REQUIREMENT_FIELD_KEYS].sort(),
+      unexpectedFields: [],
+      status: "incomplete",
+    };
+  }
+
+  const capturedFieldKeys = [...captured].filter((key) => expected.has(key)).sort();
+  const missingFields = [...expected].filter((key) => !captured.has(key)).sort();
+  const unexpectedFields = [...captured].filter((key) => !expected.has(key)).sort();
+
+  return {
+    expectedFields: REQUIREMENT_FIELD_KEYS.length,
+    capturedFields: capturedFieldKeys.length,
+    capturedFieldKeys,
+    missingFields,
+    unexpectedFields,
+    status: missingFields.length === 0 ? "complete" : "incomplete",
+  };
+}
+
 
 async function enforceProjectLimit(userId: string, planTier: PlanTier) {
   if (planTier === "FREE") {
@@ -228,12 +275,57 @@ export async function updateProject(projectId: string, userId: string, data: Rec
   const organizationId = await ensureOrganizationAssignable(userId, (data.organizationId as string | undefined) || project.organizationId || null);
   const normalizedData: Record<string, unknown> = { ...data, organizationId: organizationId || undefined };
   return prisma.$transaction(async (tx: any) => {
-    const result = await tx.project.updateMany({ where: { id: projectId }, data: normalizedData });
+    const result = await tx.project.update({ where: { id: projectId }, data: normalizedData });
     const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
       ? await materializeRequirementsForProject(tx, projectId, actorLabel)
       : null;
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
     return { ...result, requirementsMaterialization };
+  });
+}
+
+export async function saveProjectRequirements(
+  projectId: string,
+  userId: string,
+  data: { requirementsJson: string; environmentType?: string; description?: string },
+  actorLabel?: string,
+) {
+  await ensureCanEditProject(userId, projectId);
+
+  const updateData: Record<string, unknown> = {
+    requirementsJson: data.requirementsJson,
+    environmentType: data.environmentType,
+    description: data.description,
+  };
+  for (const key of Object.keys(updateData)) {
+    if (typeof updateData[key] === "undefined") delete updateData[key];
+  }
+
+  return prisma.$transaction(async (tx: any) => {
+    await tx.project.update({
+      where: { id: projectId },
+      data: updateData,
+    });
+
+    const requirementsMaterialization = await materializeRequirementsForProject(tx, projectId, actorLabel);
+    const requirementsFieldCoverage = buildRequirementsFieldCoverage(data.requirementsJson);
+    const siteCount = await tx.site.count({ where: { projectId } });
+    const vlanCount = await tx.vlan.count({ where: { site: { projectId } } });
+
+    await addChangeLog(
+      projectId,
+      `Requirements saved and materialized: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
+      actorLabel,
+      tx,
+    );
+
+    return {
+      message: requirementsFieldCoverage.status === "complete" ? "Requirements saved and materialized" : "Requirements saved with missing field coverage",
+      projectId,
+      requirementsMaterialization,
+      requirementsFieldCoverage,
+      outputCounts: { sites: siteCount, vlans: vlanCount },
+    };
   });
 }
 

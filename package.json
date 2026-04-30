@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.68.0",
+  "version": "0.76.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -35,7 +35,15 @@
     "check:phase65-requirement-scenario-proof": "node scripts/check-phase65-requirement-scenario-proof.cjs && npm run check:phase66-runtime-ui-report-proof",
     "check:phase66-runtime-ui-report-proof": "node scripts/check-phase66-runtime-ui-report-proof.cjs && npm run check:phase67-render-backend-compile-fix",
     "check:phase67-render-backend-compile-fix": "node scripts/check-phase67-render-backend-compile-fix.cjs && npm run check:phase68-render-type-alignment",
-    "check:phase68-render-type-alignment": "node scripts/check-phase68-render-type-alignment.cjs"
+    "check:phase68-render-type-alignment": "node scripts/check-phase68-render-type-alignment.cjs && npm run check:phase69-requirements-runtime-audit",
+    "check:phase69-requirements-runtime-audit": "node scripts/check-phase69-requirements-runtime-audit.cjs && npm run check:phase70-requirements-execution-wiring",
+    "check:phase70-requirements-execution-wiring": "node scripts/check-phase70-requirements-execution-wiring.cjs && npm run check:phase71-direct-design-drivers",
+    "check:phase71-direct-design-drivers": "node scripts/check-phase71-direct-design-drivers.cjs && npm run check:phase72-policy-routing-cloud-consequences",
+    "check:phase72-policy-routing-cloud-consequences": "node scripts/check-phase72-policy-routing-cloud-consequences.cjs && npm run check:phase73-validation-honesty",
+    "check:phase73-validation-honesty": "node scripts/check-phase73-validation-honesty.cjs && npm run check:phase74-report-diagram-truth-lock",
+    "check:phase74-report-diagram-truth-lock": "node scripts/check-phase74-report-diagram-truth-lock.cjs && npm run check:phase75-golden-scenario-tests",
+    "check:phase75-golden-scenario-tests": "node scripts/check-phase75-golden-scenario-tests.cjs && npm run check:phase76-requirements-save-field-coverage",
+    "check:phase76-requirements-save-field-coverage": "node scripts/check-phase76-requirements-save-field-coverage.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",

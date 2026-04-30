@@ -52,6 +52,86 @@ interface ValidationNarrative {
 }
 
 const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>> = {
+  REQ_SITE_COUNT_NOT_MATERIALIZED: {
+    impact: "The requirements stage captured site scope, but the engineering model has no site objects, so addressing, WAN, diagram, and report outputs are not trustworthy.",
+    recommendation: "Run the requirements materializer from the save path and confirm the selected site count creates durable Site rows.",
+  },
+  REQ_SITE_COUNT_UNDER_MATERIALIZED: {
+    impact: "The generated design covers fewer sites than the requirement, which under-scopes addressing, topology, routing, and implementation planning.",
+    recommendation: "Fix materialization so the saved site count and generated Site rows match, then rerun validation.",
+  },
+  REQ_NO_SEGMENTS_MATERIALIZED: {
+    impact: "A network plan without VLAN or segment rows cannot be sized, routed, secured, diagrammed, or exported honestly.",
+    recommendation: "Materialize requirement-driven access, guest, management, services, and specialty segments before validation can pass.",
+  },
+  REQ_USER_SEGMENT_MISSING: {
+    impact: "User population has no subnet or gateway consequence, so capacity calculations are not connected to requirements.",
+    recommendation: "Create user access segments from usersPerSite and feed them through the authoritative allocator.",
+  },
+  REQ_GUEST_SEGMENT_MISSING: {
+    impact: "Guest access without a guest segment cannot enforce isolation or internet-only behavior.",
+    recommendation: "Create guest VLAN/zone/policy evidence when guest Wi-Fi is selected.",
+  },
+  REQ_MANAGEMENT_SEGMENT_MISSING: {
+    impact: "Management-plane access cannot be scoped or protected without a dedicated management segment.",
+    recommendation: "Create a management VLAN/zone and admin-plane policy evidence when management is selected.",
+  },
+  REQ_PRINTER_SEGMENT_MISSING: {
+    impact: "Shared devices may be incorrectly blended into user access, weakening segmentation and policy clarity.",
+    recommendation: "Create a printer or shared-device segment when printer requirements are selected.",
+  },
+  REQ_IOT_SEGMENT_MISSING: {
+    impact: "IoT devices are high-risk shared devices; missing segment evidence undermines security posture.",
+    recommendation: "Create an IoT/specialty segment or explicitly mark IoT as not applicable when count and selection are zero.",
+  },
+  REQ_CAMERA_SEGMENT_MISSING: {
+    impact: "Camera/security systems need explicit placement and restrictions; missing segment evidence hides implementation risk.",
+    recommendation: "Create camera/security-device segment evidence when cameras are selected or counted.",
+  },
+  REQ_VOICE_SEGMENT_MISSING: {
+    impact: "Voice requirements have no VLAN/QoS consequence, so access-edge and service-quality planning are incomplete.",
+    recommendation: "Create a voice segment only when voice is selected or phone count is positive, then map QoS review evidence.",
+  },
+  REQ_WIRELESS_SEGMENT_MAPPING_MISSING: {
+    impact: "SSID planning without access segments cannot be mapped to VLANs, trust zones, or policies.",
+    recommendation: "Map wireless requirements to staff/user and guest segments before diagram and report outputs are trusted.",
+  },
+  REQ_ADDRESS_ROWS_MISSING: {
+    impact: "Segments exist without authoritative CIDR/gateway rows, so Engine 1 is not driving implementation evidence.",
+    recommendation: "Ensure saved VLANs are consumed by design-core addressing rows and rerun validation.",
+  },
+  REQ_TOPOLOGY_OBJECTS_MISSING: {
+    impact: "Sites without devices/interfaces cannot produce a usable diagram, routing model, or implementation handoff.",
+    recommendation: "Generate at least planned topology objects from materialized sites and segments.",
+  },
+  REQ_MULTISITE_LINKS_MISSING: {
+    impact: "A multi-site design without WAN/site links is not a network topology.",
+    recommendation: "Create planned site-to-site/WAN link evidence when the requirement scope is multi-site.",
+  },
+  REQ_MULTISITE_ROUTING_MISSING: {
+    impact: "Inter-site reachability cannot be reviewed when no route intent exists.",
+    recommendation: "Generate connected/default/summary route intent for materialized multi-site designs.",
+  },
+  REQ_REMOTE_ACCESS_CONSEQUENCE_MISSING: {
+    impact: "Remote access remains unsecured report text instead of a reviewable boundary or policy consequence.",
+    recommendation: "Create VPN/remote-access edge policy and zone evidence from remote access requirements.",
+  },
+  REQ_CLOUD_BOUNDARY_MISSING: {
+    impact: "Cloud/hybrid scope has no network boundary, route, or policy evidence, so hybrid design claims are unsupported.",
+    recommendation: "Create cloud edge, site-to-cloud routing, and policy review evidence from cloud requirements.",
+  },
+  REQ_SECURITY_FLOWS_MISSING: {
+    impact: "Security/segmentation selections produced no flow requirements, which makes the security design hollow.",
+    recommendation: "Generate vendor-neutral allow/deny/review flow requirements for guest, management, remote, cloud, and shared-device boundaries.",
+  },
+  REQ_OPERATIONS_EVIDENCE_MISSING: {
+    impact: "Monitoring, logging, backup, or ownership requirements are visible in the form but weak in engineering outputs.",
+    recommendation: "Expose operations-plane review evidence in policy, implementation, and report sections.",
+  },
+  REQ_SCENARIO_PROOF_ZERO_PASS: {
+    impact: "The requirement scenario proof layer says the selected design drivers failed, so validation cannot honestly call the project clean.",
+    recommendation: "Fix the missing materialized objects and rerun scenario proof until at least the relevant selected drivers pass or produce targeted blockers.",
+  },
   SITE_SUMMARY_MISSING: {
     impact: "Routing summaries, growth planning, and implementation review become weaker when the site boundary is not explicitly confirmed.",
     recommendation: "Add or confirm the site's parent address block before using the design package for implementation planning.",
@@ -178,6 +258,346 @@ function makeItem(item: ValidationItem): ValidationItem {
     ...item,
     message: composeValidationMessage(narrative),
   };
+}
+
+
+type RequirementInputMap = Record<string, unknown>;
+
+type RequirementOutputEvidence = {
+  siteCount: number;
+  vlanCount: number;
+  addressRowCount: number;
+  deviceCount: number;
+  interfaceCount: number;
+  linkCount: number;
+  routeIntentCount: number;
+  policyRuleCount: number;
+  securityFlowRequirementCount: number;
+  securityZoneText: string;
+  routeText: string;
+  policyText: string;
+  topologyText: string;
+};
+
+function parseRequirementsJson(requirementsJson?: string | null): RequirementInputMap {
+  if (!requirementsJson) return {};
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as RequirementInputMap : {};
+  } catch {
+    return {};
+  }
+}
+
+function hasRequirementValue(requirements: RequirementInputMap, key: string) {
+  if (!Object.prototype.hasOwnProperty.call(requirements, key)) return false;
+  const value = requirements[key];
+  if (value === null || typeof value === "undefined") return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+function requirementString(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function requirementTextIncludes(requirements: RequirementInputMap, keys: string[], patterns: string[]) {
+  const text = keys.map((key) => requirementString(requirements, key).toLowerCase()).join(" ");
+  return patterns.some((pattern) => text.includes(pattern));
+}
+
+function requirementBoolean(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "y", "required", "enabled", "selected", "1"].includes(normalized)) return true;
+    if (["false", "no", "n", "not required", "disabled", "0", "none"].includes(normalized)) return false;
+  }
+  return false;
+}
+
+function requirementNumber(requirements: RequirementInputMap, key: string) {
+  const value = requirements[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function isRequirementsDrivenProject(requirements: RequirementInputMap) {
+  return Object.keys(requirements).some((key) => hasRequirementValue(requirements, key));
+}
+
+function normalizeOutputText(value: unknown): string {
+  if (value === null || typeof value === "undefined") return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(normalizeOutputText).join(" ");
+  if (typeof value === "object") return Object.values(value as Record<string, unknown>).map(normalizeOutputText).join(" ");
+  return "";
+}
+
+function buildRequirementOutputEvidence(project: { sites: Array<{ vlans: Array<{ segmentRole?: string | null; purpose?: string | null; vlanName: string; department?: string | null; notes?: string | null }> }> }, designSnapshot: ReturnType<typeof buildDesignCoreSnapshot> | null): RequirementOutputEvidence {
+  const vlanCount = project.sites.reduce((total, site) => total + site.vlans.length, 0);
+  const networkObjectModel = designSnapshot?.networkObjectModel;
+  return {
+    siteCount: project.sites.length,
+    vlanCount,
+    addressRowCount: designSnapshot?.addressingRows.length ?? 0,
+    deviceCount: networkObjectModel?.devices.length ?? 0,
+    interfaceCount: networkObjectModel?.interfaces.length ?? 0,
+    linkCount: networkObjectModel?.links.length ?? 0,
+    routeIntentCount: designSnapshot?.summary.routeIntentCount ?? 0,
+    policyRuleCount: networkObjectModel?.policyRules.length ?? 0,
+    securityFlowRequirementCount: designSnapshot?.summary.securityFlowRequirementCount ?? 0,
+    securityZoneText: normalizeOutputText(networkObjectModel?.securityZones ?? []),
+    routeText: normalizeOutputText([designSnapshot?.routingIntent, designSnapshot?.routeDomain, designSnapshot?.wanPlan, designSnapshot?.transitPlan, networkObjectModel?.routeDomains, networkObjectModel?.links]),
+    policyText: normalizeOutputText([designSnapshot?.securityIntent, designSnapshot?.policyConsequences, networkObjectModel?.policyRules, designSnapshot?.requirementsScenarioProof]),
+    topologyText: normalizeOutputText([networkObjectModel?.devices, networkObjectModel?.interfaces, networkObjectModel?.links, designSnapshot?.diagramTruth, designSnapshot?.reportTruth]),
+  };
+}
+
+function roleExists(project: { sites: Array<{ vlans: Array<{ segmentRole?: string | null; purpose?: string | null; vlanName: string; department?: string | null; notes?: string | null }> }> }, roles: SegmentRole[]) {
+  return project.sites.some((site) => site.vlans.some((vlan) => roles.includes(resolveValidationSegmentRole(vlan))));
+}
+
+function outputTextHas(text: string, patterns: string[]) {
+  const normalized = text.toLowerCase();
+  return patterns.some((pattern) => normalized.includes(pattern));
+}
+
+function addRequirementHonestyIssue(results: ValidationItem[], item: Omit<ValidationItem, "projectId" | "entityType" | "entityId"> & { projectId: string; entityId?: string }) {
+  results.push(makeItem({
+    projectId: item.projectId,
+    severity: item.severity,
+    ruleCode: item.ruleCode,
+    title: item.title,
+    message: item.message,
+    entityType: "PROJECT",
+    entityId: item.entityId ?? item.projectId,
+  }));
+}
+
+function addRequirementsHonestyValidation(
+  results: ValidationItem[],
+  projectId: string,
+  project: { requirementsJson?: string | null; sites: Array<{ vlans: Array<{ segmentRole?: string | null; purpose?: string | null; vlanName: string; department?: string | null; notes?: string | null }> }> },
+  designSnapshot: ReturnType<typeof buildDesignCoreSnapshot> | null,
+) {
+  const requirements = parseRequirementsJson(project.requirementsJson);
+  if (!isRequirementsDrivenProject(requirements)) return;
+
+  const evidence = buildRequirementOutputEvidence(project, designSnapshot);
+  const selectedSiteCount = requirementNumber(requirements, "siteCount");
+  const usersPerSite = requirementNumber(requirements, "usersPerSite");
+  const multiSiteSelected = selectedSiteCount > 1 || requirementTextIncludes(requirements, ["planningFor", "internetModel", "interSiteTrafficModel"], ["multi", "branch", "site-to-site", "wan"]);
+  const segmentationSelected = requirementTextIncludes(requirements, ["primaryGoal", "securityPosture", "trustBoundaryModel"], ["security", "segment", "zero trust", "restricted", "least privilege", "zone"]);
+  const cloudSelected = requirementBoolean(requirements, "cloudConnected") || requirementTextIncludes(requirements, ["environmentType", "cloudProvider", "cloudConnectivity", "cloudNetworkModel", "cloudRoutingModel", "cloudTrafficBoundary"], ["cloud", "hybrid", "azure", "aws", "gcp", "vnet", "vpc", "vpn", "private"]);
+  const operationsSelected = requirementTextIncludes(requirements, ["monitoringModel", "loggingModel", "backupPolicy", "operationsOwnerModel", "managementIpPolicy"], ["monitor", "logging", "syslog", "backup", "owner", "management"]);
+
+  if (selectedSiteCount > 0 && evidence.siteCount === 0) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_SITE_COUNT_NOT_MATERIALIZED",
+      title: "Requirements selected sites but no Site rows exist",
+      message: `Requirement siteCount is ${selectedSiteCount}, but the saved project has 0 Site rows. Save Requirements must materialize site records before the design can be trusted.`,
+    });
+  } else if (selectedSiteCount > 0 && evidence.siteCount < selectedSiteCount) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_SITE_COUNT_UNDER_MATERIALIZED",
+      title: "Requirements selected more sites than the design contains",
+      message: `Requirement siteCount is ${selectedSiteCount}, but only ${evidence.siteCount} Site row(s) exist. The generated topology/addressing scope is incomplete.`,
+    });
+  }
+
+  if ((selectedSiteCount > 0 || usersPerSite > 0) && evidence.vlanCount === 0) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_NO_SEGMENTS_MATERIALIZED",
+      title: "Requirements require segments but no VLAN/segment rows exist",
+      message: "Site/user requirements were captured, but no VLAN or segment rows were materialized. An empty segment table must never validate as clean.",
+    });
+  }
+
+  if (usersPerSite > 0 && !roleExists(project, ["USER"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_USER_SEGMENT_MISSING",
+      title: "Users per site did not create a user access segment",
+      message: `Requirement usersPerSite is ${usersPerSite}, but no USER segment exists. User population must drive access VLAN demand and subnet sizing.`,
+    });
+  }
+
+  if (requirementBoolean(requirements, "guestWifi") && !roleExists(project, ["GUEST"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_GUEST_SEGMENT_MISSING",
+      title: "Guest Wi-Fi requirement did not create a guest segment",
+      message: "guestWifi is selected, but no GUEST VLAN/segment exists. Guest access must create an isolated guest segment before policy or diagram output can be trusted.",
+    });
+  }
+
+  if (requirementBoolean(requirements, "management") && !roleExists(project, ["MANAGEMENT"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_MANAGEMENT_SEGMENT_MISSING",
+      title: "Management requirement did not create a management segment",
+      message: "management is selected, but no MANAGEMENT VLAN/segment exists. Admin-plane access cannot be validated without a management segment.",
+    });
+  }
+
+  if (requirementBoolean(requirements, "printers") && !roleExists(project, ["PRINTER"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_PRINTER_SEGMENT_MISSING",
+      title: "Printer requirement did not create a printer/shared-device segment",
+      message: "printers is selected, but no PRINTER segment exists. Shared-device networks must not disappear into report text.",
+    });
+  }
+
+  if ((requirementBoolean(requirements, "iot") || requirementNumber(requirements, "iotDeviceCount") > 0) && !roleExists(project, ["IOT"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_IOT_SEGMENT_MISSING",
+      title: "IoT requirement did not create an IoT segment",
+      message: "IoT requirements were selected or counted, but no IOT segment exists. IoT devices require explicit isolation evidence.",
+    });
+  }
+
+  if ((requirementBoolean(requirements, "cameras") || requirementNumber(requirements, "cameraCount") > 0) && !roleExists(project, ["CAMERA"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_CAMERA_SEGMENT_MISSING",
+      title: "Camera/security device requirement did not create a camera segment",
+      message: "Camera/security device requirements were selected or counted, but no CAMERA segment exists. Surveillance/security devices require explicit segment evidence.",
+    });
+  }
+
+  if ((requirementBoolean(requirements, "voice") || requirementNumber(requirements, "phoneCount") > 0) && !roleExists(project, ["VOICE"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_VOICE_SEGMENT_MISSING",
+      title: "Voice requirement did not create a voice segment",
+      message: "Voice is selected or phone count is positive, but no VOICE segment exists. Voice requirements must drive voice VLAN/QoS evidence.",
+    });
+  }
+
+  if (requirementBoolean(requirements, "wireless") && !roleExists(project, ["USER", "GUEST"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_WIRELESS_SEGMENT_MAPPING_MISSING",
+      title: "Wireless requirement has no access segment mapping",
+      message: "wireless is selected, but no USER or GUEST segment exists for SSID/access mapping. Wireless intent must map to real access segments.",
+    });
+  }
+
+  if (evidence.vlanCount > 0 && evidence.addressRowCount === 0) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_ADDRESS_ROWS_MISSING",
+      title: "Segments exist but no addressing rows were generated",
+      message: `${evidence.vlanCount} VLAN/segment row(s) exist, but design-core produced 0 addressing rows. Engine 1/addressing output is not connected to the saved segments.`,
+    });
+  }
+
+  if (evidence.siteCount > 0 && (evidence.deviceCount === 0 || evidence.interfaceCount === 0)) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_TOPOLOGY_OBJECTS_MISSING",
+      title: "Sites exist but topology objects are missing",
+      message: `${evidence.siteCount} Site row(s) exist, but the backend model has ${evidence.deviceCount} device(s) and ${evidence.interfaceCount} interface(s). A planned network needs topology objects before the diagram/report can be trusted.`,
+    });
+  }
+
+  if (multiSiteSelected && evidence.siteCount > 1 && evidence.linkCount === 0) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_MULTISITE_LINKS_MISSING",
+      title: "Multi-site requirement has no site-to-site link model",
+      message: "The requirements indicate multi-site/WAN scope, but the backend topology has 0 links. Multi-site designs require at least planned WAN/site relationship evidence.",
+    });
+  }
+
+  if (multiSiteSelected && evidence.routeIntentCount === 0 && evidence.siteCount > 1) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_MULTISITE_ROUTING_MISSING",
+      title: "Multi-site requirement has no routing intent",
+      message: "The requirements indicate multi-site/WAN scope, but design-core has 0 route intent rows. Inter-site reachability cannot be validated from empty routing output.",
+    });
+  }
+
+  if (requirementBoolean(requirements, "remoteAccess") && !outputTextHas(`${evidence.policyText} ${evidence.securityZoneText}`, ["remote", "vpn", "access edge", "dmz"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_REMOTE_ACCESS_CONSEQUENCE_MISSING",
+      title: "Remote access requirement has no security consequence",
+      message: "remoteAccess is selected, but no remote/VPN/security-edge policy or zone evidence was found. Remote access must not remain a report-only note.",
+    });
+  }
+
+  if (cloudSelected && !outputTextHas(`${evidence.routeText} ${evidence.policyText} ${evidence.securityZoneText}`, ["cloud", "azure", "aws", "gcp", "vnet", "vpc", "site-to-cloud", "cloud edge"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_CLOUD_BOUNDARY_MISSING",
+      title: "Cloud/hybrid requirement has no cloud boundary evidence",
+      message: "Cloud/hybrid requirements were captured, but no cloud/WAN boundary, route, or policy evidence was found in design-core.",
+    });
+  }
+
+  if ((requirementBoolean(requirements, "guestWifi") || requirementBoolean(requirements, "management") || requirementBoolean(requirements, "remoteAccess") || segmentationSelected) && evidence.policyRuleCount === 0 && evidence.securityFlowRequirementCount === 0) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_SECURITY_FLOWS_MISSING",
+      title: "Security requirements produced no policy or flow requirements",
+      message: "Security/segmentation requirements are selected, but design-core has 0 policy rules and 0 security-flow requirements. This is not a valid security design output.",
+    });
+  }
+
+  if (operationsSelected && !outputTextHas(evidence.policyText, ["monitor", "logging", "backup", "operations", "syslog", "management-plane"])) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "WARNING",
+      ruleCode: "REQ_OPERATIONS_EVIDENCE_MISSING",
+      title: "Operations requirements have weak design evidence",
+      message: "Monitoring/logging/backup/operations requirements were captured, but no operations-plane policy or review evidence was found.",
+    });
+  }
+
+  if (designSnapshot?.requirementsScenarioProof?.signals?.length && designSnapshot.requirementsScenarioProof.signals.every((signal) => !signal.passed && signal.severity === "blocker")) {
+    addRequirementHonestyIssue(results, {
+      projectId,
+      severity: "ERROR",
+      ruleCode: "REQ_SCENARIO_PROOF_ZERO_PASS",
+      title: "Requirement scenario proof has zero passing signals",
+      message: "Requirement scenario proof is fully blocked. Validation must not report a clean state while every major requirement scenario signal is failing.",
+    });
+  }
 }
 
 function parseStructuredValidationMessage(message: string, ruleCode: string, title: string, severity: ValidationSeverity): ValidationNarrative {
@@ -594,6 +1014,8 @@ export async function runValidation(projectId: string) {
     }
   }
 
+
+  addRequirementsHonestyValidation(results, projectId, project, designSnapshot);
 
   if (results.length === 0) {
     results.push(

@@ -117,7 +117,7 @@ for (const token of [
 const phase64Check = read("scripts/check-phase64-requirements-completion-closure.cjs");
 if (!phase64Check.includes("0.66.0")) fail("phase64 check version expectation was not advanced to 0.66.0");
 const packageJson = JSON.parse(read("package.json"));
-if (!/^0\.(66|67|68)\.0$/.test(packageJson.version)) fail(`expected package version 0.66.0 or later, found ${packageJson.version}`);
+if (!/^0\.(6[6-9]|7[0-9])\.0$/.test(packageJson.version)) fail(`expected package version 0.66.0 or later, found ${packageJson.version}`);
 if (packageJson.scripts["check:phase64-requirements-completion-closure"] !== "node scripts/check-phase64-requirements-completion-closure.cjs && npm run check:phase65-requirement-scenario-proof") {
   fail("phase64 check does not chain phase65 scenario proof check");
 }

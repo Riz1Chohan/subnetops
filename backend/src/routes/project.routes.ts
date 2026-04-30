@@ -13,6 +13,7 @@ router.get("/:projectId", asyncHandler(projectController.getProject));
 router.post("/:projectId/duplicate", asyncHandler(projectController.duplicateProject));
 router.get("/:projectId/sites", asyncHandler(projectController.getProjectSites));
 router.get("/:projectId/vlans", asyncHandler(projectController.getProjectVlans));
+router.patch("/:projectId/requirements", asyncHandler(projectController.saveProjectRequirements));
 router.patch("/:projectId", asyncHandler(projectController.updateProject));
 router.delete("/:projectId", asyncHandler(projectController.deleteProject));
 

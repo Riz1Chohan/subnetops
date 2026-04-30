@@ -1,4 +1,5 @@
-import { parseCidr } from "../lib/cidr.js";
+import { parseCidr, recommendedCapacityPlanForHosts, type SegmentRole } from "../lib/cidr.js";
+import { allocateRequestedBlocks, type GatewayConvention } from "../lib/addressAllocator.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { buildRequirementImpactInventory, REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 
@@ -34,7 +35,7 @@ type RequirementsInput = Record<string, unknown>;
 type SegmentPlan = {
   vlanId: number;
   vlanName: string;
-  segmentRole: string;
+  segmentRole: SegmentRole;
   purpose: string;
   estimatedHosts: number;
   dhcpEnabled: boolean;
@@ -109,6 +110,20 @@ function buildSiteBlock(projectBaseRange: string | null | undefined, siteIndex: 
   return `10.${siteOctet}.0.0/16`;
 }
 
+type SegmentAddressingPlan = {
+  cidr: string;
+  gateway?: string;
+  recommendedPrefix: number;
+  requiredUsableHosts: number;
+  allocatorExplanation?: string;
+};
+
+function gatewayPreferenceFromRequirements(requirements: RequirementsInput): Exclude<GatewayConvention, "custom" | "not-applicable"> | "first-usable" {
+  const gatewayConvention = asString(requirements.gatewayConvention).toLowerCase();
+  if (gatewayConvention.includes("last")) return "last-usable";
+  return "first-usable";
+}
+
 function buildVlanCidr(projectBaseRange: string | null | undefined, siteIndex: number, vlanId: number) {
   const secondOctet = parseProjectBaseSecondOctet(projectBaseRange);
   const siteOctet = Math.max(0, Math.min(254, secondOctet + siteIndex));
@@ -116,7 +131,74 @@ function buildVlanCidr(projectBaseRange: string | null | undefined, siteIndex: n
   return {
     cidr: `10.${siteOctet}.${subnetOctet}.0/24`,
     gateway: `10.${siteOctet}.${subnetOctet}.1`,
+    recommendedPrefix: 24,
+    requiredUsableHosts: 2,
+    allocatorExplanation: "Fallback /24 segment placement used because the direct design-driver allocator could not allocate this segment.",
   };
+}
+
+function buildSegmentAddressingPlans(
+  projectBaseRange: string | null | undefined,
+  siteIndex: number,
+  segments: SegmentPlan[],
+  requirements: RequirementsInput,
+) {
+  const siteBlockCidr = buildSiteBlock(projectBaseRange, siteIndex);
+  const plans = new Map<number, SegmentAddressingPlan>();
+
+  try {
+    const parent = parseCidr(siteBlockCidr);
+    const segmentCapacity = new Map<number, ReturnType<typeof recommendedCapacityPlanForHosts>>();
+    for (const segment of segments) {
+      segmentCapacity.set(segment.vlanId, recommendedCapacityPlanForHosts(segment.estimatedHosts, segment.segmentRole));
+    }
+
+    const orderedSegments = [...segments].sort((left, right) => {
+      const leftPrefix = segmentCapacity.get(left.vlanId)?.recommendedPrefix ?? 24;
+      const rightPrefix = segmentCapacity.get(right.vlanId)?.recommendedPrefix ?? 24;
+      if (leftPrefix !== rightPrefix) return leftPrefix - rightPrefix;
+      return left.vlanId - right.vlanId;
+    });
+
+    const allocationResults = allocateRequestedBlocks(
+      parent,
+      [],
+      orderedSegments.map((segment) => ({
+        requestId: String(segment.vlanId),
+        prefix: segmentCapacity.get(segment.vlanId)?.recommendedPrefix ?? 24,
+        role: segment.segmentRole,
+      })),
+      { preferredGatewayConvention: gatewayPreferenceFromRequirements(requirements) },
+    );
+
+    for (const segment of segments) {
+      const capacity = segmentCapacity.get(segment.vlanId);
+      const allocation = allocationResults.results.find((result) => result.requestId === String(segment.vlanId));
+      if (allocation?.status === "allocated" && allocation.proposedSubnetCidr) {
+        plans.set(segment.vlanId, {
+          cidr: allocation.proposedSubnetCidr,
+          gateway: allocation.proposedGatewayIp,
+          recommendedPrefix: capacity?.recommendedPrefix ?? 24,
+          requiredUsableHosts: capacity?.requiredUsableHosts ?? segment.estimatedHosts,
+          allocatorExplanation: allocation.allocatorExplanation,
+        });
+        continue;
+      }
+
+      const fallback = buildVlanCidr(projectBaseRange, siteIndex, segment.vlanId);
+      plans.set(segment.vlanId, {
+        ...fallback,
+        recommendedPrefix: capacity?.recommendedPrefix ?? fallback.recommendedPrefix,
+        requiredUsableHosts: capacity?.requiredUsableHosts ?? fallback.requiredUsableHosts,
+      });
+    }
+  } catch {
+    for (const segment of segments) {
+      plans.set(segment.vlanId, buildVlanCidr(projectBaseRange, siteIndex, segment.vlanId));
+    }
+  }
+
+  return plans;
 }
 
 function hasText(value: unknown) {
@@ -501,13 +583,17 @@ export async function materializeRequirementsForProject(
     const site = materializedSites[index];
     if (!site) continue;
     const existingVlans = await tx.vlan.findMany({ where: { siteId: site.id }, orderBy: { vlanId: "asc" } });
+    const segmentAddressingPlans = buildSegmentAddressingPlans(project.basePrivateRange, index, segments, requirements);
 
     for (const segment of segments) {
       const matching = existingVlans.find((vlan) => vlan.vlanId === segment.vlanId || vlan.vlanName.toUpperCase() === segment.vlanName.toUpperCase());
-      const addressing = buildVlanCidr(project.basePrivateRange, index, segment.vlanId);
+      const addressing = segmentAddressingPlans.get(segment.vlanId) ?? buildVlanCidr(project.basePrivateRange, index, segment.vlanId);
       const notes = joinNotes([
         `Requirement materialization for ${segment.vlanName}.`,
         `Required by: ${segment.requiredBy.join(", ")}.`,
+        `Direct design driver output: ${segment.estimatedHosts} requested host(s), ${addressing.requiredUsableHosts} required usable address(es), /${addressing.recommendedPrefix} recommended prefix, ${addressing.cidr} selected for this site.`,
+        addressing.gateway ? `Gateway convention ${asString(requirements.gatewayConvention, "first usable address as default gateway")}: ${addressing.gateway}.` : "Gateway requires review for this segment role.",
+        addressing.allocatorExplanation ?? "Addressing was generated from deterministic requirement materialization.",
         ...segment.reviewNotes,
       ]);
 
@@ -519,7 +605,7 @@ export async function materializeRequirementsForProject(
             purpose: isRequirementManagedVlan(matching, segment) ? segment.purpose : matching.purpose || segment.purpose,
             segmentRole: isRequirementManagedVlan(matching, segment) ? segment.segmentRole : matching.segmentRole || segment.segmentRole,
             subnetCidr: isRequirementManagedVlan(matching, segment) ? addressing.cidr : matching.subnetCidr || addressing.cidr,
-            gatewayIp: isRequirementManagedVlan(matching, segment) ? addressing.gateway : matching.gatewayIp || addressing.gateway,
+            gatewayIp: isRequirementManagedVlan(matching, segment) ? (addressing.gateway ?? matching.gatewayIp) : matching.gatewayIp || addressing.gateway || "",
             dhcpEnabled: isRequirementManagedVlan(matching, segment) ? segment.dhcpEnabled : matching.dhcpEnabled ?? segment.dhcpEnabled,
             estimatedHosts: isRequirementManagedVlan(matching, segment) ? segment.estimatedHosts : matching.estimatedHosts || segment.estimatedHosts,
             department: isRequirementManagedVlan(matching, segment) ? segment.department : matching.department || segment.department,
@@ -536,7 +622,7 @@ export async function materializeRequirementsForProject(
             purpose: segment.purpose,
             segmentRole: segment.segmentRole,
             subnetCidr: addressing.cidr,
-            gatewayIp: addressing.gateway,
+            gatewayIp: addressing.gateway ?? "",
             dhcpEnabled: segment.dhcpEnabled,
             estimatedHosts: segment.estimatedHosts,
             department: segment.department,

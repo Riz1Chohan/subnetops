@@ -1,6 +1,30 @@
 import { api } from "../../lib/api";
 import type { Project, ProjectDetail, Site, Vlan } from "../../lib/types";
 
+export type RequirementsMaterializationResponse = {
+  message: string;
+  projectId: string;
+  requirementsMaterialization?: {
+    createdSites: number;
+    updatedSites: number;
+    createdVlans: number;
+    updatedVlans: number;
+    consumedFields: string[];
+    impactInventoryCount: number;
+    directImpactCount: number;
+    reviewNotes: string[];
+  } | null;
+  requirementsFieldCoverage?: {
+    expectedFields: number;
+    capturedFields: number;
+    capturedFieldKeys: string[];
+    missingFields: string[];
+    unexpectedFields: string[];
+    status: "complete" | "incomplete";
+  };
+  outputCounts: { sites: number; vlans: number };
+};
+
 export function getProjects() {
   return api<Project[]>("/projects");
 }
@@ -32,6 +56,17 @@ export function createProject(input: {
 }) {
   return api<Project>("/projects", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function saveProjectRequirements(projectId: string, input: {
+  requirementsJson: string;
+  environmentType?: string;
+  description?: string;
+}) {
+  return api<RequirementsMaterializationResponse>(`/projects/${projectId}/requirements`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

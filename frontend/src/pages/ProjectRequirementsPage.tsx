@@ -4,7 +4,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
 import { EmptyState } from "../components/app/EmptyState";
-import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
+import { useProject, useProjectSites, useProjectVlans, useSaveProjectRequirements } from "../features/projects/hooks";
 import {
   buildNamingPreviewExamples,
   buildProjectSummaryDescription,
@@ -31,7 +31,7 @@ export function ProjectRequirementsPage() {
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
-  const updateMutation = useUpdateProject(projectId);
+  const saveRequirementsMutation = useSaveProjectRequirements(projectId);
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
@@ -89,16 +89,30 @@ export function ProjectRequirementsPage() {
   const performancePlanning = multiSitePlanning || scenario.cloud || voicePlanning || requirements.primaryGoal === "performance and user experience" || requirements.primaryGoal === "availability and redundancy";
   const advancedScenario = scenario.security || scenario.cloud || scenario.wireless || scenario.voice || scenario.resilience;
 
-  const saveRequirements = () => updateMutation.mutate({
+  const saveRequirements = () => saveRequirementsMutation.mutate({
     requirementsJson: stringifyRequirementsProfile(requirements),
     environmentType: requirements.environmentType,
     description: summaryDescription,
   }, {
-    onSuccess: () => {
+    onSuccess: (result) => {
       lastServerSaveRef.current = stringifyRequirementsProfile(requirements);
       window.localStorage.removeItem(draftStorageKey);
       setDraftSavedAt("");
-      setSaveConfidenceNote(`Saved to project data at ${new Date().toLocaleString()}.`);
+      const materialized = result.requirementsMaterialization;
+      const createdSites = materialized?.createdSites ?? 0;
+      const updatedSites = materialized?.updatedSites ?? 0;
+      const createdVlans = materialized?.createdVlans ?? 0;
+      const updatedVlans = materialized?.updatedVlans ?? 0;
+      const coverage = result.requirementsFieldCoverage;
+      const coverageLabel = coverage
+        ? ` Captured ${coverage.capturedFields}/${coverage.expectedFields} requirement field(s) (${coverage.status}).`
+        : " Requirement field coverage was not returned by the backend.";
+      const missingLabel = coverage?.missingFields?.length
+        ? ` Missing: ${coverage.missingFields.slice(0, 8).join(", ")}${coverage.missingFields.length > 8 ? ", ..." : ""}.`
+        : "";
+      setSaveConfidenceNote(
+        `Saved and materialized at ${new Date().toLocaleString()}: ${result.outputCounts.sites} site(s), ${result.outputCounts.vlans} VLAN/segment row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
+      );
     },
     onError: () => {
       setSaveConfidenceNote("Save failed. Your browser draft is still kept locally so you do not lose work.");
@@ -1412,8 +1426,8 @@ export function ProjectRequirementsPage() {
             <p className="muted" style={{ margin: 0 }}>{currentStep.summary}</p>
           </div>
           <div className="workspace-detail-actions">
-            <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Requirements"}
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
             </button>
           </div>
         </div>
@@ -1440,8 +1454,8 @@ export function ProjectRequirementsPage() {
             )}
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save"}
+            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
             </button>
             {nextStep ? (
               <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary button-flow-next">Next: {nextStep.title}</Link>
@@ -1461,8 +1475,8 @@ export function ProjectRequirementsPage() {
         description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. The planner now keeps each requirement tied to downstream design impact instead of collecting disconnected form data."
         actions={
           <>
-            <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Requirements"}
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
             </button>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button link-button-subtle">Open Logical Design</Link>
           </>
@@ -1491,8 +1505,8 @@ export function ProjectRequirementsPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Saving..." : "Save to Project"}
+          <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+            {saveRequirementsMutation.isPending ? "Saving..." : "Save to Project"}
           </button>
           <button type="button" className="button-nav" onClick={clearLocalDraft} disabled={!draftSavedAt && !hasUnsavedChanges}>Restore Last Saved Version</button>
         </div>
@@ -1627,8 +1641,8 @@ export function ProjectRequirementsPage() {
               )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save"}
+              <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+                {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
               </button>
               {nextStep ? (
                 <button type="button" className="button-primary button-flow-next" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
