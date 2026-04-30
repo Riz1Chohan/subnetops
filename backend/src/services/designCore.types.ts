@@ -597,6 +597,8 @@ export interface NetworkInterface {
   deviceId: string;
   siteId: string;
   interfaceRole: "vlan-gateway" | "wan-transit" | "loopback" | "firewall-boundary" | "routed-uplink" | "unknown";
+  /** Phase 85 compile compatibility: older proof code reads a human purpose field when present. */
+  purpose?: string;
   truthState: NetworkObjectTruthState;
   vlanId?: number;
   subnetCidr?: string;
@@ -618,6 +620,8 @@ export interface NetworkLink {
   id: string;
   name: string;
   linkRole: "site-wan-transit" | "vlan-gateway-binding" | "firewall-boundary" | "route-domain-membership" | "planned";
+  /** Phase 85 compile compatibility: legacy scenario proof checks may classify by linkType. */
+  linkType?: string;
   truthState: NetworkObjectTruthState;
   status: "modeled" | "planned" | "deferred";
   siteIds: string[];

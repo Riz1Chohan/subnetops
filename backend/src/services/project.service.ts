@@ -262,25 +262,26 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
     include: { sites: { include: { vlans: true } } },
   });
   if (!source) throw new ApiError(404, "Source project not found");
+  const sourceProjectForCopy = source as any;
 
   const newProject = await prisma.$transaction(async (tx: any) => {
     const createdProject = await tx.project.create({
       data: {
         userId,
-        organizationId: source.organizationId,
-        name: `${source.name} Copy`,
-        description: source.description,
-        organizationName: source.organizationName,
-        environmentType: source.environmentType,
-        basePrivateRange: source.basePrivateRange,
-        logoUrl: source.logoUrl,
-        reportHeader: source.reportHeader,
-        reportFooter: source.reportFooter,
-        approvalStatus: source.approvalStatus,
-        reviewerNotes: source.reviewerNotes,
-        requirementsJson: source.requirementsJson,
-        discoveryJson: source.discoveryJson,
-        platformProfileJson: source.platformProfileJson,
+        organizationId: sourceProjectForCopy.organizationId,
+        name: `${sourceProjectForCopy.name} Copy`,
+        description: sourceProjectForCopy.description,
+        organizationName: sourceProjectForCopy.organizationName,
+        environmentType: sourceProjectForCopy.environmentType,
+        basePrivateRange: sourceProjectForCopy.basePrivateRange,
+        logoUrl: sourceProjectForCopy.logoUrl,
+        reportHeader: sourceProjectForCopy.reportHeader,
+        reportFooter: sourceProjectForCopy.reportFooter,
+        approvalStatus: sourceProjectForCopy.approvalStatus,
+        reviewerNotes: sourceProjectForCopy.reviewerNotes,
+        requirementsJson: sourceProjectForCopy.requirementsJson,
+        discoveryJson: sourceProjectForCopy.discoveryJson,
+        platformProfileJson: sourceProjectForCopy.platformProfileJson,
       },
     });
 
@@ -303,7 +304,7 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
       }
     }
 
-    await addChangeLog(createdProject.id, `Project duplicated from ${source.name}`, actorLabel, tx);
+    await addChangeLog(createdProject.id, `Project duplicated from ${sourceProjectForCopy.name}`, actorLabel, tx);
     return createdProject;
   });
 
