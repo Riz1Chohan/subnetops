@@ -385,6 +385,9 @@ export interface RequirementsImpactClosureSummary {
   reviewEvidenceFieldCount: number;
   traceableOnlyFieldCount: number;
   notCapturedFieldCount: number;
+  handledFieldCount: number;
+  explicitlyUnusedFieldCount: number;
+  explicitlyUnusedKeys: string[];
   directCapturedTraceableOnlyKeys: string[];
   completionStatus: "complete" | "review-required";
   fieldOutcomes: RequirementsImpactClosureItem[];

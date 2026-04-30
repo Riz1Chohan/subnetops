@@ -33,6 +33,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const routingSection = report.sections.find((section) => section.title.toLowerCase().includes("routing"));
 
   const proposedRows = Array.isArray(designCore.proposedRows) ? designCore.proposedRows : [];
+  const authoritativeAddressingRows = Array.isArray(designCore.addressingRows) ? designCore.addressingRows : [];
+  const requirementOutputAddressRowCount = Math.max(authoritativeAddressingRows.length, proposedRows.length);
   const siteSummaries = Array.isArray(designCore.siteSummaries) ? designCore.siteSummaries : [];
   const transitPlan = Array.isArray(designCore.transitPlan) ? designCore.transitPlan : [];
   const loopbackPlan = Array.isArray(designCore.loopbackPlan) ? designCore.loopbackPlan : [];
@@ -85,7 +87,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const scenarioStatus = asString(requirementsScenarioProof?.status, "");
   const scenarioPassed = Number(requirementsScenarioProof?.passedSignalCount ?? 0);
   const scenarioExpected = Number(requirementsScenarioProof?.expectedSignalCount ?? 0);
-  const materializedDesignEvidenceReady = siteSummaries.length > 0 && (proposedRows.length > 0 || networkInterfaces.length > 0) && !Boolean(diagramEmptyReason) && diagramEmptyInputs.length === 0;
+  const materializedDesignEvidenceReady = siteSummaries.length > 0 && (requirementOutputAddressRowCount > 0 || networkInterfaces.length > 0) && !Boolean(diagramEmptyReason) && diagramEmptyInputs.length === 0;
   const scenarioProofMissingAllEvidence = scenarioExpected > 0 && scenarioPassed === 0;
   const phase74TruthBlocked =
     !materializedDesignEvidenceReady && (
@@ -110,7 +112,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   }
 
   report.sections.push({
-    title: "Phase 81 Requirement Output and Implementation Readiness Reconciliation",
+    title: "Phase 83 Requirement Propagation Completion Audit",
     paragraphs: [
       phase74TruthBlocked
         ? "Requirement-output evidence is still incomplete, so the export must stay blocked until materialized sites, addressing rows, and diagram topology evidence agree."
@@ -119,10 +121,10 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     ],
     tables: [
       {
-        title: "Phase 81 Truth Gates",
+        title: "Phase 83 Truth Gates",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
-          ["Requirement-output evidence", phase74TruthBlocked ? "blocked" : "ready", `Materialized sites ${siteSummaries.length}; addressing rows ${proposedRows.length}; diagram missing inputs ${diagramEmptyInputs.length}`],
+          ["Requirement-output evidence", phase74TruthBlocked ? "blocked" : "ready", "Materialized sites " + siteSummaries.length + "; addressing rows " + requirementOutputAddressRowCount + "; diagram missing inputs " + diagramEmptyInputs.length],
           ["Implementation execution readiness", blockedDesign ? "blocked" : "review", `Overall readiness ${overallReadiness}; implementation readiness ${implementationReadiness}; blocked implementation ${blockedDesign ? "yes" : "no"}`],
           ["Requirement scenario proof", isBlocked(scenarioStatus) || (scenarioExpected > 0 && scenarioPassed === 0) ? "blocked" : "review/ready", `${scenarioPassed}/${scenarioExpected} scenario proof signal(s) passed; status ${scenarioStatus || "unavailable"}`],
           ["Diagram topology evidence", diagramEmptyReason ? "blocked" : "ready", diagramEmptyReason || "Backend diagram has modeled topology evidence."],
@@ -157,7 +159,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     report.sections.push({
       title: "Requirement Traceability and Scenario Proof",
       paragraphs: [
-        `Requirement impact closure status: ${asString(requirementsImpactClosure?.completionStatus, "unavailable")} • captured fields: ${requirementsImpactClosure?.capturedFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0}.`,
+        `Requirement impact closure status: ${asString(requirementsImpactClosure?.completionStatus, "unavailable")} • captured fields: ${requirementsImpactClosure?.capturedFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0} • handled/inventoried fields: ${requirementsImpactClosure?.handledFieldCount ?? requirementsImpactClosure?.totalFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0} • explicitly unused/not captured: ${requirementsImpactClosure?.explicitlyUnusedFieldCount ?? requirementsImpactClosure?.notCapturedFieldCount ?? 0}.`,
         `Scenario proof: ${asString(requirementsScenarioProof?.scenarioName, "unavailable")} • status: ${asString(requirementsScenarioProof?.status, "unavailable")} • passed signals: ${requirementsScenarioProof?.passedSignalCount ?? 0}/${requirementsScenarioProof?.expectedSignalCount ?? 0}.`,
         "This section is included so exported reports show where selected requirements changed the actual plan evidence instead of hiding requirement selections as unverified form data.",
       ],

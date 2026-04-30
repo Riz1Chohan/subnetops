@@ -16,7 +16,7 @@ function assertJson(path, check, message) {
   if (!check(data)) throw new Error(message);
 }
 
-assertJson('package.json', (pkg) => ['0.79.0', '0.80.0'].includes(pkg.version), 'Root package version must be 0.79.0 or later compatible Phase 80 for Phase 79 checks');
+assertJson('package.json', (pkg) => ['0.79.0', '0.80.0', '0.81.0', '0.82.0', '0.83.0'].includes(pkg.version), 'Root package version must be 0.79.0 or later compatible Phase 83 for Phase 79 checks');
 assertJson('package.json', (pkg) => Boolean(pkg.scripts['check:phase79-requirements-read-repair-materialization']), 'Phase 79 check script must be wired');
 
 assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'REQUIREMENTS_RUNTIME_RELEASE', 'Runtime proof service must expose runtime release marker');

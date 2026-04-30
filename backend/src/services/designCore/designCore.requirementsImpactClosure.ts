@@ -167,11 +167,13 @@ function networkObjectEvidenceForKey(key: string, networkObjectModel?: NetworkOb
 
   if (targetNames.length && zones.some((zone) => targetText.includes(String(zone.zoneRole ?? "").toLowerCase()) || targetNames.some((name) => String(zone.name ?? "").toUpperCase().includes(name)))) hits.push("security zones");
   if (targetNames.length && pools.some((pool) => targetNames.some((name) => String(pool.name ?? "").toUpperCase().includes(name)))) hits.push("DHCP pools");
+  const targetVlanIds = targetNames.map((name) => ({ USERS: 10, SERVICES: 20, GUEST: 30, "STAFF-WIFI": 40, VOICE: 50, PRINTERS: 60, IOT: 70, CAMERAS: 80, MANAGEMENT: 90, "REMOTE-ACCESS": 100, "CLOUD-EDGE": 110, "WAN-TRANSIT": 120, OPERATIONS: 130 } as Record<string, number>)[name]).filter((id): id is number => Number.isFinite(id));
+  if (targetVlanIds.length && pools.some((pool) => targetVlanIds.includes(Number(pool.vlanId)))) hits.push("durable DHCP scope evidence");
   if ((key === "remoteAccess" || key === "remoteAccessMethod") && devices.some((device) => String(device.role ?? device.name ?? "").toLowerCase().includes("firewall"))) hits.push("remote-access edge placement");
   if ((key === "cloudConnected" || key.startsWith("cloud")) && (links.some((link) => String(link.linkType ?? link.name ?? "").toLowerCase().includes("wan")) || zones.some((zone) => String(zone.zoneRole ?? zone.name ?? "").toLowerCase().includes("wan")))) hits.push("cloud/WAN boundary");
   if ((key === "guestWifi" || key === "guestPolicy") && policies.length > 0) hits.push("guest policy matrix");
   if ((key === "internetModel" || key === "dualIsp") && nats.length > 0) hits.push("internet/NAT posture");
-  if ((key === "management" || key === "managementAccess" || key === "managementIpPolicy") && interfaces.some((iface) => String(iface.purpose ?? iface.name ?? "").toLowerCase().includes("management"))) hits.push("management interfaces");
+  if ((key === "management" || key === "managementAccess" || key === "managementIpPolicy") && interfaces.some((iface) => Number((iface as any).vlanId) === 90 || String((iface as any).securityZoneId ?? "").toLowerCase().includes("management") || String(iface.purpose ?? iface.name ?? "").toLowerCase().includes("management") || (iface.notes ?? []).some((note) => String(note).toLowerCase().includes("management")))) hits.push("management interface object evidence");
 
   return Array.from(new Set(hits));
 }
@@ -267,6 +269,9 @@ export function buildRequirementsImpactClosureSummary(input: ClosureInput): Requ
     reviewEvidenceFieldCount,
     traceableOnlyFieldCount,
     notCapturedFieldCount,
+    handledFieldCount: fieldOutcomes.length,
+    explicitlyUnusedFieldCount: notCapturedFieldCount,
+    explicitlyUnusedKeys: fieldOutcomes.filter((item) => item.reflectionStatus === "not-captured").map((item) => item.key),
     directCapturedTraceableOnlyKeys: directCapturedTraceableOnly.map((item) => item.key),
     completionStatus: notCapturedFieldCount === 0 && directCapturedTraceableOnly.length === 0 ? "complete" : "review-required",
     fieldOutcomes,

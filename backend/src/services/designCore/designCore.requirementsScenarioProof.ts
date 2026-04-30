@@ -179,8 +179,16 @@ export function buildRequirementsScenarioProofSummary(input: ScenarioProofInput)
       concreteFragments: ["VLAN/segment row"],
       flowFragments: true,
       objectCheck: () => {
-        const interfaces = model?.interfaces?.filter((iface) => String(iface.interfaceRole ?? iface.name ?? "").toLowerCase().includes("management")).length ?? 0;
-        return interfaces > 0 ? [`${interfaces} management interface object(s)`] : [];
+        const managementZoneIds = new Set((model?.securityZones ?? [])
+          .filter((zone) => zone.zoneRole === "management" || String(zone.name ?? "").toLowerCase().includes("management"))
+          .map((zone) => zone.id));
+        const interfaces = model?.interfaces?.filter((iface) =>
+          iface.vlanId === 90
+          || managementZoneIds.has(String(iface.securityZoneId ?? ""))
+          || String(iface.name ?? "").toLowerCase().includes("management")
+          || (iface.notes ?? []).some((note) => String(note).toLowerCase().includes("management")),
+        ).length ?? 0;
+        return interfaces > 0 ? ["management interface object count: " + interfaces] : [];
       },
       severity: "blocker",
     }));

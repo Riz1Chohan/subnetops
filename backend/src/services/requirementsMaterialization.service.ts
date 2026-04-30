@@ -10,6 +10,8 @@ export type RequirementsMaterializationSummary = {
   updatedSites: number;
   createdVlans: number;
   updatedVlans: number;
+  createdDhcpScopes: number;
+  updatedDhcpScopes: number;
   consumedFields: string[];
   impactInventoryCount: number;
   directImpactCount: number;
@@ -27,6 +29,11 @@ type MaterializerTx = {
   };
   vlan: {
     findMany: (args: unknown) => Promise<any[]>;
+    create: (args: unknown) => Promise<any>;
+    update: (args: unknown) => Promise<any>;
+  };
+  designDhcpScope?: {
+    findFirst: (args: unknown) => Promise<any>;
     create: (args: unknown) => Promise<any>;
     update: (args: unknown) => Promise<any>;
   };
@@ -93,6 +100,61 @@ function isRequirementManagedVlan(vlan: { vlanName?: string | null; purpose?: st
   return String(vlan.vlanName ?? "").toUpperCase() === segment.vlanName
     || textIncludes(vlan.purpose, "Requirement-derived")
     || textIncludes(vlan.notes, `Requirement materialization for ${segment.vlanName}`);
+}
+
+function exclusionRangesForGateway(cidr: string, gateway?: string) {
+  if (!gateway) return "[]";
+  return JSON.stringify([{ start: gateway, end: gateway, reason: "default gateway reserved by requirement materializer" }]);
+}
+
+async function upsertRequirementDhcpScope(
+  tx: MaterializerTx,
+  projectId: string,
+  siteId: string,
+  vlanRecord: { id: string; vlanId: number; vlanName?: string | null; subnetCidr?: string | null; gatewayIp?: string | null; dhcpEnabled?: boolean | null },
+  segment: SegmentPlan,
+  notes: string,
+) {
+  if (!tx.designDhcpScope || !vlanRecord.dhcpEnabled || !vlanRecord.subnetCidr) return "skipped" as const;
+
+  const existing = await tx.designDhcpScope.findFirst({
+    where: {
+      projectId,
+      siteId,
+      vlanId: vlanRecord.id,
+      addressFamily: "IPV4",
+    },
+  });
+
+  const scopeNotes = joinNotes([
+    `Requirement-derived durable DHCP scope for VLAN ${vlanRecord.vlanId} ${segment.vlanName}.`,
+    `Required by: ${segment.requiredBy.join(", ")}.`,
+    `Scope CIDR: ${vlanRecord.subnetCidr}.`,
+    vlanRecord.gatewayIp ? `Default gateway: ${vlanRecord.gatewayIp}.` : "Default gateway requires review.",
+    "DNS servers, helper/relay targets, reservations, and lease options still require implementation review.",
+    notes,
+  ]);
+
+  const scopeData = {
+    siteId,
+    vlanId: vlanRecord.id,
+    addressFamily: "IPV4",
+    scopeCidr: vlanRecord.subnetCidr,
+    defaultGateway: vlanRecord.gatewayIp || null,
+    excludedRangesJson: exclusionRangesForGateway(vlanRecord.subnetCidr, vlanRecord.gatewayIp || undefined),
+    leaseSeconds: 86400,
+    source: "requirements-materializer",
+    serverLocation: "engineer-review",
+    notes: mergeNotes(existing?.notes, scopeNotes),
+  };
+
+  if (existing) {
+    await tx.designDhcpScope.update({ where: { id: existing.id }, data: scopeData });
+    return "updated" as const;
+  }
+
+  await tx.designDhcpScope.create({ data: { projectId, ...scopeData } });
+  return "created" as const;
 }
 
 function parseProjectBaseSecondOctet(basePrivateRange?: string | null) {
@@ -533,6 +595,8 @@ export async function materializeRequirementsForProject(
   let updatedSites = 0;
   let createdVlans = 0;
   let updatedVlans = 0;
+  let createdDhcpScopes = 0;
+  let updatedDhcpScopes = 0;
   const materializedSites: any[] = [...existingSites];
 
   for (let index = 0; index < siteCount; index += 1) {
@@ -602,7 +666,7 @@ export async function materializeRequirementsForProject(
       ]);
 
       if (matching) {
-        await tx.vlan.update({
+        const nextVlan = await tx.vlan.update({
           where: { id: matching.id },
           data: {
             vlanName: isRequirementManagedVlan(matching, segment) ? segment.vlanName : matching.vlanName || segment.vlanName,
@@ -616,9 +680,12 @@ export async function materializeRequirementsForProject(
             notes: mergeNotes(matching.notes, notes),
           },
         });
+        const scopeResult = await upsertRequirementDhcpScope(tx, projectId, site.id, nextVlan, segment, notes);
+        if (scopeResult === "created") createdDhcpScopes += 1;
+        if (scopeResult === "updated") updatedDhcpScopes += 1;
         updatedVlans += 1;
       } else {
-        await tx.vlan.create({
+        const nextVlan = await tx.vlan.create({
           data: {
             siteId: site.id,
             vlanId: segment.vlanId,
@@ -633,6 +700,9 @@ export async function materializeRequirementsForProject(
             notes,
           },
         });
+        const scopeResult = await upsertRequirementDhcpScope(tx, projectId, site.id, nextVlan, segment, notes);
+        if (scopeResult === "created") createdDhcpScopes += 1;
+        if (scopeResult === "updated") updatedDhcpScopes += 1;
         createdVlans += 1;
       }
     }
@@ -643,14 +713,16 @@ export async function materializeRequirementsForProject(
     updatedSites,
     createdVlans,
     updatedVlans,
+    createdDhcpScopes,
+    updatedDhcpScopes,
     consumedFields: consumedRequirementFields(requirements),
     impactInventoryCount: impactInventory.length,
     directImpactCount,
     reviewNotes,
   };
 
-  if (createdSites || updatedSites || createdVlans || updatedVlans) {
-    await addChangeLog(projectId, `Requirements materialized into ${createdSites} new site(s), ${createdVlans} new VLAN(s), and ${updatedVlans} refreshed VLAN(s).`, actorLabel, tx as any);
+  if (createdSites || updatedSites || createdVlans || updatedVlans || createdDhcpScopes || updatedDhcpScopes) {
+    await addChangeLog(projectId, `Requirements materialized into ${createdSites} new site(s), ${createdVlans} new VLAN(s), ${updatedVlans} refreshed VLAN(s), ${createdDhcpScopes} new DHCP scope(s), and ${updatedDhcpScopes} refreshed DHCP scope(s).`, actorLabel, tx as any);
   }
 
   return summary;
@@ -659,26 +731,33 @@ export async function materializeRequirementsForProject(
 export type RequirementsReadRepairSummary = {
   reason: string;
   repaired: boolean;
-  before: { sites: number; vlans: number; addressingRows: number };
-  after: { sites: number; vlans: number; addressingRows: number };
+  before: { sites: number; vlans: number; addressingRows: number; dhcpScopes: number; dhcpEnabledVlans: number };
+  after: { sites: number; vlans: number; addressingRows: number; dhcpScopes: number; dhcpEnabledVlans: number };
   selectedSiteCount: number;
   expectedSegmentFamilies: string[];
   expectedMinimumVlans: number;
+  expectedMinimumDhcpScopes: number;
   materialization: RequirementsMaterializationSummary | null;
 };
 
-function countMaterializedRows(project: { sites?: Array<{ vlans?: Array<{ subnetCidr?: string | null; gatewayIp?: string | null }> }> }) {
+function countMaterializedRows(project: { sites?: Array<{ vlans?: Array<{ subnetCidr?: string | null; gatewayIp?: string | null; dhcpEnabled?: boolean | null }> }>; dhcpScopes?: Array<{ id?: string }> }) {
   const sites = project.sites ?? [];
   const vlans = sites.flatMap((site) => site.vlans ?? []);
+  const dhcpEnabledVlans = vlans.filter((vlan) => Boolean(vlan.dhcpEnabled && vlan.subnetCidr)).length;
   return {
     sites: sites.length,
     vlans: vlans.length,
     addressingRows: vlans.filter((vlan) => Boolean(vlan.subnetCidr && vlan.gatewayIp)).length,
+    dhcpScopes: (project.dhcpScopes ?? []).length,
+    dhcpEnabledVlans,
   };
 }
 
-function readRepairGap(counts: { sites: number; vlans: number; addressingRows: number }, selectedSiteCount: number, expectedMinimumVlans: number) {
-  return counts.sites < selectedSiteCount || counts.vlans < expectedMinimumVlans || (counts.vlans > 0 && counts.addressingRows === 0);
+function readRepairGap(counts: { sites: number; vlans: number; addressingRows: number; dhcpScopes: number; dhcpEnabledVlans: number }, selectedSiteCount: number, expectedMinimumVlans: number, expectedMinimumDhcpScopes = 0) {
+  return counts.sites < selectedSiteCount
+    || counts.vlans < expectedMinimumVlans
+    || (counts.vlans > 0 && counts.addressingRows === 0)
+    || counts.dhcpScopes < Math.max(expectedMinimumDhcpScopes, counts.dhcpEnabledVlans);
 }
 
 export async function ensureRequirementsMaterializedForRead(
@@ -695,9 +774,10 @@ export async function ensureRequirementsMaterializedForRead(
         sites: {
           select: {
             id: true,
-            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true } },
+            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true, dhcpEnabled: true } },
           },
         },
+        dhcpScopes: { select: { id: true } },
       },
     });
 
@@ -708,9 +788,10 @@ export async function ensureRequirementsMaterializedForRead(
     const selectedSiteCount = asNumber(requirements.siteCount, 1, 1, 500);
     const expectedSegmentFamilies = buildSegments(requirements).map((segment) => segment.vlanName).sort();
     const expectedMinimumVlans = selectedSiteCount * expectedSegmentFamilies.length;
+    const expectedMinimumDhcpScopes = selectedSiteCount * buildSegments(requirements).filter((segment) => segment.dhcpEnabled).length;
     const before = countMaterializedRows(project);
 
-    if (!readRepairGap(before, selectedSiteCount, expectedMinimumVlans)) {
+    if (!readRepairGap(before, selectedSiteCount, expectedMinimumVlans, expectedMinimumDhcpScopes)) {
       return {
         reason,
         repaired: false,
@@ -719,6 +800,7 @@ export async function ensureRequirementsMaterializedForRead(
         selectedSiteCount,
         expectedSegmentFamilies,
         expectedMinimumVlans,
+        expectedMinimumDhcpScopes,
         materialization: null,
       };
     }
@@ -731,23 +813,24 @@ export async function ensureRequirementsMaterializedForRead(
         sites: {
           select: {
             id: true,
-            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true } },
+            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true, dhcpEnabled: true } },
           },
         },
+        dhcpScopes: { select: { id: true } },
       },
     });
-    const after = countMaterializedRows(repairedProject ?? { sites: [] });
+    const after = countMaterializedRows(repairedProject ?? { sites: [], dhcpScopes: [] });
 
-    if (readRepairGap(after, selectedSiteCount, expectedMinimumVlans)) {
+    if (readRepairGap(after, selectedSiteCount, expectedMinimumVlans, expectedMinimumDhcpScopes)) {
       throw new ApiError(
         500,
-        `Requirements read-repair failed during ${reason}: selected ${selectedSiteCount} site(s), expected at least ${expectedMinimumVlans} VLAN/segment row(s), observed ${after.sites} site(s), ${after.vlans} VLAN(s), ${after.addressingRows} addressing row(s).`,
+        `Requirements read-repair failed during ${reason}: selected ${selectedSiteCount} site(s), expected at least ${expectedMinimumVlans} VLAN/segment row(s) and ${expectedMinimumDhcpScopes} DHCP scope(s), observed ${after.sites} site(s), ${after.vlans} VLAN(s), ${after.addressingRows} addressing row(s), and ${after.dhcpScopes} DHCP scope(s).`,
       );
     }
 
     await addChangeLog(
       projectId,
-      `Phase 79 read-repair materialized saved requirements during ${reason}: ${before.sites}->${after.sites} site(s), ${before.vlans}->${after.vlans} VLAN(s), ${before.addressingRows}->${after.addressingRows} addressing row(s).`,
+      `Phase 83 read-repair materialized saved requirements during ${reason}: ${before.sites}->${after.sites} site(s), ${before.vlans}->${after.vlans} VLAN(s), ${before.addressingRows}->${after.addressingRows} addressing row(s), ${before.dhcpScopes}->${after.dhcpScopes} DHCP scope(s).`,
       actorLabel,
       tx as any,
     );
@@ -760,6 +843,7 @@ export async function ensureRequirementsMaterializedForRead(
       selectedSiteCount,
       expectedSegmentFamilies,
       expectedMinimumVlans,
+      expectedMinimumDhcpScopes,
       materialization,
     };
   });
