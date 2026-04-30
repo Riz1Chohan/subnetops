@@ -1474,6 +1474,8 @@ export interface DesignCoreSnapshot {
     implementationPlanReviewStepCount: number;
     implementationPlanFindingCount: number;
     implementationPlanBlockingFindingCount: number;
+    designReviewReadiness: DesignTruthReadiness;
+    implementationExecutionReadiness: DesignTruthReadiness;
     readyForBackendAuthority: boolean;
     readyForLiveMappingSplit: boolean;
   };

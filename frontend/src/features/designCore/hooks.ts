@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getDesignCoreSnapshot } from "./api";
 import type { Project, Site, Vlan } from "../../lib/types";
 import type { RequirementsProfile } from "../../lib/requirementsProfile";
@@ -45,7 +45,10 @@ export function useDesignCoreSnapshot(projectId: string, inputFingerprint = "") 
     queryKey: ["design-core", projectId, inputFingerprint],
     queryFn: () => getDesignCoreSnapshot(projectId),
     enabled: Boolean(projectId),
-    staleTime: 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 

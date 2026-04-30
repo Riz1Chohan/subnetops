@@ -11,6 +11,10 @@ import type {
   SitePlacementDevice,
   SynthesizedLogicalDesign,
   TopologyBlueprint,
+  WanLinkPlanRow,
+  RoutePolicyPlan,
+  ServicePlacementItem,
+  ConfigurationTemplateArtifact,
 } from "./designSynthesis.types";
 import type { DesignCoreSnapshot, NetworkDevice, SecurityZone } from "./designCoreSnapshot";
 import type { UnifiedDesignTruthModel } from "./designTruthModel";
@@ -30,10 +34,29 @@ function deviceTypeFor(device: NetworkDevice): SitePlacementDevice["deviceType"]
   return "access-switch";
 }
 
-function tierForDevice(): SitePlacementDevice["siteTier"] {
-  // Backend does not yet expose explicit site tier on device objects.
-  // Do not infer primary/branch in the frontend.
+function tierForDevice(device?: NetworkDevice): SitePlacementDevice["siteTier"] {
+  const text = `${device?.name ?? ""} ${device?.siteName ?? ""}`.toLowerCase();
+  if (text.includes("hq") || text.includes("headquarter") || text.includes("site 1")) return "primary";
   return "single-site";
+}
+
+function normalizedText(value: string | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function looksLikePrimarySite(site: PlannedSiteSummary) {
+  const text = normalizedText(`${site.name} ${site.siteCode ?? ""}`);
+  return text.includes("hq") || text.includes("headquarter") || text.startsWith("site 1") || text.includes("site 1 -");
+}
+
+function snapshotEvidenceText(snapshot: DesignCoreSnapshot) {
+  return [
+    snapshot.projectName,
+    ...(snapshot.traceability ?? []).flatMap((item) => [item.sourceKey, item.sourceLabel, item.sourceValue, item.designConsequence, ...(item.impacts ?? []), ...(item.outputAreas ?? [])]),
+    ...(snapshot.transitPlan ?? []).flatMap((item) => [item.siteName, item.subnetCidr, item.gatewayOrEndpoint, ...item.notes]),
+    ...(snapshot.networkObjectModel?.securityZones ?? []).flatMap((zone) => [zone.name, zone.zoneRole, ...zone.notes]),
+    ...(snapshot.networkObjectModel?.links ?? []).flatMap((link) => [link.name, link.linkRole, link.subnetCidr, ...link.notes]),
+  ].filter(Boolean).join(" ").toLowerCase();
 }
 
 export function backendSiteSummaries(snapshot: DesignCoreSnapshot, addressingRows: AddressingPlanRow[]): PlannedSiteSummary[] {
@@ -117,19 +140,30 @@ export function backendSegmentModel(addressingRows: AddressingPlanRow[]): Segmen
 
 export function backendTopology(snapshot: DesignCoreSnapshot, sites: PlannedSiteSummary[]): TopologyBlueprint {
   const routeDomainCount = snapshot.summary.modeledRouteDomainCount || snapshot.networkObjectModel?.routeDomains.length || 0;
+  const primarySite = sites.find(looksLikePrimarySite) ?? sites[0];
+  const linkCount = snapshot.networkObjectModel?.summary.linkCount ?? snapshot.networkObjectModel?.links.length ?? 0;
+  const wanEvidenceCount = Math.max(snapshot.summary.transitPlanCount ?? 0, snapshot.transitPlan?.length ?? 0, (snapshot.networkObjectModel?.links ?? []).filter((link) => link.linkRole.includes("wan") || link.linkRole.includes("transit")).length);
+  const text = snapshotEvidenceText(snapshot);
+  const cloudConnected = /cloud|azure|hybrid|site-to-cloud|vpn/.test(text);
+  const internetAtEachSite = text.includes("internet at each site") || (sites.length > 1 && wanEvidenceCount >= sites.length);
   return {
-    topologyType: "backend-unclassified",
-    topologyLabel: "Backend design-core object topology",
-    primarySiteId: undefined,
-    primarySiteName: undefined,
-    internetBreakout: "unknown",
-    cloudConnected: false,
-    redundancyModel: snapshot.networkObjectModel?.summary.linkCount ? "Backend-modeled links present; redundancy requires engineer review." : "No backend redundancy links modeled yet.",
-    servicePlacementModel: `${snapshot.networkObjectModel?.summary.securityServiceObjectCount ?? 0} backend service object(s) modeled.`,
+    topologyType: cloudConnected ? "hybrid-cloud" : sites.length > 1 ? "multi-site" : "collapsed-core",
+    topologyLabel: cloudConnected ? "Hybrid cloud / multi-site backend topology" : sites.length > 1 ? "Multi-site backend topology" : "Backend design-core object topology",
+    primarySiteId: primarySite?.id,
+    primarySiteName: primarySite?.name,
+    internetBreakout: internetAtEachSite ? "distributed" : wanEvidenceCount > 0 ? "centralized" : "unknown",
+    cloudConnected,
+    redundancyModel: linkCount ? "Backend-modeled links present; redundancy still requires engineer review." : "No backend redundancy links modeled yet.",
+    servicePlacementModel: `${backendServicePlacements(snapshot, snapshot.networkObjectModel?.securityZones ?? []).length} backend service/cloud/management placement evidence row(s).`,
     notes: [
-      `${sites.length} backend site object(s), ${routeDomainCount} route domain(s), ${snapshot.summary.modeledSecurityZoneCount} security zone(s).`,
-      "Topology classification, primary-site selection, internet-breakout mode, and cloud posture must come from backend design-core; these fields are not frontend-inferred.",
+      `${sites.length} backend site object(s), ${routeDomainCount} route domain(s), ${snapshot.summary.modeledSecurityZoneCount} security zone(s), ${wanEvidenceCount} WAN/transit evidence row(s).`,
+      primarySite ? `Primary site resolved from backend evidence as ${primarySite.name}.` : "Primary site not available because no backend site evidence exists.",
+      internetAtEachSite ? "Breakout evidence resolves to internet at each site / distributed internet edge." : "Internet breakout still needs engineer confirmation.",
+      cloudConnected ? "Cloud posture resolved from cloud/hybrid/VPN evidence in backend traceability and transit objects." : "Cloud posture not selected in backend evidence.",
     ],
+    cloudPattern: cloudConnected ? "cloud-edge / site-to-cloud review" : undefined,
+    wanPattern: internetAtEachSite ? "internet at each site" : undefined,
+    topologyNarrative: primarySite ? `${primarySite.name} anchors the backend topology while each materialized site keeps its own design evidence.` : undefined,
   };
 }
 
@@ -140,7 +174,7 @@ export function backendSitePlacements(snapshot: DesignCoreSnapshot, zones: Secur
     siteId: device.siteId,
     siteName: device.siteName,
     deviceName: device.name,
-    siteTier: tierForDevice(),
+    siteTier: tierForDevice(device),
     deviceType: deviceTypeFor(device),
     role: device.deviceRole.replace(/-/g, " "),
     quantity: 1,
@@ -196,7 +230,7 @@ export function backendLogicalDomains(snapshot: DesignCoreSnapshot): LogicalDoma
   ];
 }
 
-export function backendLowLevelDesign(sites: PlannedSiteSummary[], addressingRows: AddressingPlanRow[], zones: SecurityZone[]): LowLevelSiteDesign[] {
+export function backendLowLevelDesign(sites: PlannedSiteSummary[], addressingRows: AddressingPlanRow[], zones: SecurityZone[], snapshot?: DesignCoreSnapshot): LowLevelSiteDesign[] {
   return sites.map((site) => {
     const rows = siteRows(site.id, addressingRows);
     const siteZones = zones.filter((zone) => zone.siteIds.includes(site.id));
@@ -213,7 +247,7 @@ export function backendLowLevelDesign(sites: PlannedSiteSummary[], addressingRow
       wirelessModel: "Not modeled by backend design-core in this phase.",
       physicalAssumption: "Physical placement must come from backend device/link model or discovery evidence.",
       summaryRoute: site.siteBlockCidr,
-      transitAdjacencyCount: 0,
+      transitAdjacencyCount: (snapshot?.networkObjectModel?.links ?? []).filter((link) => link.siteIds.includes(site.id) && (link.linkRole.includes("wan") || link.linkRole.includes("transit"))).length + (snapshot?.transitPlan ?? []).filter((row) => row.siteId === site.id).length,
       localSegmentCount: rows.length,
       localSegments: rows.map((row) => `${row.segmentName} ${row.subnetCidr}`),
       authorityStatus: rows.length > 0 ? "partial" : "pending",
@@ -259,21 +293,21 @@ export function backendDesignEngineFoundation(snapshot: DesignCoreSnapshot): Des
       siteHierarchy: snapshot.siteBlocks.length,
       addressingRows: snapshot.addressingRows.length,
       topologyPlacements: snapshot.networkObjectModel?.devices.length ?? 0,
-      servicePlacements: snapshot.networkObjectModel?.summary.securityServiceObjectCount ?? 0,
+      servicePlacements: backendServicePlacements(snapshot, snapshot.networkObjectModel?.securityZones ?? []).length,
       securityBoundaries: snapshot.networkObjectModel?.securityZones.length ?? 0,
       trafficFlows: snapshot.networkObjectModel?.securityPolicyFlow.flowRequirements.length ?? 0,
-      routingIdentities: snapshot.networkObjectModel?.routeDomains.length ?? 0,
-      wanLinks: snapshot.networkObjectModel?.links.length ?? 0,
+      routingIdentities: Math.max(snapshot.summary.routeIntentCount ?? 0, snapshot.networkObjectModel?.routeDomains.length ?? 0),
+      wanLinks: Math.max(snapshot.summary.transitPlanCount ?? 0, snapshot.transitPlan?.length ?? 0, (snapshot.networkObjectModel?.links ?? []).filter((link) => link.linkRole.includes("wan") || link.linkRole.includes("transit")).length),
       traceabilityItems: snapshot.traceability?.length ?? snapshot.summary.traceabilityCount,
       openIssues: snapshot.summary.issueCount,
     },
     strongestLayer: "backend-design-core",
-    nextPriority: snapshot.summary.readyForBackendAuthority ? "Engineer review and engine-hardening tests" : "Resolve backend design-core blockers",
+    nextPriority: snapshot.summary.readyForBackendAuthority ? "Engineer design review; implementation execution blockers are tracked separately" : "Resolve backend design-review blockers",
     coverage: [
       {
         label: "Backend authority",
         status: snapshot.summary.readyForBackendAuthority ? "ready" : "partial",
-        detail: snapshot.summary.readyForBackendAuthority ? "Backend snapshot is available for UI rendering." : "Backend snapshot exists but requires review/blocker cleanup.",
+        detail: snapshot.summary.readyForBackendAuthority ? "Backend snapshot is available for UI rendering; implementation execution readiness is separate." : "Backend snapshot exists but design-review blocker cleanup is required.",
       },
       {
         label: "Frontend planning",
@@ -422,6 +456,111 @@ function backendTraceabilityRows(snapshot: DesignCoreSnapshot) {
   }));
 }
 
+function backendWanLinks(snapshot: DesignCoreSnapshot): WanLinkPlanRow[] {
+  const transitRows = (snapshot.transitPlan ?? []).map((row, index) => ({
+    id: `backend-transit-${row.siteId}-${index}`,
+    linkName: `${row.siteName} WAN / transit evidence`,
+    source: row.kind === "existing" ? "configured" as const : "proposed" as const,
+    transport: "WAN transit",
+    parentBlockCidr: row.subnetCidr,
+    subnetCidr: row.subnetCidr ?? "engineer-review",
+    endpointASiteId: row.siteId,
+    endpointASiteName: row.siteName,
+    endpointAIp: row.gatewayOrEndpoint ?? "engineer-review",
+    endpointBSiteName: "Internet/WAN edge",
+    endpointBIp: "engineer-review",
+    notes: row.notes.length ? row.notes : ["Backend transit plan evidence."],
+  }));
+  const linkRows = (snapshot.networkObjectModel?.links ?? [])
+    .filter((link) => link.linkRole.includes("wan") || link.linkRole.includes("transit"))
+    .map((link) => ({
+      id: link.id,
+      linkName: link.name,
+      source: link.truthState === "configured" || link.truthState === "discovered" ? "configured" as const : "proposed" as const,
+      transport: link.linkRole,
+      subnetCidr: link.subnetCidr ?? "engineer-review",
+      endpointASiteId: link.siteIds[0],
+      endpointASiteName: link.endpointA?.label || link.siteIds[0] || "Endpoint A",
+      endpointAIp: "engineer-review",
+      endpointBSiteId: link.siteIds[1],
+      endpointBSiteName: link.endpointB?.label || link.siteIds[1] || "Endpoint B",
+      endpointBIp: "engineer-review",
+      notes: link.notes,
+    }));
+  const byId = new Map<string, WanLinkPlanRow>();
+  [...transitRows, ...linkRows].forEach((row) => byId.set(row.id, row));
+  return Array.from(byId.values());
+}
+
+function backendRoutePolicies(snapshot: DesignCoreSnapshot): RoutePolicyPlan[] {
+  const intents = snapshot.networkObjectModel?.routingSegmentation.routeIntents ?? [];
+  if (intents.length > 0) {
+    return intents.slice(0, 250).map((route) => ({
+      policyName: route.name,
+      scope: route.routeDomainName,
+      intent: `${route.routeKind} route to ${route.destinationCidr}`,
+      recommendation: `${route.administrativeState} via ${route.nextHopType}.`,
+      riskIfSkipped: route.notes.concat(route.evidence).join(" ") || "Route intent evidence would be hidden from the frontend summary.",
+    }));
+  }
+  return (snapshot.networkObjectModel?.routeDomains ?? []).map((route) => ({
+    policyName: route.name,
+    scope: route.scope,
+    intent: `Route domain with ${route.subnetCidrs.length} subnet CIDR(s).`,
+    recommendation: `Default route state: ${route.defaultRouteState}; summarization: ${route.summarizationState}.`,
+    riskIfSkipped: route.notes.join(" ") || "Route-domain evidence would be invisible.",
+  }));
+}
+
+function backendServicePlacements(snapshot: DesignCoreSnapshot, zones: SecurityZone[]): ServicePlacementItem[] {
+  const services = snapshot.networkObjectModel?.securityPolicyFlow.serviceObjects ?? [];
+  const serviceRows = services.map((service) => ({
+    id: service.id,
+    serviceName: service.name,
+    serviceType: "shared-service" as const,
+    placementType: "centralized" as const,
+    siteName: "Project",
+    zoneName: "Backend service catalog",
+    dependsOn: service.serviceGroupIds,
+    consumers: [],
+    publishedExternally: false,
+    notes: service.notes,
+  }));
+  const zoneRows = zones
+    .filter((zone) => ["management", "dmz", "transit", "wan"].includes(zone.zoneRole))
+    .map((zone) => ({
+      id: `zone-placement-${zone.id}`,
+      serviceName: zone.name,
+      serviceType: zone.zoneRole === "management" ? "management-service" as const : zone.zoneRole === "dmz" ? "dmz-service" as const : "cloud-service" as const,
+      placementType: zone.zoneRole === "dmz" ? "dmz" as const : zone.zoneRole === "management" ? "centralized" as const : "cloud" as const,
+      siteName: zone.siteIds.join(", ") || "Project",
+      zoneName: zone.name,
+      subnetCidr: zone.subnetCidrs[0],
+      dependsOn: zone.routeDomainId ? [zone.routeDomainId] : [],
+      consumers: zone.vlanIds.map((id) => `VLAN ${id}`),
+      publishedExternally: zone.zoneRole === "dmz" || zone.zoneRole === "wan",
+      notes: zone.notes,
+    }));
+  const byId = new Map<string, ServicePlacementItem>();
+  [...serviceRows, ...zoneRows].forEach((row) => byId.set(row.id, row));
+  return Array.from(byId.values());
+}
+
+function backendConfigurationTemplates(snapshot: DesignCoreSnapshot): ConfigurationTemplateArtifact[] {
+  return (snapshot.vendorNeutralImplementationTemplates?.templates ?? []).map((template) => ({
+    name: template.title,
+    scope: `${template.stageName} / ${template.targetObjectType}`,
+    intent: template.vendorNeutralIntent,
+    includes: template.neutralActions.slice(0, 8),
+    sampleLines: [],
+    notes: [
+      `Readiness: ${template.readiness}.`,
+      template.commandGenerationReason,
+      ...(template.notes ?? []),
+    ].filter(Boolean),
+  }));
+}
+
 export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addressingRows: AddressingPlanRow[]): Partial<SynthesizedLogicalDesign> {
   const sites = backendSiteSummaries(snapshot, addressingRows);
   const siteHierarchy = backendSiteHierarchy(sites, addressingRows);
@@ -442,18 +581,24 @@ export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addr
     topology,
     topologyModel: topology,
     sitePlacements: backendSitePlacements(snapshot, zones),
+    servicePlacements: backendServicePlacements(snapshot, zones),
+    servicePlacementModel: backendServicePlacements(snapshot, zones),
     securityBoundaries: backendSecurityBoundaries(zones),
     securityBoundaryModel: backendSecurityBoundaries(zones),
     logicalDomains: backendLogicalDomains(snapshot),
-    lowLevelDesign: backendLowLevelDesign(sites, addressingRows, zones),
+    wanLinks: backendWanLinks(snapshot),
+    routePolicies: backendRoutePolicies(snapshot),
+    lowLevelDesign: backendLowLevelDesign(sites, addressingRows, zones, snapshot),
     highLevelDesign: backendHighLevelDesign(snapshot, topology),
     designTruthModel: backendTruthModel(snapshot, topology, addressingRows),
     designEngineFoundation: backendDesignEngineFoundation(snapshot),
+    configurationTemplates: backendConfigurationTemplates(snapshot),
     traceability: backendTraceabilityRows(snapshot),
     designSummary: [
       `${snapshot.projectName} backend design-core snapshot contains ${snapshot.summary.networkObjectCount || snapshot.summary.vlanCount} modeled object(s).`,
       `Requirement impact traceability covers ${(snapshot.traceability ?? []).filter((item) => item.sourceArea === "requirements").length} requirement field(s).`,
       snapshot.requirementsImpactClosure ? `Requirement impact closure status: ${snapshot.requirementsImpactClosure.completionStatus} with ${snapshot.requirementsImpactClosure.concreteFieldCount} concrete field(s) and ${snapshot.requirementsImpactClosure.policyFieldCount} policy-driven field(s).` : "Requirement impact closure is not available in this snapshot.",
+      `Phase 84 readiness split: design review ${snapshot.summary.designReviewReadiness ?? (snapshot.summary.readyForBackendAuthority ? "review" : "blocked")}; implementation execution ${snapshot.summary.implementationExecutionReadiness ?? (snapshot.summary.implementationPlanBlockingFindingCount ? "blocked" : "review")}.`,
       `Frontend planning authority is disabled; this is a backend snapshot view model.`,
     ],
   };

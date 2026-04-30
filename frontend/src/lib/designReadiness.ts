@@ -50,10 +50,22 @@ export function buildValidationReadinessSummary(
   const contradictions: ValidationTrustSignal[] = [];
   const strengths: string[] = [];
 
-  const plannedSiteCount = Math.max(1, num(profile.siteCount, sites.length || 1));
+  const backendSiteEvidenceCount = Math.max(design.siteHierarchy.length, design.siteSummaries.length, new Set(design.addressingPlan.map((row) => row.siteId)).size);
+  const backendAddressingEvidenceCount = design.addressingPlan.length;
+  const backendConfiguredBlockCount = Math.max(
+    design.siteHierarchy.filter((site) => site.siteBlockCidr?.trim()).length,
+    design.siteSummaries.filter((site) => site.siteBlockCidr?.trim()).length,
+  );
+  const backendSegmentEvidenceCount = Math.max(
+    design.segmentModel.reduce((sum, segment) => sum + segment.configuredCount + segment.proposedCount, 0),
+    backendAddressingEvidenceCount,
+  );
+  const plannedSiteCount = Math.max(1, num(profile.siteCount, sites.length || backendSiteEvidenceCount || 1));
   const expectedUsersPerSite = Math.max(1, num(profile.usersPerSite, 50));
-  const configuredSiteBlocks = sites.filter((site) => site.defaultAddressBlock?.trim()).length;
-  const configuredVlans = vlans.length;
+  const effectiveSiteCount = Math.max(sites.length, backendSiteEvidenceCount);
+  const configuredSiteBlocks = Math.max(sites.filter((site) => site.defaultAddressBlock?.trim()).length, backendConfiguredBlockCount);
+  const configuredVlans = Math.max(vlans.length, backendSegmentEvidenceCount);
+  const hasMaterializedBackendEvidence = effectiveSiteCount > 0 && backendAddressingEvidenceCount > 0;
   const hasCloudEnvironment = profile.environmentType !== 'On-prem';
 
   if (!project?.basePrivateRange?.trim()) {
@@ -69,7 +81,7 @@ export function buildValidationReadinessSummary(
     strengths.push('Organization base private range is explicitly defined.');
   }
 
-  if (sites.length === 0) {
+  if (effectiveSiteCount === 0) {
     missingInfo.push({
       id: 'no-sites',
       level: 'critical',
@@ -78,12 +90,12 @@ export function buildValidationReadinessSummary(
       fixPath: `/projects/${project?.id ?? ''}/sites`,
       actionLabel: 'Add site details',
     });
-  } else if (sites.length < plannedSiteCount) {
+  } else if (effectiveSiteCount < plannedSiteCount) {
     missingInfo.push({
       id: 'site-gap',
       level: 'warning',
       title: 'Planned site count is ahead of configured site records',
-      detail: `Requirements expect about ${plannedSiteCount} site(s), but only ${sites.length} site record(s) exist right now.`,
+      detail: `Requirements expect about ${plannedSiteCount} site(s), but only ${effectiveSiteCount} loaded site evidence row(s) exist right now.`,
       fixPath: `/projects/${project?.id ?? ''}/sites`,
       actionLabel: 'Complete site list',
     });
@@ -100,12 +112,12 @@ export function buildValidationReadinessSummary(
       fixPath: `/projects/${project?.id ?? ''}/sites`,
       actionLabel: 'Assign site blocks',
     });
-  } else if (configuredSiteBlocks < sites.length) {
+  } else if (configuredSiteBlocks < effectiveSiteCount) {
     missingInfo.push({
       id: 'partial-site-blocks',
       level: 'warning',
       title: 'Some sites still rely on assumed addressing',
-      detail: `${sites.length - configuredSiteBlocks} site(s) are missing an explicit default address block.`,
+      detail: `${effectiveSiteCount - configuredSiteBlocks} site(s) are missing an explicit default address block.`,
       fixPath: `/projects/${project?.id ?? ''}/sites`,
       actionLabel: 'Finish site addressing',
     });
@@ -122,12 +134,12 @@ export function buildValidationReadinessSummary(
       fixPath: `/projects/${project?.id ?? ''}/vlans`,
       actionLabel: 'Add VLAN records',
     });
-  } else if (configuredVlans < sites.length) {
+  } else if (configuredVlans < effectiveSiteCount) {
     missingInfo.push({
       id: 'thin-vlan-model',
       level: 'warning',
       title: 'Configured segments look too thin for the number of sites',
-      detail: `There are ${configuredVlans} VLAN records across ${sites.length} configured site(s), which suggests the low-level model is still incomplete.`,
+      detail: `There are ${configuredVlans} VLAN/segment evidence row(s) across ${effectiveSiteCount} loaded site(s), which suggests the low-level model is still incomplete.`,
       fixPath: `/projects/${project?.id ?? ''}/vlans`,
       actionLabel: 'Deepen segment model',
     });
@@ -223,6 +235,22 @@ export function buildValidationReadinessSummary(
     });
   }
 
+  if (hasMaterializedBackendEvidence) {
+    strengths.push(`Backend materialized evidence is loaded: ${effectiveSiteCount} site(s), ${backendAddressingEvidenceCount} addressing row(s), and ${configuredVlans} segment evidence row(s).`);
+  }
+
+  if (design.wanLinks.length > 0) {
+    strengths.push(`WAN/transit evidence is present with ${design.wanLinks.length} link or transit row(s).`);
+  }
+
+  if (design.routePolicies.length > 0) {
+    strengths.push(`Routing policy evidence is present with ${design.routePolicies.length} route policy row(s).`);
+  }
+
+  if (design.configurationTemplates.length > 0) {
+    strengths.push(`Implementation-template evidence exists with ${design.configurationTemplates.length} vendor-neutral template artifact(s).`);
+  }
+
   if (design.trafficFlows.length > 0) {
     strengths.push(`Traffic-flow modeling is present with ${design.trafficFlows.length} synthesized path(s).`);
   }
@@ -273,19 +301,26 @@ export function buildValidationReadinessSummary(
     });
   }
 
+  const warningPenaltyCap = hasMaterializedBackendEvidence && validationErrorCount === 0 ? 18 : Number.POSITIVE_INFINITY;
+  const validationWarningPenalty = Math.min(validationWarningCount * 1.25, warningPenaltyCap);
   const penalties = missingInfo.reduce((total, item) => total + (item.level === 'critical' ? 18 : 8), 0)
     + contradictions.reduce((total, item) => total + (item.level === 'critical' ? 20 : 10), 0)
-    + validationErrorCount * 6
-    + validationWarningCount * 2;
+    + validationErrorCount * 8
+    + validationWarningPenalty;
 
   const baseStrength = 52
-    + Math.min(12, configuredSiteBlocks * 3)
-    + Math.min(10, configuredVlans)
+    + Math.min(14, configuredSiteBlocks * 2)
+    + Math.min(16, configuredVlans / 5)
     + Math.min(8, design.trafficFlows.length)
     + Math.min(8, design.securityBoundaries.length)
-    + Math.min(10, design.routingPlan.length);
+    + Math.min(10, design.routingPlan.length)
+    + Math.min(8, design.routePolicies.length / 10)
+    + Math.min(6, design.wanLinks.length / 2)
+    + Math.min(6, design.configurationTemplates.length / 25);
 
-  const score = Math.max(0, Math.min(100, baseStrength - penalties));
+  const rawScore = Math.max(0, Math.min(100, baseStrength - penalties));
+  const evidenceFloor = hasMaterializedBackendEvidence && validationErrorCount === 0 && missingInfo.every((item) => item.level !== 'critical') ? 58 : 0;
+  const score = Math.max(evidenceFloor, rawScore);
 
   let status: 'high' | 'medium' | 'low' = 'low';
   let label = 'Low confidence';
@@ -298,10 +333,10 @@ export function buildValidationReadinessSummary(
   }
 
   const summary = status === 'high'
-    ? 'The design has a stronger factual base, but validation should still be re-run after every major change.'
+    ? 'The design has a stronger factual base for design review, while implementation execution may still need separate blocker cleanup.'
     : status === 'medium'
-      ? 'The design is reviewable, but some planning assumptions and contradictions still weaken implementation trust.'
-      : 'The design still depends on assumptions or conflicting inputs, so implementation-ready outputs would be premature.';
+      ? 'The design is reviewable, but warnings and assumptions should still be cleaned up before implementation execution.'
+      : 'The design still depends on assumptions or conflicting inputs. Do not confuse this design-review score with implementation execution readiness.';
 
   const nextActions = dedupeByTitle([...missingInfo, ...contradictions])
     .slice(0, 4)

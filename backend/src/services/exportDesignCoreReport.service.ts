@@ -134,6 +134,47 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     ],
   });
 
+  const phase84DefaultDenyPolicies = policyRules.filter((rule: any) => asArray(rule?.notes).some((note: any) => String(note).includes("Phase 84 explicit default-deny guardrail")));
+  report.sections.push({
+    title: "Phase 84 Design Trust and Policy Reconciliation",
+    paragraphs: [
+      "Phase 84 separates design-review readiness from implementation execution readiness so warnings, missing live inventory, and vendor-specific change gates do not collapse a materialized design into a false zero-trust state.",
+      `Design review readiness: ${asString(designCore.summary?.designReviewReadiness, designCore.summary?.readyForBackendAuthority ? "review" : "blocked")}. Implementation execution readiness: ${asString(designCore.summary?.implementationExecutionReadiness, designCore.summary?.implementationPlanBlockingFindingCount ? "blocked" : "review")}.`,
+      "The report now surfaces authoritative evidence counts used by the UI instead of relying on shallow zero-prone frontend fields.",
+    ],
+    tables: [
+      {
+        title: "Phase 84 Readiness Split",
+        headers: ["Readiness Track", "Status", "Evidence"],
+        rows: [
+          ["Design review", asString(designCore.summary?.designReviewReadiness, designCore.summary?.readyForBackendAuthority ? "review" : "blocked"), `${designCore.summary?.siteCount ?? siteSummaries.length} site(s), ${designCore.summary?.vlanCount ?? requirementOutputAddressRowCount} addressing row(s), ${designCore.summary?.networkObjectCount ?? networkDevices.length + networkInterfaces.length} modeled object(s), ${designCore.summary?.issueCount ?? 0} design issue(s).`],
+          ["Implementation execution", asString(designCore.summary?.implementationExecutionReadiness, designCore.summary?.implementationPlanBlockingFindingCount ? "blocked" : "review"), `${designCore.summary?.implementationPlanStepCount ?? implementationSteps.length} step(s), ${designCore.summary?.implementationPlanBlockingFindingCount ?? 0} blocking implementation finding(s), ${designCore.summary?.implementationPlanReviewStepCount ?? 0} review step(s).`],
+        ],
+      },
+      {
+        title: "Phase 84 Authoritative Evidence Metrics",
+        headers: ["Metric", "Count"],
+        rows: [
+          ["Materialized sites", String(designCore.summary?.siteCount ?? siteSummaries.length)],
+          ["Addressing rows", String(designCore.summary?.vlanCount ?? requirementOutputAddressRowCount)],
+          ["WAN/transit plan rows", String(designCore.summary?.transitPlanCount ?? transitPlan.length)],
+          ["Route intents", String(designCore.summary?.routeIntentCount ?? routeIntents.length)],
+          ["Durable DHCP scope evidence", String(dhcpPools.length)],
+          ["Vendor-neutral templates", String(vendorNeutralTemplates?.summary?.templateCount ?? asArray(vendorNeutralTemplates?.templates).length)],
+        ],
+      },
+      {
+        title: "Phase 84 Explicit Default-Deny Guardrails",
+        headers: ["Policy", "Source", "Destination", "Action"],
+        rows: compactRows(
+          phase84DefaultDenyPolicies.map((rule: any) => [asString(rule.name, rule.id), asString(rule.sourceZoneId, "—"), asString(rule.destinationZoneId, "—"), asString(rule.action, "deny")]).slice(0, 30),
+          [["No Phase 84 guardrail policies emitted", "—", "—", "review"]],
+        ),
+      },
+    ],
+  });
+
+
   if (requirementsImpactClosure || requirementsScenarioProof) {
     const closureRows = asArray(requirementsImpactClosure?.fieldOutcomes)
       .filter((item: any) => item?.captured)

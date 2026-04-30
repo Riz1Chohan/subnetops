@@ -1312,6 +1312,14 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   const enterpriseAllocatorReadiness = overallEnterpriseAllocatorReadiness(enterpriseAllocatorPosture);
 
   const generatedAt = new Date().toISOString();
+  const designMaterializedEvidenceReady = project.sites.length > 0 && addressingRows.length > 0 && networkObjectModel.summary.networkObjectCount > 0;
+  const designReviewReadiness =
+    !designMaterializedEvidenceReady || issues.some((issue) => issue.severity === "ERROR") || networkObjectModel.summary.designGraphBlockingFindingCount > 0 || networkObjectModel.routingSegmentation.summary.blockingFindingCount > 0 || networkObjectModel.securityPolicyFlow.summary.blockingFindingCount > 0
+      ? "blocked"
+      : networkObjectModel.securityPolicyFlow.summary.policyReadiness === "review" || networkObjectModel.routingSegmentation.summary.routingReadiness === "review"
+        ? "review"
+        : "ready";
+  const implementationExecutionReadiness = networkObjectModel.implementationPlan.summary.implementationReadiness;
 
   const summary = {
     siteCount: project.sites.length,
@@ -1352,7 +1360,9 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     implementationPlanReviewStepCount: networkObjectModel.implementationPlan.summary.reviewStepCount,
     implementationPlanFindingCount: networkObjectModel.implementationPlan.summary.findingCount,
     implementationPlanBlockingFindingCount: networkObjectModel.implementationPlan.summary.blockingFindingCount,
-    readyForBackendAuthority: !issues.some((issue) => issue.severity === "ERROR") && networkObjectModel.summary.designGraphBlockingFindingCount === 0 && networkObjectModel.routingSegmentation.summary.blockingFindingCount === 0 && networkObjectModel.securityPolicyFlow.summary.blockingFindingCount === 0 && networkObjectModel.implementationPlan.summary.blockingFindingCount === 0,
+    designReviewReadiness,
+    implementationExecutionReadiness,
+    readyForBackendAuthority: designReviewReadiness !== "blocked",
     readyForLiveMappingSplit: currentStateBoundary.liveMappingReady,
   };
 

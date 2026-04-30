@@ -1257,6 +1257,8 @@ export interface DesignCoreSnapshot {
     implementationPlanReviewStepCount: number;
     implementationPlanFindingCount: number;
     implementationPlanBlockingFindingCount: number;
+    designReviewReadiness?: "ready" | "review" | "blocked";
+    implementationExecutionReadiness?: "ready" | "review" | "blocked";
     readyForBackendAuthority: boolean;
     readyForLiveMappingSplit: boolean;
   };
@@ -1282,6 +1284,8 @@ export interface DesignCoreSnapshot {
   enterpriseAllocatorPosture?: EnterpriseAllocatorPostureSummary;
   siteBlocks: DesignCoreSiteBlock[];
   addressingRows: DesignCoreAddressRow[];
+  transitPlan?: Array<{ kind: "existing" | "proposed"; siteId: string; siteName: string; siteCode?: string | null; vlanId?: number; subnetCidr?: string; gatewayOrEndpoint?: string; notes: string[] }>;
+  loopbackPlan?: Array<{ kind: "existing" | "proposed"; siteId: string; siteName: string; siteCode?: string | null; vlanId?: number; subnetCidr?: string; endpointIp?: string; notes: string[] }>;
   networkObjectModel?: NetworkObjectModel;
   reportTruth?: BackendReportTruthModel;
   diagramTruth?: BackendDiagramTruthModel;
@@ -1295,21 +1299,24 @@ export interface DesignCoreSnapshot {
 }
 
 export function designCoreAuthorityLabel(snapshot?: DesignCoreSnapshot | null) {
-  if (!snapshot) return "Backend snapshot unavailable";
+  if (!snapshot) return "Backend snapshot loading";
   if (snapshot.summary.readyForBackendAuthority) return "Backend design-core snapshot";
-  return "Backend snapshot with blockers";
+  return "Backend snapshot available with blockers";
 }
 
 export function designCoreAuthorityDetail(snapshot?: DesignCoreSnapshot | null) {
-  if (!snapshot) return "Backend design-core snapshot unavailable; frontend planning fallback is disabled.";
+  if (!snapshot) return "Backend design-core snapshot is loading; the UI must not convert loading data into false zero evidence.";
   const generated = new Date(snapshot.authority?.generatedAt ?? snapshot.generatedAt).toLocaleString();
+  const designReadiness = snapshot.summary.designReviewReadiness ?? (snapshot.summary.readyForBackendAuthority ? "review" : "blocked");
+  const implementationReadiness = snapshot.summary.implementationExecutionReadiness ?? (snapshot.summary.implementationPlanBlockingFindingCount ? "blocked" : "review");
   const blockerCount = snapshot.issues.filter((issue) => issue.severity === "ERROR").length;
   const reviewNote = snapshot.authority?.requiresEngineerReview ? "engineer review required" : "review required";
   const objectSummary = snapshot.summary.networkObjectCount ? ` • ${snapshot.summary.networkObjectCount} network objects` : "";
   const graphSummary = snapshot.summary.designGraphNodeCount ? ` • ${snapshot.summary.designGraphNodeCount} graph nodes / ${snapshot.summary.designGraphEdgeCount} graph edges` : "";
   const graphBlockers = snapshot.summary.designGraphBlockingFindingCount ? ` • ${snapshot.summary.designGraphBlockingFindingCount} graph blocker${snapshot.summary.designGraphBlockingFindingCount === 1 ? "" : "s"}` : "";
   const routeSummary = snapshot.summary.routeIntentCount ? ` • ${snapshot.summary.routeIntentCount} route intents` : "";
+  const transitSummary = snapshot.summary.transitPlanCount ? ` • ${snapshot.summary.transitPlanCount} transit rows` : "";
   const segmentationSummary = snapshot.summary.segmentationExpectationCount ? ` • ${snapshot.summary.segmentationExpectationCount} segmentation checks` : "";
   const implementationSummary = snapshot.summary.implementationPlanStepCount ? ` • ${snapshot.summary.implementationPlanStepCount} implementation steps` : "";
-  return `${snapshot.summary.vlanCount} address rows • ${snapshot.summary.validSubnetCount} valid subnets${objectSummary}${graphSummary}${routeSummary}${segmentationSummary}${implementationSummary} • ${blockerCount} blocker${blockerCount === 1 ? "" : "s"}${graphBlockers} • generated ${generated} • ${reviewNote}`;
+  return `${snapshot.summary.vlanCount} address rows • ${snapshot.summary.validSubnetCount} valid subnets${objectSummary}${graphSummary}${routeSummary}${transitSummary}${segmentationSummary}${implementationSummary} • design review ${designReadiness} • implementation execution ${implementationReadiness} • ${blockerCount} design blocker${blockerCount === 1 ? "" : "s"}${graphBlockers} • generated ${generated} • ${reviewNote}`;
 }

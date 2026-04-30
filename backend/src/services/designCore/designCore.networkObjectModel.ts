@@ -344,6 +344,32 @@ function addPolicyRule(policyRules: PolicyRule[], rule: PolicyRule) {
   policyRules.push(rule);
 }
 
+function addPhase84DefaultDenyPolicyGuardrail(
+  policyRules: PolicyRule[],
+  zoneIds: Set<string>,
+  sourceZoneId: string,
+  destinationZoneId: string,
+  id: string,
+  name: string,
+  rationale: string,
+) {
+  if (!zoneIds.has(sourceZoneId) || !zoneIds.has(destinationZoneId)) return;
+  addPolicyRule(policyRules, {
+    id,
+    name,
+    sourceZoneId,
+    destinationZoneId,
+    action: "deny",
+    services: ["any"],
+    truthState: "proposed",
+    rationale,
+    notes: [
+      "Phase 84 explicit default-deny guardrail. This is design-review policy evidence, not a vendor-specific firewall command.",
+      "Implementation execution still requires real interface mapping, management IPs, backup evidence, logging scope, and change-window approval.",
+    ],
+  });
+}
+
 function buildPolicyRules(securityZones: SecurityZone[], requirements: RequirementInputMap): PolicyRule[] {
   const policyRules: PolicyRule[] = [];
   const zoneIds = new Set(securityZones.map((zone) => zone.id));
@@ -442,15 +468,15 @@ function buildPolicyRules(securityZones: SecurityZone[], requirements: Requireme
 
   if (zoneIds.has(dmzZoneId) && zoneIds.has(internalZoneId)) {
     addPolicyRule(policyRules, {
-      id: "policy-review-dmz-to-internal",
-      name: "Review DMZ to Internal Access",
+      id: "policy-deny-dmz-to-internal",
+      name: "Deny DMZ to Corporate Internal by Default",
       sourceZoneId: dmzZoneId,
       destinationZoneId: internalZoneId,
-      action: "review",
-      services: ["application-specific"],
+      action: "deny",
+      services: ["any"],
       truthState: "proposed",
-      rationale: "DMZ systems should not have broad access into internal networks.",
-      notes: ["Replace this review rule with explicit application flows in the security policy engine phase."],
+      rationale: "DMZ systems should not have broad access into internal networks; application-specific exceptions must be separately reviewed.",
+      notes: ["Phase 84 explicit default-deny guardrail. Application exceptions belong in separate allow/review rules with exact services and owners."],
     });
   }
 
@@ -532,6 +558,19 @@ function buildPolicyRules(securityZones: SecurityZone[], requirements: Requireme
       notes: ["Replace this review rule with exact print, camera-management, or IoT-controller services before implementation."],
     });
   }
+
+
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, managementZoneId, "policy-deny-guest-to-management", "Deny Guest to Management Plane", "Guest networks must never reach device administration or management-plane services.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, iotZoneId, "policy-deny-guest-to-iot", "Deny Guest to IoT and Shared Device Networks", "Guest networks should be internet-only and isolated from shared device segments.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, transitZoneId, "policy-deny-guest-to-wan-transit", "Deny Guest to WAN Transit", "Guest access should not reach WAN/cloud transit segments directly; internet egress must use the reviewed WAN edge policy.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, internalZoneId, "policy-deny-wan-to-corporate-internal", "Deny WAN to Corporate Internal", "Untrusted WAN or internet sources must not reach corporate internal networks by default.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, managementZoneId, "policy-deny-wan-to-management", "Deny WAN to Management Plane", "External sources must not reach the management plane unless a separate, reviewed remote-admin architecture exists.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, guestZoneId, "policy-deny-wan-to-guest", "Deny WAN to Guest Networks", "Guest networks are consumer-side egress segments, not inbound destinations from WAN or internet sources.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, iotZoneId, "policy-deny-wan-to-iot", "Deny WAN to IoT and Shared Device Networks", "Shared device networks must not be exposed to untrusted WAN sources.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, transitZoneId, "policy-deny-wan-to-wan-transit", "Deny WAN to WAN Transit Internals", "WAN/transit infrastructure should not accept broad inbound traffic from the untrusted WAN zone.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, dmzZoneId, managementZoneId, "policy-deny-dmz-to-management", "Deny DMZ to Management Plane", "Compromised DMZ workloads must not pivot into management-plane services.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, iotZoneId, managementZoneId, "policy-deny-iot-to-management", "Deny IoT to Management Plane", "Printers, cameras, and IoT devices must not reach network-device administration surfaces.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, transitZoneId, managementZoneId, "policy-deny-wan-transit-to-management", "Deny WAN Transit to Management Plane", "Transit/cloud-edge segments must not inherit management-plane access by default.");
 
   return policyRules;
 }

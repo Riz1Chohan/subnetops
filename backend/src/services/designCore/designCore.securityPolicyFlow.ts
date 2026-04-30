@@ -606,6 +606,25 @@ function buildAdditionalFlowInputs(model: SecurityPolicyNetworkObjectModel): Bas
   const dmzZone = findZoneByRole(model.securityZones, "dmz");
   const guestZone = findZoneByRole(model.securityZones, "guest");
   const wideAreaNetworkZone = findZoneByRole(model.securityZones, "wan");
+  const transitZone = findZoneByRole(model.securityZones, "transit");
+  const iotZone = findZoneByRole(model.securityZones, "iot");
+
+  const pushPhase84DenyFlow = (id: string, name: string, sourceZone: SecurityZone | undefined, destinationZone: SecurityZone | undefined, rationale: string) => {
+    if (!sourceZone || !destinationZone) return;
+    flowInputs.push({
+      id,
+      name,
+      sourceZone,
+      destinationZone,
+      expectedAction: "deny",
+      serviceNames: ["any"],
+      natRequired: false,
+      severityIfMissing: "ERROR",
+      rationale,
+      truthState: "proposed",
+      notes: ["Phase 84 explicit default-deny policy reconciliation flow."],
+    });
+  };
 
   if (internalZone && wideAreaNetworkZone) {
     flowInputs.push({
@@ -718,6 +737,17 @@ function buildAdditionalFlowInputs(model: SecurityPolicyNetworkObjectModel): Bas
       notes: ["Engineer review is required because DMZ egress depends on the application threat model."],
     });
   }
+
+  pushPhase84DenyFlow("security-flow-phase84-guest-to-iot-deny", "Guest to IoT must be denied by default", guestZone, iotZone, "Guest networks must remain isolated from shared device networks.");
+  pushPhase84DenyFlow("security-flow-phase84-guest-to-transit-deny", "Guest to WAN transit must be denied by default", guestZone, transitZone, "Guest networks should only use reviewed internet egress, not direct transit access.");
+  pushPhase84DenyFlow("security-flow-phase84-wan-to-management-deny", "WAN to management must be denied by default", wideAreaNetworkZone, managementZone, "Untrusted WAN sources must not reach management-plane services.");
+  pushPhase84DenyFlow("security-flow-phase84-wan-to-guest-deny", "WAN to guest must be denied by default", wideAreaNetworkZone, guestZone, "Guest networks are not inbound WAN destinations.");
+  pushPhase84DenyFlow("security-flow-phase84-wan-to-iot-deny", "WAN to IoT must be denied by default", wideAreaNetworkZone, iotZone, "Shared device networks must not be externally reachable.");
+  pushPhase84DenyFlow("security-flow-phase84-wan-to-transit-deny", "WAN to WAN-transit internals must be denied by default", wideAreaNetworkZone, transitZone, "Transit segments must not accept broad inbound WAN traffic.");
+  pushPhase84DenyFlow("security-flow-phase84-dmz-to-internal-deny", "DMZ to internal must be denied by default", dmzZone, internalZone, "DMZ-to-internal access requires exact application exceptions, not broad reachability.");
+  pushPhase84DenyFlow("security-flow-phase84-dmz-to-management-deny", "DMZ to management must be denied by default", dmzZone, managementZone, "DMZ workloads must not pivot into management-plane services.");
+  pushPhase84DenyFlow("security-flow-phase84-iot-to-management-deny", "IoT to management must be denied by default", iotZone, managementZone, "Shared device networks must not reach network administration services.");
+  pushPhase84DenyFlow("security-flow-phase84-transit-to-management-deny", "WAN transit to management must be denied by default", transitZone, managementZone, "WAN/cloud transit segments must not inherit management-plane access.");
 
   return flowInputs;
 }
