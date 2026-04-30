@@ -38,13 +38,47 @@ function edgeVisible(edge: BackendDiagramRenderEdge, activeOverlays: ActiveOverl
   return edge.overlayKeys.some((key) => overlays.has(key));
 }
 
+function nodeVisibleByDefault(node: BackendDiagramRenderNode, mode: DiagramMode, scope: DiagramScope) {
+  if (mode === "physical") {
+    return node.objectType === "site" || node.objectType === "network-device" || node.objectType === "route-domain" || (node.objectType === "network-link" && /wan|transit|vpn|internet|cloud|site-to-site/i.test(node.label));
+  }
+
+  if (scope === "boundaries") {
+    return node.objectType === "site" || node.objectType === "network-device" || node.objectType === "security-zone" || node.objectType === "policy-rule" || node.objectType === "nat-rule" || node.objectType === "security-flow";
+  }
+
+  if (scope === "wan-cloud") {
+    return node.objectType === "site" || node.objectType === "network-device" || node.objectType === "network-link" || node.objectType === "route-domain" || node.objectType === "route-intent" || node.objectType === "security-zone";
+  }
+
+  return node.objectType === "site" || node.objectType === "network-device" || node.objectType === "route-domain" || node.objectType === "security-zone" || (node.objectType === "network-link" && /wan|transit|vpn|internet|cloud|site-to-site/i.test(node.label));
+}
+
+function nodeVisibleForOverlays(node: BackendDiagramRenderNode, activeOverlays: ActiveOverlayMode[]) {
+  if (activeOverlays.length === 0) return false;
+  const overlays = selectedOverlaySet(activeOverlays);
+  if (overlays.has("addressing")) return node.layer === "site" || node.layer === "device" || node.layer === "interface" || node.objectType === "dhcp-pool";
+  if (overlays.has("security")) return node.layer === "security" || node.layer === "device" || node.objectType === "site";
+  if (overlays.has("flows")) return node.objectType === "security-flow" || node.objectType === "segmentation-flow" || node.layer === "security" || node.layer === "device";
+  if (overlays.has("services")) return /service|server|cloud|remote|operations/i.test(node.label) || node.layer === "device" || node.objectType === "site";
+  if (overlays.has("redundancy")) return node.layer === "routing" || node.layer === "interface" || node.layer === "device" || node.objectType === "site";
+  return false;
+}
+
+function visibleNodeSet(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
+  const visible = renderModel.nodes.filter((node) => nodeVisibleByDefault(node, mode, scope) || nodeVisibleForOverlays(node, activeOverlays));
+  return visible.length > 0 ? visible : renderModel.nodes.slice(0, 40);
+}
+
 export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays, linkAnnotationMode }: BackendDiagramCanvasProps) {
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(renderModel.nodes[0]?.id ?? "");
-  const nodeById = useMemo(() => new Map(renderModel.nodes.map((node) => [node.id, node])), [renderModel.nodes]);
-  const selectedNode = nodeById.get(selectedNodeId) ?? renderModel.nodes[0];
-  const visibleEdges = useMemo(() => renderModel.edges.filter((edge) => edgeVisible(edge, activeOverlays)), [renderModel.edges, activeOverlays]);
-  const maxX = Math.max(1200, ...renderModel.nodes.map((node) => node.x + 180));
-  const maxY = Math.max(760, ...renderModel.nodes.map((node) => node.y + 120));
+  const visibleNodes = useMemo(() => visibleNodeSet(renderModel, mode, scope, activeOverlays), [renderModel, mode, scope, activeOverlays]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(visibleNodes[0]?.id ?? renderModel.nodes[0]?.id ?? "");
+  const visibleNodeIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes]);
+  const nodeById = useMemo(() => new Map(visibleNodes.map((node) => [node.id, node])), [visibleNodes]);
+  const selectedNode = nodeById.get(selectedNodeId) ?? visibleNodes[0];
+  const visibleEdges = useMemo(() => renderModel.edges.filter((edge) => visibleNodeIds.has(edge.sourceNodeId) && visibleNodeIds.has(edge.targetNodeId) && edgeVisible(edge, activeOverlays)), [renderModel.edges, visibleNodeIds, activeOverlays]);
+  const maxX = Math.max(1200, ...visibleNodes.map((node) => node.x + 180));
+  const maxY = Math.max(760, ...visibleNodes.map((node) => node.y + 120));
 
   if (renderModel.emptyState || renderModel.nodes.length === 0) {
     return (
@@ -68,7 +102,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
         <div>
           <strong>Backend-authoritative diagram canvas</strong>
           <p className="muted" style={{ margin: "6px 0 0 0" }}>
-            Rendering {renderModel.summary.nodeCount} backend nodes and {renderModel.summary.edgeCount} backend edges using {renderModel.summary.layoutMode}. View: {mode}. Scope: {scope}.
+            Showing {visibleNodes.length} of {renderModel.summary.nodeCount} backend nodes and {visibleEdges.length} of {renderModel.summary.edgeCount} backend edges using {renderModel.summary.layoutMode}. View: {mode}. Scope: {scope}. Phase 80 default hides DHCP, implementation, and verification proof nodes unless an overlay asks for them.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -109,7 +143,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
                 </g>
               );
             })}
-            {renderModel.nodes.map((node) => {
+            {visibleNodes.map((node) => {
               const radius = nodeRadius(node);
               const selected = selectedNode?.id === node.id;
               return (

@@ -17,6 +17,7 @@ import {
   type SegmentRole,
 } from "../lib/cidr.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
+import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 
 function normalizeValidationSegmentRole(value?: string | null): SegmentRole | null {
   if (!value) return null;
@@ -631,6 +632,7 @@ function enrichValidationResult<T extends { message: string; ruleCode: string; t
 }
 
 export async function runValidation(projectId: string) {
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps validation", "validation-read");
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -1044,10 +1046,9 @@ export async function runValidation(projectId: string) {
 }
 
 export async function getValidationResults(projectId: string) {
-  const results = await prisma.validationResult.findMany({
-    where: { projectId },
-    orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
-  });
-
-  return results.map(enrichValidationResult);
+  // Phase 80: validation reads must reconcile with the same read-repaired
+  // materialized evidence used by design-core/report. Returning old persisted
+  // ValidationResult rows after Phase 79 can falsely claim 0 sites/0 VLANs
+  // even after read-repair creates durable engineering objects.
+  return runValidation(projectId);
 }

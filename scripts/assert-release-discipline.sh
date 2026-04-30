@@ -41,15 +41,23 @@ if grep -q "SKIP_INSTALL_DEPS" render.yaml .npmrc backend/.npmrc frontend/.npmrc
   fail "SKIP_INSTALL_DEPS/prebuilt-artifact shortcuts must not be present."
 fi
 
-if grep -A1 "key: PRISMA_BASELINE_EXISTING_DB" render.yaml | grep -q 'value: "true"'; then
+value_true_for_key() {
+  local key="$1"
+  awk -v key="$key" '
+    $0 ~ key { getline; if ($0 ~ /value: "true"/) found=1 }
+    END { exit found ? 0 : 1 }
+  ' render.yaml
+}
+
+if value_true_for_key "key: PRISMA_BASELINE_EXISTING_DB"; then
   fail "PRISMA_BASELINE_EXISTING_DB must not be left true in a clean release. Use it only for one recovery deploy."
 fi
 
-if grep -A1 "key: ALLOW_UNSAFE_DB_PUSH" render.yaml | grep -q 'value: "true"'; then
+if value_true_for_key "key: ALLOW_UNSAFE_DB_PUSH"; then
   fail "ALLOW_UNSAFE_DB_PUSH must be false in Render release config."
 fi
 
-if grep -A1 "key: DB_PUSH_ON_BOOT" render.yaml | grep -q 'value: "true"'; then
+if value_true_for_key "key: DB_PUSH_ON_BOOT"; then
   fail "DB_PUSH_ON_BOOT must be false in Render release config."
 fi
 

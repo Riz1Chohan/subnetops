@@ -526,6 +526,62 @@ function routeMatchState(routes: RouteIntent[]): RouteMatchState {
   return routes.some((route) => route.administrativeState === "present" || route.administrativeState === "proposed") ? "reachable" : "review";
 }
 
+function combineRouteLegStates(states: RouteMatchState[]): RouteMatchState {
+  if (states.some((state) => state === "missing")) return "missing";
+  if (states.some((state) => state === "review")) return "review";
+  return "reachable";
+}
+
+function hubTransitPathForDestination(params: {
+  sourceSiteId: string;
+  destinationSiteId: string;
+  hubSiteId?: string;
+  sourceSummaryCidr?: string;
+  destinationSummaryCidr?: string;
+  hubSummaryCidr?: string;
+  routeDomainId: string;
+  routeIntents: RouteIntent[];
+}) {
+  if (!params.hubSiteId || params.sourceSiteId === params.hubSiteId || params.destinationSiteId === params.hubSiteId) {
+    return null;
+  }
+
+  const sourceToHubRoutes = bestRoutesForDestination({
+    sourceSiteId: params.sourceSiteId,
+    destinationCidr: params.hubSummaryCidr,
+    routeDomainId: params.routeDomainId,
+    routeIntents: params.routeIntents,
+  });
+  const hubToDestinationRoutes = bestRoutesForDestination({
+    sourceSiteId: params.hubSiteId,
+    destinationCidr: params.destinationSummaryCidr,
+    routeDomainId: params.routeDomainId,
+    routeIntents: params.routeIntents,
+  });
+  const destinationToHubRoutes = bestRoutesForDestination({
+    sourceSiteId: params.destinationSiteId,
+    destinationCidr: params.hubSummaryCidr,
+    routeDomainId: params.routeDomainId,
+    routeIntents: params.routeIntents,
+  });
+  const hubToSourceRoutes = bestRoutesForDestination({
+    sourceSiteId: params.hubSiteId,
+    destinationCidr: params.sourceSummaryCidr,
+    routeDomainId: params.routeDomainId,
+    routeIntents: params.routeIntents,
+  });
+
+  const forwardState = combineRouteLegStates([routeMatchState(sourceToHubRoutes), routeMatchState(hubToDestinationRoutes)]);
+  const returnState = combineRouteLegStates([routeMatchState(destinationToHubRoutes), routeMatchState(hubToSourceRoutes)]);
+
+  return {
+    forwardState,
+    returnState,
+    forwardRoutes: [...sourceToHubRoutes, ...hubToDestinationRoutes],
+    returnRoutes: [...destinationToHubRoutes, ...hubToSourceRoutes],
+  };
+}
+
 function buildSiteReachabilityChecks(params: {
   project: RoutingProject;
   routeDomains: RouteDomain[];
@@ -536,6 +592,9 @@ function buildSiteReachabilityChecks(params: {
   if (params.project.sites.length <= 1) return checks;
 
   const summaryBySiteId = new Map(params.siteSummaries.map((summary) => [summary.siteId, summary]));
+  const hubSite = chooseHubSite(params.project);
+  const hubSummary = hubSite ? summaryBySiteId.get(hubSite.id) : undefined;
+  const hubSummaryCidr = hubSummary?.currentSiteBlock ?? hubSummary?.minimumRequiredSummary;
 
   for (const routeDomain of params.routeDomains) {
     for (const sourceSite of params.project.sites) {
@@ -557,8 +616,30 @@ function buildSiteReachabilityChecks(params: {
           routeDomainId: routeDomain.id,
           routeIntents: params.routeIntents,
         });
-        const forwardState = routeMatchState(forwardRoutes);
-        const returnState = routeMatchState(returnRoutes);
+        let effectiveForwardRoutes = forwardRoutes;
+        let effectiveReturnRoutes = returnRoutes;
+        let forwardState = routeMatchState(forwardRoutes);
+        let returnState = routeMatchState(returnRoutes);
+        const hubTransitPath = hubTransitPathForDestination({
+          sourceSiteId: sourceSite.id,
+          destinationSiteId: destinationSite.id,
+          hubSiteId: hubSite?.id,
+          sourceSummaryCidr,
+          destinationSummaryCidr,
+          hubSummaryCidr,
+          routeDomainId: routeDomain.id,
+          routeIntents: params.routeIntents,
+        });
+
+        if (hubTransitPath && forwardState === "missing" && hubTransitPath.forwardState !== "missing") {
+          forwardState = hubTransitPath.forwardState;
+          effectiveForwardRoutes = hubTransitPath.forwardRoutes;
+        }
+        if (hubTransitPath && returnState === "missing" && hubTransitPath.returnState !== "missing") {
+          returnState = hubTransitPath.returnState;
+          effectiveReturnRoutes = hubTransitPath.returnRoutes;
+        }
+
         const overallState: SiteToSiteReachabilityCheck["overallState"] = forwardState === "missing"
           ? "missing-forward"
           : returnState === "missing"
@@ -579,8 +660,8 @@ function buildSiteReachabilityChecks(params: {
           forwardState,
           returnState,
           overallState,
-          forwardRouteIntentIds: forwardRoutes.map((route) => route.id),
-          returnRouteIntentIds: returnRoutes.map((route) => route.id),
+          forwardRouteIntentIds: effectiveForwardRoutes.map((route) => route.id),
+          returnRouteIntentIds: effectiveReturnRoutes.map((route) => route.id),
           notes: [
             destinationSummaryCidr
               ? `Destination summary checked: ${destinationSummaryCidr}.`
@@ -588,7 +669,10 @@ function buildSiteReachabilityChecks(params: {
             sourceSummaryCidr
               ? `Return summary checked: ${sourceSummaryCidr}.`
               : "Source summary is missing, so return-path proof is not possible.",
-          ],
+            hubTransitPath && (forwardState !== routeMatchState(forwardRoutes) || returnState !== routeMatchState(returnRoutes))
+              ? `Phase 80 hub-transit reconciliation: direct branch-to-branch route was absent, but path evidence exists through ${hubSite ? findSiteName(params.project, hubSite.id) : "the hub"}.`
+              : null,
+          ].filter(Boolean) as string[],
         });
       }
     }

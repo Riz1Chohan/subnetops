@@ -16,10 +16,10 @@ function assertJson(path, check, message) {
   if (!check(data)) throw new Error(message);
 }
 
-assertJson('package.json', (pkg) => pkg.version === '0.79.0', 'Root package version must be 0.79.0 for Phase 79');
+assertJson('package.json', (pkg) => ['0.79.0', '0.80.0'].includes(pkg.version), 'Root package version must be 0.79.0 or later compatible Phase 80 for Phase 79 checks');
 assertJson('package.json', (pkg) => Boolean(pkg.scripts['check:phase79-requirements-read-repair-materialization']), 'Phase 79 check script must be wired');
 
-assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'PHASE_79_REQUIREMENTS_READ_REPAIR_MATERIALIZATION', 'Runtime proof service must expose Phase 79 marker');
+assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'REQUIREMENTS_RUNTIME_RELEASE', 'Runtime proof service must expose runtime release marker');
 assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'selectedSiteCount', 'Runtime proof must expose selected site count');
 assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'expectedMinimumVlans', 'Runtime proof must expose expected VLAN count');
 assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'addressingRows', 'Runtime proof must expose addressing row count');
