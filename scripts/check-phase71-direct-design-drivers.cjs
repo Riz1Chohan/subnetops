@@ -23,7 +23,7 @@ const frontendProfile = read('frontend/src/lib/requirementsProfile.ts');
 const projectHooks = read('frontend/src/features/projects/hooks.ts');
 const packageJson = JSON.parse(read('package.json'));
 
-if (!['0.71.0', '0.72.0', '0.73.0'].includes(packageJson.version)) fail(`Expected root package version 0.71.0, 0.72.0, or 0.73.0, found ${packageJson.version}.`);
+if (!['0.71.0', '0.72.0', '0.73.0', '0.74.0', '0.75.0', '0.76.0', '0.77.0'].includes(packageJson.version)) fail(`Expected root package version 0.71.0 or later successor through 0.77.0, found ${packageJson.version}.`);
 if (!packageJson.scripts['check:phase71-direct-design-drivers']) fail('Missing check:phase71-direct-design-drivers script.');
 if (!packageJson.scripts['check:phase70-requirements-execution-wiring']?.includes('check:phase71-direct-design-drivers')) {
   fail('Phase 70 check must chain into Phase 71 so requirement execution proof cannot skip direct-driver proof.');

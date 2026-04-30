@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.76.0",
+  "version": "0.77.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -43,7 +43,8 @@
     "check:phase73-validation-honesty": "node scripts/check-phase73-validation-honesty.cjs && npm run check:phase74-report-diagram-truth-lock",
     "check:phase74-report-diagram-truth-lock": "node scripts/check-phase74-report-diagram-truth-lock.cjs && npm run check:phase75-golden-scenario-tests",
     "check:phase75-golden-scenario-tests": "node scripts/check-phase75-golden-scenario-tests.cjs && npm run check:phase76-requirements-save-field-coverage",
-    "check:phase76-requirements-save-field-coverage": "node scripts/check-phase76-requirements-save-field-coverage.cjs"
+    "check:phase76-requirements-save-field-coverage": "node scripts/check-phase76-requirements-save-field-coverage.cjs && npm run check:phase77-requirements-runtime-persistence",
+    "check:phase77-requirements-runtime-persistence": "node scripts/check-phase77-requirements-runtime-persistence.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",

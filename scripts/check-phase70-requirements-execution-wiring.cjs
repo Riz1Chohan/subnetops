@@ -16,7 +16,7 @@ requireText('backend/src/validators/project.schemas.ts', 'saveProjectRequirement
 requireText('backend/src/validators/project.schemas.ts', 'requirementsJson: z.string().min(2).max(50000)');
 requireText('backend/src/validators/project.schemas.ts', 'requirementsJson: z.string().max(50000).optional()');
 requireText('backend/src/services/project.service.ts', 'export async function saveProjectRequirements(');
-requireText('backend/src/services/project.service.ts', 'await materializeRequirementsForProject(tx, projectId, actorLabel)');
+requireText('backend/src/services/project.service.ts', 'await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: data.requirementsJson })');
 requireText('backend/src/services/project.service.ts', 'outputCounts: { sites: siteCount, vlans: vlanCount }');
 requireText('backend/src/services/project.service.ts', 'Requirements saved and materialized:');
 requireText('frontend/src/features/projects/api.ts', 'export function saveProjectRequirements(projectId: string');

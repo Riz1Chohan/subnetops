@@ -39,8 +39,8 @@ assertContains("docs/doc/PHASE75-GOLDEN-SCENARIO-RUNTIME-TESTS.md", "Phase 75");
 assertContains("docs/doc/PHASE75-GOLDEN-SCENARIO-RUNTIME-TESTS.md", "requirements JSON → materializer → Sites/VLANs/CIDR/gateways → design-core");
 
 const rootPackage = JSON.parse(read("package.json"));
-if (!/^0\.(75|76)\.0$/.test(rootPackage.version)) {
-  console.error(`Phase 75 check failed: expected root package version 0.75.0 or later Phase 76 release version, got ${rootPackage.version}`);
+if (!/^0\.(75|76|77)\.0$/.test(rootPackage.version)) {
+  console.error(`Phase 75 check failed: expected root package version 0.75.0 or later Phase 76/77 release version, got ${rootPackage.version}`);
   process.exit(1);
 }
 if (!rootPackage.scripts["check:phase75-golden-scenario-tests"]?.includes("node scripts/check-phase75-golden-scenario-tests.cjs")) {

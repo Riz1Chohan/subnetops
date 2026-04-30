@@ -54,6 +54,67 @@ function buildRequirementsFieldCoverage(requirementsJson: string): RequirementsF
 }
 
 
+function parseSavedRequirementsForPersistenceContract(requirementsJson: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function numberRequirement(value: unknown, fallback = 0) {
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function booleanRequirement(value: unknown) {
+  return value === true || String(value).toLowerCase() === "true";
+}
+
+function hasRequirementText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 && !value.toLowerCase().includes("not applicable");
+}
+
+function expectedRequirementSegmentFamilies(requirements: Record<string, unknown>) {
+  const expected = new Set<string>();
+  expected.add("USERS");
+  if (numberRequirement(requirements.serverCount) > 0 || hasRequirementText(requirements.serverPlacement) || hasRequirementText(requirements.criticalServicesModel)) expected.add("SERVICES");
+  if (booleanRequirement(requirements.guestWifi)) expected.add("GUEST");
+  if (booleanRequirement(requirements.wireless) || numberRequirement(requirements.apCount) > 0) expected.add("STAFF-WIFI");
+  if (booleanRequirement(requirements.voice) || numberRequirement(requirements.phoneCount) > 0) expected.add("VOICE");
+  if (booleanRequirement(requirements.printers) || numberRequirement(requirements.printerCount) > 0) expected.add("PRINTERS");
+  if (booleanRequirement(requirements.iot) || numberRequirement(requirements.iotDeviceCount) > 0) expected.add("IOT");
+  if (booleanRequirement(requirements.cameras) || numberRequirement(requirements.cameraCount) > 0) expected.add("CAMERAS");
+  if (booleanRequirement(requirements.management) || hasRequirementText(requirements.managementIpPolicy) || hasRequirementText(requirements.managementAccess)) expected.add("MANAGEMENT");
+  if (booleanRequirement(requirements.remoteAccess)) expected.add("REMOTE-ACCESS");
+  const environmentType = String(requirements.environmentType ?? "").toLowerCase();
+  if (booleanRequirement(requirements.cloudConnected) || environmentType.includes("cloud") || environmentType.includes("hybrid")) expected.add("CLOUD-EDGE");
+  const selectedSites = Math.max(1, numberRequirement(requirements.siteCount, 1));
+  const internetModel = String(requirements.internetModel ?? "internet at each site").toLowerCase();
+  if (selectedSites > 1 || !internetModel.includes("each site") || booleanRequirement(requirements.dualIsp)) expected.add("WAN-TRANSIT");
+  if (hasRequirementText(requirements.monitoringModel) || hasRequirementText(requirements.loggingModel) || hasRequirementText(requirements.backupPolicy)) expected.add("OPERATIONS");
+  return [...expected];
+}
+
+async function assertRequirementsPersistenceContract(tx: any, projectId: string, requirementsJson: string) {
+  const requirements = parseSavedRequirementsForPersistenceContract(requirementsJson);
+  const selectedSiteCount = Math.max(1, numberRequirement(requirements.siteCount, 1));
+  const expectedSegments = expectedRequirementSegmentFamilies(requirements);
+  const siteCount = await tx.site.count({ where: { projectId } });
+  const vlanCount = await tx.vlan.count({ where: { site: { projectId } } });
+
+  if (siteCount < selectedSiteCount) {
+    throw new ApiError(500, `Requirements materialization failed: selected ${selectedSiteCount} site(s), but only ${siteCount} durable Site row(s) exist after save.`);
+  }
+
+  if (expectedSegments.length > 0 && vlanCount < selectedSiteCount * expectedSegments.length) {
+    throw new ApiError(500, `Requirements materialization failed: expected at least ${selectedSiteCount * expectedSegments.length} durable VLAN/segment row(s) from ${expectedSegments.length} segment family/families across ${selectedSiteCount} site(s), but only ${vlanCount} exist after save.`);
+  }
+
+  return { siteCount, vlanCount, selectedSiteCount, expectedSegmentFamilies: expectedSegments };
+}
+
 async function enforceProjectLimit(userId: string, planTier: PlanTier) {
   if (planTier === "FREE") {
     const projectCount = await prisma.project.count({ where: { userId } });
@@ -115,8 +176,11 @@ export async function createProject(
     });
 
     const requirementsMaterialization = data.requirementsJson
-      ? await materializeRequirementsForProject(tx, project.id, actorLabel)
+      ? await materializeRequirementsForProject(tx, project.id, actorLabel, { requirementsJson: data.requirementsJson })
       : null;
+    if (data.requirementsJson) {
+      await assertRequirementsPersistenceContract(tx, project.id, data.requirementsJson);
+    }
     await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
     return { ...project, requirementsMaterialization };
   });
@@ -277,8 +341,11 @@ export async function updateProject(projectId: string, userId: string, data: Rec
   return prisma.$transaction(async (tx: any) => {
     const result = await tx.project.update({ where: { id: projectId }, data: normalizedData });
     const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
-      ? await materializeRequirementsForProject(tx, projectId, actorLabel)
+      ? await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: normalizedData["requirementsJson"] as string })
       : null;
+    if (typeof normalizedData["requirementsJson"] === "string") {
+      await assertRequirementsPersistenceContract(tx, projectId, normalizedData["requirementsJson"] as string);
+    }
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
     return { ...result, requirementsMaterialization };
   });
@@ -307,10 +374,11 @@ export async function saveProjectRequirements(
       data: updateData,
     });
 
-    const requirementsMaterialization = await materializeRequirementsForProject(tx, projectId, actorLabel);
+    const requirementsMaterialization = await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: data.requirementsJson });
     const requirementsFieldCoverage = buildRequirementsFieldCoverage(data.requirementsJson);
-    const siteCount = await tx.site.count({ where: { projectId } });
-    const vlanCount = await tx.vlan.count({ where: { site: { projectId } } });
+    const persistenceContract = await assertRequirementsPersistenceContract(tx, projectId, data.requirementsJson);
+    const siteCount = persistenceContract.siteCount;
+    const vlanCount = persistenceContract.vlanCount;
 
     await addChangeLog(
       projectId,

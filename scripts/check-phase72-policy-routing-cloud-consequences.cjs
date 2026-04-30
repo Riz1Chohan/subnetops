@@ -9,7 +9,7 @@ function fail(message) { failures.push(message); }
 const pkg = JSON.parse(read('package.json'));
 const model = read('backend/src/services/designCore/designCore.networkObjectModel.ts');
 const flow = read('backend/src/services/designCore/designCore.securityPolicyFlow.ts');
-if (!['0.72.0', '0.73.0'].includes(pkg.version)) fail(`Expected root package version 0.72.0 or 0.73.0, found ${pkg.version}.`);
+if (!['0.72.0', '0.73.0', '0.74.0', '0.75.0', '0.76.0', '0.77.0'].includes(pkg.version)) fail(`Expected root package version 0.72.0 or later successor through 0.77.0, found ${pkg.version}.`);
 if (!pkg.scripts['check:phase72-policy-routing-cloud-consequences']) fail('Missing check:phase72-policy-routing-cloud-consequences script.');
 if (!pkg.scripts['check:phase71-direct-design-drivers']?.includes('check:phase72-policy-routing-cloud-consequences')) {
   fail('Phase 71 check must chain into Phase 72 so direct-driver proof cannot skip policy/cloud consequence proof.');

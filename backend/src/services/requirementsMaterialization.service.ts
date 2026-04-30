@@ -510,9 +510,11 @@ export async function materializeRequirementsForProject(
   tx: MaterializerTx,
   projectId: string,
   actorLabel?: string,
+  options?: { requirementsJson?: string | null },
 ): Promise<RequirementsMaterializationSummary | null> {
   const project = await tx.project.findUnique({ where: { id: projectId }, select: { id: true, basePrivateRange: true, requirementsJson: true } });
-  const requirements = parseRequirementsJson(project?.requirementsJson);
+  const requirementsSource = typeof options?.requirementsJson === "string" ? options.requirementsJson : project?.requirementsJson;
+  const requirements = parseRequirementsJson(requirementsSource);
   if (!project || !requirements) return null;
 
   const siteCount = asNumber(requirements.siteCount, 1, 1, 500);

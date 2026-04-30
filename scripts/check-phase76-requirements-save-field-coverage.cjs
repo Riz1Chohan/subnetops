@@ -76,8 +76,8 @@ assertContains("frontend/src/pages/ProjectRequirementsPage.tsx", "coverage.missi
 assertContains("docs/doc/PHASE76-REQUIREMENTS-SAVE-FIELD-COVERAGE-PROOF.md", "Captured 83/83 requirement field(s)");
 
 const rootPackage = JSON.parse(read("package.json"));
-if (rootPackage.version !== "0.76.0") fail(`expected root package version 0.76.0, got ${rootPackage.version}`);
-if (rootPackage.scripts["check:phase76-requirements-save-field-coverage"] !== "node scripts/check-phase76-requirements-save-field-coverage.cjs") {
+if (!/^0\.(76|77)\.0$/.test(rootPackage.version)) fail(`expected root package version 0.76.0 or Phase 77 successor, got ${rootPackage.version}`);
+if (!rootPackage.scripts["check:phase76-requirements-save-field-coverage"]?.includes("node scripts/check-phase76-requirements-save-field-coverage.cjs")) {
   fail("missing root check:phase76-requirements-save-field-coverage script.");
 }
 if (!rootPackage.scripts["check:phase75-golden-scenario-tests"]?.includes("check:phase76-requirements-save-field-coverage")) {

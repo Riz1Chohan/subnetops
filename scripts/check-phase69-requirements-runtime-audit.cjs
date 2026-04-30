@@ -26,7 +26,7 @@ if (missingRegistry.length || extraRegistry.length) {
 }
 
 requireText('frontend/src/pages/ProjectRequirementsPage.tsx', 'requirementsJson: stringifyRequirementsProfile(requirements)');
-requireText('backend/src/services/project.service.ts', 'await materializeRequirementsForProject(tx, projectId, actorLabel)');
+requireText('backend/src/services/project.service.ts', 'await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: data.requirementsJson })');
 requireText('frontend/src/features/projects/hooks.ts', 'queryKey: ["project-sites", projectId]');
 requireText('frontend/src/features/projects/hooks.ts', 'queryKey: ["project-vlans", projectId]');
 requireText('frontend/src/features/projects/hooks.ts', 'queryKey: ["design-core", projectId]');
