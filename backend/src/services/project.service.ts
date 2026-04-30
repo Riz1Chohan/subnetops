@@ -2,7 +2,7 @@ import type { PlanTier } from "../lib/domainTypes.js";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
-import { materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
+import { ensureRequirementsMaterializedForRead, materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
 import { assertRequirementsRuntimeProofPass, buildRequirementsRuntimeProof, REQUIREMENTS_RUNTIME_RELEASE } from "./requirementsRuntimeProof.service.js";
 import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
@@ -312,6 +312,7 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
 
 export async function getProject(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "project-read");
   const project = await prisma.project.findFirst({
     where: { id: projectId },
     include: {
@@ -325,12 +326,14 @@ export async function getProject(projectId: string, userId: string) {
 
 export async function getProjectSites(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "sites-read");
   const project = await prisma.project.findFirst({ where: { id: projectId }, select: { sites: { orderBy: { createdAt: "asc" } } } });
   return project?.sites ?? [];
 }
 
 export async function getProjectVlans(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "vlans-read");
   return prisma.vlan.findMany({
     where: { site: { projectId } },
     include: { site: { select: { id: true, name: true, siteCode: true } } },
@@ -393,7 +396,7 @@ export async function saveProjectRequirements(
 
     await addChangeLog(
       projectId,
-      `Phase 78 requirements runtime truth bomb passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
+      `Phase 79 requirements read-repair materialization passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
       actorLabel,
       tx,
     );

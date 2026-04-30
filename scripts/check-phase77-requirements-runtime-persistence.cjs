@@ -61,7 +61,7 @@ requireText('docs/doc/PHASE77-REQUIREMENTS-MATERIALIZATION-RUNTIME-PERSISTENCE-F
 requireText('docs/doc/PHASE77-REQUIREMENTS-MATERIALIZATION-RUNTIME-PERSISTENCE-FIX.md', 'selected 10 site(s) must not complete with 0 durable Site row(s)');
 
 const pkg = JSON.parse(read('package.json'));
-if (!/^0\.(77|78)\.0$/.test(pkg.version)) fail(`expected package version 0.77.0 or 0.78.0, got ${pkg.version}`);
+if (!/^0\.(77|78|79)\.0$/.test(pkg.version)) fail(`expected package version 0.77.0, 0.78.0, or 0.79.0, got ${pkg.version}`);
 if (!pkg.scripts['check:phase77-requirements-runtime-persistence']?.includes('node scripts/check-phase77-requirements-runtime-persistence.cjs')) fail('missing phase77 check script.');
 if (!pkg.scripts['check:phase76-requirements-save-field-coverage']?.includes('check:phase77-requirements-runtime-persistence')) fail('Phase 76 script must chain Phase 77.');
 

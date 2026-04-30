@@ -3,8 +3,8 @@ import { ApiError } from "../utils/apiError.js";
 import { ensureCanViewProject } from "./access.service.js";
 
 export const REQUIREMENTS_RUNTIME_RELEASE = {
-  phase: "PHASE_78_REQUIREMENTS_RUNTIME_TRUTH_BOMB",
-  version: "0.78.0",
+  phase: "PHASE_79_REQUIREMENTS_READ_REPAIR_MATERIALIZATION",
+  version: "0.79.0",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;

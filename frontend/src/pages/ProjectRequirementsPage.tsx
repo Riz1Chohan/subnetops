@@ -100,8 +100,8 @@ export function ProjectRequirementsPage() {
       const proof = result.runtimeProofAfter ?? null;
       setLastRuntimeProof(proof);
 
-      if (!proof || proof.release?.phase !== "PHASE_78_REQUIREMENTS_RUNTIME_TRUTH_BOMB") {
-        setSaveConfidenceNote("Save response did not include Phase 78 runtime proof. Backend may still be stale; do not trust design/report output yet.");
+      if (!proof || proof.release?.phase !== "PHASE_79_REQUIREMENTS_READ_REPAIR_MATERIALIZATION") {
+        setSaveConfidenceNote("Save response did not include Phase 79 runtime proof. Backend may still be stale; do not trust design/report output yet.");
         return;
       }
 
@@ -126,7 +126,7 @@ export function ProjectRequirementsPage() {
         ? ` Missing: ${coverage.missingFields.slice(0, 8).join(", ")}${coverage.missingFields.length > 8 ? ", ..." : ""}.`
         : "";
       setSaveConfidenceNote(
-        `Phase 78 runtime proof PASSED at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
+        `Phase 79 runtime proof PASSED at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
       );
     },
     onError: (error) => {
@@ -1525,7 +1525,7 @@ export function ProjectRequirementsPage() {
             <span>
               {lastRuntimeProof
                 ? `${lastRuntimeProof.release?.phase ?? "unknown backend phase"}: ${lastRuntimeProof.status}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
-                : "No Phase 78 runtime proof has been returned by the backend in this browser session."}
+                : "No Phase 79 runtime proof has been returned by the backend in this browser session."}
             </span>
           </div>
         </div>

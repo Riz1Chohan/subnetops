@@ -42,3 +42,11 @@ assertIncludes('frontend/src/pages/ProjectRequirementsPage.tsx', 'Save failed:',
 assertIncludes('frontend/src/pages/ProjectRequirementsPage.tsx', 'Backend runtime proof', 'Frontend must display runtime proof counts');
 
 console.log('Phase 79 requirements read-repair materialization static checks passed');
+
+assertIncludes('backend/src/services/requirementsMaterialization.service.ts', 'ensureRequirementsMaterializedForRead', 'Phase 79 must expose read-repair materialization helper');
+assertIncludes('backend/src/services/requirementsMaterialization.service.ts', 'Requirements read-repair failed during', 'Phase 79 read-repair must hard-fail if persistence is still broken');
+assertIncludes('backend/src/services/designCore/designCore.repository.ts', 'ensureRequirementsMaterializedForRead(projectId, "SubnetOps runtime", "design-core-read")', 'Design-core reads must repair saved requirements before building snapshots');
+assertIncludes('backend/src/services/export.service.ts', 'ensureRequirementsMaterializedForRead(projectId, "SubnetOps export", "export-read")', 'Report exports must repair saved requirements before composing report data');
+assertIncludes('backend/src/services/project.service.ts', 'ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "project-read")', 'Project reads must repair saved requirements before returning project data');
+
+console.log('Phase 79 requirements read-repair materialization static checks passed');

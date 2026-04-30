@@ -1,5 +1,6 @@
 import { prisma } from "../db/prisma.js";
 import { getDesignCoreSnapshotForExport } from "./designCore.service.js";
+import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 import { applyBackendDesignCoreToReport } from "./exportDesignCoreReport.service.js";
 import type { ProfessionalReport, ReportMetadata, ReportSection, ReportTable, ReportVisualSnapshot } from "./export.types.js";
 
@@ -180,6 +181,7 @@ function validationNarrative(item: ValidationItem) {
 
 
 export async function getProjectExportData(projectId: string) {
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps export", "export-read");
   return prisma.project.findUnique({
     where: { id: projectId },
     include: {

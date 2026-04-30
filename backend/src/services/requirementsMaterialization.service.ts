@@ -1,6 +1,8 @@
 import { parseCidr, recommendedCapacityPlanForHosts, type SegmentRole } from "../lib/cidr.js";
 import { allocateRequestedBlocks, type GatewayConvention } from "../lib/addressAllocator.js";
 import { addChangeLog } from "./changeLog.service.js";
+import { prisma } from "../db/prisma.js";
+import { ApiError } from "../utils/apiError.js";
 import { buildRequirementImpactInventory, REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 
 export type RequirementsMaterializationSummary = {
@@ -652,4 +654,113 @@ export async function materializeRequirementsForProject(
   }
 
   return summary;
+}
+
+export type RequirementsReadRepairSummary = {
+  reason: string;
+  repaired: boolean;
+  before: { sites: number; vlans: number; addressingRows: number };
+  after: { sites: number; vlans: number; addressingRows: number };
+  selectedSiteCount: number;
+  expectedSegmentFamilies: string[];
+  expectedMinimumVlans: number;
+  materialization: RequirementsMaterializationSummary | null;
+};
+
+function countMaterializedRows(project: { sites?: Array<{ vlans?: Array<{ subnetCidr?: string | null; gatewayIp?: string | null }> }> }) {
+  const sites = project.sites ?? [];
+  const vlans = sites.flatMap((site) => site.vlans ?? []);
+  return {
+    sites: sites.length,
+    vlans: vlans.length,
+    addressingRows: vlans.filter((vlan) => Boolean(vlan.subnetCidr && vlan.gatewayIp)).length,
+  };
+}
+
+function readRepairGap(counts: { sites: number; vlans: number; addressingRows: number }, selectedSiteCount: number, expectedMinimumVlans: number) {
+  return counts.sites < selectedSiteCount || counts.vlans < expectedMinimumVlans || (counts.vlans > 0 && counts.addressingRows === 0);
+}
+
+export async function ensureRequirementsMaterializedForRead(
+  projectId: string,
+  actorLabel?: string,
+  reason = "read-repair",
+): Promise<RequirementsReadRepairSummary | null> {
+  return prisma.$transaction(async (tx: any) => {
+    const project = await tx.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        requirementsJson: true,
+        sites: {
+          select: {
+            id: true,
+            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true } },
+          },
+        },
+      },
+    });
+
+    if (!project?.requirementsJson) return null;
+    const requirements = parseRequirementsJson(project.requirementsJson);
+    if (!requirements) return null;
+
+    const selectedSiteCount = asNumber(requirements.siteCount, 1, 1, 500);
+    const expectedSegmentFamilies = buildSegments(requirements).map((segment) => segment.vlanName).sort();
+    const expectedMinimumVlans = selectedSiteCount * expectedSegmentFamilies.length;
+    const before = countMaterializedRows(project);
+
+    if (!readRepairGap(before, selectedSiteCount, expectedMinimumVlans)) {
+      return {
+        reason,
+        repaired: false,
+        before,
+        after: before,
+        selectedSiteCount,
+        expectedSegmentFamilies,
+        expectedMinimumVlans,
+        materialization: null,
+      };
+    }
+
+    const materialization = await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: project.requirementsJson });
+    const repairedProject = await tx.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        sites: {
+          select: {
+            id: true,
+            vlans: { select: { id: true, subnetCidr: true, gatewayIp: true } },
+          },
+        },
+      },
+    });
+    const after = countMaterializedRows(repairedProject ?? { sites: [] });
+
+    if (readRepairGap(after, selectedSiteCount, expectedMinimumVlans)) {
+      throw new ApiError(
+        500,
+        `Requirements read-repair failed during ${reason}: selected ${selectedSiteCount} site(s), expected at least ${expectedMinimumVlans} VLAN/segment row(s), observed ${after.sites} site(s), ${after.vlans} VLAN(s), ${after.addressingRows} addressing row(s).`,
+      );
+    }
+
+    await addChangeLog(
+      projectId,
+      `Phase 79 read-repair materialized saved requirements during ${reason}: ${before.sites}->${after.sites} site(s), ${before.vlans}->${after.vlans} VLAN(s), ${before.addressingRows}->${after.addressingRows} addressing row(s).`,
+      actorLabel,
+      tx as any,
+    );
+
+    return {
+      reason,
+      repaired: true,
+      before,
+      after,
+      selectedSiteCount,
+      expectedSegmentFamilies,
+      expectedMinimumVlans,
+      materialization,
+    };
+  });
 }
