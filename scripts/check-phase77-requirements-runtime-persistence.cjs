@@ -48,7 +48,7 @@ requireText('backend/src/services/project.service.ts', 'await materializeRequire
 requireText('backend/src/services/project.service.ts', 'async function assertRequirementsPersistenceContract');
 requireText('backend/src/services/project.service.ts', 'Requirements materialization failed: selected ${selectedSiteCount} site(s), but only ${siteCount} durable Site row(s) exist after save.');
 requireText('backend/src/services/project.service.ts', 'Requirements materialization failed: expected at least ${selectedSiteCount * expectedSegments.length} durable VLAN/segment row(s)');
-requireText('backend/src/services/project.service.ts', 'outputCounts: { sites: siteCount, vlans: vlanCount }');
+requireText('backend/src/services/project.service.ts', 'outputCounts: { sites: siteCount, vlans: vlanCount');
 
 requireText('backend/src/services/designCore/designCore.repository.ts', 'sites: {');
 requireText('backend/src/services/designCore/designCore.repository.ts', 'vlans: {');
@@ -61,8 +61,8 @@ requireText('docs/doc/PHASE77-REQUIREMENTS-MATERIALIZATION-RUNTIME-PERSISTENCE-F
 requireText('docs/doc/PHASE77-REQUIREMENTS-MATERIALIZATION-RUNTIME-PERSISTENCE-FIX.md', 'selected 10 site(s) must not complete with 0 durable Site row(s)');
 
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '0.77.0') fail(`expected package version 0.77.0, got ${pkg.version}`);
-if (pkg.scripts['check:phase77-requirements-runtime-persistence'] !== 'node scripts/check-phase77-requirements-runtime-persistence.cjs') fail('missing phase77 check script.');
+if (!/^0\.(77|78)\.0$/.test(pkg.version)) fail(`expected package version 0.77.0 or 0.78.0, got ${pkg.version}`);
+if (!pkg.scripts['check:phase77-requirements-runtime-persistence']?.includes('node scripts/check-phase77-requirements-runtime-persistence.cjs')) fail('missing phase77 check script.');
 if (!pkg.scripts['check:phase76-requirements-save-field-coverage']?.includes('check:phase77-requirements-runtime-persistence')) fail('Phase 76 script must chain Phase 77.');
 
 console.log('Phase 77 requirements runtime persistence checks passed.');

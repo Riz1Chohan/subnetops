@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { checkDatabaseHealth } from "./db/prisma.js";
+import { REQUIREMENTS_RUNTIME_RELEASE } from "./services/requirementsRuntimeProof.service.js";
 import {
   aiRoutes,
   authRoutes,
@@ -43,20 +44,20 @@ app.use(csrfProtection);
 app.get("/api/health", async (_req, res) => {
   try {
     await checkDatabaseHealth();
-    res.json({ ok: true, service: "subnetops-backend", db: "ok" });
+    res.json({ ok: true, service: "subnetops-backend", db: "ok", release: REQUIREMENTS_RUNTIME_RELEASE });
   } catch {
     res.status(503).json({ ok: false, service: "subnetops-backend", db: "unavailable" });
   }
 });
 
 app.get("/api/health/live", (_req, res) => {
-  res.json({ ok: true, service: "subnetops-backend" });
+  res.json({ ok: true, service: "subnetops-backend", release: REQUIREMENTS_RUNTIME_RELEASE });
 });
 
 app.get("/api/health/ready", async (_req, res) => {
   try {
     await checkDatabaseHealth();
-    res.json({ ok: true, ready: true });
+    res.json({ ok: true, ready: true, release: REQUIREMENTS_RUNTIME_RELEASE });
   } catch {
     res.status(503).json({ ok: false, ready: false });
   }

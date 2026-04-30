@@ -5,6 +5,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
 import { EmptyState } from "../components/app/EmptyState";
 import { useProject, useProjectSites, useProjectVlans, useSaveProjectRequirements } from "../features/projects/hooks";
+import type { RequirementsRuntimeProof } from "../features/projects/api";
 import {
   buildNamingPreviewExamples,
   buildProjectSummaryDescription,
@@ -42,6 +43,7 @@ export function ProjectRequirementsPage() {
   const [currentStepKey, setCurrentStepKey] = useState("core");
   const [draftSavedAt, setDraftSavedAt] = useState<string>("");
   const [saveConfidenceNote, setSaveConfidenceNote] = useState<string>("");
+  const [lastRuntimeProof, setLastRuntimeProof] = useState<RequirementsRuntimeProof | null>(null);
   const lastServerSaveRef = useRef(stringifyRequirementsProfile(initialProfile));
   const hasHydratedDraftRef = useRef(false);
 
@@ -95,6 +97,19 @@ export function ProjectRequirementsPage() {
     description: summaryDescription,
   }, {
     onSuccess: (result) => {
+      const proof = result.runtimeProofAfter ?? null;
+      setLastRuntimeProof(proof);
+
+      if (!proof || proof.release?.phase !== "PHASE_78_REQUIREMENTS_RUNTIME_TRUTH_BOMB") {
+        setSaveConfidenceNote("Save response did not include Phase 78 runtime proof. Backend may still be stale; do not trust design/report output yet.");
+        return;
+      }
+
+      if (proof.status !== "pass") {
+        setSaveConfidenceNote(`Requirements runtime proof BLOCKED: ${proof.failureReasons.join(" ")}`);
+        return;
+      }
+
       lastServerSaveRef.current = stringifyRequirementsProfile(requirements);
       window.localStorage.removeItem(draftStorageKey);
       setDraftSavedAt("");
@@ -111,11 +126,13 @@ export function ProjectRequirementsPage() {
         ? ` Missing: ${coverage.missingFields.slice(0, 8).join(", ")}${coverage.missingFields.length > 8 ? ", ..." : ""}.`
         : "";
       setSaveConfidenceNote(
-        `Saved and materialized at ${new Date().toLocaleString()}: ${result.outputCounts.sites} site(s), ${result.outputCounts.vlans} VLAN/segment row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
+        `Phase 78 runtime proof PASSED at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
       );
     },
-    onError: () => {
-      setSaveConfidenceNote("Save failed. Your browser draft is still kept locally so you do not lose work.");
+    onError: (error) => {
+      setLastRuntimeProof(null);
+      const message = error instanceof Error ? error.message : "Unknown save failure";
+      setSaveConfidenceNote(`Save failed: ${message}. Your browser draft is still kept locally so you do not lose work.`);
     },
   });
 
@@ -1502,6 +1519,14 @@ export function ProjectRequirementsPage() {
           <div className="save-confidence-pill">
             <strong>Shared project data</strong>
             <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later stages."}</span>
+          </div>
+          <div className={`save-confidence-pill ${lastRuntimeProof?.status === "blocker" ? "warning" : lastRuntimeProof?.status === "pass" ? "ok" : ""}`.trim()}>
+            <strong>Backend runtime proof</strong>
+            <span>
+              {lastRuntimeProof
+                ? `${lastRuntimeProof.release?.phase ?? "unknown backend phase"}: ${lastRuntimeProof.status}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
+                : "No Phase 78 runtime proof has been returned by the backend in this browser session."}
+            </span>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

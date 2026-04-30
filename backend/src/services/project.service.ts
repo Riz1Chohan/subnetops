@@ -3,6 +3,7 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
+import { assertRequirementsRuntimeProofPass, buildRequirementsRuntimeProof, REQUIREMENTS_RUNTIME_RELEASE } from "./requirementsRuntimeProof.service.js";
 import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
 
@@ -178,11 +179,14 @@ export async function createProject(
     const requirementsMaterialization = data.requirementsJson
       ? await materializeRequirementsForProject(tx, project.id, actorLabel, { requirementsJson: data.requirementsJson })
       : null;
+    let requirementsRuntimeProof: Awaited<ReturnType<typeof buildRequirementsRuntimeProof>> | null = null;
     if (data.requirementsJson) {
       await assertRequirementsPersistenceContract(tx, project.id, data.requirementsJson);
+      requirementsRuntimeProof = await buildRequirementsRuntimeProof(tx, project.id, data.requirementsJson, "create-project-after-materialization");
+      assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
     }
     await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
-    return { ...project, requirementsMaterialization };
+    return { ...project, requirementsMaterialization, requirementsRuntimeProof };
   });
 }
 
@@ -343,11 +347,14 @@ export async function updateProject(projectId: string, userId: string, data: Rec
     const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
       ? await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: normalizedData["requirementsJson"] as string })
       : null;
+    let requirementsRuntimeProof: Awaited<ReturnType<typeof buildRequirementsRuntimeProof>> | null = null;
     if (typeof normalizedData["requirementsJson"] === "string") {
       await assertRequirementsPersistenceContract(tx, projectId, normalizedData["requirementsJson"] as string);
+      requirementsRuntimeProof = await buildRequirementsRuntimeProof(tx, projectId, normalizedData["requirementsJson"] as string, "generic-project-update-after-materialization");
+      assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
     }
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
-    return { ...result, requirementsMaterialization };
+    return { ...result, requirementsMaterialization, requirementsRuntimeProof };
   });
 }
 
@@ -369,6 +376,8 @@ export async function saveProjectRequirements(
   }
 
   return prisma.$transaction(async (tx: any) => {
+    const runtimeProofBefore = await buildRequirementsRuntimeProof(tx, projectId, data.requirementsJson, "before-project-update-and-materialization");
+
     await tx.project.update({
       where: { id: projectId },
       data: updateData,
@@ -377,22 +386,28 @@ export async function saveProjectRequirements(
     const requirementsMaterialization = await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: data.requirementsJson });
     const requirementsFieldCoverage = buildRequirementsFieldCoverage(data.requirementsJson);
     const persistenceContract = await assertRequirementsPersistenceContract(tx, projectId, data.requirementsJson);
-    const siteCount = persistenceContract.siteCount;
-    const vlanCount = persistenceContract.vlanCount;
+    const runtimeProofAfter = await buildRequirementsRuntimeProof(tx, projectId, data.requirementsJson, "after-materialization-before-response");
+    assertRequirementsRuntimeProofPass(runtimeProofAfter);
+    const siteCount = runtimeProofAfter.counts.sites;
+    const vlanCount = runtimeProofAfter.counts.vlans;
 
     await addChangeLog(
       projectId,
-      `Requirements saved and materialized: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
+      `Phase 78 requirements runtime truth bomb passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
       actorLabel,
       tx,
     );
 
     return {
-      message: requirementsFieldCoverage.status === "complete" ? "Requirements saved and materialized" : "Requirements saved with missing field coverage",
+      message: requirementsFieldCoverage.status === "complete" ? "Requirements saved and runtime proof passed" : "Requirements saved with missing field coverage and runtime proof passed",
       projectId,
+      release: REQUIREMENTS_RUNTIME_RELEASE,
       requirementsMaterialization,
       requirementsFieldCoverage,
-      outputCounts: { sites: siteCount, vlans: vlanCount },
+      persistenceContract,
+      runtimeProofBefore,
+      runtimeProofAfter,
+      outputCounts: { sites: siteCount, vlans: vlanCount, addressingRows: runtimeProofAfter.counts.addressingRows },
     };
   });
 }
