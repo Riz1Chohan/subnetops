@@ -3,8 +3,8 @@ import { ApiError } from "../utils/apiError.js";
 import { ensureCanViewProject } from "./access.service.js";
 
 export const REQUIREMENTS_RUNTIME_RELEASE = {
-  phase: "PHASE_80_VALIDATION_DIAGRAM_RECONCILIATION",
-  version: "0.80.0",
+  phase: "PHASE_81_WORKSPACE_REPORT_RECONCILIATION",
+  version: "0.81.0",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;

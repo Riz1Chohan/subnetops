@@ -2623,9 +2623,14 @@ tr:last-child td {
 
 .project-stage-nav-pane {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 14px;
   position: sticky;
   top: 88px;
+  height: calc(100vh - 116px);
+  max-height: calc(100vh - 116px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .project-stage-nav-header {
@@ -2638,6 +2643,11 @@ tr:last-child td {
 .project-stage-nav-list {
   display: grid;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
 }
 
 .project-stage-nav-link {
@@ -2850,13 +2860,28 @@ tr:last-child td {
 }
 
 .project-stage-nav-pane {
-  max-height: calc(100vh - 120px);
+  height: calc(100vh - 116px);
+  max-height: calc(100vh - 116px);
+  min-height: 0;
   overflow: hidden;
 }
 
 .project-stage-nav-list {
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+}
+
+.project-stage-nav-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.project-stage-nav-list::-webkit-scrollbar-thumb {
+  background: #c8d6ee;
+  border-radius: 999px;
+  border: 2px solid #f7faff;
 }
 
 

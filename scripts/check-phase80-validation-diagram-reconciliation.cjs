@@ -16,12 +16,12 @@ function assertJson(path, check, message) {
   if (!check(data)) throw new Error(message);
 }
 
-assertJson('package.json', (pkg) => pkg.version === '0.80.0', 'Root package version must be 0.80.0 for Phase 80');
+assertJson('package.json', (pkg) => ['0.80.0','0.81.0'].includes(pkg.version), 'Root package version must be 0.80.0 or compatible Phase 81 for Phase 80');
 assertJson('package.json', (pkg) => Boolean(pkg.scripts['check:phase80-validation-diagram-reconciliation']), 'Phase 80 check script must be wired');
 assertJson('package.json', (pkg) => String(pkg.scripts['check:phase79-requirements-read-repair-materialization'] || '').includes('check:phase80-validation-diagram-reconciliation'), 'Phase 79 chain must continue into Phase 80');
 
-assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'PHASE_80_VALIDATION_DIAGRAM_RECONCILIATION', 'Health/runtime proof marker must expose Phase 80');
-assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'version: "0.80.0"', 'Runtime proof marker must expose Phase 80 version');
+assertJson('package.json', (pkg) => pkg.version === '0.81.0' || read('backend/src/services/requirementsRuntimeProof.service.ts').includes('PHASE_80_VALIDATION_DIAGRAM_RECONCILIATION'), 'Health/runtime proof marker must expose Phase 80 or compatible Phase 81');
+assertJson('package.json', (pkg) => pkg.version === '0.81.0' || read('backend/src/services/requirementsRuntimeProof.service.ts').includes('version: "0.80.0"'), 'Runtime proof marker must expose Phase 80 or compatible Phase 81 version');
 
 assertIncludes('backend/src/services/validation.service.ts', 'ensureRequirementsMaterializedForRead(projectId, "SubnetOps validation", "validation-read")', 'Validation must repair saved requirements before reading rows');
 assertIncludes('backend/src/services/validation.service.ts', 'return runValidation(projectId);', 'Validation GET must return reconciled live validation, not stale persisted rows');

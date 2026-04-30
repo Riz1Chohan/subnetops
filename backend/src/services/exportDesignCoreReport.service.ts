@@ -85,11 +85,13 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const scenarioStatus = asString(requirementsScenarioProof?.status, "");
   const scenarioPassed = Number(requirementsScenarioProof?.passedSignalCount ?? 0);
   const scenarioExpected = Number(requirementsScenarioProof?.expectedSignalCount ?? 0);
+  const materializedDesignEvidenceReady = siteSummaries.length > 0 && (proposedRows.length > 0 || networkInterfaces.length > 0) && !Boolean(diagramEmptyReason) && diagramEmptyInputs.length === 0;
+  const scenarioProofMissingAllEvidence = scenarioExpected > 0 && scenarioPassed === 0;
   const phase74TruthBlocked =
-    blockedDesign
-    || Boolean(diagramEmptyReason)
-    || isBlocked(scenarioStatus)
-    || (scenarioExpected > 0 && scenarioPassed === 0);
+    !materializedDesignEvidenceReady && (
+      Boolean(diagramEmptyReason)
+      || scenarioProofMissingAllEvidence
+    );
 
   if (phase74TruthBlocked) {
     report.metadata = report.metadata ?? {
@@ -104,23 +106,24 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     report.metadata.reportVersion = "Version 0.94 Phase 74 truth-locked";
     report.metadata.revisionStatus = "Blocked - backend truth gaps present";
     report.metadata.approvalStatus = "Not ready for approval";
-    report.executiveSummary.unshift("Phase 74 truth lock: this export is blocked until requirement scenario proof, topology evidence, and backend report truth agree. Do not treat polished report language as implementation readiness.");
+    report.executiveSummary.unshift("Requirement-output evidence is still incomplete. Do not treat the package as design-review ready until materialized sites, addressing rows, and diagram topology evidence agree.");
   }
 
   report.sections.push({
-    title: "Phase 74 Report and Diagram Truth Lock",
+    title: "Phase 81 Requirement Output and Implementation Readiness Reconciliation",
     paragraphs: [
       phase74TruthBlocked
-        ? "This export is truth-locked because backend evidence is incomplete or blocked. It must not present fallback single-site wording, clean validation language, or diagram readiness when selected requirements have not generated engineering objects."
-        : "Phase 74 truth lock found no backend report/diagram mismatch in this export cycle.",
+        ? "Requirement-output evidence is still incomplete, so the export must stay blocked until materialized sites, addressing rows, and diagram topology evidence agree."
+        : "Requirement-output evidence is present. Remaining blockers belong to implementation execution readiness, not to requirements materialization.",
       "The purpose of this section is to keep report, diagram, requirement proof, and backend design-core posture aligned.",
     ],
     tables: [
       {
-        title: "Phase 74 Truth Gates",
+        title: "Phase 81 Truth Gates",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
-          ["Backend report readiness", phase74TruthBlocked ? "blocked/review" : "ready", `Overall readiness ${overallReadiness}; implementation readiness ${implementationReadiness}; blocked design ${blockedDesign ? "yes" : "no"}`],
+          ["Requirement-output evidence", phase74TruthBlocked ? "blocked" : "ready", `Materialized sites ${siteSummaries.length}; addressing rows ${proposedRows.length}; diagram missing inputs ${diagramEmptyInputs.length}`],
+          ["Implementation execution readiness", blockedDesign ? "blocked" : "review", `Overall readiness ${overallReadiness}; implementation readiness ${implementationReadiness}; blocked implementation ${blockedDesign ? "yes" : "no"}`],
           ["Requirement scenario proof", isBlocked(scenarioStatus) || (scenarioExpected > 0 && scenarioPassed === 0) ? "blocked" : "review/ready", `${scenarioPassed}/${scenarioExpected} scenario proof signal(s) passed; status ${scenarioStatus || "unavailable"}`],
           ["Diagram topology evidence", diagramEmptyReason ? "blocked" : "ready", diagramEmptyReason || "Backend diagram has modeled topology evidence."],
           ["Diagram required inputs", diagramEmptyInputs.length > 0 ? "blocked" : "ready", joinText(diagramEmptyInputs, "No missing diagram inputs recorded")],
