@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -39,6 +39,64 @@ function generatedSummary({ projectName, environmentType, siteCount, rowCount, e
 
   return `${projectName} is a ${environment.toLowerCase()} network plan covering ${siteCount} site${siteCount === 1 ? "" : "s"} and ${rowCount} addressing plan row${rowCount === 1 ? "" : "s"}. ${readiness}`;
 }
+
+type ExportKind = "pdf" | "docx" | "csv";
+
+type ExportRunState = {
+  kind: ExportKind;
+  startedAt: number;
+  elapsedSeconds: number;
+  phaseIndex: number;
+} | null;
+
+const EXPORT_PHASES = [
+  "Preparing export request",
+  "Building addressing schedule",
+  "Building validation summary",
+  "Building diagram and backend evidence",
+  "Building implementation appendix",
+  "Finalizing downloadable file",
+];
+
+function exportKindLabel(kind: ExportKind) {
+  if (kind === "pdf") return "professional PDF report";
+  if (kind === "docx") return "professional DOCX report";
+  return "Excel-friendly CSV export";
+}
+
+function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCancelNote: () => void }) {
+  if (!run) return null;
+  const phase = EXPORT_PHASES[Math.min(run.phaseIndex, EXPORT_PHASES.length - 1)] ?? EXPORT_PHASES[0];
+  const longRunning = run.elapsedSeconds >= 60;
+
+  return (
+    <div className="export-progress-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="export-progress-title">
+      <div className="export-progress-modal">
+        <div className="export-progress-spinner" aria-hidden="true" />
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <p className="workspace-detail-kicker" style={{ marginBottom: 4 }}>Report processing</p>
+            <h2 id="export-progress-title" style={{ margin: 0 }}>Generating {exportKindLabel(run.kind)}…</h2>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            {phase}. Large multi-site designs can take 1–4 minutes because SubnetOps is composing addressing, validation, diagram, and implementation evidence.
+          </p>
+          <div className="export-progress-track" aria-hidden="true">
+            <span style={{ width: `${Math.min(92, 14 + run.phaseIndex * 16)}%` }} />
+          </div>
+          <div className="export-progress-meta">
+            <span>Elapsed: {run.elapsedSeconds}s</span>
+            <span>{longRunning ? "Still working — do not click export again." : "Request is active."}</span>
+          </div>
+          <button type="button" className="link-button" onClick={onCancelNote}>
+            Keep working note
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function saveBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
@@ -101,6 +159,25 @@ export function ProjectReportPage() {
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [activeExport, setActiveExport] = useState<ExportRunState>(null);
+
+  useEffect(() => {
+    if (!activeExport) return;
+
+    const timer = window.setInterval(() => {
+      setActiveExport((current) => {
+        if (!current) return current;
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
+        return {
+          ...current,
+          elapsedSeconds,
+          phaseIndex: Math.min(EXPORT_PHASES.length - 1, Math.floor(elapsedSeconds / 18)),
+        };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [activeExport?.startedAt]);
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
@@ -195,9 +272,17 @@ export function ProjectReportPage() {
     synthesized.siteSummaries.length === 0 ? "No site design has been defined yet" : null,
   ].filter(Boolean) as string[];
 
-  const downloadExport = async (kind: "pdf" | "docx" | "csv") => {
+  const downloadExport = async (kind: ExportKind) => {
+    if (activeExport) {
+      setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish before starting another export.`);
+      return;
+    }
+
+    const startedAt = Date.now();
+    setActiveExport({ kind, startedAt, elapsedSeconds: 0, phaseIndex: 0 });
+    setExportMessage(`Generating ${exportKindLabel(kind)}. This may take 1–4 minutes for large designs.`);
+
     try {
-      setExportMessage(kind === "pdf" ? "Preparing professional PDF report..." : kind === "docx" ? "Preparing professional DOCX report..." : "Preparing Excel-friendly CSV export...");
       const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
         method: "POST",
       });
@@ -209,11 +294,15 @@ export function ProjectReportPage() {
             ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-professional-report.docx`
             : `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-addressing-export.csv`,
       );
-      setExportMessage(kind === "pdf" ? "Professional PDF report exported." : kind === "docx" ? "Professional DOCX report exported." : "Excel-friendly CSV exported.");
+      const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      setExportMessage(`${exportKindLabel(kind)} generated in ${elapsedSeconds}s.`);
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "Export failed.");
+      setExportMessage(error instanceof Error ? error.message : "Export failed. The backend did not return a downloadable file.");
+    } finally {
+      setActiveExport(null);
     }
   };
+
 
   const reportSectionLinks = [
     { key: "assumptions", label: "Assumptions & constraints", detail: "Start the written package from the design basis and open issues.", path: `/projects/${projectId}/report?section=assumptions` },
@@ -234,6 +323,7 @@ export function ProjectReportPage() {
   if (!selectedSection) {
     return (
       <section style={{ display: "grid", gap: 18 }}>
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
         <div className="panel workspace-selection-blank report-landing-shell">
           <p className="workspace-detail-kicker">Deliver</p>
           <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
@@ -286,6 +376,7 @@ export function ProjectReportPage() {
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
       {isFocusedSectionView ? (
         <>
         <div className="panel workspace-detail-toolbar">
@@ -294,7 +385,7 @@ export function ProjectReportPage() {
             <strong>{focusedSectionTitle}</strong>
           </div>
           <div className="workspace-detail-actions">
-            <button type="button" onClick={() => void downloadExport("docx")}>Export DOCX</button>
+            <button type="button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("docx")}>{activeExport ? "Generating…" : "Export DOCX"}</button>
           </div>
         </div>
         <WorkspaceIssueBanner notice={issueNotice} />
@@ -319,9 +410,9 @@ export function ProjectReportPage() {
             </p>
           </div>
           <div className="form-actions" style={{ flexWrap: "wrap" }}>
-            <button type="button" onClick={() => void downloadExport("pdf")}>Export Professional PDF</button>
-            <button type="button" className="link-button" onClick={() => void downloadExport("docx")}>Export Professional DOCX</button>
-            <button type="button" className="link-button" onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
+            <button type="button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("pdf")}>{activeExport ? "Generating…" : "Export Professional PDF"}</button>
+            <button type="button" className="link-button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("docx")}>Export Professional DOCX</button>
+            <button type="button" className="link-button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
             <button type="button" className="link-button" onClick={() => window.print()}>Print / Save current view</button>
             <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link>

@@ -7,11 +7,11 @@ function read(rel) { return fs.readFileSync(path.join(root, rel), 'utf8'); }
 function assert(condition, message) { if (!condition) failures.push(message); }
 function assertIncludes(rel, text, message) { assert(read(rel).includes(text), message); }
 const pkg = JSON.parse(read('package.json'));
-assert(pkg.version === '0.81.0', 'Root package version must be 0.81.0 for Phase 81');
+assert(['0.81.0','0.82.0'].includes(pkg.version), 'Root package version must be 0.81.0 or successor 0.82.0 for Phase 81');
 assert(Boolean(pkg.scripts['check:phase81-workspace-report-reconciliation']), 'Phase 81 check script must be wired');
 assert(String(pkg.scripts['check:phase80-validation-diagram-reconciliation'] || '').includes('check:phase81-workspace-report-reconciliation'), 'Phase 80 chain must continue into Phase 81');
-assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'PHASE_81_WORKSPACE_REPORT_RECONCILIATION', 'Health/runtime proof marker must expose Phase 81');
-assertIncludes('backend/src/services/requirementsRuntimeProof.service.ts', 'version: "0.81.0"', 'Runtime proof marker must expose Phase 81 version');
+assert(read('backend/src/services/requirementsRuntimeProof.service.ts').includes('PHASE_81_WORKSPACE_REPORT_RECONCILIATION') || read('backend/src/services/requirementsRuntimeProof.service.ts').includes('PHASE_82_REPORT_GENERATION_UX_EXPORT_PROGRESS'), 'Health/runtime proof marker must expose Phase 81 or successor Phase 82');
+assert(read('backend/src/services/requirementsRuntimeProof.service.ts').includes('version: "0.81.0"') || read('backend/src/services/requirementsRuntimeProof.service.ts').includes('version: "0.82.0"'), 'Runtime proof marker must expose Phase 81 or successor Phase 82 version');
 assertIncludes('frontend/src/styles.css', 'grid-template-rows: auto minmax(0, 1fr) auto auto', 'Project stage nav pane must reserve an independent scroll row');
 assertIncludes('frontend/src/styles.css', 'height: calc(100vh - 116px)', 'Project stage nav pane must be viewport bounded');
 assertIncludes('frontend/src/styles.css', 'overscroll-behavior: contain', 'Project stage card rail must contain scroll behavior');

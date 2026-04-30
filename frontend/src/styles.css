@@ -4419,3 +4419,73 @@ tr:last-child td {
 :root[data-theme="dark"] .diagram-advanced-panel summary {
   color: #e5e7eb;
 }
+
+/* Phase 82 report generation UX: visible long-running export state */
+.export-progress-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.export-progress-modal {
+  width: min(520px, 100%);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+}
+
+.export-progress-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 4px solid rgba(37, 99, 235, 0.16);
+  border-top-color: #2563eb;
+  animation: subnetops-export-spin 0.9s linear infinite;
+}
+
+.export-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.export-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+  transition: width 400ms ease;
+}
+
+.export-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #475569;
+  font-size: 0.86rem;
+}
+
+:root[data-theme="dark"] .export-progress-modal {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+:root[data-theme="dark"] .export-progress-meta {
+  color: #cbd5e1;
+}
+
+@keyframes subnetops-export-spin {
+  to { transform: rotate(360deg); }
+}

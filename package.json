@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release-root",
-  "version": "0.81.0",
+  "version": "0.82.0",
   "private": true,
   "description": "Root release-verification helpers for SubnetOps. The application packages remain in backend/ and frontend/.",
   "scripts": {
@@ -48,7 +48,8 @@
     "check:phase78-requirements-runtime-truth-bomb": "node scripts/check-phase78-requirements-runtime-truth-bomb.cjs && npm run check:phase79-requirements-read-repair-materialization",
     "check:phase79-requirements-read-repair-materialization": "node scripts/check-phase79-requirements-read-repair-materialization.cjs && npm run check:phase80-validation-diagram-reconciliation",
     "check:phase80-validation-diagram-reconciliation": "node scripts/check-phase80-validation-diagram-reconciliation.cjs && npm run check:phase81-workspace-report-reconciliation",
-    "check:phase81-workspace-report-reconciliation": "node scripts/check-phase81-workspace-report-reconciliation.cjs"
+    "check:phase81-workspace-report-reconciliation": "node scripts/check-phase81-workspace-report-reconciliation.cjs && npm run check:phase82-report-generation-ux",
+    "check:phase82-report-generation-ux": "node scripts/check-phase82-report-generation-ux.cjs"
   },
   "engines": {
     "node": ">=20.12.2 <21",
