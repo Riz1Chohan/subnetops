@@ -1326,10 +1326,16 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   const generatedAt = new Date().toISOString();
   const networkObjectCount = countNetworkObjectModelObjects(networkObjectModel.summary);
   const designMaterializedEvidenceReady = project.sites.length > 0 && addressingRows.length > 0 && networkObjectCount > 0;
-  const designReviewReadiness: DesignTruthReadiness =
-    !designMaterializedEvidenceReady || issues.some((issue) => issue.severity === "ERROR") || networkObjectModel.summary.designGraphBlockingFindingCount > 0 || networkObjectModel.routingSegmentation.summary.blockingFindingCount > 0 || networkObjectModel.securityPolicyFlow.summary.blockingFindingCount > 0
-      ? "blocked"
-      : networkObjectModel.securityPolicyFlow.summary.policyReadiness === "review" || networkObjectModel.routingSegmentation.summary.routingReadiness === "review"
+  const structuralDesignErrorCount = issues.filter((issue) => issue.severity === "ERROR").length + networkObjectModel.summary.designGraphBlockingFindingCount;
+  const reviewOnlyEngineFindingCount = networkObjectModel.routingSegmentation.summary.blockingFindingCount
+    + networkObjectModel.securityPolicyFlow.summary.blockingFindingCount
+    + networkObjectModel.securityPolicyFlow.summary.missingNatCount
+    + networkObjectModel.routingSegmentation.summary.reachabilityFindingCount;
+  const designReviewReadiness: DesignTruthReadiness = !designMaterializedEvidenceReady || structuralDesignErrorCount > 0
+    ? "blocked"
+    : reviewOnlyEngineFindingCount > 0
+      || networkObjectModel.securityPolicyFlow.summary.policyReadiness !== "ready"
+      || networkObjectModel.routingSegmentation.summary.routingReadiness !== "ready"
         ? "review"
         : "ready";
   const implementationExecutionReadiness = networkObjectModel.implementationPlan.summary.implementationReadiness;

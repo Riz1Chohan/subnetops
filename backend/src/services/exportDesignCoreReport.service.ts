@@ -1,5 +1,7 @@
 import type { ProfessionalReport } from "./export.types.js";
 
+export type ProfessionalReportMode = "professional" | "technical" | "full-proof";
+
 function asString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -26,7 +28,8 @@ function compactRows(rows: string[][], fallback: string[][]) {
   return rows.length > 0 ? rows : fallback;
 }
 
-export function applyBackendDesignCoreToReport(report: ProfessionalReport, designCore: any) {
+export function applyBackendDesignCoreToReport(report: ProfessionalReport, designCore: any, options?: { reportMode?: ProfessionalReportMode }) {
+  const reportMode: ProfessionalReportMode = options?.reportMode ?? "professional";
   if (!designCore || typeof designCore !== "object") return report;
 
   const addressingSection = report.sections.find((section) => section.title.toLowerCase().includes("addressing"));
@@ -99,20 +102,20 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     report.metadata = report.metadata ?? {
       organizationName: "To be confirmed",
       environment: "To be confirmed",
-      reportVersion: "Version 0.94 Phase 74 truth-locked",
-      revisionStatus: "Blocked - backend truth gaps present",
+      reportVersion: "Version 0.97 truth-locked",
+      revisionStatus: "Blocked - design evidence gaps present",
       documentOwner: "SubnetOps project owner",
       approvalStatus: "Not ready for approval",
-      generatedFrom: "Backend design-core truth lock",
+      generatedFrom: "Backend design evidence truth lock",
     };
-    report.metadata.reportVersion = "Version 0.94 Phase 74 truth-locked";
-    report.metadata.revisionStatus = "Blocked - backend truth gaps present";
+    report.metadata.reportVersion = "Version 0.97 truth-locked";
+    report.metadata.revisionStatus = "Blocked - design evidence gaps present";
     report.metadata.approvalStatus = "Not ready for approval";
     report.executiveSummary.unshift("Requirement-output evidence is still incomplete. Do not treat the package as design-review ready until materialized sites, addressing rows, and diagram topology evidence agree.");
   }
 
   report.sections.push({
-    title: "Phase 83 Requirement Propagation Completion Audit",
+    title: "Requirement Output Verification",
     paragraphs: [
       phase74TruthBlocked
         ? "Requirement-output evidence is still incomplete, so the export must stay blocked until materialized sites, addressing rows, and diagram topology evidence agree."
@@ -121,7 +124,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     ],
     tables: [
       {
-        title: "Phase 83 Truth Gates",
+        title: "Requirement Output Truth Gates",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
           ["Requirement-output evidence", phase74TruthBlocked ? "blocked" : "ready", "Materialized sites " + siteSummaries.length + "; addressing rows " + requirementOutputAddressRowCount + "; diagram missing inputs " + diagramEmptyInputs.length],
@@ -136,15 +139,15 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
 
   const phase84DefaultDenyPolicies = policyRules.filter((rule: any) => asArray(rule?.notes).some((note: any) => String(note).includes("Phase 84 explicit default-deny guardrail")));
   report.sections.push({
-    title: "Phase 84 Design Trust and Policy Reconciliation",
+    title: "Design Trust and Policy Reconciliation",
     paragraphs: [
-      "Phase 84 separates design-review readiness from implementation execution readiness so warnings, missing live inventory, and vendor-specific change gates do not collapse a materialized design into a false zero-trust state.",
+      "This section separates design-review readiness from implementation execution readiness so warnings, missing live inventory, and vendor-specific change gates do not collapse a materialized design into a false zero-trust state.",
       `Design review readiness: ${asString(designCore.summary?.designReviewReadiness, designCore.summary?.readyForBackendAuthority ? "review" : "blocked")}. Implementation execution readiness: ${asString(designCore.summary?.implementationExecutionReadiness, designCore.summary?.implementationPlanBlockingFindingCount ? "blocked" : "review")}.`,
       "The report now surfaces authoritative evidence counts used by the UI instead of relying on shallow zero-prone frontend fields.",
     ],
     tables: [
       {
-        title: "Phase 84 Readiness Split",
+        title: "Readiness Split",
         headers: ["Readiness Track", "Status", "Evidence"],
         rows: [
           ["Design review", asString(designCore.summary?.designReviewReadiness, designCore.summary?.readyForBackendAuthority ? "review" : "blocked"), `${designCore.summary?.siteCount ?? siteSummaries.length} site(s), ${designCore.summary?.vlanCount ?? requirementOutputAddressRowCount} addressing row(s), ${designCore.summary?.networkObjectCount ?? networkDevices.length + networkInterfaces.length} modeled object(s), ${designCore.summary?.issueCount ?? 0} design issue(s).`],
@@ -152,7 +155,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         ],
       },
       {
-        title: "Phase 84 Authoritative Evidence Metrics",
+        title: "Authoritative Evidence Metrics",
         headers: ["Metric", "Count"],
         rows: [
           ["Materialized sites", String(designCore.summary?.siteCount ?? siteSummaries.length)],
@@ -164,11 +167,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         ],
       },
       {
-        title: "Phase 84 Explicit Default-Deny Guardrails",
+        title: "Explicit Default-Deny Guardrails",
         headers: ["Policy", "Source", "Destination", "Action"],
         rows: compactRows(
           phase84DefaultDenyPolicies.map((rule: any) => [asString(rule.name, rule.id), asString(rule.sourceZoneId, "—"), asString(rule.destinationZoneId, "—"), asString(rule.action, "deny")]).slice(0, 30),
-          [["No Phase 84 guardrail policies emitted", "—", "—", "review"]],
+          [["No default-deny guardrail policies emitted", "—", "—", "review"]],
         ),
       },
     ],
@@ -1053,7 +1056,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       },
     ],
   };
-  report.sections.push(phase40Section, phase42Section);
+  if (reportMode === "full-proof") report.sections.push(phase40Section, phase42Section);
 
   return report;
 }

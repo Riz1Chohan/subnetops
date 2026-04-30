@@ -12,7 +12,6 @@ import {
   isValidIpv4,
   parseCidr,
   recommendedPrefixForHosts,
-  suggestedGatewayPattern,
   usableHostCount,
   type SegmentRole,
 } from "../lib/cidr.js";
@@ -931,33 +930,21 @@ export async function runValidation(projectId: string) {
         }
       }
 
-      if (parsedCidr.prefix <= 30 && role !== "WAN_TRANSIT" && role !== "LOOPBACK" && !suggestedGatewayPattern(vlan.gatewayIp)) {
+      const gatewayIsUsableConvention = Boolean(subnetFacts.firstUsableIp && vlan.gatewayIp === subnetFacts.firstUsableIp) || Boolean(subnetFacts.lastUsableIp && vlan.gatewayIp === subnetFacts.lastUsableIp);
+      if (parsedCidr.prefix <= 30 && role !== "WAN_TRANSIT" && role !== "LOOPBACK" && !gatewayIsUsableConvention) {
         results.push(
           makeItem({
             projectId,
             severity: "WARNING",
             ruleCode: "NONSTANDARD_GATEWAY_PATTERN",
             title: `Non-standard gateway pattern on VLAN ${vlan.vlanId}`,
-            message: `Gateway ${vlan.gatewayIp} is valid, but it does not follow common conventions like .1 or .254 for normal LAN segments.`,
+            message: `Gateway ${vlan.gatewayIp} is valid, but it is neither the first usable (${subnetFacts.firstUsableIp ?? "unknown"}) nor last usable (${subnetFacts.lastUsableIp ?? "unknown"}) address for ${canonical}.`,
             entityType: "VLAN",
             entityId: vlan.id,
           }),
         );
       }
 
-      if (subnetFacts.firstUsableIp && subnetFacts.lastUsableIp && vlan.gatewayIp !== subnetFacts.firstUsableIp && vlan.gatewayIp !== subnetFacts.lastUsableIp && role !== "WAN_TRANSIT") {
-        results.push(
-          makeItem({
-            projectId,
-            severity: "INFO",
-            ruleCode: "GATEWAY_CONVENTION_REVIEW",
-            title: `Gateway convention review on VLAN ${vlan.vlanId}`,
-            message: `Common gateway placements for ${canonical} would be ${subnetFacts.firstUsableIp} or ${subnetFacts.lastUsableIp}. The current gateway ${vlan.gatewayIp} is valid, but review whether you want a standard gateway convention across the project.`,
-            entityType: "VLAN",
-            entityId: vlan.id,
-          }),
-        );
-      }
     }
   }
 

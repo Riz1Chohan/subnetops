@@ -26,3 +26,5 @@ assert(project.includes('requirementsJson: sourceProjectForCopy.requirementsJson
 const doc = read('docs/doc/PHASE85-RENDER-COMPILE-FIXES-FOR-PHASE84.md');
 assert(doc.includes('PHASE_85_RENDER_COMPILE_FIXES_FOR_PHASE_84'), 'Phase 85 doc marker missing');
 console.log('Phase 85 Render compile fixes for Phase 84 checks passed.');
+
+process.exit(0);

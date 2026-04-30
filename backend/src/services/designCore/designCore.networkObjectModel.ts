@@ -560,6 +560,9 @@ function buildPolicyRules(securityZones: SecurityZone[], requirements: Requireme
   }
 
 
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, internalZoneId, managementZoneId, "policy-deny-general-internal-users-to-management", "Deny General Internal Users to Management Plane", "Normal corporate user networks must not broadly administer device management services; approved admin or operations sources require separate scoped review rules.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, dmzZoneId, "policy-deny-guest-to-dmz", "Deny Guest to DMZ Services", "Guest networks must stay internet-only and must not reach public-service or remote-access DMZ segments.");
+  addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, WIDE_AREA_NETWORK_ZONE_ID, dmzZoneId, "policy-deny-general-wan-to-dmz", "Deny General WAN to DMZ by Default", "General inbound WAN traffic is denied by default; approved published services and remote-access edges remain separate review rules.");
   addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, managementZoneId, "policy-deny-guest-to-management", "Deny Guest to Management Plane", "Guest networks must never reach device administration or management-plane services.");
   addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, iotZoneId, "policy-deny-guest-to-iot", "Deny Guest to IoT and Shared Device Networks", "Guest networks should be internet-only and isolated from shared device segments.");
   addPhase84DefaultDenyPolicyGuardrail(policyRules, zoneIds, guestZoneId, transitZoneId, "policy-deny-guest-to-wan-transit", "Deny Guest to WAN Transit", "Guest access should not reach WAN/cloud transit segments directly; internet egress must use the reviewed WAN edge policy.");

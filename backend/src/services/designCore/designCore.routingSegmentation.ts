@@ -808,8 +808,12 @@ function findZoneByRole(securityZones: SecurityZone[], zoneRole: "internal" | "g
   return securityZones.find((zone) => zone.zoneRole === zoneRole);
 }
 
-function findPolicyAction(policyRules: PolicyRule[], sourceZoneId: string, destinationZoneId: string) {
-  return policyRules.find((rule) => rule.sourceZoneId === sourceZoneId && rule.destinationZoneId === destinationZoneId)?.action;
+function findPolicyActionForExpectation(policyRules: PolicyRule[], sourceZoneId: string, destinationZoneId: string, expectedAction: "allow" | "deny" | "review") {
+  const pairRules = policyRules.filter((rule) => rule.sourceZoneId === sourceZoneId && rule.destinationZoneId === destinationZoneId);
+  if (pairRules.length === 0) return undefined;
+  if (expectedAction === "deny") return pairRules.find((rule) => rule.action === "deny")?.action ?? pairRules[0].action;
+  if (expectedAction === "allow") return pairRules.find((rule) => rule.action === "allow")?.action ?? pairRules[0].action;
+  return pairRules.find((rule) => rule.action === "review")?.action ?? pairRules[0].action;
 }
 
 function segmentationExpectationState(expectedAction: "allow" | "deny" | "review", policyAction?: "allow" | "deny" | "review"): "satisfied" | "missing-policy" | "conflict" | "review" {
@@ -830,7 +834,7 @@ function createSegmentationFlowExpectation(params: {
   policyRules: PolicyRule[];
   severityIfMissing: "ERROR" | "WARNING";
 }): SegmentationFlowExpectation {
-  const observedPolicyAction = findPolicyAction(params.policyRules, params.sourceZone.id, params.destinationZone.id);
+  const observedPolicyAction = findPolicyActionForExpectation(params.policyRules, params.sourceZone.id, params.destinationZone.id, params.expectedAction);
   const state = segmentationExpectationState(params.expectedAction, observedPolicyAction);
 
   return {

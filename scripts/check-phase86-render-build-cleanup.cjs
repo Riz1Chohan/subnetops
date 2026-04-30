@@ -26,3 +26,5 @@ assert(doc.includes('PHASE_86_RENDER_BUILD_CLEANUP'), 'Phase 86 doc marker missi
 const pkg = read('package.json');
 assert(pkg.includes('check:phase86-render-build-cleanup'), 'root package check script missing');
 console.log('Phase 86 Render build cleanup checks passed.');
+
+process.exit(0);

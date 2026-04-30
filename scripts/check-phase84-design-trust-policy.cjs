@@ -6,7 +6,7 @@ function read(rel) { return fs.readFileSync(path.join(root, rel), 'utf8'); }
 function assert(condition, message) { if (!condition) { console.error(`Phase 84 check failed: ${message}`); process.exit(1); } }
 const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts');
 assert(runtime.includes('PHASE_84_DESIGN_TRUST_SNAPSHOT_POLICY_RECONCILIATION'), 'runtime marker missing');
-assert(runtime.includes('version: "0.86.0"') || runtime.includes('version: "0.84.1"'), 'runtime version missing');
+assert(runtime.includes('version: "0.87.0"') || runtime.includes('version: "0.86.0"') || runtime.includes('version: "0.84.1"'), 'runtime version missing');
 const hooks = read('frontend/src/features/designCore/hooks.ts');
 assert(hooks.includes('keepPreviousData') && hooks.includes('placeholderData: keepPreviousData'), 'snapshot hydration does not preserve previous backend data');
 const readiness = read('frontend/src/lib/designReadiness.ts');
@@ -42,7 +42,9 @@ const policy = read('backend/src/services/designCore/designCore.networkObjectMod
 ].forEach((id) => assert(policy.includes(id), `${id} guardrail missing`));
 assert(policy.includes('Phase 84 explicit default-deny guardrail'), 'policy guardrails lack Phase 84 marker');
 const report = read('backend/src/services/exportDesignCoreReport.service.ts');
-assert(report.includes('Phase 84 Design Trust and Policy Reconciliation'), 'report Phase 84 section missing');
+assert(report.includes('Design Trust and Policy Reconciliation'), 'report Phase 84 section missing');
 const doc = read('docs/doc/PHASE84-DESIGN-TRUST-SNAPSHOT-POLICY-RECONCILIATION.md');
 assert(doc.includes('PHASE_84_DESIGN_TRUST_SNAPSHOT_POLICY_RECONCILIATION'), 'Phase 84 doc missing marker');
 console.log('Phase 84 design trust, snapshot hydration, and policy reconciliation checks passed.');
+
+process.exit(0);

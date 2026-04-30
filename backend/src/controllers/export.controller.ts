@@ -21,6 +21,11 @@ import {
 } from "docx";
 import { composeProfessionalReportForProject, getCsvRows, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
 
+function parseReportMode(value: unknown): "professional" | "technical" | "full-proof" {
+  const mode = Array.isArray(value) ? value[0] : value;
+  return mode === "technical" || mode === "full-proof" ? mode : "professional";
+}
+
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
 
@@ -255,8 +260,8 @@ function drawMetricCards(
   }
 }
 
-async function buildPdf(projectId: string) {
-  const { project, report } = await composeProfessionalReportForProject(projectId);
+async function buildPdf(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
+  const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
@@ -356,8 +361,8 @@ function cellParagraph(text: string, bold = false) {
   });
 }
 
-async function buildDocx(projectId: string) {
-  const { project, report } = await composeProfessionalReportForProject(projectId);
+async function buildDocx(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
+  const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
@@ -512,7 +517,7 @@ export async function exportPdf(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
   await ensureCanExportProject(req, projectId);
 
-  const pdfBytes = await buildPdf(projectId);
+  const pdfBytes = await buildPdf(projectId, parseReportMode(req.query.reportMode));
   if (!pdfBytes) {
     return res.status(404).json({ message: "Project not found" });
   }
@@ -526,7 +531,7 @@ export async function exportDocx(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
   await ensureCanExportProject(req, projectId);
 
-  const docxBytes = await buildDocx(projectId);
+  const docxBytes = await buildDocx(projectId, parseReportMode(req.query.reportMode));
   if (!docxBytes) {
     return res.status(404).json({ message: "Project not found" });
   }

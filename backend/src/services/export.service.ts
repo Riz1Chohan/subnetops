@@ -2,7 +2,7 @@ import { prisma } from "../db/prisma.js";
 import { getDesignCoreSnapshotForExport } from "./designCore.service.js";
 import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 import { runValidation } from "./validation.service.js";
-import { applyBackendDesignCoreToReport } from "./exportDesignCoreReport.service.js";
+import { applyBackendDesignCoreToReport, type ProfessionalReportMode } from "./exportDesignCoreReport.service.js";
 import type { ProfessionalReport, ReportMetadata, ReportSection, ReportTable, ReportVisualSnapshot } from "./export.types.js";
 
 type JsonMap = Record<string, unknown>;
@@ -561,7 +561,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   };
 
   const engineerChecklistSection: ReportSection = {
-    title: "11. Engineer Review Checklist",
+    title: "12. Engineer Review Checklist",
     paragraphs: [
       "The export should be treated as a design review package, not a replacement for implementation engineering. The checklist below captures the minimum review gates before the plan becomes a change-ready implementation artifact.",
       ENGINEER_REVIEW_STATEMENT,
@@ -680,7 +680,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     projectPhase: asString(exportContext.requirements.projectPhase, "To be confirmed"),
     planningFocus: asString(exportContext.planningFor, "To be confirmed"),
     primaryObjective: asString(exportContext.primaryGoal, "To be confirmed"),
-    generatedFrom: "Saved project records, backend design-core snapshot, deterministic addressing checks, and assumption-based recommendations",
+    generatedFrom: "Saved project records, authoritative design snapshot, deterministic addressing checks, and assumption-based recommendations",
   };
 
   const visualSnapshot: ReportVisualSnapshot = {
@@ -714,12 +714,12 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   } satisfies ProfessionalReport;
 }
 
-export async function composeProfessionalReportForProject(projectId: string) {
+export async function composeProfessionalReportForProject(projectId: string, reportMode: ProfessionalReportMode = "professional") {
   const project = await getProjectExportData(projectId);
   const report = composeProfessionalReport(project);
   if (!project || !report) return { project, report: null };
   const designCore = await getDesignCoreSnapshotForExport(projectId);
-  return { project, report: applyBackendDesignCoreToReport(report, designCore) };
+  return { project, report: applyBackendDesignCoreToReport(report, designCore, { reportMode }) };
 }
 
 export async function getCsvRows(projectId: string) {

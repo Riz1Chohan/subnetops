@@ -598,7 +598,7 @@ export function buildBackendSnapshotViewModel(snapshot: DesignCoreSnapshot, addr
       `${snapshot.projectName} backend design-core snapshot contains ${snapshot.summary.networkObjectCount || snapshot.summary.vlanCount} modeled object(s).`,
       `Requirement impact traceability covers ${(snapshot.traceability ?? []).filter((item) => item.sourceArea === "requirements").length} requirement field(s).`,
       snapshot.requirementsImpactClosure ? `Requirement impact closure status: ${snapshot.requirementsImpactClosure.completionStatus} with ${snapshot.requirementsImpactClosure.concreteFieldCount} concrete field(s) and ${snapshot.requirementsImpactClosure.policyFieldCount} policy-driven field(s).` : "Requirement impact closure is not available in this snapshot.",
-      `Phase 84 readiness split: design review ${snapshot.summary.designReviewReadiness ?? (snapshot.summary.readyForBackendAuthority ? "review" : "blocked")}; implementation execution ${snapshot.summary.implementationExecutionReadiness ?? (snapshot.summary.implementationPlanBlockingFindingCount ? "blocked" : "review")}.`,
+      `Readiness split: design review ${snapshot.summary.designReviewReadiness ?? (snapshot.summary.readyForBackendAuthority ? "review" : "blocked")}; implementation execution ${snapshot.summary.implementationExecutionReadiness ?? (snapshot.summary.implementationPlanBlockingFindingCount ? "blocked" : "review")}.`,
       `Frontend planning authority is disabled; this is a backend snapshot view model.`,
     ],
   };

@@ -318,8 +318,10 @@ function natRuleMatchesFlow(natRule: NatRule, flowInput: BaseFlowRequirementInpu
   return natRule.translatedAddressMode !== "not-required";
 }
 
-function chooseObservedPolicyRule(matchedPolicyRules: SequencedPolicyRule[]) {
-  return [...matchedPolicyRules].sort((left, right) => left.sequence - right.sequence)[0];
+function chooseObservedPolicyRule(matchedPolicyRules: SequencedPolicyRule[], expectedAction: SecurityPolicyAction) {
+  if (expectedAction === "deny") return [...matchedPolicyRules].sort((left, right) => (left.action === "deny" ? 0 : 1) - (right.action === "deny" ? 0 : 1) || left.sequence - right.sequence)[0];
+  if (expectedAction === "allow") return [...matchedPolicyRules].sort((left, right) => (left.action === "allow" ? 0 : 1) - (right.action === "allow" ? 0 : 1) || left.sequence - right.sequence)[0];
+  return [...matchedPolicyRules].sort((left, right) => (left.action === "review" ? 0 : 1) - (right.action === "review" ? 0 : 1) || left.sequence - right.sequence)[0];
 }
 
 function evaluateFlowState(params: {
@@ -343,7 +345,7 @@ function createFlowRequirement(params: {
 }): SecurityFlowRequirement {
   const matchedPolicyRules = params.policyRules.filter((rule) => policyRuleMatchesFlow(rule, params.flowInput));
   const matchedNatRules = params.natRules.filter((natRule) => natRuleMatchesFlow(natRule, params.flowInput));
-  const observedPolicyRule = chooseObservedPolicyRule(matchedPolicyRules);
+  const observedPolicyRule = chooseObservedPolicyRule(matchedPolicyRules, params.flowInput.expectedAction);
   const observedPolicyAction = observedPolicyRule?.action;
   const state = evaluateFlowState({
     expectedAction: params.flowInput.expectedAction,
@@ -737,6 +739,10 @@ function buildAdditionalFlowInputs(model: SecurityPolicyNetworkObjectModel): Bas
       notes: ["Engineer review is required because DMZ egress depends on the application threat model."],
     });
   }
+
+  pushPhase84DenyFlow("security-flow-phase87-internal-users-to-management-deny", "General internal users must not administer the management plane", internalZone, managementZone, "Normal corporate user networks must not broadly reach device administration; scoped admin/operations access belongs in separate review flows.");
+  pushPhase84DenyFlow("security-flow-phase87-guest-to-dmz-deny", "Guest to DMZ must be denied by default", guestZone, dmzZone, "Guest networks must remain internet-only and isolated from published service or remote-access edge segments.");
+  pushPhase84DenyFlow("security-flow-phase87-general-wan-to-dmz-deny", "General WAN to DMZ must be denied by default", wideAreaNetworkZone, dmzZone, "General inbound WAN traffic is denied by default; approved published services use separate explicit review/allow flows.");
 
   pushPhase84DenyFlow("security-flow-phase84-guest-to-iot-deny", "Guest to IoT must be denied by default", guestZone, iotZone, "Guest networks must remain isolated from shared device networks.");
   pushPhase84DenyFlow("security-flow-phase84-guest-to-transit-deny", "Guest to WAN transit must be denied by default", guestZone, transitZone, "Guest networks should only use reviewed internet egress, not direct transit access.");
