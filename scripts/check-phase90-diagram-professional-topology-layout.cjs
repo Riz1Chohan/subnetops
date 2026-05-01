@@ -21,8 +21,8 @@ const phase89 = read('scripts/check-phase89-professional-report-audience-cleanup
 const docs = read('docs/doc/PHASE90-DIAGRAM-PROFESSIONAL-TOPOLOGY-LAYOUT.md');
 
 assert(runtime.includes('diagramProfessionalLayout: "PHASE_90_DIAGRAM_PROFESSIONAL_TOPOLOGY_LAYOUT"'), 'runtime Phase 90 marker missing');
-assert(runtime.includes('version: "0.90.0"'), 'runtime version not advanced to 0.90.0');
-assert(pkg.includes('"version": "0.90.0"'), 'root package version not advanced to 0.90.0');
+assert(/version:\s*"0\.(9[0-9]|1[0-9]{2})\.0"/.test(runtime), 'compatible runtime version missing for Phase 90 or later');
+assert(/"version":\s*"0\.(9[0-9]|1[0-9]{2})\.0"/.test(pkg), 'compatible package version missing for Phase 90 or later');
 assert(pkg.includes('check:phase90-diagram-professional-topology-layout'), 'Phase 90 package script missing');
 assert(pkg.includes('check:phase84-90-release'), 'Phase 84-90 aggregate script missing');
 

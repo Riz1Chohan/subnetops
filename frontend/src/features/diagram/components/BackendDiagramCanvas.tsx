@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { BackendDiagramRenderEdge, BackendDiagramRenderModel, BackendDiagramRenderNode } from "../../../lib/designCoreSnapshot";
 import { truthBadgeClass } from "../../../lib/reportDiagramTruth";
 import type { ActiveOverlayMode, DiagramMode, DiagramScope, LinkAnnotationMode } from "../diagramTypes";
+import { DeviceIcon, type DeviceKind } from "./diagramRendererShared";
 
 interface BackendDiagramCanvasProps {
   renderModel: BackendDiagramRenderModel;
@@ -10,6 +11,8 @@ interface BackendDiagramCanvasProps {
   activeOverlays: ActiveOverlayMode[];
   linkAnnotationMode: LinkAnnotationMode;
 }
+
+type CanvasBounds = { width: number; height: number; offsetX: number; offsetY: number };
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
   if (node.objectType === "site") return "Site";
@@ -27,15 +30,6 @@ function professionalNodeKind(node: BackendDiagramRenderNode) {
   if (node.objectType === "dhcp-pool") return "DHCP";
   if (node.objectType === "network-link") return "Link";
   return node.objectType.replace(/-/g, " ");
-}
-
-function nodeRadius(node: BackendDiagramRenderNode) {
-  if (node.objectType === "site") return 40;
-  if (node.objectType === "network-device") return /firewall/i.test(node.label) ? 38 : 36;
-  if (node.objectType === "security-zone") return /wan|internet/i.test(node.label) ? 44 : 34;
-  if (node.objectType === "policy-rule") return 28;
-  if (node.objectType === "dhcp-pool") return 28;
-  return 32;
 }
 
 function cleanCanvasLabel(value: string, max = 28) {
@@ -142,32 +136,151 @@ function visibleNodeSet(renderModel: BackendDiagramRenderModel, mode: DiagramMod
   return (visible.length > 0 ? visible : renderModel.nodes).slice(0, professionalLimit);
 }
 
-function nodeShape(node: BackendDiagramRenderNode, selected: boolean) {
-  const radius = nodeRadius(node);
-  const strokeWidth = selected ? 4 : node.readiness === "blocked" ? 3 : 2;
+function backendDiagramTextFill() {
+  return "#1f3148";
+}
+
+function backendDiagramMutedFill() {
+  return "#64748b";
+}
+
+function readinessStroke(readiness: BackendDiagramRenderNode["readiness"] | BackendDiagramRenderEdge["readiness"]) {
+  if (readiness === "blocked") return "#c2410c";
+  if (readiness === "review") return "#b7791f";
+  if (readiness === "ready") return "#40699f";
+  return "#64748b";
+}
+
+function automaticIconScale(nodeCount: number) {
+  if (nodeCount > 90) return 0.42;
+  if (nodeCount > 60) return 0.48;
+  if (nodeCount > 36) return 0.56;
+  return 0.64;
+}
+
+function professionalDeviceKind(node: BackendDiagramRenderNode): DeviceKind | null {
+  const text = `${node.objectType} ${node.label} ${node.notes.join(" ")}`.toLowerCase();
+  if (node.objectType === "dhcp-pool") return "server";
+  if (node.objectType === "route-domain" || node.objectType === "route-intent") return "cloud-edge";
+  if (node.objectType === "security-zone" && /wan|internet|wide area/.test(text)) return "internet";
+  if (node.objectType !== "network-device") return null;
+  if (/firewall|security boundary|perimeter/.test(text)) return "firewall";
+  if (/switch|layer-3|l3/.test(text) && /core|hq/.test(text)) return "core-switch";
+  if (/switch|access/.test(text)) return "access-switch";
+  if (/cloud/.test(text)) return "cloud-edge";
+  return "router";
+}
+
+function BackendDiagramCanvasDefs() {
+  return (
+    <defs>
+      <pattern id="backend-diagram-grid-fine" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#d9e4f2" strokeWidth="1" opacity="0.42" />
+      </pattern>
+      <pattern id="backend-diagram-grid-major" width="96" height="96" patternUnits="userSpaceOnUse">
+        <rect width="96" height="96" fill="url(#backend-diagram-grid-fine)" />
+        <path d="M 96 0 L 0 0 0 96" fill="none" stroke="#c8d6e8" strokeWidth="1.1" opacity="0.58" />
+      </pattern>
+      <filter id="backend-diagram-device-shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="#587399" floodOpacity="0.13" />
+      </filter>
+      <marker id="backend-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#40699f" />
+      </marker>
+      <marker id="backend-arrow-blocked" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#c2410c" />
+      </marker>
+      <marker id="backend-arrow-review" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7791f" />
+      </marker>
+    </defs>
+  );
+}
+
+function backendArrowForReadiness(readiness: BackendDiagramRenderEdge["readiness"]) {
+  if (readiness === "blocked") return "url(#backend-arrow-blocked)";
+  if (readiness === "review") return "url(#backend-arrow-review)";
+  return "url(#backend-arrow)";
+}
+
+function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: number) {
+  const stroke = readinessStroke(node.readiness);
+  const strokeWidth = selected ? 3 : node.readiness === "blocked" ? 2.4 : 1.8;
   const common = {
-    fill: "var(--panel-bg, #fff)",
-    stroke: "currentColor",
+    fill: "#ffffff",
+    stroke,
     strokeWidth,
-    opacity: node.readiness === "unknown" ? 0.72 : 1,
+    opacity: node.readiness === "unknown" ? 0.74 : 1,
+    filter: selected ? "url(#backend-diagram-device-shadow)" : undefined,
   };
 
   if (node.objectType === "site") {
-    return <rect x={-60} y={-34} width={120} height={68} rx={18} {...common} />;
-  }
-
-  if (node.objectType === "network-device") {
-    if (/firewall/i.test(node.label)) {
-      return <path d="M -46 -28 H 46 V 28 H -46 Z M -46 -9 H 46 M -46 10 H 46 M -16 -28 V 28 M 16 -28 V 28" {...common} />;
-    }
-    return <rect x={-48} y={-28} width={96} height={56} rx={14} {...common} />;
+    const width = 128 * Math.max(scale, 0.58);
+    const height = 64 * Math.max(scale, 0.58);
+    return <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={16} fill="#ffffff" stroke={stroke} strokeWidth={strokeWidth} opacity="0.94" />;
   }
 
   if (node.objectType === "policy-rule") {
-    return <path d="M 0 -34 L 44 0 L 0 34 L -44 0 Z" {...common} />;
+    return <path d="M 0 -30 L 40 0 L 0 30 L -40 0 Z" {...common} />;
   }
 
-  return <circle r={radius} {...common} />;
+  if (node.objectType === "security-zone") {
+    return <rect x={-52 * scale} y={-28 * scale} width={104 * scale} height={56 * scale} rx={18 * scale} fill="#fffaf0" stroke={stroke} strokeWidth={strokeWidth} />;
+  }
+
+  return <circle r={30 * Math.max(scale, 0.58)} {...common} />;
+}
+
+function renderNodeVisual(node: BackendDiagramRenderNode, selected: boolean, scale: number) {
+  const kind = professionalDeviceKind(node);
+  const titleY = kind ? 48 * scale : node.objectType === "site" ? 4 : 6;
+  const statusY = titleY + 15;
+  const labelMax = node.objectType === "site" ? 24 : 22;
+
+  if (kind) {
+    const iconX = -58 * scale;
+    const iconY = -35 * scale;
+    return (
+      <>
+        {selected ? <circle r={54 * scale} fill="none" stroke={readinessStroke(node.readiness)} strokeWidth="2.5" opacity="0.7" /> : null}
+        <g transform={`translate(${iconX}, ${iconY}) scale(${scale})`} filter={selected ? "url(#backend-diagram-device-shadow)" : undefined}>
+          <DeviceIcon x={0} y={0} kind={kind} label="" showSublabel={false} emphasized />
+        </g>
+        <text textAnchor="middle" y={titleY} fontSize={Math.max(10, 12 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
+        <text textAnchor="middle" y={statusY} fontSize={Math.max(8, 9.5 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)} • {node.readiness}</text>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {nodeShape(node, selected, scale)}
+      <text textAnchor="middle" y={node.objectType === "site" ? -6 : -5} fontSize={Math.max(8, 10 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)}</text>
+      <text textAnchor="middle" y={node.objectType === "site" ? 10 : 10} fontSize={Math.max(9, 11 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
+      <text textAnchor="middle" y={node.objectType === "site" ? 25 : 24} fontSize={Math.max(8, 9 * scale)} fill={backendDiagramMutedFill()}>{node.readiness}</text>
+    </>
+  );
+}
+
+function nodePoint(node: BackendDiagramRenderNode, bounds: CanvasBounds) {
+  return { x: node.x + bounds.offsetX, y: node.y + bounds.offsetY };
+}
+
+function calculateCanvasBounds(nodes: BackendDiagramRenderNode[]): CanvasBounds {
+  const minX = Math.min(...nodes.map((node) => node.x), 0);
+  const minY = Math.min(...nodes.map((node) => node.y), 0);
+  const maxX = Math.max(...nodes.map((node) => node.x), 1600);
+  const maxY = Math.max(...nodes.map((node) => node.y), 900);
+  const paddingLeft = 240;
+  const paddingTop = 180;
+  const paddingRight = 420;
+  const paddingBottom = 260;
+  return {
+    width: Math.max(2400, maxX - minX + paddingLeft + paddingRight),
+    height: Math.max(1400, maxY - minY + paddingTop + paddingBottom),
+    offsetX: paddingLeft - minX,
+    offsetY: paddingTop - minY,
+  };
 }
 
 export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays, linkAnnotationMode }: BackendDiagramCanvasProps) {
@@ -180,8 +293,8 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
     () => visibleEdgesForView(renderModel, mode, scope, activeOverlays).filter((edge) => visibleNodeIds.has(edge.sourceNodeId) && visibleNodeIds.has(edge.targetNodeId)),
     [renderModel, mode, scope, activeOverlays, visibleNodeIds],
   );
-  const maxX = Math.max(1200, ...visibleNodes.map((node) => node.x + 220));
-  const maxY = Math.max(760, ...visibleNodes.map((node) => node.y + 160));
+  const canvasBounds = useMemo(() => calculateCanvasBounds(visibleNodes), [visibleNodes]);
+  const iconScale = automaticIconScale(visibleNodes.length);
 
   if (renderModel.emptyState || renderModel.nodes.length === 0) {
     return (
@@ -205,56 +318,66 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
         <div>
           <strong>Authoritative topology canvas</strong>
           <p className="muted" style={{ margin: "6px 0 0 0" }}>
-            Showing {visibleNodes.length} professional topology object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {scope}; layout: {renderModel.summary.layoutMode}. Detailed proof, implementation, and verification objects stay hidden unless an overlay asks for them.
+            Showing {visibleNodes.length} professional topology object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {scope}; layout: {renderModel.summary.layoutMode}. Canvas expands with topology size; detailed proof, implementation, and verification objects stay hidden unless an overlay asks for them.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Authoritative model</span>
           <span className="badge-soft">Groups {renderModel.summary.groupCount}</span>
           <span className="badge-soft">Overlays {renderModel.summary.overlayCount}</span>
+          <span className="badge-soft">Icon scale {Math.round(iconScale * 100)}%</span>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(720px, 1fr) minmax(260px, 340px)", gap: 12, alignItems: "start" }}>
-        <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)" }}>
-          <svg width={maxX} height={maxY} viewBox={`0 0 ${maxX} ${maxY}`} role="img" aria-label="Authoritative professional network topology diagram">
-            <defs>
-              <marker id="backend-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
-              </marker>
-            </defs>
-            <rect x={0} y={0} width={maxX} height={maxY} rx={20} fill="var(--canvas-bg, #f7fbff)" opacity={0.9} />
+        <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", minHeight: 680, maxHeight: "calc(100vh - 250px)", background: "#f8fbff" }}>
+          <svg width={canvasBounds.width} height={canvasBounds.height} viewBox={`0 0 ${canvasBounds.width} ${canvasBounds.height}`} role="img" aria-label="Authoritative professional network topology diagram" style={{ display: "block", minWidth: `${canvasBounds.width}px`, maxWidth: "none", background: "#ffffff" }}>
+            <BackendDiagramCanvasDefs />
+            <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="#fbfdff" />
+            <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="url(#backend-diagram-grid-major)" opacity="0.82" />
             {visibleEdges.map((edge) => {
               const source = nodeById.get(edge.sourceNodeId);
               const target = nodeById.get(edge.targetNodeId);
               if (!source || !target) return null;
-              const midX = (source.x + target.x) / 2;
-              const bendY = Math.abs(source.y - target.y) < 80 ? source.y - 48 : (source.y + target.y) / 2;
+              const sourcePoint = nodePoint(source, canvasBounds);
+              const targetPoint = nodePoint(target, canvasBounds);
+              const midX = (sourcePoint.x + targetPoint.x) / 2;
+              const bendY = Math.abs(sourcePoint.y - targetPoint.y) < 80 ? sourcePoint.y - 48 : (sourcePoint.y + targetPoint.y) / 2;
+              const stroke = readinessStroke(edge.readiness);
               return (
                 <g key={edge.id} className={`backend-diagram-edge backend-diagram-edge-${edge.readiness}`}>
                   <path
-                    d={`M ${source.x} ${source.y} L ${midX} ${source.y} L ${midX} ${target.y} L ${target.x} ${target.y}`}
+                    d={`M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`}
                     fill="none"
-                    stroke="currentColor"
-                    strokeWidth={edge.readiness === "blocked" ? 3 : 2}
+                    stroke="#ffffff"
+                    strokeWidth={edge.readiness === "blocked" ? 7 : 5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.92"
+                  />
+                  <path
+                    d={`M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={edge.readiness === "blocked" ? 3 : 2.2}
                     strokeDasharray={edge.readiness === "unknown" ? "6 6" : undefined}
-                    markerEnd="url(#backend-arrow)"
-                    opacity={edge.readiness === "unknown" ? 0.38 : 0.7}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    markerEnd={backendArrowForReadiness(edge.readiness)}
+                    opacity={edge.readiness === "unknown" ? 0.48 : 0.76}
                   />
                   {linkAnnotationMode === "full" ? (
-                    <text x={midX + 8} y={bendY - 8} fontSize="11" fill="currentColor">{cleanCanvasLabel(edge.label, 34)}</text>
+                    <text x={midX + 8} y={bendY - 8} fontSize="11" fill={backendDiagramTextFill()}>{cleanCanvasLabel(edge.label, 34)}</text>
                   ) : null}
                 </g>
               );
             })}
             {visibleNodes.map((node) => {
               const selected = selectedNode?.id === node.id;
+              const point = nodePoint(node, canvasBounds);
               return (
-                <g key={node.id} transform={`translate(${node.x}, ${node.y})`} onClick={() => setSelectedNodeId(node.id)} style={{ cursor: "pointer" }}>
-                  {nodeShape(node, selected)}
-                  <text textAnchor="middle" y={-8} fontSize="10" fill="currentColor">{professionalNodeKind(node)}</text>
-                  <text textAnchor="middle" y={8} fontSize="12" fontWeight={700} fill="currentColor">{cleanCanvasLabel(node.label, 22)}</text>
-                  <text textAnchor="middle" y={24} fontSize="10" fill="currentColor">{node.readiness}</text>
+                <g key={node.id} transform={`translate(${point.x}, ${point.y})`} onClick={() => setSelectedNodeId(node.id)} style={{ cursor: "pointer" }}>
+                  {renderNodeVisual(node, selected, iconScale)}
                 </g>
               );
             })}

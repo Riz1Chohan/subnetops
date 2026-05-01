@@ -4,13 +4,14 @@ import { ensureCanViewProject } from "./access.service.js";
 
 export const REQUIREMENTS_RUNTIME_RELEASE = {
   phase: "PHASE_84_DESIGN_TRUST_SNAPSHOT_POLICY_RECONCILIATION",
-  version: "0.90.0",
+  version: "0.91.0",
   compileFix: "PHASE_85_RENDER_COMPILE_FIXES_FOR_PHASE_84",
   renderBuildCleanup: "PHASE_86_RENDER_BUILD_CLEANUP",
   truthStabilization: "PHASE_87_READINESS_POLICY_WARNING_REPORT_DIAGRAM_STABILIZATION",
   professionalReportHardening: "PHASE_88_PROFESSIONAL_REPORT_RELEASE_DISCIPLINE",
   professionalAudienceCleanup: "PHASE_89_PROFESSIONAL_REPORT_AUDIENCE_CLEANUP",
   diagramProfessionalLayout: "PHASE_90_DIAGRAM_PROFESSIONAL_TOPOLOGY_LAYOUT",
+  diagramVisualRegressionPatch: "PHASE_91_DIAGRAM_VISUAL_REGRESSION_PATCH",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;
