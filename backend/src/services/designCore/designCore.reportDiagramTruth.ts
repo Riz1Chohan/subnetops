@@ -197,93 +197,435 @@ function overlayKeysForRelationship(relationship: DesignGraphRelationship): Back
   return ["addressing"];
 }
 
-function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, overlaySummaries: BackendDiagramTruthOverlaySummary[], hotspots: BackendDiagramTruthHotspot[]): BackendDiagramRenderModel {
+
+function cleanTopologyLabel(value: string) {
+  return value
+    .replace(/device-[0-9a-f-]+/gi, "modeled device")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function deviceDiagramLabel(device: NetworkObjectModel["devices"][number]) {
+  const siteCode = device.siteCode || (device.siteName || "").replace(/^Site\s+/i, "S").replace(/\s.*$/, "");
+  if (device.deviceRole === "security-firewall") return `${siteCode} Security Firewall`;
+  if (device.deviceRole === "core-layer3-switch") return `${siteCode} Core Gateway`;
+  if (device.deviceRole === "branch-edge-router") return `${siteCode} Branch Gateway`;
+  if (device.deviceRole === "routing-identity") return `${siteCode} Routing Identity`;
+  return `${siteCode} Network Device`;
+}
+
+function siteDiagramCode(site: { siteCode?: string | null; siteName: string }) {
+  if (site.siteCode && site.siteCode.trim()) return site.siteCode.trim();
+  if (/hq/i.test(site.siteName)) return "HQ";
+  const numberMatch = site.siteName.match(/\b(\d{1,2})\b/);
+  return numberMatch ? `S${numberMatch[1]}` : site.siteName.slice(0, 6).toUpperCase();
+}
+
+function siteDiagramRank(site: { siteCode?: string | null; siteName: string }) {
+  const label = `${site.siteCode ?? ""} ${site.siteName}`.toLowerCase();
+  if (label.includes("hq") || label.includes("head") || label.includes("primary")) return -1;
+  const numberMatch = label.match(/\b(?:site|s)\s*(\d{1,2})\b/);
+  return numberMatch ? Number(numberMatch[1]) : 999;
+}
+
+function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectModel, overlaySummaries: BackendDiagramTruthOverlaySummary[], hotspots: BackendDiagramTruthHotspot[]): BackendDiagramRenderModel {
   const findingRefs = collectFindingRefs(networkObjectModel);
-  const graphNodes = networkObjectModel.designGraph.nodes.slice(0, 260);
-  const graphNodeIds = new Set(graphNodes.map((node) => node.id));
-  const siteNodes = graphNodes.filter((node) => node.objectType === "site");
-  const routeDomainNodes = graphNodes.filter((node) => node.objectType === "route-domain");
-  const securityZoneNodes = graphNodes.filter((node) => node.objectType === "security-zone");
-  const implementationStageNodes = graphNodes.filter((node) => node.objectType === "implementation-stage");
+  const renderNodes: BackendDiagramRenderNode[] = [];
+  const renderEdges: BackendDiagramRenderEdge[] = [];
 
-  const layerOrder: BackendDiagramRenderNode["layer"][] = ["site", "device", "interface", "routing", "security", "implementation", "verification"];
-  const layerCounts = new Map<BackendDiagramRenderNode["layer"], number>();
+  const siteMap = new Map<string, { siteId: string; siteName: string; siteCode?: string | null; deviceIds: string[] }>();
+  for (const device of networkObjectModel.devices) {
+    const existing = siteMap.get(device.siteId);
+    if (existing) {
+      existing.deviceIds.push(device.id);
+      if (!existing.siteCode && device.siteCode) existing.siteCode = device.siteCode;
+    } else {
+      siteMap.set(device.siteId, {
+        siteId: device.siteId,
+        siteName: device.siteName,
+        siteCode: device.siteCode,
+        deviceIds: [device.id],
+      });
+    }
+  }
 
-  const renderNodes: BackendDiagramRenderNode[] = graphNodes.map((node) => {
-    const layer = layerForObjectType(node.objectType);
-    const indexInLayer = layerCounts.get(layer) ?? 0;
-    layerCounts.set(layer, indexInLayer + 1);
-    const readiness = readinessForObject(node.objectId, networkObjectModel, findingRefs);
-    const layerIndex = layerOrder.indexOf(layer);
-    const row = indexInLayer % 8;
-    const columnBand = Math.floor(indexInLayer / 8);
+  for (const graphNode of networkObjectModel.designGraph.nodes.filter((node) => node.objectType === "site")) {
+    if (!siteMap.has(graphNode.objectId)) {
+      siteMap.set(graphNode.objectId, {
+        siteId: graphNode.objectId,
+        siteName: graphNode.label,
+        deviceIds: [],
+      });
+    }
+  }
 
-    return {
-      id: node.id,
-      objectId: node.objectId,
-      objectType: node.objectType,
-      label: node.label,
-      groupId: node.siteId ? `site:${node.siteId}` : undefined,
-      siteId: node.siteId,
-      layer,
-      readiness: readiness.readiness,
-      truthState: node.truthState,
-      x: 120 + layerIndex * 260 + columnBand * 90,
-      y: 120 + row * 110,
-      sourceEngine: node.objectType === "route-intent" || node.objectType === "route-domain" || node.objectType === "segmentation-flow"
-        ? "routing"
-        : node.objectType === "security-flow" || node.objectType === "security-zone" || node.objectType === "policy-rule" || node.objectType === "nat-rule"
-          ? "security"
-          : node.objectType === "implementation-stage" || node.objectType === "implementation-step"
-            ? "implementation"
-            : "design-graph",
-      relatedFindingIds: readiness.relatedFindingIds,
-      notes: node.notes,
-    };
+  const sites = Array.from(siteMap.values()).sort((left, right) => {
+    const rankDiff = siteDiagramRank(left) - siteDiagramRank(right);
+    if (rankDiff !== 0) return rankDiff;
+    return siteDiagramCode(left).localeCompare(siteDiagramCode(right), undefined, { numeric: true });
   });
 
-  const renderEdges: BackendDiagramRenderEdge[] = networkObjectModel.designGraph.edges
-    .filter((edge) => graphNodeIds.has(edge.sourceNodeId) && graphNodeIds.has(edge.targetNodeId))
-    .slice(0, 360)
-    .map((edge) => ({
-      id: edge.id,
-      relationship: edge.relationship,
-      sourceNodeId: edge.sourceNodeId,
-      targetNodeId: edge.targetNodeId,
-      label: edge.relationship.replace(/-/g, " "),
-      readiness: edge.required ? "review" : "unknown",
-      overlayKeys: overlayKeysForRelationship(edge.relationship),
-      relatedObjectIds: [edge.sourceNodeId, edge.targetNodeId],
-      notes: edge.notes,
-    }));
+  const primarySite = sites.find((site) => /hq|head|primary/i.test(`${site.siteCode ?? ""} ${site.siteName}`)) ?? sites[0];
+  const branchSites = sites.filter((site) => site.siteId !== primarySite?.siteId);
+  const sitePoints = new Map<string, { x: number; y: number }>();
 
-  const groupFromNodes = (groupType: BackendDiagramRenderGroup["groupType"], prefix: string, nodes: typeof graphNodes): BackendDiagramRenderGroup[] => nodes.map((node) => ({
-    id: `${prefix}:${node.objectId}`,
-    groupType,
-    label: node.label,
-    readiness: readinessForObject(node.objectId, networkObjectModel, findingRefs).readiness,
-    nodeIds: renderNodes.filter((renderNode) => renderNode.objectId === node.objectId || renderNode.siteId === node.objectId).map((renderNode) => renderNode.id),
-    notes: node.notes,
-  }));
+  if (primarySite) {
+    sitePoints.set(primarySite.siteId, { x: 760, y: 190 });
+  }
 
-  const groups = [
-    ...groupFromNodes("site", "site", siteNodes),
-    ...groupFromNodes("route-domain", "route-domain", routeDomainNodes),
-    ...groupFromNodes("security-zone", "security-zone", securityZoneNodes),
-    ...groupFromNodes("implementation-stage", "implementation-stage", implementationStageNodes),
+  const branchColumnCount = branchSites.length <= 4 ? Math.max(1, branchSites.length) : 5;
+  const branchStartX = 180;
+  const branchStartY = 500;
+  const branchGapX = 300;
+  const branchGapY = 230;
+  branchSites.forEach((site, index) => {
+    const column = index % branchColumnCount;
+    const row = Math.floor(index / branchColumnCount);
+    sitePoints.set(site.siteId, { x: branchStartX + column * branchGapX, y: branchStartY + row * branchGapY });
+  });
+
+  const addNode = (node: BackendDiagramRenderNode) => {
+    if (!renderNodes.some((existing) => existing.id === node.id)) renderNodes.push(node);
+  };
+  const addEdge = (edge: BackendDiagramRenderEdge) => {
+    if (!renderEdges.some((existing) => existing.id === edge.id)) renderEdges.push(edge);
+  };
+
+  const routeDomain = networkObjectModel.routeDomains[0];
+  if (routeDomain) {
+    const readiness = readinessForObject(routeDomain.id, networkObjectModel, findingRefs);
+    addNode({
+      id: `render-route-domain-${routeDomain.id}`,
+      objectId: routeDomain.id,
+      objectType: "route-domain",
+      label: cleanTopologyLabel(routeDomain.name || "Corporate Routing Domain"),
+      layer: "routing",
+      readiness: readiness.readiness,
+      truthState: routeDomain.truthState,
+      x: 760,
+      y: 70,
+      sourceEngine: "routing",
+      relatedFindingIds: readiness.relatedFindingIds,
+      notes: routeDomain.notes.slice(0, 4),
+    });
+  }
+
+  const wanZone = networkObjectModel.securityZones.find((zone) => zone.zoneRole === "wan") ?? networkObjectModel.securityZones.find((zone) => /wan|internet|wide area/i.test(zone.name));
+  const wanNodeId = "render-wan-internet-edge";
+  addNode({
+    id: wanNodeId,
+    objectId: wanZone?.id ?? "wan-internet-edge",
+    objectType: "security-zone",
+    label: "WAN / Internet Edge",
+    layer: "security",
+    readiness: wanZone ? readinessForObject(wanZone.id, networkObjectModel, findingRefs).readiness : "review",
+    truthState: wanZone?.truthState ?? "proposed",
+    x: 760,
+    y: 340,
+    sourceEngine: "security",
+    relatedFindingIds: wanZone ? readinessForObject(wanZone.id, networkObjectModel, findingRefs).relatedFindingIds : [],
+    notes: wanZone?.notes.slice(0, 4) ?? ["Represents internet, WAN, cloud, and remote-access edge review boundary."],
+  });
+
+  for (const site of sites) {
+    const point = sitePoints.get(site.siteId) ?? { x: 160 + renderNodes.length * 180, y: 500 };
+    const siteNodeId = `render-site-${site.siteId}`;
+    addNode({
+      id: siteNodeId,
+      objectId: site.siteId,
+      objectType: "site",
+      label: `${siteDiagramCode(site)} — ${site.siteName}`,
+      groupId: `site:${site.siteId}`,
+      siteId: site.siteId,
+      layer: "site",
+      readiness: "ready",
+      truthState: "inferred",
+      x: point.x,
+      y: point.y,
+      sourceEngine: "object-model",
+      relatedFindingIds: [],
+      notes: [`Professional topology group for ${site.siteName}.`],
+    });
+
+    const siteDhcpPools = networkObjectModel.dhcpPools.filter((pool) => pool.siteId === site.siteId);
+    if (siteDhcpPools.length > 0) {
+      const dhcpNodeId = `render-dhcp-summary-${site.siteId}`;
+      addNode({
+        id: dhcpNodeId,
+        objectId: `dhcp-summary-${site.siteId}`,
+        objectType: "dhcp-pool",
+        label: `${siteDiagramCode(site)} DHCP (${siteDhcpPools.length})`,
+        groupId: `site:${site.siteId}`,
+        siteId: site.siteId,
+        layer: "interface",
+        readiness: "review",
+        truthState: "inferred",
+        x: point.x + 88,
+        y: point.y + 95,
+        sourceEngine: "object-model",
+        relatedFindingIds: [],
+        notes: [`Summarizes ${siteDhcpPools.length} DHCP scope record(s) for this site without flooding the canvas.`],
+      });
+      addEdge({
+        id: `render-edge-site-dhcp-${site.siteId}`,
+        relationship: "dhcp-pool-serves-subnet",
+        sourceNodeId: siteNodeId,
+        targetNodeId: dhcpNodeId,
+        label: "DHCP scope summary",
+        readiness: "review",
+        overlayKeys: ["addressing"],
+        relatedObjectIds: siteDhcpPools.map((pool) => pool.id).slice(0, 12),
+        notes: ["Collapsed DHCP evidence edge for professional readability."],
+      });
+    }
+  }
+
+  const devicesBySite = new Map<string, NetworkObjectModel["devices"]>();
+  for (const device of networkObjectModel.devices) {
+    const current = devicesBySite.get(device.siteId) ?? [];
+    current.push(device);
+    devicesBySite.set(device.siteId, current);
+  }
+
+  for (const site of sites) {
+    const point = sitePoints.get(site.siteId);
+    if (!point) continue;
+    const siteNodeId = `render-site-${site.siteId}`;
+    const devices = (devicesBySite.get(site.siteId) ?? []).sort((left, right) => {
+      const roleRank: Record<NetworkObjectModel["devices"][number]["deviceRole"], number> = {
+        "security-firewall": 0,
+        "core-layer3-switch": 1,
+        "branch-edge-router": 1,
+        "routing-identity": 2,
+        unknown: 3,
+      };
+      return roleRank[left.deviceRole] - roleRank[right.deviceRole] || left.name.localeCompare(right.name);
+    });
+
+    devices.forEach((device, index) => {
+      const readiness = readinessForObject(device.id, networkObjectModel, findingRefs);
+      const deviceNodeId = `render-device-${device.id}`;
+      const xOffset = devices.length === 1 ? 0 : (index - (devices.length - 1) / 2) * 120;
+      addNode({
+        id: deviceNodeId,
+        objectId: device.id,
+        objectType: "network-device",
+        label: cleanTopologyLabel(deviceDiagramLabel(device)),
+        groupId: `site:${site.siteId}`,
+        siteId: site.siteId,
+        layer: "device",
+        readiness: readiness.readiness,
+        truthState: device.truthState,
+        x: point.x + xOffset,
+        y: point.y + 100,
+        sourceEngine: "object-model",
+        relatedFindingIds: readiness.relatedFindingIds,
+        notes: device.notes.slice(0, 4),
+      });
+      addEdge({
+        id: `render-edge-site-device-${device.id}`,
+        relationship: "site-contains-device",
+        sourceNodeId: siteNodeId,
+        targetNodeId: deviceNodeId,
+        label: "site device",
+        readiness: readiness.readiness === "blocked" ? "blocked" : "ready",
+        overlayKeys: ["addressing"],
+        relatedObjectIds: [site.siteId, device.id],
+        notes: ["Site-to-device ownership edge."],
+      });
+
+      if (routeDomain) {
+        addEdge({
+          id: `render-edge-device-route-domain-${device.id}`,
+          relationship: "interface-belongs-to-route-domain",
+          sourceNodeId: deviceNodeId,
+          targetNodeId: `render-route-domain-${routeDomain.id}`,
+          label: "routing domain",
+          readiness: "review",
+          overlayKeys: ["routing"],
+          relatedObjectIds: [device.id, routeDomain.id],
+          notes: ["Device participates in the corporate routing domain or needs route-domain confirmation."],
+        });
+      }
+
+      addEdge({
+        id: `render-edge-device-wan-${device.id}`,
+        relationship: "network-link-terminates-on-device",
+        sourceNodeId: deviceNodeId,
+        targetNodeId: wanNodeId,
+        label: device.deviceRole === "security-firewall" ? "internet/security edge" : "WAN edge path",
+        readiness: "review",
+        overlayKeys: ["routing", "nat"],
+        relatedObjectIds: [device.id, wanZone?.id ?? "wan-internet-edge"],
+        notes: ["Professional topology edge for WAN, internet, cloud, or remote-access boundary review."],
+      });
+    });
+  }
+
+  const primaryDevices = primarySite ? devicesBySite.get(primarySite.siteId) ?? [] : [];
+  const primaryGateway = primaryDevices.find((device) => device.deviceRole === "core-layer3-switch") ?? primaryDevices.find((device) => device.deviceRole !== "security-firewall");
+  if (primaryGateway) {
+    for (const site of branchSites) {
+      const branchGateway = (devicesBySite.get(site.siteId) ?? []).find((device) => device.deviceRole === "branch-edge-router") ?? (devicesBySite.get(site.siteId) ?? [])[0];
+      if (!branchGateway) continue;
+      addEdge({
+        id: `render-edge-hub-spoke-${primaryGateway.id}-${branchGateway.id}`,
+        relationship: "network-link-terminates-on-device",
+        sourceNodeId: `render-device-${primaryGateway.id}`,
+        targetNodeId: `render-device-${branchGateway.id}`,
+        label: "site-to-site summary path",
+        readiness: "review",
+        overlayKeys: ["routing"],
+        relatedObjectIds: [primaryGateway.id, branchGateway.id],
+        notes: ["Hub-and-spoke relationship derived from multi-site routing intent and site summarization."],
+      });
+    }
+  }
+
+  const zoneBaseX = 1580;
+  const zoneBaseY = 120;
+  const visibleZones = networkObjectModel.securityZones
+    .filter((zone) => zone.zoneRole !== "wan")
+    .sort((left, right) => left.zoneRole.localeCompare(right.zoneRole) || left.name.localeCompare(right.name))
+    .slice(0, 8);
+
+  visibleZones.forEach((zone, index) => {
+    const readiness = readinessForObject(zone.id, networkObjectModel, findingRefs);
+    const zoneNodeId = `render-zone-${zone.id}`;
+    addNode({
+      id: zoneNodeId,
+      objectId: zone.id,
+      objectType: "security-zone",
+      label: cleanTopologyLabel(zone.name),
+      layer: "security",
+      readiness: readiness.readiness,
+      truthState: zone.truthState,
+      x: zoneBaseX,
+      y: zoneBaseY + index * 92,
+      sourceEngine: "security",
+      relatedFindingIds: readiness.relatedFindingIds,
+      notes: zone.notes.slice(0, 4),
+    });
+    if (routeDomain) {
+      addEdge({
+        id: `render-edge-route-domain-zone-${zone.id}`,
+        relationship: "security-zone-protects-subnet",
+        sourceNodeId: `render-route-domain-${routeDomain.id}`,
+        targetNodeId: zoneNodeId,
+        label: "zone boundary",
+        readiness: zone.isolationExpectation === "isolated" || zone.isolationExpectation === "restricted" ? "review" : readiness.readiness,
+        overlayKeys: ["security"],
+        relatedObjectIds: [routeDomain.id, zone.id],
+        notes: [`${zone.name} carries ${zone.subnetCidrs.length} subnet(s) and ${zone.vlanIds.length} VLAN id(s).`],
+      });
+    }
+  });
+
+  const policyNodes = networkObjectModel.policyRules
+    .filter((policy) => policy.action === "deny" || /guest|management|dmz|wan/i.test(policy.name))
+    .slice(0, 10);
+
+  policyNodes.forEach((policy, index) => {
+    const policyNodeId = `render-policy-${policy.id}`;
+    addNode({
+      id: policyNodeId,
+      objectId: policy.id,
+      objectType: "policy-rule",
+      label: cleanTopologyLabel(policy.name.replace(/^Deny\s+/i, "Deny ")),
+      layer: "security",
+      readiness: policy.action === "review" ? "review" : "ready",
+      truthState: policy.truthState,
+      x: zoneBaseX + 280,
+      y: zoneBaseY + index * 86,
+      sourceEngine: "security",
+      relatedFindingIds: [],
+      notes: [policy.rationale, ...policy.notes].filter(Boolean).slice(0, 4),
+    });
+    const sourceZoneNodeId = `render-zone-${policy.sourceZoneId}`;
+    const targetZoneNodeId = `render-zone-${policy.destinationZoneId}`;
+    const sourceExists = renderNodes.some((node) => node.id === sourceZoneNodeId);
+    const targetExists = renderNodes.some((node) => node.id === targetZoneNodeId);
+    addEdge({
+      id: `render-edge-policy-source-${policy.id}`,
+      relationship: "security-zone-applies-policy",
+      sourceNodeId: sourceExists ? sourceZoneNodeId : wanNodeId,
+      targetNodeId: policyNodeId,
+      label: `${policy.action} policy`,
+      readiness: policy.action === "review" ? "review" : "ready",
+      overlayKeys: ["security"],
+      relatedObjectIds: [policy.id, policy.sourceZoneId],
+      notes: ["Policy source relationship."],
+    });
+    if (targetExists) {
+      addEdge({
+        id: `render-edge-policy-target-${policy.id}`,
+        relationship: "security-flow-covered-by-policy",
+        sourceNodeId: policyNodeId,
+        targetNodeId: targetZoneNodeId,
+        label: "protected destination",
+        readiness: policy.action === "review" ? "review" : "ready",
+        overlayKeys: ["security"],
+        relatedObjectIds: [policy.id, policy.destinationZoneId],
+        notes: ["Policy destination relationship."],
+      });
+    }
+  });
+
+  const routeLinkCount = renderEdges.filter((edge) => edge.overlayKeys.includes("routing")).length;
+  const missingRenderInputs = [
+    sites.length <= 0 ? "materialized site topology groups" : null,
+    networkObjectModel.devices.length <= 0 ? "modeled network devices" : null,
+    routeLinkCount <= 0 ? "WAN or routing relationships" : null,
+  ].filter(Boolean) as string[];
+
+  const emptyState = missingRenderInputs.length > 0
+    ? {
+        reason: `Authoritative topology canvas is blocked because these inputs are missing: ${missingRenderInputs.join(", ")}.`,
+        requiredInputs: missingRenderInputs.map((item) => `Generate ${item}`),
+      }
+    : undefined;
+
+  const groupFromSite = (site: { siteId: string; siteName: string; siteCode?: string | null }): BackendDiagramRenderGroup => ({
+    id: `site:${site.siteId}`,
+    groupType: "site",
+    label: `${siteDiagramCode(site)} — ${site.siteName}`,
+    readiness: "ready",
+    nodeIds: renderNodes.filter((node) => node.siteId === site.siteId).map((node) => node.id),
+    notes: [`Professional diagram grouping for ${site.siteName}.`],
+  });
+
+  const groups: BackendDiagramRenderGroup[] = [
+    ...sites.map(groupFromSite),
+    ...(routeDomain ? [{
+      id: `route-domain:${routeDomain.id}`,
+      groupType: "route-domain" as const,
+      label: routeDomain.name,
+      readiness: readinessForObject(routeDomain.id, networkObjectModel, findingRefs).readiness,
+      nodeIds: renderNodes.filter((node) => node.objectId === routeDomain.id || node.layer === "routing").map((node) => node.id),
+      notes: routeDomain.notes,
+    }] : []),
+    ...visibleZones.map((zone) => ({
+      id: `security-zone:${zone.id}`,
+      groupType: "security-zone" as const,
+      label: zone.name,
+      readiness: readinessForObject(zone.id, networkObjectModel, findingRefs).readiness,
+      nodeIds: renderNodes.filter((node) => node.objectId === zone.id).map((node) => node.id),
+      notes: zone.notes,
+    })),
   ];
 
   const overlayKeyToLayer: Record<BackendDiagramRenderOverlay["key"], BackendDiagramRenderNode["layer"][]> = {
-    addressing: ["site", "interface"],
-    routing: ["routing", "interface"],
-    security: ["security"],
-    nat: ["security"],
+    addressing: ["site", "device", "interface"],
+    routing: ["site", "device", "routing"],
+    security: ["site", "device", "security"],
+    nat: ["device", "security", "routing"],
     implementation: ["implementation"],
     verification: ["verification", "implementation"],
     "operational-safety": ["device", "implementation"],
   };
 
-  const overlays: BackendDiagramRenderOverlay[] = overlaySummaries.map((summary, index) => {
+  const overlays: BackendDiagramRenderOverlay[] = overlaySummaries.map((summary) => {
     const layers = overlayKeyToLayer[summary.key];
     const nodeIds = renderNodes.filter((node) => layers.includes(node.layer)).map((node) => node.id);
     const edgeIds = renderEdges.filter((edge) => edge.overlayKeys.includes(summary.key)).map((edge) => edge.id);
@@ -293,25 +635,10 @@ function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, 
       readiness: summary.readiness,
       nodeIds,
       edgeIds,
-      hotspotIndexes: hotspots.map((_, hotspotIndex) => hotspotIndex).filter((hotspotIndex) => hotspotIndex % overlaySummaries.length === index % overlaySummaries.length).slice(0, 4),
+      hotspotIndexes: hotspots.map((_, hotspotIndex) => hotspotIndex).slice(0, 6),
       detail: summary.detail,
     };
   });
-
-  const missingRenderInputs = [
-    networkObjectModel.devices.length <= 0 ? "modeled network devices" : null,
-    networkObjectModel.interfaces.length <= 0 ? "modeled network interfaces" : null,
-    networkObjectModel.links.length <= 0 ? "modeled network links or WAN/site relationships" : null,
-    networkObjectModel.designGraph.edges.length <= 0 ? "backend design graph relationships" : null,
-    renderNodes.length === 0 ? "backend render nodes" : null,
-  ].filter(Boolean) as string[];
-
-  const emptyState = missingRenderInputs.length > 0
-    ? {
-        reason: `Backend diagram render model is blocked because these inputs are missing: ${missingRenderInputs.join(", ")}.`,
-        requiredInputs: missingRenderInputs.map((item) => `Generate ${item}`),
-      }
-    : undefined;
 
   return {
     summary: {
@@ -320,7 +647,7 @@ function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, 
       groupCount: groups.length,
       overlayCount: overlays.length,
       backendAuthored: true,
-      layoutMode: "backend-deterministic-grid",
+      layoutMode: "professional-topology-layout",
     },
     nodes: renderNodes,
     edges: renderEdges,
@@ -328,6 +655,10 @@ function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, 
     overlays,
     emptyState,
   };
+}
+
+function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, overlaySummaries: BackendDiagramTruthOverlaySummary[], hotspots: BackendDiagramTruthHotspot[]): BackendDiagramRenderModel {
+  return buildProfessionalTopologyRenderModel(networkObjectModel, overlaySummaries, hotspots);
 }
 
 export function buildBackendReportTruthModel(params: { summary: SnapshotSummaryForTruth; networkObjectModel: NetworkObjectModel; issues: DesignCoreIssue[] }): BackendReportTruthModel {

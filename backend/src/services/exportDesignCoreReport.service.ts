@@ -32,7 +32,9 @@ function sanitizeProfessionalReportText(value: string) {
   return value
     .replace(/\bPhase\s+\d+(?:\s*[–-]\s*\d+)?\s*/gi, "")
     .replace(/\bPHASE_\d+_[A-Z0-9_]+\b/g, "release marker")
-    .replace(/\bbackend-design-core\b/gi, "authoritative design snapshot")
+    .replace(/\bbackend-design-core\b/gi, "authoritative design model")
+    .replace(/\bbackend design-core\b/gi, "authoritative design model")
+    .replace(/\bdesign model design-core\b/gi, "authoritative design model")
     .replace(/\bbackend\b/gi, "design model")
     .replace(/\breportTruth\b/g, "report readiness evidence")
     .replace(/\bdiagramTruth\b/g, "diagram readiness evidence")
@@ -194,7 +196,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       phase74TruthBlocked
         ? "Requirement-output evidence is still incomplete, so the export must stay blocked until materialized sites, addressing rows, and diagram topology evidence agree."
         : "Requirement-output evidence is present. Remaining blockers belong to implementation execution readiness, not to requirements materialization.",
-      "The purpose of this section is to keep report, diagram, requirement proof, and backend design-core posture aligned.",
+      "The purpose of this section is to keep report, diagram, requirement proof, and authoritative design model posture aligned.",
     ],
     tables: [
       {
