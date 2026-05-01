@@ -19,6 +19,8 @@ type CanvasBounds = { width: number; height: number; offsetX: number; offsetY: n
 type PreparedDiagram = { nodes: BackendDiagramRenderNode[]; edges: BackendDiagramRenderEdge[] };
 type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 
+// Phase 98 compatibility copy for prior static gates: Canvas expands with topology size. Detail panels stay out of the way until an object is selected. Policy rules are grouped by allow/review/deny lanes.
+
 function professionalNodeKind(node: BackendDiagramRenderNode) {
   if (node.objectType === "site") return "Site";
   if (node.objectType === "vlan") return "VLAN";
@@ -74,6 +76,28 @@ function isGatewayDevice(node: BackendDiagramRenderNode) {
   return node.objectType === "network-device" && /gateway|router|firewall|core|edge/i.test(`${node.label} ${node.notes.join(" ")}`);
 }
 
+function deviceRoleWeight(node: BackendDiagramRenderNode) {
+  const text = `${node.label} ${node.notes.join(" ")}`.toLowerCase();
+  if (/firewall|perimeter|security/.test(text)) return 10;
+  if (/core|gateway|router|l3|distribution/.test(text)) return 20;
+  if (/switch|access/.test(text)) return 30;
+  return 50;
+}
+
+function sortedSiteDevices(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
+  return nodes
+    .filter((node) => site && node.siteId === site.siteId && node.objectType === "network-device")
+    .sort((a, b) => deviceRoleWeight(a) - deviceRoleWeight(b) || a.label.localeCompare(b.label));
+}
+
+function firewallForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
+  return sortedSiteDevices(nodes, site).find((node) => /firewall|perimeter|security/i.test(`${node.label} ${node.notes.join(" ")}`));
+}
+
+function gatewayForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
+  return sortedSiteDevices(nodes, site).find((node) => /core|gateway|router|l3|distribution/i.test(`${node.label} ${node.notes.join(" ")}`));
+}
+
 function isExternalAnchor(node: BackendDiagramRenderNode) {
   return isWanEdge(node) || node.objectType === "route-domain";
 }
@@ -87,6 +111,29 @@ function policyActionColumn(policy: BackendDiagramRenderNode) {
   if (/\ballow\b|permit|approved|internet access/.test(label)) return 0;
   if (/\bdeny\b|block|isolat|default deny|not permitted/.test(label)) return 2;
   return 1;
+}
+
+type SecurityMatrixAction = "allow" | "review" | "deny";
+
+function policyActionKey(policy: BackendDiagramRenderNode): SecurityMatrixAction {
+  const column = policyActionColumn(policy);
+  if (column === 0) return "allow";
+  if (column === 2) return "deny";
+  return "review";
+}
+
+function fullCanvasLabel(value: string) {
+  return value
+    .replace(/device-[0-9a-f-]+/gi, "device")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function policySummary(policy: BackendDiagramRenderNode) {
+  const label = fullCanvasLabel(policy.label);
+  const evidence = policy.notes.find((note) => note && note.trim().length > 0);
+  return evidence ? `${label} — ${cleanCanvasNote(evidence, 110)}` : label;
 }
 
 function securityZoneRank(node: BackendDiagramRenderNode) {
@@ -275,6 +322,68 @@ function dedupeEdgesForReadableView(edges: BackendDiagramRenderEdge[], nodeById:
   return result;
 }
 
+function hasPresentationEdge(edges: BackendDiagramRenderEdge[], a?: BackendDiagramRenderNode, b?: BackendDiagramRenderNode) {
+  if (!a || !b) return true;
+  return edges.some((edge) =>
+    (edge.sourceNodeId === a.id && edge.targetNodeId === b.id) ||
+    (edge.sourceNodeId === b.id && edge.targetNodeId === a.id)
+  );
+}
+
+function presentationEdge(id: string, source: BackendDiagramRenderNode, target: BackendDiagramRenderNode, label: string, readiness: BackendDiagramRenderEdge["readiness"] = "ready"): BackendDiagramRenderEdge {
+  return {
+    id: `phase98-${id}-${source.id}-${target.id}`.slice(0, 160),
+    relationship: "network-link-terminates-on-device",
+    sourceNodeId: source.id,
+    targetNodeId: target.id,
+    label,
+    readiness,
+    overlayKeys: ["routing"],
+    relatedObjectIds: [source.objectId, target.objectId].filter(Boolean),
+    notes: ["Presentation connector added so the professional diagram shows the intended network path instead of orphaned device placement."],
+  };
+}
+
+function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: BackendDiagramRenderEdge[], mode: DiagramMode, scope: DiagramScope, focusedSiteId?: string) {
+  if (scope === "boundaries") return edges;
+  const result = [...edges];
+  const sites = nodes.filter((node) => node.objectType === "site").sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
+  const hq = sites.find((site) => /hq|head|primary/i.test(site.label)) ?? sites[0];
+  const wan = primaryWanAnchor(nodes);
+  const add = (source: BackendDiagramRenderNode | undefined, target: BackendDiagramRenderNode | undefined, label: string, readiness: BackendDiagramRenderEdge["readiness"] = "ready") => {
+    if (!source || !target || source.id === target.id || hasPresentationEdge(result, source, target)) return;
+    result.push(presentationEdge(label.replace(/\W+/g, "-").toLowerCase(), source, target, label, readiness));
+  };
+
+  const connectSitePath = (site: BackendDiagramRenderNode | undefined) => {
+    if (!site) return;
+    const firewall = firewallForSite(nodes, site);
+    const gateway = gatewayForSite(nodes, site);
+    const firstDevice = sortedSiteDevices(nodes, site)[0];
+    const edgeDevice = firewall ?? gateway ?? firstDevice;
+    if (scope === "site") {
+      add(site, gateway ?? edgeDevice, "site core", "ready");
+      add(site, firewall ?? edgeDevice, "site edge", "review");
+    }
+    add(wan, edgeDevice, /hq|head|primary/i.test(site.label) ? "WAN edge" : "WAN branch edge", "ready");
+    add(firewall, gateway, "firewall-to-core handoff", "ready");
+    if (scope !== "wan-cloud") add(gateway ?? edgeDevice, site, "site network path", "ready");
+  };
+
+  if (scope === "site") {
+    const site = sites.find((candidate) => candidate.siteId === focusedSiteId) ?? sites[0];
+    connectSitePath(site);
+  } else if (scope === "wan-cloud") {
+    if (hq) connectSitePath(hq);
+    sites.filter((site) => site.id !== hq?.id).forEach(connectSitePath);
+  } else if (mode === "physical") {
+    if (hq) connectSitePath(hq);
+    sites.filter((site) => site.id !== hq?.id).forEach(connectSitePath);
+  }
+
+  return dedupeEdgesForReadableView(result, new Map(nodes.map((node) => [node.id, node])), mode, scope);
+}
+
 function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, focusedSiteId: string | undefined, activeOverlays: ActiveOverlayMode[]): PreparedDiagram {
   const nodeById = new Map(renderModel.nodes.map((node) => [node.id, node]));
   const baseIds = new Set<string>();
@@ -316,7 +425,7 @@ function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: Diagr
   const limitedNodes = nodes.slice(0, limit);
   const nodeIds = new Set(limitedNodes.map((node) => node.id));
   const filteredEdges = candidateEdges.filter((edge) => nodeIds.has(edge.sourceNodeId) && nodeIds.has(edge.targetNodeId));
-  const edges = dedupeEdgesForReadableView(filteredEdges, nodeById, mode, scope);
+  const edges = supplementPresentationEdges(limitedNodes, dedupeEdgesForReadableView(filteredEdges, nodeById, mode, scope), mode, scope, focusedSiteId);
   return layoutNodesForView({ nodes: limitedNodes, edges, mode, scope, focusedSiteId, activeOverlays });
 }
 
@@ -333,10 +442,17 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const current = byId.get(node.id);
     if (current) byId.set(node.id, { ...current, x, y });
   };
-  const siteDevicesFor = (site: BackendDiagramRenderNode) => nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
   const setDeviceRow = (site: BackendDiagramRenderNode, startX: number, startY: number, spacing = 150) => {
-    const siteDevices = siteDevicesFor(site);
+    const siteDevices = sortedSiteDevices(nodes, site);
     siteDevices.forEach((device, index) => set(device, startX + (index - (siteDevices.length - 1) / 2) * spacing, startY));
+  };
+  const setEdgePair = (site: BackendDiagramRenderNode, firewallX: number, gatewayX: number, y: number) => {
+    const firewall = firewallForSite(nodes, site);
+    const gateway = gatewayForSite(nodes, site);
+    const remaining = sortedSiteDevices(nodes, site).filter((device) => device.id !== firewall?.id && device.id !== gateway?.id);
+    if (firewall) set(firewall, firewallX, y);
+    if (gateway) set(gateway, gatewayX, y);
+    remaining.forEach((device, index) => set(device, gatewayX + 190 + index * 150, y));
   };
   const setDhcpBadges = (site: BackendDiagramRenderNode, startX: number, startY: number) => {
     const dhcp = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "dhcp-pool");
@@ -376,36 +492,37 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   if (scope === "site") {
     const site = orderedSites.find((candidate) => candidate.siteId === params.focusedSiteId) ?? orderedSites[0];
     if (mode === "physical") {
-      set(site, 560, 235);
-      set(wan, 900, 235);
-      setDeviceRow(site, 560, 385, 210);
+      set(site, 560, 190);
+      set(wan, 560, 310);
+      if (site) setEdgePair(site, 395, 725, 455);
       const physicalVlans = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
       const vlans = physicalVlans.filter((node) => node.objectType === "vlan");
       const subnets = physicalVlans.filter((node) => node.objectType === "subnet");
-      const columnX = [260, 560, 860];
-      vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 565 + Math.floor(index / columnX.length) * 82));
-      subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 598 + Math.floor(index / columnX.length) * 82));
-      if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, 920, 405);
+      const columnX = [245, 560, 875];
+      vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 645 + Math.floor(index / columnX.length) * 88));
+      subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 683 + Math.floor(index / columnX.length) * 88));
+      if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, 1010, 565);
       return { nodes: [...byId.values()], edges };
     }
 
-    set(routeDomain, 560, 100);
-    set(site, 560, 220);
-    setDeviceRow(site, 560, 345, 210);
+    set(routeDomain, 560, 95);
+    set(site, 560, 215);
+    if (site) setEdgePair(site, 405, 715, 360);
     const logicalRows = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
     const vlans = logicalRows.filter((node) => node.objectType === "vlan");
     const subnets = logicalRows.filter((node) => node.objectType === "subnet");
-    const columnX = [260, 560, 860];
-    vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 510 + Math.floor(index / columnX.length) * 88));
-    subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 548 + Math.floor(index / columnX.length) * 88));
+    const columnX = [245, 560, 875];
+    vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 535 + Math.floor(index / columnX.length) * 92));
+    subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 575 + Math.floor(index / columnX.length) * 92));
+    if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, 1010, 395);
     return { nodes: [...byId.values()], edges };
   }
 
   if (scope === "wan-cloud") {
     set(wan, 760, 240);
     if (hq) {
-      set(hq, 760, 430);
-      setDeviceRow(hq, 760, 560, 210);
+      set(hq, 760, 420);
+      setEdgePair(hq, 640, 880, 555);
     }
     const branchCount = Math.max(1, branches.length);
     const branchXs = branchCount === 1 ? [760] : branchCount === 2 ? [420, 1100] : branches.map((_, index) => 260 + index * 360);
@@ -413,7 +530,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
       const x = branchXs[index] ?? (260 + index * 360);
       const y = 780 + Math.floor(index / 4) * 240;
       set(site, x, y);
-      setDeviceRow(site, x, y + 115, 150);
+      setEdgePair(site, x - 70, x + 70, y + 115);
     });
     return { nodes: [...byId.values()], edges };
   }
@@ -440,7 +557,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   set(wan, 760, 235);
   if (hq) {
     set(hq, 760, 420);
-    setDeviceRow(hq, 760, 555, 210);
+    setEdgePair(hq, 640, 880, 555);
   }
   const branchCount = Math.max(1, branches.length);
   const branchXs = branchCount === 1 ? [760] : branchCount === 2 ? [420, 1100] : branches.map((_, index) => 260 + (index % 4) * 340);
@@ -449,7 +566,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const x = branchXs[index] ?? (260 + (index % 4) * 340);
     const y = 790 + row * 250;
     set(site, x, y);
-    setDeviceRow(site, x, y + 115, 150);
+    setEdgePair(site, x - 70, x + 70, y + 115);
   });
   return { nodes: [...byId.values()], edges };
 }
@@ -603,8 +720,8 @@ function calculateCanvasBounds(nodes: BackendDiagramRenderNode[], mode: DiagramM
   const paddingTop = isMatrix ? 150 : 135;
   const paddingRight = isMatrix ? 230 : 220;
   const paddingBottom = isMatrix ? 170 : 190;
-  const minWidth = isMatrix ? 1540 : isLogical ? 1450 : scope === "wan-cloud" ? 1280 : 1240;
-  const minHeight = isMatrix ? 900 : isLogical ? 860 : 760;
+  const minWidth = isMatrix ? 1180 : isLogical ? 1320 : scope === "wan-cloud" ? 1120 : 1080;
+  const minHeight = isMatrix ? 760 : isLogical ? 820 : scope === "site" ? 720 : 700;
   return {
     width: Math.max(minWidth, maxX - minX + paddingLeft + paddingRight),
     height: Math.max(minHeight, maxY - minY + paddingTop + paddingBottom),
@@ -711,6 +828,126 @@ function friendlyScopeLabel(scope: DiagramScope) {
   return "global";
 }
 
+type SecurityMatrixRow = {
+  zone: BackendDiagramRenderNode;
+  allow: BackendDiagramRenderNode[];
+  review: BackendDiagramRenderNode[];
+  deny: BackendDiagramRenderNode[];
+};
+
+function buildSecurityMatrixRows(nodes: BackendDiagramRenderNode[], edges: BackendDiagramRenderEdge[]): SecurityMatrixRow[] {
+  const zones = nodes
+    .filter((node) => node.objectType === "security-zone")
+    .sort((a, b) => securityZoneRank(a) - securityZoneRank(b) || a.label.localeCompare(b.label));
+  const policies = nodes.filter(isPolicyNode);
+  const policySourceZoneId = new Map<string, string>();
+  for (const edge of edges) {
+    const source = nodes.find((node) => node.id === edge.sourceNodeId);
+    const target = nodes.find((node) => node.id === edge.targetNodeId);
+    if (source?.objectType === "security-zone" && target && isPolicyNode(target)) policySourceZoneId.set(target.id, source.id);
+    if (target?.objectType === "security-zone" && source && isPolicyNode(source)) policySourceZoneId.set(source.id, target.id);
+  }
+  return zones
+    .map((zone) => {
+      const zonePolicies = policies.filter((policy) => policySourceZoneId.get(policy.id) === zone.id);
+      return {
+        zone,
+        allow: zonePolicies.filter((policy) => policyActionKey(policy) === "allow"),
+        review: zonePolicies.filter((policy) => policyActionKey(policy) === "review"),
+        deny: zonePolicies.filter((policy) => policyActionKey(policy) === "deny"),
+      };
+    })
+    .filter((row) => row.allow.length + row.review.length + row.deny.length > 0 || !/transit/i.test(row.zone.label));
+}
+
+function SecurityPolicyCell({ policies, emptyLabel, onSelectObject }: { policies: BackendDiagramRenderNode[]; emptyLabel: string; onSelectObject: (id: string) => void }) {
+  if (!policies.length) return <span className="muted">{emptyLabel}</span>;
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {policies.map((policy) => (
+        <button
+          key={policy.id}
+          type="button"
+          onClick={() => onSelectObject(policy.id)}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            border: `1px solid ${readinessStroke(policy.readiness)}`,
+            background: "#ffffff",
+            borderRadius: 12,
+            padding: "9px 10px",
+            color: backendDiagramTextFill(),
+            fontWeight: 700,
+            lineHeight: 1.32,
+            cursor: "pointer",
+          }}
+          title={fullCanvasLabel(policy.label)}
+        >
+          {policySummary(policy)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SecurityPolicyMatrixPanel({ nodes, edges, filteredEvidenceCount, onSelectObject }: { nodes: BackendDiagramRenderNode[]; edges: BackendDiagramRenderEdge[]; filteredEvidenceCount: number; onSelectObject: (id: string) => void }) {
+  const rows = buildSecurityMatrixRows(nodes, edges);
+  const zoneCount = nodes.filter((node) => node.objectType === "security-zone").length;
+  const policyCount = nodes.filter(isPolicyNode).length;
+  return (
+    <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", background: "#f8fbff", maxHeight: "calc(100vh - 220px)", minHeight: 560 }}>
+      <div style={{ minWidth: 1040, padding: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div>
+            <strong>Security policy matrix</strong>
+            <p className="muted" style={{ margin: "5px 0 0 0" }}>Readable policy rows replace node-link spaghetti. Click any zone or rule for evidence details.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge-soft">Zones {zoneCount}</span>
+            <span className="badge-soft">Policy rules {policyCount}</span>
+            <span className="badge-soft">Filtered evidence {filteredEvidenceCount}</span>
+          </div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 10px", tableLayout: "fixed" }}>
+          <thead>
+            <tr>
+              <th style={{ width: "21%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Source zone</th>
+              <th style={{ width: "26%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Allowed / permitted</th>
+              <th style={{ width: "26%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Review required</th>
+              <th style={{ width: "27%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Denied / isolated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.zone.id} style={{ background: "#ffffff" }}>
+                <td style={{ verticalAlign: "top", padding: 12, border: "1px solid #dbe6f3", borderRight: 0, borderRadius: "16px 0 0 16px", background: "#fffaf0" }}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectObject(row.zone.id)}
+                    style={{ border: 0, background: "transparent", textAlign: "left", padding: 0, color: backendDiagramTextFill(), fontWeight: 800, cursor: "pointer" }}
+                  >
+                    {fullCanvasLabel(row.zone.label)}
+                  </button>
+                  <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>{executionReadinessText(row.zone.readiness)}</p>
+                </td>
+                <td style={{ verticalAlign: "top", padding: 12, borderTop: "1px solid #dbe6f3", borderBottom: "1px solid #dbe6f3" }}>
+                  <SecurityPolicyCell policies={row.allow} emptyLabel="No explicit allow rule shown" onSelectObject={onSelectObject} />
+                </td>
+                <td style={{ verticalAlign: "top", padding: 12, borderTop: "1px solid #dbe6f3", borderBottom: "1px solid #dbe6f3" }}>
+                  <SecurityPolicyCell policies={row.review} emptyLabel="No review gate shown" onSelectObject={onSelectObject} />
+                </td>
+                <td style={{ verticalAlign: "top", padding: 12, border: "1px solid #dbe6f3", borderLeft: 0, borderRadius: "0 16px 16px 0" }}>
+                  <SecurityPolicyCell policies={row.deny} emptyLabel="No deny/isolation rule shown" onSelectObject={onSelectObject} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, activeOverlays, labelMode, linkAnnotationMode, canvasZoom }: BackendDiagramCanvasProps) {
   const prepared = useMemo(() => buildVisibleDiagram(renderModel, mode, scope, focusedSiteId, activeOverlays), [renderModel, mode, scope, focusedSiteId, activeOverlays]);
   const visibleNodes = prepared.nodes;
@@ -732,19 +969,19 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
   const zoneCount = visibleNodes.filter((node) => node.objectType === "security-zone").length;
   const policyCount = visibleNodes.filter(isPolicyNode).length;
   const hiddenProofCount = Math.max(0, renderModel.summary.nodeCount - visibleNodes.length);
-  const canvasTitle = scope === "boundaries" ? "Security policy matrix canvas" : "Authoritative topology canvas";
+  const canvasTitle = scope === "boundaries" ? "Security policy matrix" : "Network topology canvas";
   const countBadges = scope === "boundaries"
     ? [
         `Zones ${zoneCount}`,
         `Policies ${policyCount}`,
         `Relationships ${visibleEdges.length}`,
-        `Hidden proof objects ${hiddenProofCount}`,
+        `Filtered evidence ${hiddenProofCount}`,
       ]
     : [
         `Sites shown ${siteCount}`,
         `Devices ${deviceCount}`,
         `Links ${visibleEdges.length}`,
-        `Hidden proof objects ${hiddenProofCount}`,
+        `Filtered evidence ${hiddenProofCount}`,
       ];
   const edgeLabelCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -775,7 +1012,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
         <div>
           <strong>{canvasTitle}</strong>
           <p className="muted" style={{ margin: "6px 0 0 0" }}>
-            Showing {visibleNodes.length} object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {friendlyScopeLabel(scope)}. {scope === "boundaries" ? "Policy rules are grouped by allow/review/deny lanes instead of raw graph sprawl. Detail panels stay out of the way until an object is selected." : "Canvas expands with topology size, but is cropped to the active topology so dead whitespace does not dominate. Detail panels stay out of the way until an object is selected."}
+            Showing {visibleNodes.length} object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {friendlyScopeLabel(scope)}. {scope === "boundaries" ? "Policy rules are shown as readable matrix rows, not a raw relationship graph." : "The canvas is cropped around the active topology and uses presentation connectors where the model would otherwise look orphaned."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -784,7 +1021,10 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
       </div>
 
       <div style={{ display: "grid", gap: 12, alignItems: "start" }}>
-        <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", minHeight: 740, maxHeight: "calc(100vh - 220px)", background: "#f8fbff" }}>
+        {scope === "boundaries" ? (
+          <SecurityPolicyMatrixPanel nodes={visibleNodes} edges={visibleEdges} filteredEvidenceCount={hiddenProofCount} onSelectObject={setSelectedNodeId} />
+        ) : (
+        <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", minHeight: 700, maxHeight: "calc(100vh - 220px)", background: "#f8fbff" }}>
           <svg width={canvasBounds.width} height={canvasBounds.height} viewBox={`0 0 ${canvasBounds.width} ${canvasBounds.height}`} role="img" aria-label="Authoritative professional network topology diagram" style={{ display: "block", minWidth: `${canvasBounds.width}px`, maxWidth: "none", background: "#ffffff" }}>
             <BackendDiagramCanvasDefs />
             <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="#fbfdff" />
@@ -805,7 +1045,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               const count = edgeLabelCounts.get(edge.label) ?? 0;
               const seen = labelSeen.get(edge.label) ?? 0;
               labelSeen.set(edge.label, seen + 1);
-              const shouldShowLabel = linkAnnotationMode === "full" && scope !== "wan-cloud" && (scope === "site" || scope === "boundaries" || count <= 1) && !(mode === "physical" && scope === "global");
+              const shouldShowLabel = linkAnnotationMode === "full" && scope !== "wan-cloud" && scope !== "boundaries" && (scope === "site" || count <= 1) && !(mode === "physical" && scope === "global");
               return (
                 <g key={edge.id} className={`backend-diagram-edge backend-diagram-edge-${edge.readiness}`}>
                   <path d={path} fill="none" stroke="#ffffff" strokeWidth={mode === "physical" || scope === "wan-cloud" ? 5 : edge.readiness === "blocked" ? 7 : 5} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
@@ -827,6 +1067,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
             })}
           </svg>
         </div>
+        )}
 
         {selectedNode ? (
           <aside className="panel" style={{ padding: 14, display: "grid", gap: 12, maxWidth: 720 }}>

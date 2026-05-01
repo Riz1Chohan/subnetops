@@ -32,8 +32,8 @@ const assert = (condition, message) => {
 ].forEach((file) => assert(exists(file), `${file} missing`));
 
 const rootPkg = JSON.parse(read("package.json"));
-assert(rootPkg.version === "0.97.0", "root package version must be 0.97.0");
-assert(rootPkg.scripts["check:phase84-97-release"], "phase84-97 release chain missing");
+assert(rootPkg.version === "0.98.0", "root package version must be 0.98.0");
+assert(rootPkg.scripts["check:phase84-98-release"], "phase84-98 release chain missing");
 
 const render = read("render.yaml");
 assert(render.includes("subnetops-backend"), "render.yaml missing backend service");

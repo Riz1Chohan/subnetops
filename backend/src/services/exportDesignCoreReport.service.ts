@@ -178,13 +178,13 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     report.metadata = report.metadata ?? {
       organizationName: "To be confirmed",
       environment: "To be confirmed",
-      reportVersion: "Version 0.97 truth-locked",
+      reportVersion: "Version 0.98 truth-locked",
       revisionStatus: "Blocked - design evidence gaps present",
       documentOwner: "SubnetOps project owner",
       approvalStatus: "Not ready for approval",
       generatedFrom: "Backend design evidence truth lock",
     };
-    report.metadata.reportVersion = "Version 0.97 truth-locked";
+    report.metadata.reportVersion = "Version 0.98 truth-locked";
     report.metadata.revisionStatus = "Blocked - design evidence gaps present";
     report.metadata.approvalStatus = "Not ready for approval";
     report.executiveSummary.unshift("Requirement-output evidence is still incomplete. Do not treat the package as design-review ready until materialized sites, addressing rows, and diagram topology evidence agree.");

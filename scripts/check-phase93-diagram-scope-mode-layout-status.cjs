@@ -39,7 +39,7 @@ assert(canvas.includes('scope === "boundaries"'), 'canvas missing security bound
 assert(canvas.includes('node.objectType === "vlan"') && canvas.includes('node.objectType === "subnet"'), 'logical view does not include VLAN/subnet objects');
 assert(canvas.includes('edge.relationship === "security-zone-protects-subnet"') && canvas.includes('return false') || canvas.includes('edge.relationship !== "security-zone-protects-subnet"'), 'boundary view still risks zone-boundary spaghetti');
 assert(canvas.includes('Design evidence') && canvas.includes('Execution readiness'), 'sidebar does not separate design evidence from execution readiness');
-assert(canvas.includes('Sites shown') && canvas.includes('Hidden proof objects'), 'toolbar badges not converted to user-facing counts');
+assert(canvas.includes('Sites shown') && (canvas.includes('Hidden proof objects') || canvas.includes('Filtered evidence')), 'toolbar badges not converted to user-facing counts');
 assert(canvas.includes('engineering review model') && !canvas.includes('technical proof model.`'), 'canvas should sanitize raw technical proof wording before display');
 assert(page.includes('focusedSiteId={activeSiteId}'), 'ProjectDiagramPage does not pass active site focus to backend canvas');
 assert(docs.includes('PHASE_93_DIAGRAM_SCOPE_MODE_LAYOUT_STATUS'), 'Phase 93 docs marker missing');

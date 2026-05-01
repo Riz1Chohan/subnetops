@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-npm run check:phase84-97-release
+npm run check:phase84-98-release
 bash scripts/assert-release-discipline.sh
 
 if [[ "${RUN_FULL_BUILD:-0}" == "1" ]]; then
