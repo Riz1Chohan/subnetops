@@ -11,9 +11,9 @@ const pkg = read('package.json');
 const diagramPage = read('frontend/src/pages/ProjectDiagramPage.tsx');
 const requirementsPage = read('frontend/src/pages/ProjectRequirementsPage.tsx');
 
-assert(runtime.includes('version: "0.95.0"'), 'runtime version not advanced to 0.95.0');
+assert(/version: \"0\.(9[5-9]|[1-9][0-9]{2,})\.0\"/.test(runtime), 'runtime version not compatible with Phase 95 or later');
 assert(runtime.includes('renderFrontendCompileFix: "PHASE_95_RENDER_FRONTEND_COMPILE_FIX"'), 'runtime Phase 95 marker missing');
-assert(pkg.includes('"version": "0.95.0"'), 'root package version not advanced to 0.95.0');
+assert(/\"version\": \"0\.(9[5-9]|[1-9][0-9]{2,})\.0\"/.test(pkg), 'root package version not compatible with Phase 95 or later');
 assert(pkg.includes('check:phase95-render-frontend-compile-fix'), 'Phase 95 package script missing');
 assert(pkg.includes('check:phase84-95-release'), 'Phase 84-95 aggregate script missing');
 

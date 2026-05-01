@@ -15,7 +15,7 @@ assert(service.includes('const designReviewReadiness: DesignTruthReadiness'), 'd
 assert(service.includes('networkObjectCount,'), 'summary does not reuse computed networkObjectCount');
 const requirementsPage = read('frontend/src/pages/ProjectRequirementsPage.tsx');
 assert(requirementsPage.split(/\r?\n/).length > 1600, 'ProjectRequirementsPage appears truncated');
-assert(requirementsPage.includes('message={projectQuery.error instanceof Error ? projectQuery.error.message'), 'ProjectRequirementsPage error render is still syntactically broken/truncated');
+assert(requirementsPage.includes('message={projectQuery.error instanceof Error ? projectQuery.error.message') || requirementsPage.includes('message={requirementsLoadErrorMessage}'), 'ProjectRequirementsPage error render is missing a stable error message');
 assert(requirementsPage.includes('Continue to Logical Design'), 'ProjectRequirementsPage focused view tail is missing');
 assert(exists('frontend/src/assets/networks-logo.png'), 'frontend logo asset missing');
 assert(exists('frontend/src/router/index.tsx'), 'frontend router module missing');

@@ -397,7 +397,9 @@ export function ProjectDiagramPage() {
                     scope={scope}
                     focusedSiteId={activeSiteId}
                     activeOverlays={activeOverlays}
+                    labelMode={labelMode}
                     linkAnnotationMode={linkAnnotationMode}
+                    canvasZoom={canvasZoom}
                   />
                 ) : (
                   <div className="panel" style={{ padding: 14 }}>

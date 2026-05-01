@@ -15,8 +15,8 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE93-DIAGRAM-SCOPE-MODE-LAYOUT-STATUS.md');
 
 assert(runtime.includes('diagramScopeModeLayout: "PHASE_93_DIAGRAM_SCOPE_MODE_LAYOUT_STATUS"'), 'runtime Phase 93 marker missing');
-assert(runtime.includes('version: "0.93.0"') || runtime.includes('version: "0.94.0"'), 'runtime version not compatible with Phase 93+');
-assert(pkg.includes('"version": "0.93.0"') || pkg.includes('"version": "0.94.0"'), 'root package version not compatible with Phase 93+');
+assert(/version: "0\.(9[3-9]|[1-9][0-9]{2,})\.0"/.test(runtime), 'runtime version not compatible with Phase 93+');
+assert(/"version": "0\.(9[3-9]|[1-9][0-9]{2,})\.0"/.test(pkg), 'root package version not compatible with Phase 93+');
 assert(pkg.includes('check:phase93-diagram-scope-mode-layout-status'), 'Phase 93 package script missing');
 assert(pkg.includes('check:phase84-93-release'), 'Phase 84-93 aggregate script missing');
 
