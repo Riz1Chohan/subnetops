@@ -616,3 +616,8 @@ bash scripts/verify-build.sh
 ## Phase 36 — Implementation Planning Engine
 
 Phase 36 upgrades the backend implementation-planning engine into a stronger change-plan compiler. Implementation steps now carry readiness reasons, blockers, upstream finding links, dependencies, blast radius, required evidence, acceptance criteria, and rollback intent. NAT implementation readiness consumes security NAT reviews instead of guessing from raw NAT status. See `docs/doc/PHASE36-IMPLEMENTATION-PLANNING-ENGINE.md`.
+
+
+## Current release marker
+
+Phase 97: `PHASE_97_DIAGRAM_QA_SECURITY_MATRIX_RELEASE_INTEGRITY` — diagram QA, security matrix readability, and release package integrity.

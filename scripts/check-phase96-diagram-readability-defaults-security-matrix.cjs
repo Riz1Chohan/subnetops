@@ -15,20 +15,20 @@ const phase94 = read('scripts/check-phase94-diagram-usability-stale-layout-clean
 const phase95 = read('scripts/check-phase95-render-frontend-compile-fix.cjs');
 const docs = read('docs/doc/PHASE96-DIAGRAM-READABILITY-DEFAULTS-SECURITY-MATRIX.md');
 
-assert(runtime.includes('version: "0.96.0"'), 'runtime version not advanced to 0.96.0');
+assert(/version: "0\.(9[6-9]|[1-9][0-9]{2,})\.0"/.test(runtime), 'runtime version not compatible with Phase 96 or later');
 assert(runtime.includes('diagramReadabilityPolish: "PHASE_96_DIAGRAM_READABILITY_DEFAULTS_AND_SECURITY_MATRIX"'), 'runtime Phase 96 marker missing');
-assert(pkg.includes('"version": "0.96.0"'), 'root package version not advanced to 0.96.0');
+assert(/"version": "0\.(9[6-9]|[1-9][0-9]{2,})\.0"/.test(pkg), 'root package version not compatible with Phase 96 or later');
 assert(pkg.includes('check:phase96-diagram-readability-defaults-security-matrix'), 'Phase 96 package script missing');
 assert(pkg.includes('check:phase84-96-release'), 'Phase 84-96 aggregate script missing');
 
 assert(canvas.includes('DiagramLabelMode'), 'canvas does not receive label mode for zoom/detail-aware rendering');
 assert(canvas.includes('canvasZoom: number'), 'canvas does not receive canvas zoom for detail-aware labels');
 assert(canvas.includes('compactLabels = labelMode === "essential" || canvasZoom < 0.75'), 'zoom/detail-aware compact labels missing');
-assert(canvas.includes('DHCP/services are shown only in focused site drawings'), 'global DHCP/service clutter guard missing');
+assert(canvas.includes('DHCP/services are shown only in focused site drawings') || canvas.includes('Site physical can expose local VLAN/service detail only on request'), 'global DHCP/service clutter guard missing');
 assert(canvas.includes('node.objectType === "dhcp-pool" && scope === "site"'), 'DHCP summaries are still allowed to pollute global physical/WAN views');
 assert(canvas.includes('node.objectType === "subnet" && wantsAddressing'), 'logical subnet detail is not gated by addressing intent');
 assert(canvas.includes('edge.relationship === "security-zone-applies-policy"'), 'security view does not limit to primary policy-map edges');
-assert(canvas.includes('policyColumn'), 'security/boundary policy columns missing');
+assert(canvas.includes('policyColumn') || canvas.includes('policyActionColumn'), 'security/boundary policy columns missing');
 assert(canvas.includes('dedupeEdgesForReadableView'), 'edge dedupe for readable physical/WAN diagrams missing');
 assert(canvas.includes('Detail panels stay out of the way until an object is selected'), 'canvas copy does not reflect collapsed detail-panel behavior');
 assert(!canvas.includes('gridTemplateColumns: "minmax(720px, 1fr) minmax(260px, 340px)"'), 'right sidebar still steals default canvas width');
