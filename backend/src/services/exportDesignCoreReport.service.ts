@@ -31,10 +31,28 @@ function compactRows(rows: string[][], fallback: string[][]) {
 function sanitizeProfessionalReportText(value: string) {
   return value
     .replace(/\bPhase\s+\d+(?:\s*[–-]\s*\d+)?\s*/gi, "")
-    .replace(/\bPHASE_\d+_[A-Z0-9_]+\b/g, "backend release marker")
+    .replace(/\bPHASE_\d+_[A-Z0-9_]+\b/g, "release marker")
+    .replace(/\bbackend-design-core\b/gi, "authoritative design snapshot")
+    .replace(/\bbackend\b/gi, "design model")
+    .replace(/\breportTruth\b/g, "report readiness evidence")
+    .replace(/\bdiagramTruth\b/g, "diagram readiness evidence")
+    .replace(/\bimplementationPlan\b/g, "implementation plan")
+    .replace(/\bvendorNeutralImplementationTemplates\b/g, "implementation templates")
+    .replace(/graph-node-[A-Za-z0-9_-]+/g, "modeled object")
+    .replace(/device-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-[A-Za-z0-9-]+)?/gi, "modeled device")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "object reference")
+    .replace(/input hash [a-z0-9]+/gi, "current design snapshot recorded")
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:])/g, "$1")
     .trim();
+}
+
+function isProfessionalInternalTableTitle(title: string) {
+  return /(?:Design Graph|Authoritative Design Graph|Gateway and Routing Interfaces|DHCP Pools|Enterprise Address Allocator Readiness|Enterprise Allocator Findings|Enterprise Allocator Review Queue|Allocation Plan|Report Truth|Implementation Review Queue|Verification Coverage|Rollback Truth|Diagram Render|Diagram Overlay|Diagram Hotspots|Security Flow Requirements|Security Service Objects|Security Policy Findings|Implementation-Neutral|Implementation Stages|Implementation Steps|Verification Checks|Rollback Actions|Implementation Findings|Route Intent Table|NAT Intent|Vendor-Neutral|Template|Proof Boundary)/i.test(title);
+}
+
+function isProfessionalInternalSectionTitle(title: string) {
+  return /(?:Export Truth|Vendor-Neutral Implementation Templates|Full Proof|Runtime Proof Dump|Audit Dump)/i.test(title);
 }
 
 function sanitizeProfessionalReportStringArray(values: string[] | undefined) {
@@ -63,22 +81,29 @@ function professionalizeReportForAudience(report: ProfessionalReport) {
     section.paragraphs = sanitizeProfessionalReportStringArray(section.paragraphs) ?? [];
     section.bullets = sanitizeProfessionalReportStringArray(section.bullets);
     if (Array.isArray(section.tables)) {
-      section.tables = section.tables.map((table: any) => ({
-        ...table,
-        title: sanitizeProfessionalReportText(String(table.title ?? "")),
-        headers: sanitizeProfessionalReportStringArray(table.headers) ?? [],
-        rows: sanitizeProfessionalReportRows(table.rows) ?? [],
-      }));
+      section.tables = section.tables
+        .map((table: any) => ({
+          ...table,
+          title: sanitizeProfessionalReportText(String(table.title ?? "")),
+          headers: sanitizeProfessionalReportStringArray(table.headers) ?? [],
+          rows: sanitizeProfessionalReportRows(table.rows) ?? [],
+        }))
+        .filter((table: any) => !isProfessionalInternalTableTitle(String(table.title ?? "")));
     }
   };
 
+  report.sections = report.sections.filter((section: any) => !isProfessionalInternalSectionTitle(String(section.title ?? "")));
   report.sections.forEach(sanitizeSection);
-  report.appendices?.forEach(sanitizeSection);
+  if (Array.isArray(report.appendices)) {
+    report.appendices = report.appendices.filter((section: any) => !isProfessionalInternalSectionTitle(String(section.title ?? "")));
+    report.appendices.forEach(sanitizeSection);
+  }
   return report;
 }
 
 export function applyBackendDesignCoreToReport(report: ProfessionalReport, designCore: any, options?: { reportMode?: ProfessionalReportMode }) {
   const reportMode: ProfessionalReportMode = options?.reportMode ?? "professional";
+  const includeTechnicalEvidence = reportMode !== "professional";
   if (!designCore || typeof designCore !== "object") return report;
 
   const addressingSection = report.sections.find((section) => section.title.toLowerCase().includes("addressing"));
@@ -275,10 +300,10 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     addressingSection.tables = addressingSection.tables ?? [];
     addressingSection.paragraphs = [
       ...addressingSection.paragraphs,
-      `Backend design-core snapshot source: ${asString(authority?.source, "backend-design-core")} • mode: ${asString(authority?.mode, "authoritative")} • generated: ${generatedAt} • engineer review required.`,
+      `Authoritative design snapshot: ${asString(authority?.mode, "authoritative")} • generated: ${generatedAt} • engineer review required.`,
     ];
 
-    if (enterpriseAllocatorPosture) {
+    if (includeTechnicalEvidence && enterpriseAllocatorPosture) {
       addressingSection.tables.push({
         title: "Enterprise Address Allocator Readiness",
         headers: ["Gate", "Status", "Evidence"],
@@ -356,9 +381,22 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         ]),
       });
     }
+
+    if (!includeTechnicalEvidence && enterpriseAllocatorPosture) {
+      addressingSection.tables.push({
+        title: "IP Address Management Review Summary",
+        headers: ["Review Area", "Status", "Evidence"],
+        rows: [
+          ["Source-of-truth IPAM", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), String(enterpriseAllocatorPosture.durablePoolCount ?? 0) + " pool(s), " + String(enterpriseAllocatorPosture.durableAllocationCount ?? 0) + " durable allocation(s), " + String(enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0) + " ledger entrie(s)."],
+          ["DHCP evidence", asString(enterpriseAllocatorPosture.dhcpReadiness, "review"), String(enterpriseAllocatorPosture.dhcpScopeCount ?? 0) + " DHCP scope(s), " + String(enterpriseAllocatorPosture.dhcpFindingCount ?? 0) + " review finding(s)."],
+          ["Brownfield/IPAM import", asString(enterpriseAllocatorPosture.brownfieldReadiness, "review"), asString(enterpriseAllocatorPosture.brownfieldEvidenceState, "import required") + "; " + String(enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0) + " imported network(s), " + String(enterpriseAllocatorPosture.brownfieldConflictCount ?? 0) + " conflict(s)."],
+          ["Approval workflow", asString(enterpriseAllocatorPosture.approvalReadiness, "review"), String(enterpriseAllocatorPosture.allocationApprovalCount ?? 0) + " approval(s), " + String(enterpriseAllocatorPosture.staleAllocationCount ?? 0) + " stale allocation(s)."],
+        ],
+      });
+    }
   }
 
-  if (addressingSection && networkObjectModel) {
+  if (includeTechnicalEvidence && addressingSection && networkObjectModel) {
     addressingSection.tables = addressingSection.tables ?? [];
 
     if (networkDevices.length > 0) {
@@ -435,7 +473,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   }
 
 
-  if (routingSection) {
+  if (includeTechnicalEvidence && routingSection) {
     routingSection.tables = routingSection.tables ?? [];
 
     if (reportTruth) {

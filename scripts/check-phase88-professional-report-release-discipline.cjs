@@ -14,8 +14,8 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE88-PROFESSIONAL-REPORT-RELEASE-DISCIPLINE.md');
 
 assert(runtime.includes('professionalReportHardening: "PHASE_88_PROFESSIONAL_REPORT_RELEASE_DISCIPLINE"'), 'runtime Phase 88 marker missing');
-assert(runtime.includes('version: "0.88.0"'), 'runtime version not advanced to 0.88.0');
-assert(pkg.includes('"version": "0.88.0"'), 'root package version not advanced to 0.88.0');
+assert(/version:\s*"0\.(8[8-9]|9[0-9])\.0"/.test(runtime), 'compatible runtime version missing for Phase 88 or later');
+assert(/"version":\s*"0\.(8[8-9]|9[0-9])\.0"/.test(pkg), 'compatible package version missing for Phase 88 or later');
 assert(pkg.includes('check:phase88-professional-report-release-discipline'), 'Phase 88 check script not wired');
 assert(pkg.includes('check:phase84-88-release'), 'Phase 84-88 aggregate check missing');
 
