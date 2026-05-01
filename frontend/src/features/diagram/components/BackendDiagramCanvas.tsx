@@ -1029,9 +1029,8 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
             <BackendDiagramCanvasDefs />
             <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="#fbfdff" />
             <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="url(#backend-diagram-grid-major)" opacity="0.82" />
-            {scope === "boundaries" ? phase97SecurityMatrixGuides(visibleNodes, canvasBounds) : null}
-            {mode === "logical" && scope !== "boundaries" ? phase97LogicalSiteGuides(visibleNodes, canvasBounds) : null}
-            {(mode === "physical" || scope === "wan-cloud") && scope !== "boundaries" ? phase97TopologyGuides(visibleNodes, canvasBounds, scope) : null}
+            {mode === "logical" ? phase97LogicalSiteGuides(visibleNodes, canvasBounds) : null}
+            {(mode === "physical" || scope === "wan-cloud") ? phase97TopologyGuides(visibleNodes, canvasBounds, scope) : null}
             {visibleEdges.map((edge) => {
               const source = nodeById.get(edge.sourceNodeId);
               const target = nodeById.get(edge.targetNodeId);
@@ -1045,11 +1044,11 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               const count = edgeLabelCounts.get(edge.label) ?? 0;
               const seen = labelSeen.get(edge.label) ?? 0;
               labelSeen.set(edge.label, seen + 1);
-              const shouldShowLabel = linkAnnotationMode === "full" && scope !== "wan-cloud" && scope !== "boundaries" && (scope === "site" || count <= 1) && !(mode === "physical" && scope === "global");
+              const shouldShowLabel = linkAnnotationMode === "full" && scope !== "wan-cloud" && (scope === "site" || count <= 1) && !(mode === "physical" && scope === "global");
               return (
                 <g key={edge.id} className={`backend-diagram-edge backend-diagram-edge-${edge.readiness}`}>
                   <path d={path} fill="none" stroke="#ffffff" strokeWidth={mode === "physical" || scope === "wan-cloud" ? 5 : edge.readiness === "blocked" ? 7 : 5} strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
-                  <path d={path} fill="none" stroke={stroke} strokeWidth={mode === "physical" || scope === "wan-cloud" ? 2 : edge.readiness === "blocked" ? 3 : 2.2} strokeDasharray={edge.readiness === "unknown" ? "6 6" : undefined} strokeLinecap="round" strokeLinejoin="round" markerEnd={scope === "boundaries" ? backendArrowForReadiness(edge.readiness) : undefined} opacity={edge.readiness === "unknown" ? 0.42 : scope === "boundaries" ? 0.52 : mode === "physical" || scope === "wan-cloud" ? 0.58 : 0.7} />
+                  <path d={path} fill="none" stroke={stroke} strokeWidth={mode === "physical" || scope === "wan-cloud" ? 2 : edge.readiness === "blocked" ? 3 : 2.2} strokeDasharray={edge.readiness === "unknown" ? "6 6" : undefined} strokeLinecap="round" strokeLinejoin="round" markerEnd={undefined} opacity={edge.readiness === "unknown" ? 0.42 : mode === "physical" || scope === "wan-cloud" ? 0.58 : 0.7} />
                   {shouldShowLabel ? (
                     <text x={midX + 8} y={midY - 8} fontSize="11" fill={backendDiagramTextFill()}>{cleanCanvasLabel(edge.label, 34)}</text>
                   ) : null}
