@@ -7,7 +7,7 @@ function exists(rel) { return fs.existsSync(path.join(root, rel)); }
 function assert(condition, message) { if (!condition) { console.error(`Phase 86 check failed: ${message}`); process.exit(1); } }
 const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts');
 assert(runtime.includes('PHASE_86_RENDER_BUILD_CLEANUP'), 'runtime Phase 86 marker missing');
-assert(runtime.includes('version: "0.86.0"'), 'runtime version was not advanced to 0.86.0');
+assert(/version:\s*"0\.(8[6-9]|9[0-9])\.0"/.test(runtime), 'runtime version was not advanced to at least 0.86.0');
 const service = read('backend/src/services/designCore.service.ts');
 assert(service.includes('function countNetworkObjectModelObjects(summary: NetworkObjectModelSummary)'), 'backend object-count compatibility helper missing');
 assert(!service.includes('networkObjectModel.summary.networkObjectCount'), 'backend still reads nonexistent NetworkObjectModelSummary.networkObjectCount');

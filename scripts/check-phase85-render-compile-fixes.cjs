@@ -6,7 +6,7 @@ function read(rel) { return fs.readFileSync(path.join(root, rel), 'utf8'); }
 function assert(condition, message) { if (!condition) { console.error(`Phase 85 check failed: ${message}`); process.exit(1); } }
 const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts');
 assert(runtime.includes('PHASE_85_RENDER_COMPILE_FIXES_FOR_PHASE_84'), 'Phase 85 runtime marker missing');
-assert(runtime.includes('version: "0.86.0"') || runtime.includes('version: "0.84.1"'), 'Phase 85 compile-fix version missing');
+assert(/version:\s*"0\.(8[5-9]|9[0-9])\.0"/.test(runtime) || runtime.includes('version: "0.84.1"'), 'Phase 85 compile-fix compatible runtime version missing');
 const viewModel = read('frontend/src/lib/backendSnapshotViewModel.ts');
 assert(!viewModel.includes('backendProvidedCapacityOnly'), 'frontend still references undefined backendProvidedCapacityOnly');
 assert(viewModel.includes('organizationBlock?.totalAddresses') || viewModel.includes('organizationCapacity'), 'frontend capacity summary is not derived from backend evidence');

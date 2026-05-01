@@ -28,6 +28,55 @@ function compactRows(rows: string[][], fallback: string[][]) {
   return rows.length > 0 ? rows : fallback;
 }
 
+function sanitizeProfessionalReportText(value: string) {
+  return value
+    .replace(/\bPhase\s+\d+(?:\s*[–-]\s*\d+)?\s*/gi, "")
+    .replace(/\bPHASE_\d+_[A-Z0-9_]+\b/g, "backend release marker")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .trim();
+}
+
+function sanitizeProfessionalReportStringArray(values: string[] | undefined) {
+  return Array.isArray(values) ? values.map((value) => sanitizeProfessionalReportText(String(value))) : values;
+}
+
+function sanitizeProfessionalReportRows(rows: string[][] | undefined) {
+  return Array.isArray(rows)
+    ? rows.map((row) => row.map((value) => sanitizeProfessionalReportText(String(value))))
+    : rows;
+}
+
+function professionalizeReportForAudience(report: ProfessionalReport) {
+  report.title = sanitizeProfessionalReportText(report.title);
+  report.subtitle = sanitizeProfessionalReportText(report.subtitle);
+  report.executiveSummary = sanitizeProfessionalReportStringArray(report.executiveSummary) ?? [];
+  if (report.metadata) {
+    for (const key of Object.keys(report.metadata) as Array<keyof typeof report.metadata>) {
+      const value = report.metadata[key];
+      if (typeof value === "string") report.metadata[key] = sanitizeProfessionalReportText(value) as any;
+    }
+  }
+
+  const sanitizeSection = (section: any) => {
+    section.title = sanitizeProfessionalReportText(String(section.title ?? ""));
+    section.paragraphs = sanitizeProfessionalReportStringArray(section.paragraphs) ?? [];
+    section.bullets = sanitizeProfessionalReportStringArray(section.bullets);
+    if (Array.isArray(section.tables)) {
+      section.tables = section.tables.map((table: any) => ({
+        ...table,
+        title: sanitizeProfessionalReportText(String(table.title ?? "")),
+        headers: sanitizeProfessionalReportStringArray(table.headers) ?? [],
+        rows: sanitizeProfessionalReportRows(table.rows) ?? [],
+      }));
+    }
+  };
+
+  report.sections.forEach(sanitizeSection);
+  report.appendices?.forEach(sanitizeSection);
+  return report;
+}
+
 export function applyBackendDesignCoreToReport(report: ProfessionalReport, designCore: any, options?: { reportMode?: ProfessionalReportMode }) {
   const reportMode: ProfessionalReportMode = options?.reportMode ?? "professional";
   if (!designCore || typeof designCore !== "object") return report;
@@ -1058,5 +1107,5 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   };
   if (reportMode === "full-proof") report.sections.push(phase40Section, phase42Section);
 
-  return report;
+  return reportMode === "professional" ? professionalizeReportForAudience(report) : report;
 }

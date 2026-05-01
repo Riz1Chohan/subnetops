@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release",
-  "version": "0.87.0",
+  "version": "0.88.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -10,6 +10,8 @@
     "check:phase86-render-build-cleanup": "node scripts/check-phase86-render-build-cleanup.cjs",
     "check:phase84-86-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs",
     "check:phase87-readiness-policy-report-diagram": "node scripts/check-phase87-readiness-policy-report-diagram.cjs",
-    "check:phase84-87-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs"
+    "check:phase84-87-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs",
+    "check:phase88-professional-report-release-discipline": "node scripts/check-phase88-professional-report-release-discipline.cjs",
+    "check:phase84-88-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs && node scripts/check-phase88-professional-report-release-discipline.cjs"
   }
 }
