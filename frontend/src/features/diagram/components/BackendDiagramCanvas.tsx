@@ -41,8 +41,28 @@ function cleanCanvasLabel(value: string, max = 28) {
   return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
 }
 
+function cleanCanvasNote(value: string, max = 140) {
+  const cleaned = value
+    .replace(/\bPhase\s+\d+\s+models\b/gi, "The current planning model uses")
+    .replace(/\bFuture phases\b/gi, "Future versions")
+    .replace(/\bbackend\b/gi, "design model")
+    .replace(/\bdesign-core\b/gi, "design model")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+}
+
 function selectedOverlaySet(activeOverlays: ActiveOverlayMode[]) {
   return new Set(activeOverlays.map((item) => String(item)));
+}
+
+function explicitlyRequestsSecurity(activeOverlays: ActiveOverlayMode[]) {
+  return activeOverlays.includes("security") || activeOverlays.includes("flows");
+}
+
+function explicitlyRequestsAddressing(activeOverlays: ActiveOverlayMode[]) {
+  return activeOverlays.includes("addressing") || activeOverlays.includes("services");
 }
 
 function backendOverlayKeysForActiveOverlays(activeOverlays: ActiveOverlayMode[]) {
@@ -54,9 +74,8 @@ function backendOverlayKeysForActiveOverlays(activeOverlays: ActiveOverlayMode[]
       keys.add("nat");
     }
     if (overlay === "services") {
+      // Services is a summary layer, not permission to flood the physical canvas with policy objects.
       keys.add("addressing");
-      keys.add("security");
-      keys.add("nat");
     }
     if (overlay === "redundancy") keys.add("routing");
   }
@@ -64,52 +83,69 @@ function backendOverlayKeysForActiveOverlays(activeOverlays: ActiveOverlayMode[]
 }
 
 function edgeVisibleForView(edge: BackendDiagramRenderEdge, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
+  const securityRequested = explicitlyRequestsSecurity(activeOverlays);
+  const addressingRequested = explicitlyRequestsAddressing(activeOverlays);
+
+  if (scope === "boundaries") {
+    return edge.overlayKeys.some((key) => key === "security" || key === "nat");
+  }
+
+  if (mode === "physical") {
+    const isSiteDeviceEdge = edge.relationship === "site-contains-device";
+    const isPhysicalTransportEdge = edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge/i.test(edge.label);
+    const isDhcpSummaryEdge = addressingRequested && /DHCP scope summary/i.test(edge.label);
+    const isExplicitSecurityEdge = securityRequested && edge.overlayKeys.includes("security");
+    return isSiteDeviceEdge || isPhysicalTransportEdge || isDhcpSummaryEdge || isExplicitSecurityEdge;
+  }
+
   if (activeOverlays.length > 0) {
     const overlays = backendOverlayKeysForActiveOverlays(activeOverlays);
     return edge.overlayKeys.some((key) => overlays.has(key));
   }
 
-  if (scope === "boundaries") return edge.overlayKeys.some((key) => key === "security" || key === "nat");
   if (scope === "wan-cloud") return edge.overlayKeys.some((key) => key === "routing" || key === "nat") || /wan|transit|cloud|route|internet/i.test(edge.label);
-  if (mode === "physical") return edge.overlayKeys.some((key) => key === "routing" || key === "addressing" || key === "nat");
-  return edge.overlayKeys.some((key) => key === "routing" || key === "security" || key === "addressing");
+  return edge.overlayKeys.some((key) => key === "routing" || key === "addressing");
 }
 
 function nodeVisibleByDefault(node: BackendDiagramRenderNode, mode: DiagramMode, scope: DiagramScope) {
+  const isWanEdge = node.objectType === "security-zone" && /wan|internet|cloud|transit/i.test(node.label);
+
   if (scope === "boundaries") {
-    return node.objectType === "site"
-      || node.objectType === "network-device"
-      || node.objectType === "security-zone"
-      || node.objectType === "policy-rule";
+    return node.objectType === "security-zone"
+      || node.objectType === "policy-rule"
+      || node.objectType === "security-flow";
   }
 
   if (scope === "wan-cloud") {
     return node.objectType === "site"
       || node.objectType === "network-device"
       || node.objectType === "route-domain"
-      || (node.objectType === "security-zone" && /wan|internet|cloud|transit/i.test(node.label));
+      || isWanEdge;
   }
 
   if (mode === "physical") {
     return node.objectType === "site"
       || node.objectType === "network-device"
-      || node.objectType === "route-domain"
-      || (node.objectType === "security-zone" && /wan|internet/i.test(node.label));
+      || isWanEdge;
   }
 
   return node.objectType === "site"
     || node.objectType === "network-device"
-    || node.objectType === "route-domain"
-    || node.objectType === "security-zone";
+    || node.objectType === "route-domain";
 }
 
 function nodeVisibleForOverlays(node: BackendDiagramRenderNode, activeOverlays: ActiveOverlayMode[]) {
   if (activeOverlays.length === 0) return false;
   const overlays = selectedOverlaySet(activeOverlays);
   if (overlays.has("addressing")) return node.layer === "site" || node.layer === "device" || node.layer === "interface" || node.objectType === "dhcp-pool";
-  if (overlays.has("security")) return node.layer === "security" || node.layer === "device" || node.objectType === "site" || node.objectType === "policy-rule";
-  if (overlays.has("flows")) return node.objectType === "security-flow" || node.objectType === "segmentation-flow" || node.objectType === "policy-rule" || node.layer === "security" || node.layer === "device";
-  if (overlays.has("services")) return /service|server|cloud|remote|operations|dhcp/i.test(node.label) || node.layer === "device" || node.objectType === "site";
+  if (overlays.has("security")) return node.layer === "security" || node.objectType === "policy-rule" || node.objectType === "security-zone";
+  if (overlays.has("flows")) return node.objectType === "security-flow" || node.objectType === "segmentation-flow" || node.objectType === "policy-rule" || node.layer === "security";
+  if (overlays.has("services")) {
+    return node.objectType === "site"
+      || node.objectType === "network-device"
+      || node.objectType === "dhcp-pool"
+      || (node.layer !== "security" && /service|server|cloud|remote|operations|dhcp/i.test(node.label));
+  }
   if (overlays.has("redundancy")) return node.layer === "routing" || node.layer === "device" || node.objectType === "site";
   return false;
 }
@@ -118,8 +154,12 @@ function visibleEdgesForView(renderModel: BackendDiagramRenderModel, mode: Diagr
   const edges = renderModel.edges.filter((edge) => edgeVisibleForView(edge, mode, scope, activeOverlays));
   if (edges.length > 0) return edges;
 
+  if (mode === "physical") {
+    return renderModel.edges.filter((edge) => edge.relationship === "site-contains-device" || /site-to-site|WAN edge path|internet\/security edge/i.test(edge.label));
+  }
+
   const fallbackEdges = renderModel.edges.filter((edge) => edge.overlayKeys.includes("routing") || edge.overlayKeys.includes("addressing"));
-  return fallbackEdges.length > 0 ? fallbackEdges : renderModel.edges;
+  return fallbackEdges.length > 0 ? fallbackEdges : [];
 }
 
 function visibleNodeSet(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
@@ -404,7 +444,9 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
                 <strong>Review signal</strong>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>
                   {selectedNode.relatedFindingIds.length === 0
-                    ? "No blocking or review finding is attached to this visible topology object."
+                    ? selectedNode.readiness === "blocked"
+                      ? "This object is blocked by implementation readiness or safety dependency evidence, not by a graph-integrity finding."
+                      : "No blocking or review finding is attached to this visible topology object."
                     : `${selectedNode.relatedFindingIds.length} finding reference(s) are attached in the technical proof model.`}
                 </p>
               </div>
@@ -414,7 +456,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>No notes provided for this topology object.</p>
                 ) : (
                   <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
-                    {selectedNode.notes.slice(0, 5).map((note) => <li key={note}>{cleanCanvasLabel(note, 120)}</li>)}
+                    {selectedNode.notes.slice(0, 5).map((note) => <li key={note}>{cleanCanvasNote(note, 140)}</li>)}
                   </ul>
                 )}
               </div>

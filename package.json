@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release",
-  "version": "0.91.0",
+  "version": "0.92.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -18,6 +18,8 @@
     "check:phase90-diagram-professional-topology-layout": "node scripts/check-phase90-diagram-professional-topology-layout.cjs",
     "check:phase84-90-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs && node scripts/check-phase88-professional-report-release-discipline.cjs && node scripts/check-phase89-professional-report-audience-cleanup.cjs && node scripts/check-phase90-diagram-professional-topology-layout.cjs",
     "check:phase91-diagram-visual-regression-patch": "node scripts/check-phase91-diagram-visual-regression-patch.cjs",
-    "check:phase84-91-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs && node scripts/check-phase88-professional-report-release-discipline.cjs && node scripts/check-phase89-professional-report-audience-cleanup.cjs && node scripts/check-phase90-diagram-professional-topology-layout.cjs && node scripts/check-phase91-diagram-visual-regression-patch.cjs"
+    "check:phase84-91-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs && node scripts/check-phase88-professional-report-release-discipline.cjs && node scripts/check-phase89-professional-report-audience-cleanup.cjs && node scripts/check-phase90-diagram-professional-topology-layout.cjs && node scripts/check-phase91-diagram-visual-regression-patch.cjs",
+    "check:phase92-diagram-view-separation-layout-intelligence": "node scripts/check-phase92-diagram-view-separation-layout-intelligence.cjs",
+    "check:phase84-92-release": "node scripts/check-phase84-design-trust-policy.cjs && node scripts/check-phase85-render-compile-fixes.cjs && node scripts/check-phase86-render-build-cleanup.cjs && node scripts/check-phase87-readiness-policy-report-diagram.cjs && node scripts/check-phase88-professional-report-release-discipline.cjs && node scripts/check-phase89-professional-report-audience-cleanup.cjs && node scripts/check-phase90-diagram-professional-topology-layout.cjs && node scripts/check-phase91-diagram-visual-regression-patch.cjs && node scripts/check-phase92-diagram-view-separation-layout-intelligence.cjs"
   }
 }

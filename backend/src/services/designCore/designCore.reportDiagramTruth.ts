@@ -200,6 +200,10 @@ function overlayKeysForRelationship(relationship: DesignGraphRelationship): Back
 
 function cleanTopologyLabel(value: string) {
   return value
+    .replace(/\bPhase\s+\d+\s+models\b/gi, "The current planning model uses")
+    .replace(/\bFuture phases\b/gi, "Future versions")
+    .replace(/\bbackend\b/gi, "design model")
+    .replace(/\bdesign-core\b/gi, "design model")
     .replace(/device-[0-9a-f-]+/gi, "modeled device")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
     .replace(/\s{2,}/g, " ")
@@ -307,7 +311,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       y: 70,
       sourceEngine: "routing",
       relatedFindingIds: readiness.relatedFindingIds,
-      notes: routeDomain.notes.slice(0, 4),
+      notes: routeDomain.notes.map(cleanTopologyLabel).slice(0, 4),
     });
   }
 
@@ -325,7 +329,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
     y: 340,
     sourceEngine: "security",
     relatedFindingIds: wanZone ? readinessForObject(wanZone.id, networkObjectModel, findingRefs).relatedFindingIds : [],
-    notes: wanZone?.notes.slice(0, 4) ?? ["Represents internet, WAN, cloud, and remote-access edge review boundary."],
+    notes: wanZone?.notes.map(cleanTopologyLabel).slice(0, 4) ?? ["Represents internet, WAN, cloud, and remote-access edge review boundary."],
   });
 
   for (const site of sites) {
@@ -421,7 +425,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
         y: point.y + 100,
         sourceEngine: "object-model",
         relatedFindingIds: readiness.relatedFindingIds,
-        notes: device.notes.slice(0, 4),
+        notes: device.notes.map(cleanTopologyLabel).slice(0, 4),
       });
       addEdge({
         id: `render-edge-site-device-${device.id}`,
@@ -487,6 +491,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
   const zoneBaseY = 120;
   const visibleZones = networkObjectModel.securityZones
     .filter((zone) => zone.zoneRole !== "wan")
+    .filter((zone) => !/voice/i.test(zone.name) || zone.subnetCidrs.length > 0 || zone.vlanIds.length > 0)
     .sort((left, right) => left.zoneRole.localeCompare(right.zoneRole) || left.name.localeCompare(right.name))
     .slice(0, 8);
 
@@ -505,7 +510,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       y: zoneBaseY + index * 92,
       sourceEngine: "security",
       relatedFindingIds: readiness.relatedFindingIds,
-      notes: zone.notes.slice(0, 4),
+      notes: zone.notes.map(cleanTopologyLabel).slice(0, 4),
     });
     if (routeDomain) {
       addEdge({
@@ -540,7 +545,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       y: zoneBaseY + index * 86,
       sourceEngine: "security",
       relatedFindingIds: [],
-      notes: [policy.rationale, ...policy.notes].filter(Boolean).slice(0, 4),
+      notes: [policy.rationale, ...policy.notes].filter(Boolean).map(cleanTopologyLabel).slice(0, 4),
     });
     const sourceZoneNodeId = `render-zone-${policy.sourceZoneId}`;
     const targetZoneNodeId = `render-zone-${policy.destinationZoneId}`;
@@ -647,7 +652,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       groupCount: groups.length,
       overlayCount: overlays.length,
       backendAuthored: true,
-      layoutMode: "professional-topology-layout",
+      layoutMode: "professional-view-separated-layout",
     },
     nodes: renderNodes,
     edges: renderEdges,

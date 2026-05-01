@@ -139,7 +139,8 @@ export function ProjectDiagramPage() {
   const deviceFocus = deriveDeviceFocus(scope, activeOverlays);
   const linkFocus = deriveLinkFocus(scope);
   const canvasFileBase = `${(project?.name || "project").replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
-  const estimatedSiteCount = scope === "site" ? 1 : enrichedProject?.sites.length || 1;
+  const authoritativeRenderSiteCount = diagramTruth.renderModel?.groups.filter((group) => group.groupType === "site").length || enrichedProject?.sites.length || 1;
+  const estimatedSiteCount = scope === "site" ? 1 : authoritativeRenderSiteCount;
   const estimatedBranchRows = Math.max(1, Math.ceil(Math.max(estimatedSiteCount - 1, 0) / 2));
   const canvasViewportMinHeight = mode === "physical"
     ? Math.max(760, 760 + Math.max(0, estimatedBranchRows - 1) * 220)
@@ -387,7 +388,7 @@ export function ProjectDiagramPage() {
                 </div>
                 <div className="diagram-stage-toolbar-group diagram-stage-toolbar-group-passive" aria-label="Canvas context">
                   <span className="diagram-stage-passive-pill">{scopeItems.find((item) => item.key === scope)?.label || "Global"}</span>
-                  <span className="diagram-stage-passive-pill">{scope === "site" ? activeSiteName : `${enrichedProject.sites.length} sites`}</span>
+                  <span className="diagram-stage-passive-pill">{scope === "site" ? activeSiteName : `${authoritativeRenderSiteCount} sites`}</span>
                 </div>
                 <div className="diagram-stage-toolbar-group">
                   <button type="button" className="diagram-stage-button" onClick={() => setIsCanvasFocused((current) => !current)}>{isCanvasFocused ? "Show controls" : "Focus canvas"}</button>

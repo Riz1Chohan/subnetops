@@ -13,8 +13,8 @@ const phase90 = read('scripts/check-phase90-diagram-professional-topology-layout
 const docs = read('docs/doc/PHASE91-DIAGRAM-VISUAL-REGRESSION-PATCH.md');
 
 assert(runtime.includes('diagramVisualRegressionPatch: "PHASE_91_DIAGRAM_VISUAL_REGRESSION_PATCH"'), 'runtime Phase 91 marker missing');
-assert(runtime.includes('version: "0.91.0"'), 'runtime version not advanced to 0.91.0');
-assert(pkg.includes('"version": "0.91.0"'), 'root package version not advanced to 0.91.0');
+assert(/version: "0\.(9[1-9]|[1-9][0-9]{2,})\.0"/.test(runtime), 'compatible runtime version missing for Phase 91 or later');
+assert(/"version": "0\.(9[1-9]|[1-9][0-9]{2,})\.0"/.test(pkg), 'compatible root package version missing for Phase 91 or later');
 assert(pkg.includes('check:phase91-diagram-visual-regression-patch'), 'Phase 91 package script missing');
 assert(pkg.includes('check:phase84-91-release'), 'Phase 84-91 aggregate script missing');
 
