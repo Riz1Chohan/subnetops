@@ -1001,7 +1001,7 @@ export interface BackendDiagramRenderModel {
     groupCount: number;
     overlayCount: number;
     backendAuthored: true;
-    layoutMode: "backend-deterministic-grid" | "professional-topology-layout" | "professional-view-separated-layout" | "professional-scope-mode-layout";
+    layoutMode: "backend-deterministic-grid" | "professional-topology-layout" | "professional-view-separated-layout" | "professional-scope-mode-layout" | "professional-usability-polish-layout";
   };
   nodes: BackendDiagramRenderNode[];
   edges: BackendDiagramRenderEdge[];

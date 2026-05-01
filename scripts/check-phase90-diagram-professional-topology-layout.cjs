@@ -30,7 +30,7 @@ assert(backendTypes.includes('"professional-topology-layout"'), 'backend render 
 assert(frontendTypes.includes('"professional-topology-layout"'), 'frontend render model type does not support professional topology layout');
 
 assert(truth.includes('buildProfessionalTopologyRenderModel'), 'backend lacks professional topology render model builder');
-assert(truth.includes('layoutMode: "professional-topology-layout"') || truth.includes('layoutMode: "professional-view-separated-layout"') || truth.includes('layoutMode: "professional-scope-mode-layout"'), 'backend render model does not declare professional topology or later view-separated layout');
+assert(truth.includes('layoutMode: "professional-topology-layout"') || truth.includes('layoutMode: "professional-view-separated-layout"') || truth.includes('layoutMode: "professional-scope-mode-layout"') || truth.includes('layoutMode: "professional-usability-polish-layout"'), 'backend render model does not declare professional topology or later view-separated layout');
 assert(truth.includes('render-edge-hub-spoke'), 'backend render model does not create hub-spoke topology edges');
 assert(truth.includes('render-dhcp-summary'), 'backend render model does not collapse DHCP pools into readable site summaries');
 assert(truth.includes('render-wan-internet-edge'), 'backend render model does not create a clear WAN/Internet edge node');

@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import { BackendDiagramCanvas } from "../features/diagram/components/BackendDiagramCanvas";
 import {
   annotationItems,
-  deriveDeviceFocus,
-  deriveLabelFocus,
-  deriveLinkFocus,
   layerItems,
   scopeItems,
 } from "../features/diagram/diagramWorkspace";
@@ -16,18 +12,14 @@ import type {
   DiagramMode,
   DiagramScope,
   LinkAnnotationMode,
-  LinkFocus,
-  OverlayMode,
 } from "../features/diagram/diagramTypes";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
-import { useProjectComments } from "../features/comments/hooks";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
-import { useValidationResults } from "../features/validation/hooks";
 import { buildDiagramTruthModel, truthBadgeClass } from "../lib/reportDiagramTruth";
 
 export function ProjectDiagramPage() {
@@ -35,8 +27,6 @@ export function ProjectDiagramPage() {
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
-  const commentsQuery = useProjectComments(projectId);
-  const validationQuery = useValidationResults(projectId);
 
   const [mode, setMode] = useState<DiagramMode>("physical");
   const [scope, setScope] = useState<DiagramScope>("global");
@@ -69,8 +59,6 @@ export function ProjectDiagramPage() {
   const vlanMap = new Map(projectVlans.map((vlan) => [vlan.id, vlan]));
   for (const vlan of fetchedVlans) vlanMap.set(vlan.id, { ...vlanMap.get(vlan.id), ...vlan });
   const baseVlans = Array.from(vlanMap.values());
-  const comments = commentsQuery.data ?? [];
-  const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
 
   const seedProject = project
@@ -134,10 +122,6 @@ export function ProjectDiagramPage() {
   const activeSiteId = focusedSiteId || enrichedProject?.sites[0]?.id || "";
   const activeSiteName = enrichedProject?.sites.find((site) => site.id === activeSiteId)?.name || "site";
   const overlayCount = activeOverlays.length;
-  const effectiveOverlay: OverlayMode = activeOverlays[activeOverlays.length - 1] ?? (scope === "boundaries" ? "security" : "none");
-  const effectiveLabelFocus = deriveLabelFocus(scope, activeOverlays);
-  const deviceFocus = deriveDeviceFocus(scope, activeOverlays);
-  const linkFocus = deriveLinkFocus(scope);
   const canvasFileBase = `${(project?.name || "project").replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
   const authoritativeRenderSiteCount = diagramTruth.renderModel?.groups.filter((group) => group.groupType === "site").length || enrichedProject?.sites.length || 1;
   const estimatedSiteCount = scope === "site" ? 1 : authoritativeRenderSiteCount;
@@ -279,15 +263,7 @@ export function ProjectDiagramPage() {
   return (
     <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">
       <DesignAuthorityBanner authority={authority} compact />
-      <div className="panel" style={{ display: "grid", gap: 14, marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-          <div><p className="workspace-detail-kicker">Visualize</p><h2 style={{ margin: "0 0 8px 0" }}>Diagram truth workspace</h2><p className="muted" style={{ margin: 0 }}>The canvas remains a display surface. These truth panels tell you whether the backend has enough modeled topology, routing, security, and implementation evidence to trust what the diagram is showing.</p></div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><span className={truthBadgeClass(diagramTruth.overallReadiness)}>{diagramTruth.overallReadiness === "unknown" ? "Truth pending" : diagramTruth.overallReadiness === "blocked" ? "Diagram truth blocked" : diagramTruth.overallReadiness === "review" ? "Diagram truth under review" : "Diagram truth ready"}</span><span className="badge-soft">Devices {diagramTruth.topologySummary.deviceCount}</span><span className="badge-soft">Links {diagramTruth.topologySummary.linkCount}</span><span className="badge-soft">Route domains {diagramTruth.topologySummary.routeDomainCount}</span><span className="badge-soft">Security zones {diagramTruth.topologySummary.securityZoneCount}</span></div>
-        </div>
-        {diagramTruth.emptyStateReason ? <div className="trust-note"><p className="muted" style={{ margin: 0 }}><strong>Why the diagram is limited:</strong> {diagramTruth.emptyStateReason}</p></div> : null}
-        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>{diagramTruth.overlaySummaries.map((item) => <div key={item.key} className="summary-card"><div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}><div className="muted">{item.label}</div><span className={truthBadgeClass(item.readiness)}>{item.readiness}</span></div><div className="value">{item.count}</div><div className="muted" style={{ marginTop: 6 }}>{item.detail}</div></div>)}</div>
-        <div className="grid-2" style={{ alignItems: "start" }}><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>Top cross-check hotspots</h3>{diagramTruth.hotspots.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major routing, security, or implementation hotspots are currently surfaced by backend truth.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{diagramTruth.hotspots.map((item, index) => <li key={`${item.scopeLabel}-${item.title}-${index}`} style={{ marginBottom: 8 }}><strong>{item.scopeLabel} — {item.title}:</strong> {item.detail}</li>)}</ul>}</div><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>How to use the canvas honestly</h3><ul style={{ margin: 0, paddingLeft: 18 }}><li style={{ marginBottom: 8 }}><strong>Addressing:</strong> confirm site blocks, gateway anchors, and orphaned rows before trusting labels.</li><li style={{ marginBottom: 8 }}><strong>Routing:</strong> compare displayed paths against route intents, reachability checks, and next-hop review items.</li><li style={{ marginBottom: 8 }}><strong>Security:</strong> cross-check zone boundaries, required flows, and NAT coverage instead of assuming visual adjacency means permission.</li><li style={{ marginBottom: 0 }}><strong>Implementation:</strong> blocked implementation or verification items still override a clean-looking canvas.</li></ul></div></div>
-      </div>
+
       <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
         <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>
           <div className="diagram-control-card diagram-control-card-compact diagram-control-card-top">
@@ -424,33 +400,9 @@ export function ProjectDiagramPage() {
                     linkAnnotationMode={linkAnnotationMode}
                   />
                 ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    <div className="panel" style={{ padding: 14 }}>
-                      <strong>Legacy diagram fallback is active.</strong>
-                      <p className="muted" style={{ margin: "8px 0 0 0" }}>Backend diagram render model is unavailable or stale. Site/VLAN records are present in the workspace, so this is a renderer-input problem, not proof that the project has no sites or VLANs.</p>
-                    </div>
-                    <ProjectDiagram
-                      project={enrichedProject}
-                      synthesizedDesign={synthesized}
-                      comments={comments}
-                      validations={validations}
-                      compact
-                      minimalWorkspace
-                      controls={{
-                        mode,
-                        overlay: effectiveOverlay,
-                        activeOverlays,
-                        scope,
-                        workspaceDensity: "guided",
-                        labelMode,
-                        linkAnnotationMode,
-                        labelFocus: effectiveLabelFocus,
-                        deviceFocus,
-                        linkFocus,
-                        focusedSiteId: activeSiteId,
-                        bareCanvas: true,
-                      }}
-                    />
+                  <div className="panel" style={{ padding: 14 }}>
+                    <strong>Authoritative topology canvas is unavailable.</strong>
+                    <p className="muted" style={{ margin: "8px 0 0 0" }}>The legacy diagram renderer is intentionally disabled. Refresh after deployment or regenerate the design snapshot so the current authoritative render model is used.</p>
                   </div>
                 )}
               </div>
@@ -458,6 +410,20 @@ export function ProjectDiagramPage() {
           </div>
         </div>
       </div>
+
+      <details className="panel diagram-truth-details-panel" style={{ display: "grid", gap: 14, marginTop: 18 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 800 }}>Diagram truth / readiness details</summary>
+        <div style={{ display: "grid", gap: 14, paddingTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div><p className="workspace-detail-kicker">Verify</p><h2 style={{ margin: "0 0 8px 0" }}>Diagram truth workspace</h2><p className="muted" style={{ margin: 0 }}>Use this panel when you need evidence behind the canvas. It stays collapsed so the diagram remains the primary workspace.</p></div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><span className={truthBadgeClass(diagramTruth.overallReadiness)}>{diagramTruth.overallReadiness === "unknown" ? "Truth pending" : diagramTruth.overallReadiness === "blocked" ? "Diagram truth blocked" : diagramTruth.overallReadiness === "review" ? "Diagram truth under review" : "Diagram truth ready"}</span><span className="badge-soft">Devices {diagramTruth.topologySummary.deviceCount}</span><span className="badge-soft">Links {diagramTruth.topologySummary.linkCount}</span><span className="badge-soft">Route domains {diagramTruth.topologySummary.routeDomainCount}</span><span className="badge-soft">Security zones {diagramTruth.topologySummary.securityZoneCount}</span></div>
+          </div>
+          {diagramTruth.emptyStateReason ? <div className="trust-note"><p className="muted" style={{ margin: 0 }}><strong>Why the diagram is limited:</strong> {diagramTruth.emptyStateReason}</p></div> : null}
+          <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>{diagramTruth.overlaySummaries.map((item) => <div key={item.key} className="summary-card"><div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}><div className="muted">{item.label}</div><span className={truthBadgeClass(item.readiness)}>{item.readiness}</span></div><div className="value">{item.count}</div><div className="muted" style={{ marginTop: 6 }}>{item.detail}</div></div>)}</div>
+          <div className="grid-2" style={{ alignItems: "start" }}><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>Top cross-check hotspots</h3>{diagramTruth.hotspots.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major routing, security, or implementation hotspots are currently surfaced by design truth.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{diagramTruth.hotspots.map((item, index) => <li key={`${item.scopeLabel}-${item.title}-${index}`} style={{ marginBottom: 8 }}><strong>{item.scopeLabel} — {item.title}:</strong> {item.detail}</li>)}</ul>}</div><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>How to use the canvas honestly</h3><ul style={{ margin: 0, paddingLeft: 18 }}><li style={{ marginBottom: 8 }}><strong>Addressing:</strong> confirm site blocks, gateway anchors, and orphaned rows before trusting labels.</li><li style={{ marginBottom: 8 }}><strong>Routing:</strong> compare displayed paths against route intents, reachability checks, and next-hop review items.</li><li style={{ marginBottom: 8 }}><strong>Security:</strong> cross-check zone boundaries, required flows, and NAT coverage instead of assuming visual adjacency means permission.</li><li style={{ marginBottom: 0 }}><strong>Implementation:</strong> blocked implementation or verification items still override a clean-looking canvas.</li></ul></div></div>
+        </div>
+      </details>
     </section>
+  );
   );
 }

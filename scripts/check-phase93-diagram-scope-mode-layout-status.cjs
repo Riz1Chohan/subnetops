@@ -15,8 +15,8 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE93-DIAGRAM-SCOPE-MODE-LAYOUT-STATUS.md');
 
 assert(runtime.includes('diagramScopeModeLayout: "PHASE_93_DIAGRAM_SCOPE_MODE_LAYOUT_STATUS"'), 'runtime Phase 93 marker missing');
-assert(runtime.includes('version: "0.93.0"'), 'runtime version not advanced to 0.93.0');
-assert(pkg.includes('"version": "0.93.0"'), 'root package version not advanced to 0.93.0');
+assert(runtime.includes('version: "0.93.0"') || runtime.includes('version: "0.94.0"'), 'runtime version not compatible with Phase 93+');
+assert(pkg.includes('"version": "0.93.0"') || pkg.includes('"version": "0.94.0"'), 'root package version not compatible with Phase 93+');
 assert(pkg.includes('check:phase93-diagram-scope-mode-layout-status'), 'Phase 93 package script missing');
 assert(pkg.includes('check:phase84-93-release'), 'Phase 84-93 aggregate script missing');
 
@@ -25,7 +25,7 @@ assert(backendDiagram.includes('objectType: "vlan"'), 'backend render model miss
 assert(backendDiagram.includes('objectType: "subnet"'), 'backend render model missing subnet render nodes');
 assert(backendDiagram.includes('relationship: "site-contains-vlan"'), 'backend render model missing site-to-VLAN relationships');
 assert(backendDiagram.includes('relationship: "vlan-uses-subnet"'), 'backend render model missing VLAN-to-subnet relationships');
-assert(backendDiagram.includes('professional-scope-mode-layout'), 'backend render model did not advance to Phase 93 layout mode');
+assert(backendDiagram.includes('professional-scope-mode-layout') || backendDiagram.includes('professional-usability-polish-layout'), 'backend render model did not advance to Phase 93 or later layout mode');
 assert(backendTypes.includes('"professional-scope-mode-layout"'), 'backend type does not allow Phase 93 layout mode');
 assert(frontendSnapshot.includes('"professional-scope-mode-layout"'), 'frontend snapshot type does not allow Phase 93 layout mode');
 

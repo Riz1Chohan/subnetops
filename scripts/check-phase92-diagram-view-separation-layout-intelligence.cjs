@@ -21,7 +21,7 @@ assert(/\"version\": \"0\.(9[2-9]|[1-9][0-9]{2,})\.0\"/.test(pkg), 'root package
 assert(pkg.includes('check:phase92-diagram-view-separation-layout-intelligence'), 'Phase 92 package script missing');
 assert(pkg.includes('check:phase84-92-release'), 'Phase 84-92 aggregate script missing');
 
-assert(backendDiagram.includes('professional-view-separated-layout') || backendDiagram.includes('professional-scope-mode-layout'), 'backend render model did not advance to view-separated or later scope/mode layout');
+assert(backendDiagram.includes('professional-view-separated-layout') || backendDiagram.includes('professional-scope-mode-layout') || backendDiagram.includes('professional-usability-polish-layout'), 'backend render model did not advance to view-separated or later scope/mode layout');
 assert(backendTypes.includes('"professional-view-separated-layout"'), 'backend render type does not allow Phase 92 layout mode');
 assert(frontendSnapshot.includes('"professional-view-separated-layout"'), 'frontend snapshot type does not allow Phase 92 layout mode');
 assert(backendDiagram.includes('!\/voice\/i.test(zone.name) || zone.subnetCidrs.length > 0 || zone.vlanIds.length > 0'), 'inactive voice zone filter missing');
@@ -33,7 +33,7 @@ assert(canvas.includes('nodeAllowedByView') || canvas.includes('Services is a su
 assert(canvas.includes('mode === "physical"'), 'physical-view separation logic missing');
 assert(canvas.includes('edge.relationship === "site-contains-device"'), 'physical view no longer guarantees site-device edges');
 assert(canvas.includes('site-to-site|WAN edge path|internet\\/security edge') || canvas.includes('site-to-site|WAN edge path|internet\\/security edge|routing domain'), 'physical transport edge filter missing');
-assert(canvas.includes('scope === "boundaries"') && canvas.includes('node.objectType === "dhcp-pool" && overlays.has("services")'), 'services overlay and security boundary separation missing');
+assert(canvas.includes('scope === "boundaries"') && canvas.includes('shouldShowDhcpSummary(activeOverlays)'), 'services overlay and security boundary separation missing');
 assert(canvas.includes('cleanCanvasNote'), 'sidebar note sanitization missing');
 assert(!canvas.includes('Phase 27 models'), 'known internal phase wording is still hard-coded in canvas');
 

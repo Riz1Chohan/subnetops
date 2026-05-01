@@ -15,6 +15,7 @@ interface BackendDiagramCanvasProps {
 
 type CanvasBounds = { width: number; height: number; offsetX: number; offsetY: number };
 type PreparedDiagram = { nodes: BackendDiagramRenderNode[]; edges: BackendDiagramRenderEdge[] };
+type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
   if (node.objectType === "site") return "Site";
@@ -75,6 +76,16 @@ function isExternalAnchor(node: BackendDiagramRenderNode) {
   return isWanEdge(node) || node.objectType === "route-domain";
 }
 
+function shouldShowRouteDomain({ mode, scope }: ViewScope) {
+  // Route domains are logical control-plane evidence, not physical equipment.
+  // Keep them out of physical/WAN drawings so they do not look like a device.
+  return mode === "logical" || scope === "boundaries";
+}
+
+function shouldShowDhcpSummary(activeOverlays: ActiveOverlayMode[]) {
+  return activeOverlays.includes("services") || activeOverlays.includes("addressing");
+}
+
 function siteCodeFromLabel(label: string) {
   const clean = label.replace(/—.*/, "").replace(/\(.*/, "").trim();
   if (/hq/i.test(label)) return "HQ";
@@ -115,21 +126,23 @@ function nodeAllowedByScope(node: BackendDiagramRenderNode, scope: DiagramScope,
 }
 
 function nodeAllowedByView(node: BackendDiagramRenderNode, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
-  const overlays = selectedOverlaySet(activeOverlays);
   const wantsAddressing = explicitlyRequestsAddressing(activeOverlays);
   const wantsSecurity = explicitlyRequestsSecurity(activeOverlays);
 
+  if (node.objectType === "route-domain" && !shouldShowRouteDomain({ mode, scope })) return false;
+
   if (scope === "boundaries") {
-    return isSecurityObject(node);
+    return isSecurityObject(node) || node.objectType === "route-domain";
   }
 
   if (scope === "wan-cloud") {
-    return node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node) || node.objectType === "route-domain";
+    // WAN mode should read like a WAN topology, not a route-domain/debug graph.
+    return node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node);
   }
 
   if (mode === "physical") {
     if (node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node)) return true;
-    if (node.objectType === "dhcp-pool" && overlays.has("services")) return true;
+    if (node.objectType === "dhcp-pool" && shouldShowDhcpSummary(activeOverlays)) return true;
     if (wantsSecurity && isSecurityObject(node)) return true;
     return false;
   }
@@ -144,6 +157,7 @@ function nodeAllowedByView(node: BackendDiagramRenderNode, mode: DiagramMode, sc
 
   return true;
 }
+
 
 function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
   const wantsAddressing = explicitlyRequestsAddressing(activeOverlays);
@@ -163,7 +177,7 @@ function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, sc
 
   if (mode === "physical") {
     if (edge.relationship === "site-contains-device") return true;
-    if (edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge|routing domain/i.test(edge.label)) return true;
+    if (edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge/i.test(edge.label)) return true;
     if (wantsAddressing && edge.relationship === "dhcp-pool-serves-subnet") return true;
     if (wantsSecurity && edge.overlayKeys.includes("security") && edge.relationship !== "security-zone-protects-subnet") return true;
     return false;
@@ -180,6 +194,7 @@ function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, sc
 
   return false;
 }
+
 
 function edgeAllowedByScope(edge: BackendDiagramRenderEdge, source: BackendDiagramRenderNode, target: BackendDiagramRenderNode, scope: DiagramScope, focusedSiteId?: string) {
   if (scope !== "site") return true;
@@ -214,8 +229,8 @@ function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: Diagr
     if (!source || !target) continue;
     if (nodeAllowedByScope(source, scope, focusedSiteId) && nodeAllowedByView(source, mode, scope, activeOverlays)) visibleIds.add(source.id);
     if (nodeAllowedByScope(target, scope, focusedSiteId) && nodeAllowedByView(target, mode, scope, activeOverlays)) visibleIds.add(target.id);
-    if (isExternalAnchor(source) && scope !== "boundaries") visibleIds.add(source.id);
-    if (isExternalAnchor(target) && scope !== "boundaries") visibleIds.add(target.id);
+    if (isExternalAnchor(source) && scope !== "boundaries" && nodeAllowedByView(source, mode, scope, activeOverlays)) visibleIds.add(source.id);
+    if (isExternalAnchor(target) && scope !== "boundaries" && nodeAllowedByView(target, mode, scope, activeOverlays)) visibleIds.add(target.id);
   }
 
   const nodes = renderModel.nodes.filter((node) => visibleIds.has(node.id));
@@ -238,93 +253,112 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const current = byId.get(node.id);
     if (current) byId.set(node.id, { ...current, x, y });
   };
-  const setChildren = (site: BackendDiagramRenderNode, startX: number, startY: number) => {
-    const siteDevices = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
-    siteDevices.forEach((device, index) => set(device, startX + (index - (siteDevices.length - 1) / 2) * 116, startY + 108));
+  const siteDevicesFor = (site: BackendDiagramRenderNode) => nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
+  const setDeviceRow = (site: BackendDiagramRenderNode, startX: number, startY: number, spacing = 150) => {
+    const siteDevices = siteDevicesFor(site);
+    siteDevices.forEach((device, index) => set(device, startX + (index - (siteDevices.length - 1) / 2) * spacing, startY));
+  };
+  const setDhcpBadges = (site: BackendDiagramRenderNode, startX: number, startY: number) => {
     const dhcp = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "dhcp-pool");
-    dhcp.forEach((node, index) => set(node, startX + 150, startY + 104 + index * 68));
+    dhcp.slice(0, 2).forEach((node, index) => set(node, startX + 190, startY + index * 58));
   };
 
   if (scope === "boundaries") {
     const zones = nodes.filter((node) => node.objectType === "security-zone").sort((a, b) => a.label.localeCompare(b.label));
     const policies = nodes.filter((node) => node.objectType === "policy-rule" || node.objectType === "security-flow").sort((a, b) => a.label.localeCompare(b.label));
-    zones.forEach((zone, index) => set(zone, 360, 170 + index * 118));
-    policies.forEach((policy, index) => set(policy, 880, 150 + index * 86));
-    if (wan) set(wan, 130, 220);
+    set(wan, 260, 210);
+    set(routeDomain, 260, 95);
+    zones.forEach((zone, index) => set(zone, 430, 165 + index * 104));
+    const lanes = 2;
+    policies.forEach((policy, index) => {
+      const col = index % lanes;
+      const row = Math.floor(index / lanes);
+      set(policy, 850 + col * 300, 150 + row * 82);
+    });
     return { nodes: [...byId.values()], edges };
   }
 
   if (scope === "site") {
     const site = orderedSites.find((candidate) => candidate.siteId === params.focusedSiteId) ?? orderedSites[0];
-    set(routeDomain, 520, 80);
-    set(site, 520, 220);
-    setChildren(site, 520, 220);
-    set(wan, 880, 360);
-    if (mode === "logical") {
-      const logicalRows = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
-      const vlans = logicalRows.filter((node) => node.objectType === "vlan");
-      const subnets = logicalRows.filter((node) => node.objectType === "subnet");
-      vlans.forEach((vlan, index) => set(vlan, 240 + (index % 2) * 340, 430 + Math.floor(index / 2) * 92));
-      subnets.forEach((subnet, index) => set(subnet, 240 + (index % 2) * 340, 466 + Math.floor(index / 2) * 92));
+    if (mode === "physical") {
+      set(site, 560, 190);
+      set(wan, 910, 190);
+      setDeviceRow(site, 560, 360, 170);
+      if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, 560, 455);
+      return { nodes: [...byId.values()], edges };
     }
+
+    set(routeDomain, 560, 95);
+    set(site, 560, 210);
+    setDeviceRow(site, 560, 335, 170);
+    const logicalRows = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
+    const vlans = logicalRows.filter((node) => node.objectType === "vlan");
+    const subnets = logicalRows.filter((node) => node.objectType === "subnet");
+    const columnX = [230, 560, 890];
+    vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 500 + Math.floor(index / columnX.length) * 94));
+    subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 538 + Math.floor(index / columnX.length) * 94));
     return { nodes: [...byId.values()], edges };
   }
 
   if (scope === "wan-cloud") {
-    set(routeDomain, 760, 80);
-    set(wan, 760, 280);
+    set(wan, 720, 250);
     if (hq) {
-      set(hq, 760, 470);
-      setChildren(hq, 760, 470);
+      set(hq, 720, 455);
+      setDeviceRow(hq, 720, 575, 160);
     }
-    const columns = Math.max(1, Math.min(5, branches.length));
+    const branchCount = Math.max(1, branches.length);
+    const radiusX = Math.max(320, 210 + branchCount * 70);
     branches.forEach((site, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      const x = 220 + column * 280;
-      const y = 720 + row * 220;
+      const angle = branchCount === 1 ? Math.PI / 2 : Math.PI * (0.18 + (0.64 * index) / Math.max(branchCount - 1, 1));
+      const x = 720 + Math.cos(angle) * radiusX;
+      const y = 540 + Math.sin(angle) * 310;
       set(site, x, y);
-      setChildren(site, x, y);
+      setDeviceRow(site, x, y + 112, 130);
     });
     return { nodes: [...byId.values()], edges };
   }
 
   if (mode === "logical") {
-    set(routeDomain, 760, 80);
-    const columns = Math.max(1, Math.min(4, orderedSites.length));
+    set(routeDomain, 760, 85);
+    const columns = Math.max(1, Math.min(3, orderedSites.length));
     orderedSites.forEach((site, index) => {
       const column = index % columns;
       const row = Math.floor(index / columns);
-      const x = 240 + column * 390;
-      const y = 240 + row * 720;
+      const x = 250 + column * 520;
+      const y = 235 + row * 830;
       set(site, x, y);
-      const devices = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
-      devices.slice(0, 2).forEach((device, deviceIndex) => set(device, x - 70 + deviceIndex * 140, y + 96));
+      setDeviceRow(site, x, y + 115, 150);
       const vlans = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "vlan");
       const subnets = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "subnet");
-      vlans.forEach((vlan, vlanIndex) => set(vlan, x - 125 + (vlanIndex % 2) * 250, y + 190 + Math.floor(vlanIndex / 2) * 88));
-      subnets.forEach((subnet, subnetIndex) => set(subnet, x - 125 + (subnetIndex % 2) * 250, y + 224 + Math.floor(subnetIndex / 2) * 88));
+      vlans.forEach((vlan, vlanIndex) => set(vlan, x - 155 + (vlanIndex % 2) * 310, y + 230 + Math.floor(vlanIndex / 2) * 96));
+      subnets.forEach((subnet, subnetIndex) => set(subnet, x - 155 + (subnetIndex % 2) * 310, y + 268 + Math.floor(subnetIndex / 2) * 96));
     });
     return { nodes: [...byId.values()], edges };
   }
 
-  set(routeDomain, 760, 70);
-  set(wan, 760, 300);
+  // Physical global: hub/WAN view with a clean branch fan-out. Route-domain nodes are intentionally hidden in physical mode.
+  set(wan, 760, 260);
   if (hq) {
-    set(hq, 760, 200);
-    setChildren(hq, 760, 200);
+    set(hq, 760, 430);
+    setDeviceRow(hq, 760, 540, 160);
+    if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(hq, 760, 630);
   }
-  const columns = Math.max(1, Math.min(4, branches.length));
+  const branchCount = Math.max(1, branches.length);
+  const columns = Math.max(1, Math.min(4, branchCount));
+  const startX = 260;
+  const gapX = 340;
   branches.forEach((site, index) => {
     const column = index % columns;
     const row = Math.floor(index / columns);
-    const x = 240 + column * 360;
-    const y = 570 + row * 260;
+    const x = startX + column * gapX;
+    const y = 760 + row * 250;
     set(site, x, y);
-    setChildren(site, x, y);
+    setDeviceRow(site, x, y + 100, 130);
+    if (shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, x, y + 160);
   });
   return { nodes: [...byId.values()], edges };
 }
+
 
 function backendDiagramTextFill() {
   return "#1f3148";
@@ -466,13 +500,13 @@ function calculateCanvasBounds(nodes: BackendDiagramRenderNode[]): CanvasBounds 
   const minY = Math.min(...nodes.map((node) => node.y), 0);
   const maxX = Math.max(...nodes.map((node) => node.x), 1600);
   const maxY = Math.max(...nodes.map((node) => node.y), 900);
-  const paddingLeft = 240;
-  const paddingTop = 180;
-  const paddingRight = 440;
-  const paddingBottom = 300;
+  const paddingLeft = 260;
+  const paddingTop = 170;
+  const paddingRight = 520;
+  const paddingBottom = 360;
   return {
-    width: Math.max(1800, maxX - minX + paddingLeft + paddingRight),
-    height: Math.max(1050, maxY - minY + paddingTop + paddingBottom),
+    width: Math.max(1900, maxX - minX + paddingLeft + paddingRight),
+    height: Math.max(1120, maxY - minY + paddingTop + paddingBottom),
     offsetX: paddingLeft - minX,
     offsetY: paddingTop - minY,
   };
@@ -505,16 +539,16 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
   const prepared = useMemo(() => buildVisibleDiagram(renderModel, mode, scope, focusedSiteId, activeOverlays), [renderModel, mode, scope, focusedSiteId, activeOverlays]);
   const visibleNodes = prepared.nodes;
   const visibleEdges = prepared.edges;
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(visibleNodes[0]?.id ?? renderModel.nodes[0]?.id ?? "");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (visibleNodes.length > 0 && !visibleNodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(visibleNodes[0].id);
+    if (selectedNodeId && !visibleNodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(null);
     }
   }, [selectedNodeId, visibleNodes]);
 
   const nodeById = useMemo(() => new Map(visibleNodes.map((node) => [node.id, node])), [visibleNodes]);
-  const selectedNode = nodeById.get(selectedNodeId) ?? visibleNodes[0];
+  const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const canvasBounds = useMemo(() => calculateCanvasBounds(visibleNodes), [visibleNodes]);
   const iconScale = automaticIconScale(visibleNodes.length, scope);
   const siteCount = visibleNodes.filter((node) => node.objectType === "site").length;
@@ -579,7 +613,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               const count = edgeLabelCounts.get(edge.label) ?? 0;
               const seen = labelSeen.get(edge.label) ?? 0;
               labelSeen.set(edge.label, seen + 1);
-              const shouldShowLabel = linkAnnotationMode === "full" && (count <= 2 || seen === 0 || scope === "site") && !(mode === "physical" && count > 3);
+              const shouldShowLabel = linkAnnotationMode === "full" && scope !== "wan-cloud" && (scope === "site" || scope === "boundaries" || count <= 1) && !(mode === "physical" && scope === "global");
               return (
                 <g key={edge.id} className={`backend-diagram-edge backend-diagram-edge-${edge.readiness}`}>
                   <path d={path} fill="none" stroke="#ffffff" strokeWidth={edge.readiness === "blocked" ? 7 : 5} strokeLinecap="round" strokeLinejoin="round" opacity="0.92" />
@@ -626,7 +660,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>
                   {selectedNode.relatedFindingIds.length === 0
                     ? selectedNode.readiness === "blocked"
-                      ? "This object is blocked by implementation readiness or safety evidence, not because the design object is missing."
+                      ? "Execution is blocked by missing implementation safety evidence. The diagram object itself is still usable for design review."
                       : "No visible blocker is attached to this topology object."
                     : `${selectedNode.relatedFindingIds.length} engineering review item(s) are attached to this object.`}
                 </p>
@@ -637,12 +671,28 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>No notes provided for this topology object.</p>
                 ) : (
                   <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
-                    {selectedNode.notes.slice(0, 5).map((note) => <li key={note}>{cleanCanvasNote(note, 150)}</li>)}
+                    {selectedNode.notes.slice(0, 4).map((note) => <li key={note}>{cleanCanvasNote(note, 130)}</li>)}
                   </ul>
                 )}
               </div>
             </>
-          ) : null}
+          ) : (
+            <>
+              <div>
+                <p className="workspace-detail-kicker">Canvas summary</p>
+                <h3 style={{ margin: "0 0 8px 0" }}>{mode === "physical" ? "Physical topology" : "Logical topology"}</h3>
+                <p className="muted" style={{ margin: 0 }}>Select a site, device, VLAN, subnet, zone, or policy object to inspect design evidence and execution readiness.</p>
+              </div>
+              <div>
+                <strong>Visible scope</strong>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>{siteCount} site(s), {deviceCount} device object(s), {visibleEdges.length} relationship(s), {hiddenProofCount} hidden proof object(s).</p>
+              </div>
+              <div>
+                <strong>Mode discipline</strong>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>Physical, logical, WAN/cloud, and security views use different placement rules instead of reusing the legacy graph fallback.</p>
+              </div>
+            </>
+          )}
         </aside>
       </div>
     </div>

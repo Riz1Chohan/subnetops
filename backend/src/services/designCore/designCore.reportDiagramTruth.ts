@@ -742,7 +742,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       groupCount: groups.length,
       overlayCount: overlays.length,
       backendAuthored: true,
-      layoutMode: "professional-scope-mode-layout",
+      layoutMode: "professional-usability-polish-layout",
     },
     nodes: renderNodes,
     edges: renderEdges,
