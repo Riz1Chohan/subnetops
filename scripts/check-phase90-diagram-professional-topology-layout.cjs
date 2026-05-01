@@ -30,14 +30,14 @@ assert(backendTypes.includes('"professional-topology-layout"'), 'backend render 
 assert(frontendTypes.includes('"professional-topology-layout"'), 'frontend render model type does not support professional topology layout');
 
 assert(truth.includes('buildProfessionalTopologyRenderModel'), 'backend lacks professional topology render model builder');
-assert(truth.includes('layoutMode: "professional-topology-layout"') || truth.includes('layoutMode: "professional-view-separated-layout"'), 'backend render model does not declare professional topology or later view-separated layout');
+assert(truth.includes('layoutMode: "professional-topology-layout"') || truth.includes('layoutMode: "professional-view-separated-layout"') || truth.includes('layoutMode: "professional-scope-mode-layout"'), 'backend render model does not declare professional topology or later view-separated layout');
 assert(truth.includes('render-edge-hub-spoke'), 'backend render model does not create hub-spoke topology edges');
 assert(truth.includes('render-dhcp-summary'), 'backend render model does not collapse DHCP pools into readable site summaries');
 assert(truth.includes('render-wan-internet-edge'), 'backend render model does not create a clear WAN/Internet edge node');
 assert(!truth.includes('const graphNodes = networkObjectModel.designGraph.nodes.slice(0, 260);'), 'backend still uses raw graph-node slice as the primary diagram model');
 
 assert(canvas.includes('Authoritative topology canvas'), 'frontend canvas still uses backend/debug title');
-assert(canvas.includes('professional topology object(s)'), 'frontend canvas does not explain professional topology object filtering');
+assert(canvas.includes('object(s) and') || canvas.includes('professional topology object(s)'), 'frontend canvas does not explain topology object filtering');
 assert(canvas.includes('cleanCanvasLabel'), 'frontend canvas lacks label cleanup for raw ids');
 assert(canvas.includes('Topology object'), 'frontend sidebar still exposes backend object language');
 assert(!canvas.includes('<strong>Object ID</strong>'), 'frontend sidebar still exposes raw object IDs by default');

@@ -43,7 +43,7 @@ assert(!report.includes('title: "Phase 83 Requirement Propagation Completion Aud
 assert(!report.includes('title: "Phase 84 Design Trust and Policy Reconciliation"'), 'default professional report still has Phase 84 heading');
 assert(exportService.includes('reportMode: ProfessionalReportMode = "professional"'), 'export service lacks default professional report mode');
 assert(exportController.includes('parseReportMode') && exportController.includes('req.query.reportMode'), 'export controller does not expose reportMode query support');
-assert(canvas.includes('visibleEdgesForView') && canvas.includes('visibleIds.add(edge.sourceNodeId)') && canvas.includes('backendOverlayKeysForActiveOverlays'), 'diagram canvas does not preserve visible connected edges/endpoints');
+assert((canvas.includes('visibleEdgesForView') && canvas.includes('visibleIds.add(edge.sourceNodeId)') && canvas.includes('backendOverlayKeysForActiveOverlays')) || (canvas.includes('buildVisibleDiagram') && canvas.includes('visibleIds.add(source.id)') && canvas.includes('visibleIds.add(target.id)')), 'diagram canvas does not preserve visible connected edges/endpoints');
 assert(!canvas.includes('Phase 80 default hides'), 'diagram canvas still exposes internal phase wording');
 assert(!frontendVm.includes('Phase 84 readiness split'), 'frontend summary still exposes internal phase wording');
 assert(docs.includes('PHASE_87_READINESS_POLICY_WARNING_REPORT_DIAGRAM_STABILIZATION'), 'Phase 87 doc marker missing');

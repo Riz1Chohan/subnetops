@@ -419,6 +419,7 @@ export function ProjectDiagramPage() {
                     renderModel={diagramTruth.renderModel}
                     mode={mode}
                     scope={scope}
+                    focusedSiteId={activeSiteId}
                     activeOverlays={activeOverlays}
                     linkAnnotationMode={linkAnnotationMode}
                   />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BackendDiagramRenderEdge, BackendDiagramRenderModel, BackendDiagramRenderNode } from "../../../lib/designCoreSnapshot";
 import { truthBadgeClass } from "../../../lib/reportDiagramTruth";
 import type { ActiveOverlayMode, DiagramMode, DiagramScope, LinkAnnotationMode } from "../diagramTypes";
@@ -8,14 +8,18 @@ interface BackendDiagramCanvasProps {
   renderModel: BackendDiagramRenderModel;
   mode: DiagramMode;
   scope: DiagramScope;
+  focusedSiteId?: string;
   activeOverlays: ActiveOverlayMode[];
   linkAnnotationMode: LinkAnnotationMode;
 }
 
 type CanvasBounds = { width: number; height: number; offsetX: number; offsetY: number };
+type PreparedDiagram = { nodes: BackendDiagramRenderNode[]; edges: BackendDiagramRenderEdge[] };
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
   if (node.objectType === "site") return "Site";
+  if (node.objectType === "vlan") return "VLAN";
+  if (node.objectType === "subnet") return "Subnet";
   if (node.objectType === "network-device") {
     if (/firewall/i.test(node.label)) return "Firewall";
     if (/core|gateway|router/i.test(node.label)) return "Gateway";
@@ -41,139 +45,285 @@ function cleanCanvasLabel(value: string, max = 28) {
   return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
 }
 
-function cleanCanvasNote(value: string, max = 140) {
+function cleanCanvasNote(value: string, max = 150) {
   const cleaned = value
     .replace(/\bPhase\s+\d+\s+models\b/gi, "The current planning model uses")
     .replace(/\bFuture phases\b/gi, "Future versions")
     .replace(/\bbackend\b/gi, "design model")
     .replace(/\bdesign-core\b/gi, "design model")
+    .replace(/\bfinding reference\(s\)/gi, "review item")
+    .replace(/\btechnical proof model\b/gi, "engineering review model")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
   return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
 }
 
-function selectedOverlaySet(activeOverlays: ActiveOverlayMode[]) {
-  return new Set(activeOverlays.map((item) => String(item)));
+function isWanEdge(node: BackendDiagramRenderNode) {
+  return node.objectType === "security-zone" && /wan|internet|cloud|wide area/i.test(`${node.label} ${node.notes.join(" ")}`);
 }
 
-function explicitlyRequestsSecurity(activeOverlays: ActiveOverlayMode[]) {
-  return activeOverlays.includes("security") || activeOverlays.includes("flows");
+function isSecurityObject(node: BackendDiagramRenderNode) {
+  return node.objectType === "security-zone" || node.objectType === "policy-rule" || node.objectType === "security-flow" || node.objectType === "nat-rule";
+}
+
+function isGatewayDevice(node: BackendDiagramRenderNode) {
+  return node.objectType === "network-device" && /gateway|router|firewall|core|edge/i.test(`${node.label} ${node.notes.join(" ")}`);
+}
+
+function isExternalAnchor(node: BackendDiagramRenderNode) {
+  return isWanEdge(node) || node.objectType === "route-domain";
+}
+
+function siteCodeFromLabel(label: string) {
+  const clean = label.replace(/—.*/, "").replace(/\(.*/, "").trim();
+  if (/hq/i.test(label)) return "HQ";
+  const match = clean.match(/\bS\d+\b/i) || label.match(/\bSite\s*(\d+)\b/i);
+  return match ? (match[0].toUpperCase().startsWith("S") ? match[0].toUpperCase() : `S${match[1]}`) : clean.slice(0, 8);
+}
+
+function siteRank(node: BackendDiagramRenderNode) {
+  const label = node.label.toLowerCase();
+  if (label.includes("hq") || label.includes("head") || label.includes("primary")) return -1;
+  const match = label.match(/\b(?:site|s)\s*(\d{1,2})\b/);
+  return match ? Number(match[1]) : 999;
+}
+
+function selectedOverlaySet(activeOverlays: ActiveOverlayMode[]) {
+  return new Set(activeOverlays.map((item) => String(item)));
 }
 
 function explicitlyRequestsAddressing(activeOverlays: ActiveOverlayMode[]) {
   return activeOverlays.includes("addressing") || activeOverlays.includes("services");
 }
 
-function backendOverlayKeysForActiveOverlays(activeOverlays: ActiveOverlayMode[]) {
-  const keys = new Set<string>();
-  for (const overlay of activeOverlays) {
-    if (overlay === "addressing") keys.add("addressing");
-    if (overlay === "security" || overlay === "flows") {
-      keys.add("security");
-      keys.add("nat");
-    }
-    if (overlay === "services") {
-      // Services is a summary layer, not permission to flood the physical canvas with policy objects.
-      keys.add("addressing");
-    }
-    if (overlay === "redundancy") keys.add("routing");
-  }
-  return keys;
+function explicitlyRequestsSecurity(activeOverlays: ActiveOverlayMode[]) {
+  return activeOverlays.includes("security") || activeOverlays.includes("flows");
 }
 
-function edgeVisibleForView(edge: BackendDiagramRenderEdge, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
-  const securityRequested = explicitlyRequestsSecurity(activeOverlays);
-  const addressingRequested = explicitlyRequestsAddressing(activeOverlays);
-
+function nodeAllowedByScope(node: BackendDiagramRenderNode, scope: DiagramScope, focusedSiteId?: string) {
+  if (scope === "site") {
+    return Boolean(focusedSiteId && node.siteId === focusedSiteId) || isExternalAnchor(node);
+  }
+  if (scope === "wan-cloud") {
+    return node.objectType === "site" || isGatewayDevice(node) || node.objectType === "route-domain" || isWanEdge(node);
+  }
   if (scope === "boundaries") {
-    return edge.overlayKeys.some((key) => key === "security" || key === "nat");
+    return isSecurityObject(node) && !(/voice/i.test(node.label) && node.notes.every((note) => /no|zero|not/i.test(note)));
   }
-
-  if (mode === "physical") {
-    const isSiteDeviceEdge = edge.relationship === "site-contains-device";
-    const isPhysicalTransportEdge = edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge/i.test(edge.label);
-    const isDhcpSummaryEdge = addressingRequested && /DHCP scope summary/i.test(edge.label);
-    const isExplicitSecurityEdge = securityRequested && edge.overlayKeys.includes("security");
-    return isSiteDeviceEdge || isPhysicalTransportEdge || isDhcpSummaryEdge || isExplicitSecurityEdge;
-  }
-
-  if (activeOverlays.length > 0) {
-    const overlays = backendOverlayKeysForActiveOverlays(activeOverlays);
-    return edge.overlayKeys.some((key) => overlays.has(key));
-  }
-
-  if (scope === "wan-cloud") return edge.overlayKeys.some((key) => key === "routing" || key === "nat") || /wan|transit|cloud|route|internet/i.test(edge.label);
-  return edge.overlayKeys.some((key) => key === "routing" || key === "addressing");
+  return true;
 }
 
-function nodeVisibleByDefault(node: BackendDiagramRenderNode, mode: DiagramMode, scope: DiagramScope) {
-  const isWanEdge = node.objectType === "security-zone" && /wan|internet|cloud|transit/i.test(node.label);
+function nodeAllowedByView(node: BackendDiagramRenderNode, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
+  const overlays = selectedOverlaySet(activeOverlays);
+  const wantsAddressing = explicitlyRequestsAddressing(activeOverlays);
+  const wantsSecurity = explicitlyRequestsSecurity(activeOverlays);
 
   if (scope === "boundaries") {
-    return node.objectType === "security-zone"
-      || node.objectType === "policy-rule"
-      || node.objectType === "security-flow";
+    return isSecurityObject(node);
   }
 
   if (scope === "wan-cloud") {
-    return node.objectType === "site"
-      || node.objectType === "network-device"
-      || node.objectType === "route-domain"
-      || isWanEdge;
+    return node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node) || node.objectType === "route-domain";
   }
 
   if (mode === "physical") {
-    return node.objectType === "site"
-      || node.objectType === "network-device"
-      || isWanEdge;
+    if (node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node)) return true;
+    if (node.objectType === "dhcp-pool" && overlays.has("services")) return true;
+    if (wantsSecurity && isSecurityObject(node)) return true;
+    return false;
   }
 
-  return node.objectType === "site"
-    || node.objectType === "network-device"
-    || node.objectType === "route-domain";
+  if (mode === "logical") {
+    if (node.objectType === "site" || node.objectType === "vlan" || node.objectType === "subnet" || node.objectType === "route-domain") return true;
+    if (isGatewayDevice(node)) return true;
+    if (node.objectType === "dhcp-pool" && wantsAddressing) return true;
+    if (wantsSecurity && isSecurityObject(node)) return true;
+    return false;
+  }
+
+  return true;
 }
 
-function nodeVisibleForOverlays(node: BackendDiagramRenderNode, activeOverlays: ActiveOverlayMode[]) {
-  if (activeOverlays.length === 0) return false;
-  const overlays = selectedOverlaySet(activeOverlays);
-  if (overlays.has("addressing")) return node.layer === "site" || node.layer === "device" || node.layer === "interface" || node.objectType === "dhcp-pool";
-  if (overlays.has("security")) return node.layer === "security" || node.objectType === "policy-rule" || node.objectType === "security-zone";
-  if (overlays.has("flows")) return node.objectType === "security-flow" || node.objectType === "segmentation-flow" || node.objectType === "policy-rule" || node.layer === "security";
-  if (overlays.has("services")) {
-    return node.objectType === "site"
-      || node.objectType === "network-device"
-      || node.objectType === "dhcp-pool"
-      || (node.layer !== "security" && /service|server|cloud|remote|operations|dhcp/i.test(node.label));
+function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
+  const wantsAddressing = explicitlyRequestsAddressing(activeOverlays);
+  const wantsSecurity = explicitlyRequestsSecurity(activeOverlays);
+
+  if (scope === "boundaries") {
+    return edge.relationship === "security-zone-applies-policy"
+      || edge.relationship === "security-flow-covered-by-policy"
+      || edge.relationship === "security-zone-initiates-security-flow"
+      || edge.relationship === "security-flow-targets-security-zone"
+      || edge.relationship === "nat-rule-translates-zone";
   }
-  if (overlays.has("redundancy")) return node.layer === "routing" || node.layer === "device" || node.objectType === "site";
+
+  if (scope === "wan-cloud") {
+    return edge.overlayKeys.includes("routing") || edge.overlayKeys.includes("nat") || /wan|internet|cloud|site-to-site|summary/i.test(edge.label);
+  }
+
+  if (mode === "physical") {
+    if (edge.relationship === "site-contains-device") return true;
+    if (edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge|routing domain/i.test(edge.label)) return true;
+    if (wantsAddressing && edge.relationship === "dhcp-pool-serves-subnet") return true;
+    if (wantsSecurity && edge.overlayKeys.includes("security") && edge.relationship !== "security-zone-protects-subnet") return true;
+    return false;
+  }
+
+  if (mode === "logical") {
+    if (edge.relationship === "site-contains-vlan" || edge.relationship === "vlan-uses-subnet" || edge.relationship === "interface-belongs-to-route-domain") return true;
+    if (edge.relationship === "site-contains-device") return true;
+    if (edge.overlayKeys.includes("routing") && /routing domain|site-to-site|summary/i.test(edge.label)) return true;
+    if (wantsAddressing && edge.relationship === "dhcp-pool-serves-subnet") return true;
+    if (wantsSecurity && edge.overlayKeys.includes("security") && edge.relationship !== "security-zone-protects-subnet") return true;
+    return false;
+  }
+
   return false;
 }
 
-function visibleEdgesForView(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
-  const edges = renderModel.edges.filter((edge) => edgeVisibleForView(edge, mode, scope, activeOverlays));
-  if (edges.length > 0) return edges;
-
-  if (mode === "physical") {
-    return renderModel.edges.filter((edge) => edge.relationship === "site-contains-device" || /site-to-site|WAN edge path|internet\/security edge/i.test(edge.label));
-  }
-
-  const fallbackEdges = renderModel.edges.filter((edge) => edge.overlayKeys.includes("routing") || edge.overlayKeys.includes("addressing"));
-  return fallbackEdges.length > 0 ? fallbackEdges : [];
+function edgeAllowedByScope(edge: BackendDiagramRenderEdge, source: BackendDiagramRenderNode, target: BackendDiagramRenderNode, scope: DiagramScope, focusedSiteId?: string) {
+  if (scope !== "site") return true;
+  const sourceInSite = Boolean(focusedSiteId && source.siteId === focusedSiteId);
+  const targetInSite = Boolean(focusedSiteId && target.siteId === focusedSiteId);
+  const sourceAnchor = isExternalAnchor(source);
+  const targetAnchor = isExternalAnchor(target);
+  return (sourceInSite && (targetInSite || targetAnchor)) || (targetInSite && (sourceInSite || sourceAnchor));
 }
 
-function visibleNodeSet(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, activeOverlays: ActiveOverlayMode[]) {
-  const baseNodes = renderModel.nodes.filter((node) => nodeVisibleByDefault(node, mode, scope) || nodeVisibleForOverlays(node, activeOverlays));
-  const visibleIds = new Set(baseNodes.map((node) => node.id));
+function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: DiagramMode, scope: DiagramScope, focusedSiteId: string | undefined, activeOverlays: ActiveOverlayMode[]): PreparedDiagram {
+  const nodeById = new Map(renderModel.nodes.map((node) => [node.id, node]));
+  const baseIds = new Set<string>();
 
-  for (const edge of visibleEdgesForView(renderModel, mode, scope, activeOverlays)) {
-    visibleIds.add(edge.sourceNodeId);
-    visibleIds.add(edge.targetNodeId);
+  for (const node of renderModel.nodes) {
+    if (nodeAllowedByScope(node, scope, focusedSiteId) && nodeAllowedByView(node, mode, scope, activeOverlays)) {
+      baseIds.add(node.id);
+    }
   }
 
-  const visible = renderModel.nodes.filter((node) => visibleIds.has(node.id));
-  const professionalLimit = activeOverlays.length > 0 || scope === "boundaries" ? 120 : 80;
-  return (visible.length > 0 ? visible : renderModel.nodes).slice(0, professionalLimit);
+  const candidateEdges = renderModel.edges.filter((edge) => {
+    const source = nodeById.get(edge.sourceNodeId);
+    const target = nodeById.get(edge.targetNodeId);
+    if (!source || !target) return false;
+    return edgeAllowedByView(edge, mode, scope, activeOverlays) && edgeAllowedByScope(edge, source, target, scope, focusedSiteId);
+  });
+
+  const visibleIds = new Set(baseIds);
+  for (const edge of candidateEdges) {
+    const source = nodeById.get(edge.sourceNodeId);
+    const target = nodeById.get(edge.targetNodeId);
+    if (!source || !target) continue;
+    if (nodeAllowedByScope(source, scope, focusedSiteId) && nodeAllowedByView(source, mode, scope, activeOverlays)) visibleIds.add(source.id);
+    if (nodeAllowedByScope(target, scope, focusedSiteId) && nodeAllowedByView(target, mode, scope, activeOverlays)) visibleIds.add(target.id);
+    if (isExternalAnchor(source) && scope !== "boundaries") visibleIds.add(source.id);
+    if (isExternalAnchor(target) && scope !== "boundaries") visibleIds.add(target.id);
+  }
+
+  const nodes = renderModel.nodes.filter((node) => visibleIds.has(node.id));
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = candidateEdges.filter((edge) => nodeIds.has(edge.sourceNodeId) && nodeIds.has(edge.targetNodeId));
+  const limit = scope === "boundaries" ? 90 : mode === "logical" ? 120 : 80;
+  return layoutNodesForView({ nodes: nodes.slice(0, limit), edges, mode, scope, focusedSiteId, activeOverlays });
+}
+
+function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope: DiagramScope; focusedSiteId?: string; activeOverlays: ActiveOverlayMode[] }): PreparedDiagram {
+  const { nodes, edges, mode, scope } = params;
+  const byId = new Map(nodes.map((node) => [node.id, { ...node }]));
+  const orderedSites = nodes.filter((node) => node.objectType === "site").sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
+  const hq = orderedSites.find((site) => /hq|head|primary/i.test(site.label)) ?? orderedSites[0];
+  const branches = orderedSites.filter((site) => site.id !== hq?.id);
+  const routeDomain = nodes.find((node) => node.objectType === "route-domain");
+  const wan = nodes.find(isWanEdge);
+  const set = (node: BackendDiagramRenderNode | undefined, x: number, y: number) => {
+    if (!node) return;
+    const current = byId.get(node.id);
+    if (current) byId.set(node.id, { ...current, x, y });
+  };
+  const setChildren = (site: BackendDiagramRenderNode, startX: number, startY: number) => {
+    const siteDevices = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
+    siteDevices.forEach((device, index) => set(device, startX + (index - (siteDevices.length - 1) / 2) * 116, startY + 108));
+    const dhcp = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "dhcp-pool");
+    dhcp.forEach((node, index) => set(node, startX + 150, startY + 104 + index * 68));
+  };
+
+  if (scope === "boundaries") {
+    const zones = nodes.filter((node) => node.objectType === "security-zone").sort((a, b) => a.label.localeCompare(b.label));
+    const policies = nodes.filter((node) => node.objectType === "policy-rule" || node.objectType === "security-flow").sort((a, b) => a.label.localeCompare(b.label));
+    zones.forEach((zone, index) => set(zone, 360, 170 + index * 118));
+    policies.forEach((policy, index) => set(policy, 880, 150 + index * 86));
+    if (wan) set(wan, 130, 220);
+    return { nodes: [...byId.values()], edges };
+  }
+
+  if (scope === "site") {
+    const site = orderedSites.find((candidate) => candidate.siteId === params.focusedSiteId) ?? orderedSites[0];
+    set(routeDomain, 520, 80);
+    set(site, 520, 220);
+    setChildren(site, 520, 220);
+    set(wan, 880, 360);
+    if (mode === "logical") {
+      const logicalRows = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
+      const vlans = logicalRows.filter((node) => node.objectType === "vlan");
+      const subnets = logicalRows.filter((node) => node.objectType === "subnet");
+      vlans.forEach((vlan, index) => set(vlan, 240 + (index % 2) * 340, 430 + Math.floor(index / 2) * 92));
+      subnets.forEach((subnet, index) => set(subnet, 240 + (index % 2) * 340, 466 + Math.floor(index / 2) * 92));
+    }
+    return { nodes: [...byId.values()], edges };
+  }
+
+  if (scope === "wan-cloud") {
+    set(routeDomain, 760, 80);
+    set(wan, 760, 280);
+    if (hq) {
+      set(hq, 760, 470);
+      setChildren(hq, 760, 470);
+    }
+    const columns = Math.max(1, Math.min(5, branches.length));
+    branches.forEach((site, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = 220 + column * 280;
+      const y = 720 + row * 220;
+      set(site, x, y);
+      setChildren(site, x, y);
+    });
+    return { nodes: [...byId.values()], edges };
+  }
+
+  if (mode === "logical") {
+    set(routeDomain, 760, 80);
+    const columns = Math.max(1, Math.min(4, orderedSites.length));
+    orderedSites.forEach((site, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = 240 + column * 390;
+      const y = 240 + row * 720;
+      set(site, x, y);
+      const devices = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "network-device");
+      devices.slice(0, 2).forEach((device, deviceIndex) => set(device, x - 70 + deviceIndex * 140, y + 96));
+      const vlans = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "vlan");
+      const subnets = nodes.filter((node) => node.siteId === site.siteId && node.objectType === "subnet");
+      vlans.forEach((vlan, vlanIndex) => set(vlan, x - 125 + (vlanIndex % 2) * 250, y + 190 + Math.floor(vlanIndex / 2) * 88));
+      subnets.forEach((subnet, subnetIndex) => set(subnet, x - 125 + (subnetIndex % 2) * 250, y + 224 + Math.floor(subnetIndex / 2) * 88));
+    });
+    return { nodes: [...byId.values()], edges };
+  }
+
+  set(routeDomain, 760, 70);
+  set(wan, 760, 300);
+  if (hq) {
+    set(hq, 760, 200);
+    setChildren(hq, 760, 200);
+  }
+  const columns = Math.max(1, Math.min(4, branches.length));
+  branches.forEach((site, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = 240 + column * 360;
+    const y = 570 + row * 260;
+    set(site, x, y);
+    setChildren(site, x, y);
+  });
+  return { nodes: [...byId.values()], edges };
 }
 
 function backendDiagramTextFill() {
@@ -191,11 +341,12 @@ function readinessStroke(readiness: BackendDiagramRenderNode["readiness"] | Back
   return "#64748b";
 }
 
-function automaticIconScale(nodeCount: number) {
+function automaticIconScale(nodeCount: number, scope: DiagramScope) {
+  if (scope === "site") return 0.72;
   if (nodeCount > 90) return 0.42;
   if (nodeCount > 60) return 0.48;
   if (nodeCount > 36) return 0.56;
-  return 0.64;
+  return 0.66;
 }
 
 function professionalDeviceKind(node: BackendDiagramRenderNode): DeviceKind | null {
@@ -245,7 +396,7 @@ function backendArrowForReadiness(readiness: BackendDiagramRenderEdge["readiness
 
 function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: number) {
   const stroke = readinessStroke(node.readiness);
-  const strokeWidth = selected ? 3 : node.readiness === "blocked" ? 2.4 : 1.8;
+  const strokeWidth = selected ? 3 : node.readiness === "blocked" ? 2.2 : 1.7;
   const common = {
     fill: "#ffffff",
     stroke,
@@ -255,39 +406,43 @@ function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: num
   };
 
   if (node.objectType === "site") {
-    const width = 128 * Math.max(scale, 0.58);
-    const height = 64 * Math.max(scale, 0.58);
-    return <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={16} fill="#ffffff" stroke={stroke} strokeWidth={strokeWidth} opacity="0.94" />;
+    const width = 138 * Math.max(scale, 0.62);
+    const height = 66 * Math.max(scale, 0.62);
+    return <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={16} fill="#ffffff" stroke={stroke} strokeWidth={strokeWidth} opacity="0.96" />;
   }
 
-  if (node.objectType === "policy-rule") {
-    return <path d="M 0 -30 L 40 0 L 0 30 L -40 0 Z" {...common} />;
+  if (node.objectType === "vlan" || node.objectType === "subnet" || node.objectType === "dhcp-pool") {
+    const width = node.objectType === "subnet" ? 150 : 158;
+    const height = 42;
+    return <rect x={-(width * scale) / 2} y={-(height * scale) / 2} width={width * scale} height={height * scale} rx={10 * scale} fill={node.objectType === "subnet" ? "#f8fbff" : "#ffffff"} stroke={stroke} strokeWidth={strokeWidth} opacity="0.98" />;
+  }
+
+  if (node.objectType === "policy-rule" || node.objectType === "security-flow") {
+    return <path d="M 0 -30 L 44 0 L 0 30 L -44 0 Z" {...common} />;
   }
 
   if (node.objectType === "security-zone") {
-    return <rect x={-52 * scale} y={-28 * scale} width={104 * scale} height={56 * scale} rx={18 * scale} fill="#fffaf0" stroke={stroke} strokeWidth={strokeWidth} />;
+    return <rect x={-76 * scale} y={-32 * scale} width={152 * scale} height={64 * scale} rx={18 * scale} fill="#fffaf0" stroke={stroke} strokeWidth={strokeWidth} />;
   }
 
-  return <circle r={30 * Math.max(scale, 0.58)} {...common} />;
+  return <circle r={31 * Math.max(scale, 0.6)} {...common} />;
 }
 
 function renderNodeVisual(node: BackendDiagramRenderNode, selected: boolean, scale: number) {
   const kind = professionalDeviceKind(node);
-  const titleY = kind ? 48 * scale : node.objectType === "site" ? 4 : 6;
-  const statusY = titleY + 15;
-  const labelMax = node.objectType === "site" ? 24 : 22;
+  const labelMax = node.objectType === "site" ? 26 : node.objectType === "subnet" ? 24 : 23;
 
   if (kind) {
     const iconX = -58 * scale;
     const iconY = -35 * scale;
     return (
       <>
-        {selected ? <circle r={54 * scale} fill="none" stroke={readinessStroke(node.readiness)} strokeWidth="2.5" opacity="0.7" /> : null}
+        {selected ? <circle r={56 * scale} fill="none" stroke={readinessStroke(node.readiness)} strokeWidth="2.5" opacity="0.7" /> : null}
         <g transform={`translate(${iconX}, ${iconY}) scale(${scale})`} filter={selected ? "url(#backend-diagram-device-shadow)" : undefined}>
           <DeviceIcon x={0} y={0} kind={kind} label="" showSublabel={false} emphasized />
         </g>
-        <text textAnchor="middle" y={titleY} fontSize={Math.max(10, 12 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
-        <text textAnchor="middle" y={statusY} fontSize={Math.max(8, 9.5 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)} • {node.readiness}</text>
+        <text textAnchor="middle" y={49 * scale} fontSize={Math.max(11, 12.5 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
+        <text textAnchor="middle" y={64 * scale} fontSize={Math.max(9, 9.5 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)}</text>
       </>
     );
   }
@@ -295,9 +450,9 @@ function renderNodeVisual(node: BackendDiagramRenderNode, selected: boolean, sca
   return (
     <>
       {nodeShape(node, selected, scale)}
-      <text textAnchor="middle" y={node.objectType === "site" ? -6 : -5} fontSize={Math.max(8, 10 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)}</text>
-      <text textAnchor="middle" y={node.objectType === "site" ? 10 : 10} fontSize={Math.max(9, 11 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
-      <text textAnchor="middle" y={node.objectType === "site" ? 25 : 24} fontSize={Math.max(8, 9 * scale)} fill={backendDiagramMutedFill()}>{node.readiness}</text>
+      <text textAnchor="middle" y={node.objectType === "site" ? -7 : -4} fontSize={Math.max(8, 9.8 * scale)} fill={backendDiagramMutedFill()}>{professionalNodeKind(node)}</text>
+      <text textAnchor="middle" y={node.objectType === "site" ? 10 : 10} fontSize={Math.max(10, 11.5 * scale)} fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, labelMax)}</text>
+      {node.objectType === "site" || node.objectType === "security-zone" ? <text textAnchor="middle" y={node.objectType === "site" ? 26 : 25} fontSize={Math.max(8, 8.8 * scale)} fill={backendDiagramMutedFill()}>{node.truthState}</text> : null}
     </>
   );
 }
@@ -313,28 +468,64 @@ function calculateCanvasBounds(nodes: BackendDiagramRenderNode[]): CanvasBounds 
   const maxY = Math.max(...nodes.map((node) => node.y), 900);
   const paddingLeft = 240;
   const paddingTop = 180;
-  const paddingRight = 420;
-  const paddingBottom = 260;
+  const paddingRight = 440;
+  const paddingBottom = 300;
   return {
-    width: Math.max(2400, maxX - minX + paddingLeft + paddingRight),
-    height: Math.max(1400, maxY - minY + paddingTop + paddingBottom),
+    width: Math.max(1800, maxX - minX + paddingLeft + paddingRight),
+    height: Math.max(1050, maxY - minY + paddingTop + paddingBottom),
     offsetX: paddingLeft - minX,
     offsetY: paddingTop - minY,
   };
 }
 
-export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays, linkAnnotationMode }: BackendDiagramCanvasProps) {
-  const visibleNodes = useMemo(() => visibleNodeSet(renderModel, mode, scope, activeOverlays), [renderModel, mode, scope, activeOverlays]);
+function sourceLabel(sourceEngine: BackendDiagramRenderNode["sourceEngine"]) {
+  if (sourceEngine === "object-model") return "Planning model";
+  if (sourceEngine === "routing") return "Routing model";
+  if (sourceEngine === "security") return "Security model";
+  if (sourceEngine === "implementation") return "Implementation model";
+  return "Design model";
+}
+
+function executionReadinessText(readiness: BackendDiagramRenderNode["readiness"]) {
+  if (readiness === "blocked") return "Implementation blocked";
+  if (readiness === "review") return "Review required";
+  if (readiness === "ready") return "Ready for review";
+  return "Unknown";
+}
+
+function edgePath(sourcePoint: { x: number; y: number }, targetPoint: { x: number; y: number }, scope: DiagramScope) {
+  const midX = (sourcePoint.x + targetPoint.x) / 2;
+  if (scope === "boundaries") {
+    return `M ${sourcePoint.x} ${sourcePoint.y} C ${midX} ${sourcePoint.y}, ${midX} ${targetPoint.y}, ${targetPoint.x} ${targetPoint.y}`;
+  }
+  return `M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`;
+}
+
+export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, activeOverlays, linkAnnotationMode }: BackendDiagramCanvasProps) {
+  const prepared = useMemo(() => buildVisibleDiagram(renderModel, mode, scope, focusedSiteId, activeOverlays), [renderModel, mode, scope, focusedSiteId, activeOverlays]);
+  const visibleNodes = prepared.nodes;
+  const visibleEdges = prepared.edges;
   const [selectedNodeId, setSelectedNodeId] = useState<string>(visibleNodes[0]?.id ?? renderModel.nodes[0]?.id ?? "");
-  const visibleNodeIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes]);
+
+  useEffect(() => {
+    if (visibleNodes.length > 0 && !visibleNodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(visibleNodes[0].id);
+    }
+  }, [selectedNodeId, visibleNodes]);
+
   const nodeById = useMemo(() => new Map(visibleNodes.map((node) => [node.id, node])), [visibleNodes]);
   const selectedNode = nodeById.get(selectedNodeId) ?? visibleNodes[0];
-  const visibleEdges = useMemo(
-    () => visibleEdgesForView(renderModel, mode, scope, activeOverlays).filter((edge) => visibleNodeIds.has(edge.sourceNodeId) && visibleNodeIds.has(edge.targetNodeId)),
-    [renderModel, mode, scope, activeOverlays, visibleNodeIds],
-  );
   const canvasBounds = useMemo(() => calculateCanvasBounds(visibleNodes), [visibleNodes]);
-  const iconScale = automaticIconScale(visibleNodes.length);
+  const iconScale = automaticIconScale(visibleNodes.length, scope);
+  const siteCount = visibleNodes.filter((node) => node.objectType === "site").length;
+  const deviceCount = visibleNodes.filter((node) => node.objectType === "network-device").length;
+  const hiddenProofCount = Math.max(0, renderModel.summary.nodeCount - visibleNodes.length);
+  const edgeLabelCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const edge of visibleEdges) counts.set(edge.label, (counts.get(edge.label) ?? 0) + 1);
+    return counts;
+  }, [visibleEdges]);
+  const labelSeen = new Map<string, number>();
 
   if (renderModel.emptyState || renderModel.nodes.length === 0) {
     return (
@@ -358,14 +549,14 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
         <div>
           <strong>Authoritative topology canvas</strong>
           <p className="muted" style={{ margin: "6px 0 0 0" }}>
-            Showing {visibleNodes.length} professional topology object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {scope}; layout: {renderModel.summary.layoutMode}. Canvas expands with topology size; detailed proof, implementation, and verification objects stay hidden unless an overlay asks for them.
+            Showing {visibleNodes.length} object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {scope}; layout: {renderModel.summary.layoutMode}. Canvas expands with topology size. The canvas is mode-specific: physical, logical, WAN/cloud, and security views use separate filtering and placement rules.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Authoritative model</span>
-          <span className="badge-soft">Groups {renderModel.summary.groupCount}</span>
-          <span className="badge-soft">Overlays {renderModel.summary.overlayCount}</span>
-          <span className="badge-soft">Icon scale {Math.round(iconScale * 100)}%</span>
+          <span className="badge-soft">Sites shown {siteCount}</span>
+          <span className="badge-soft">Devices {deviceCount}</span>
+          <span className="badge-soft">Links {visibleEdges.length}</span>
+          <span className="badge-soft">Hidden proof objects {hiddenProofCount}</span>
         </div>
       </div>
 
@@ -382,32 +573,19 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
               const sourcePoint = nodePoint(source, canvasBounds);
               const targetPoint = nodePoint(target, canvasBounds);
               const midX = (sourcePoint.x + targetPoint.x) / 2;
-              const bendY = Math.abs(sourcePoint.y - targetPoint.y) < 80 ? sourcePoint.y - 48 : (sourcePoint.y + targetPoint.y) / 2;
+              const midY = (sourcePoint.y + targetPoint.y) / 2;
               const stroke = readinessStroke(edge.readiness);
+              const path = edgePath(sourcePoint, targetPoint, scope);
+              const count = edgeLabelCounts.get(edge.label) ?? 0;
+              const seen = labelSeen.get(edge.label) ?? 0;
+              labelSeen.set(edge.label, seen + 1);
+              const shouldShowLabel = linkAnnotationMode === "full" && (count <= 2 || seen === 0 || scope === "site") && !(mode === "physical" && count > 3);
               return (
                 <g key={edge.id} className={`backend-diagram-edge backend-diagram-edge-${edge.readiness}`}>
-                  <path
-                    d={`M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`}
-                    fill="none"
-                    stroke="#ffffff"
-                    strokeWidth={edge.readiness === "blocked" ? 7 : 5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity="0.92"
-                  />
-                  <path
-                    d={`M ${sourcePoint.x} ${sourcePoint.y} L ${midX} ${sourcePoint.y} L ${midX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`}
-                    fill="none"
-                    stroke={stroke}
-                    strokeWidth={edge.readiness === "blocked" ? 3 : 2.2}
-                    strokeDasharray={edge.readiness === "unknown" ? "6 6" : undefined}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    markerEnd={backendArrowForReadiness(edge.readiness)}
-                    opacity={edge.readiness === "unknown" ? 0.48 : 0.76}
-                  />
-                  {linkAnnotationMode === "full" ? (
-                    <text x={midX + 8} y={bendY - 8} fontSize="11" fill={backendDiagramTextFill()}>{cleanCanvasLabel(edge.label, 34)}</text>
+                  <path d={path} fill="none" stroke="#ffffff" strokeWidth={edge.readiness === "blocked" ? 7 : 5} strokeLinecap="round" strokeLinejoin="round" opacity="0.92" />
+                  <path d={path} fill="none" stroke={stroke} strokeWidth={edge.readiness === "blocked" ? 3 : 2.2} strokeDasharray={edge.readiness === "unknown" ? "6 6" : undefined} strokeLinecap="round" strokeLinejoin="round" markerEnd={backendArrowForReadiness(edge.readiness)} opacity={edge.readiness === "unknown" ? 0.48 : 0.76} />
+                  {shouldShowLabel ? (
+                    <text x={midX + 8} y={midY - 8} fontSize="11" fill={backendDiagramTextFill()}>{cleanCanvasLabel(edge.label, 34)}</text>
                   ) : null}
                 </g>
               );
@@ -431,23 +609,26 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
                 <p className="workspace-detail-kicker">Topology object</p>
                 <h3 style={{ margin: "0 0 8px 0" }}>{cleanCanvasLabel(selectedNode.label, 56)}</h3>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className={truthBadgeClass(selectedNode.readiness)}>{selectedNode.readiness}</span>
                   <span className="badge-soft">{professionalNodeKind(selectedNode)}</span>
-                  <span className="badge-soft">{selectedNode.sourceEngine.replace(/-/g, " ")}</span>
+                  <span className="badge-soft">{sourceLabel(selectedNode.sourceEngine)}</span>
                 </div>
               </div>
               <div>
-                <strong>Truth state</strong>
+                <strong>Design evidence</strong>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>{selectedNode.truthState}</p>
+              </div>
+              <div>
+                <strong>Execution readiness</strong>
+                <p style={{ margin: "6px 0 0 0" }}><span className={truthBadgeClass(selectedNode.readiness)}>{executionReadinessText(selectedNode.readiness)}</span></p>
               </div>
               <div>
                 <strong>Review signal</strong>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>
                   {selectedNode.relatedFindingIds.length === 0
                     ? selectedNode.readiness === "blocked"
-                      ? "This object is blocked by implementation readiness or safety dependency evidence, not by a graph-integrity finding."
-                      : "No blocking or review finding is attached to this visible topology object."
-                    : `${selectedNode.relatedFindingIds.length} finding reference(s) are attached in the technical proof model.`}
+                      ? "This object is blocked by implementation readiness or safety evidence, not because the design object is missing."
+                      : "No visible blocker is attached to this topology object."
+                    : `${selectedNode.relatedFindingIds.length} engineering review item(s) are attached to this object.`}
                 </p>
               </div>
               <div>
@@ -456,7 +637,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, activeOverlays,
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>No notes provided for this topology object.</p>
                 ) : (
                   <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
-                    {selectedNode.notes.slice(0, 5).map((note) => <li key={note}>{cleanCanvasNote(note, 140)}</li>)}
+                    {selectedNode.notes.slice(0, 5).map((note) => <li key={note}>{cleanCanvasNote(note, 150)}</li>)}
                   </ul>
                 )}
               </div>

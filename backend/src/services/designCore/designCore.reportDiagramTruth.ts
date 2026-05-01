@@ -385,6 +385,96 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
     }
   }
 
+  const logicalRowsBySite = new Map<string, { vlanNodeId: string; subnetNodeId?: string }[]>();
+  const subnetTargetByVlanNodeId = new Map<string, { id: string; objectId: string; label: string; siteId?: string; truthState: NetworkObjectTruthState; notes: string[] }>();
+  for (const graphEdge of networkObjectModel.designGraph.edges.filter((edge) => edge.relationship === "vlan-uses-subnet")) {
+    const targetNode = networkObjectModel.designGraph.nodes.find((node) => node.id === graphEdge.targetNodeId && node.objectType === "subnet");
+    if (!targetNode) continue;
+    subnetTargetByVlanNodeId.set(graphEdge.sourceNodeId, {
+      id: targetNode.id,
+      objectId: targetNode.objectId,
+      label: targetNode.label,
+      siteId: targetNode.siteId,
+      truthState: targetNode.truthState,
+      notes: targetNode.notes,
+    });
+  }
+
+  for (const graphNode of networkObjectModel.designGraph.nodes.filter((node) => node.objectType === "vlan" && node.siteId)) {
+    const site = sites.find((candidate) => candidate.siteId === graphNode.siteId);
+    if (!site) continue;
+    const point = sitePoints.get(site.siteId) ?? { x: 160 + renderNodes.length * 180, y: 500 };
+    const current = logicalRowsBySite.get(site.siteId) ?? [];
+    const rowIndex = current.length;
+    if (rowIndex >= 14) continue;
+    const safeVlanId = graphNode.objectId.replace(/[^a-z0-9_-]/gi, "-");
+    const vlanNodeId = `render-vlan-${safeVlanId}`;
+    const vlanLabel = cleanTopologyLabel(graphNode.label.replace(/^.*?\bVLAN\s+/i, "VLAN "));
+    addNode({
+      id: vlanNodeId,
+      objectId: graphNode.objectId,
+      objectType: "vlan",
+      label: vlanLabel,
+      groupId: `site:${site.siteId}`,
+      siteId: site.siteId,
+      layer: "site",
+      readiness: "ready",
+      truthState: graphNode.truthState,
+      x: point.x - 170 + (rowIndex % 2) * 340,
+      y: point.y + 190 + Math.floor(rowIndex / 2) * 82,
+      sourceEngine: "object-model",
+      relatedFindingIds: [],
+      notes: graphNode.notes.map(cleanTopologyLabel).slice(0, 3),
+    });
+    addEdge({
+      id: `render-edge-site-vlan-${safeVlanId}`,
+      relationship: "site-contains-vlan",
+      sourceNodeId: `render-site-${site.siteId}`,
+      targetNodeId: vlanNodeId,
+      label: "VLAN membership",
+      readiness: "ready",
+      overlayKeys: ["addressing"],
+      relatedObjectIds: [site.siteId, graphNode.objectId],
+      notes: ["Logical VLAN membership evidence for site-level diagram mode."],
+    });
+
+    const subnet = subnetTargetByVlanNodeId.get(graphNode.id);
+    let subnetNodeId: string | undefined;
+    if (subnet) {
+      const safeSubnetId = subnet.objectId.replace(/[^a-z0-9_-]/gi, "-");
+      subnetNodeId = `render-subnet-${safeSubnetId}`;
+      addNode({
+        id: subnetNodeId,
+        objectId: subnet.objectId,
+        objectType: "subnet",
+        label: cleanTopologyLabel(subnet.label),
+        groupId: `site:${site.siteId}`,
+        siteId: site.siteId,
+        layer: "interface",
+        readiness: "ready",
+        truthState: subnet.truthState,
+        x: point.x - 170 + (rowIndex % 2) * 340,
+        y: point.y + 225 + Math.floor(rowIndex / 2) * 82,
+        sourceEngine: "object-model",
+        relatedFindingIds: [],
+        notes: subnet.notes.map(cleanTopologyLabel).slice(0, 3),
+      });
+      addEdge({
+        id: `render-edge-vlan-subnet-${safeVlanId}`,
+        relationship: "vlan-uses-subnet",
+        sourceNodeId: vlanNodeId,
+        targetNodeId: subnetNodeId,
+        label: "subnet",
+        readiness: "ready",
+        overlayKeys: ["addressing"],
+        relatedObjectIds: [graphNode.objectId, subnet.objectId],
+        notes: ["Logical VLAN-to-subnet binding from the authoritative addressing model."],
+      });
+    }
+    current.push({ vlanNodeId, subnetNodeId });
+    logicalRowsBySite.set(site.siteId, current);
+  }
+
   const devicesBySite = new Map<string, NetworkObjectModel["devices"]>();
   for (const device of networkObjectModel.devices) {
     const current = devicesBySite.get(device.siteId) ?? [];
@@ -652,7 +742,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
       groupCount: groups.length,
       overlayCount: overlays.length,
       backendAuthored: true,
-      layoutMode: "professional-view-separated-layout",
+      layoutMode: "professional-scope-mode-layout",
     },
     nodes: renderNodes,
     edges: renderEdges,

@@ -16,12 +16,12 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE92-DIAGRAM-VIEW-SEPARATION-LAYOUT-INTELLIGENCE.md');
 
 assert(runtime.includes('diagramViewSeparationLayout: "PHASE_92_DIAGRAM_VIEW_SEPARATION_LAYOUT_INTELLIGENCE"'), 'runtime Phase 92 marker missing');
-assert(runtime.includes('version: "0.92.0"'), 'runtime version not advanced to 0.92.0');
-assert(pkg.includes('"version": "0.92.0"'), 'root package version not advanced to 0.92.0');
+assert(/version: \"0\.(9[2-9]|[1-9][0-9]{2,})\.0\"/.test(runtime), 'runtime version not advanced to Phase 92 or later');
+assert(/\"version\": \"0\.(9[2-9]|[1-9][0-9]{2,})\.0\"/.test(pkg), 'root package version not advanced to Phase 92 or later');
 assert(pkg.includes('check:phase92-diagram-view-separation-layout-intelligence'), 'Phase 92 package script missing');
 assert(pkg.includes('check:phase84-92-release'), 'Phase 84-92 aggregate script missing');
 
-assert(backendDiagram.includes('professional-view-separated-layout'), 'backend render model did not advance to view-separated layout mode');
+assert(backendDiagram.includes('professional-view-separated-layout') || backendDiagram.includes('professional-scope-mode-layout'), 'backend render model did not advance to view-separated or later scope/mode layout');
 assert(backendTypes.includes('"professional-view-separated-layout"'), 'backend render type does not allow Phase 92 layout mode');
 assert(frontendSnapshot.includes('"professional-view-separated-layout"'), 'frontend snapshot type does not allow Phase 92 layout mode');
 assert(backendDiagram.includes('!\/voice\/i.test(zone.name) || zone.subnetCidrs.length > 0 || zone.vlanIds.length > 0'), 'inactive voice zone filter missing');
@@ -29,11 +29,11 @@ assert(backendDiagram.includes('The current planning model uses'), 'internal pha
 
 assert(canvas.includes('explicitlyRequestsSecurity'), 'canvas lacks explicit security overlay gate');
 assert(canvas.includes('explicitlyRequestsAddressing'), 'canvas lacks explicit addressing/services overlay gate');
-assert(canvas.includes('Services is a summary layer, not permission to flood the physical canvas with policy objects.'), 'services overlay still risks pulling security policy objects into physical view');
+assert(canvas.includes('nodeAllowedByView') || canvas.includes('Services is a summary layer'), 'services/security view separation logic missing');
 assert(canvas.includes('mode === "physical"'), 'physical-view separation logic missing');
 assert(canvas.includes('edge.relationship === "site-contains-device"'), 'physical view no longer guarantees site-device edges');
-assert(canvas.includes('site-to-site|WAN edge path|internet\\/security edge'), 'physical transport edge filter missing');
-assert(canvas.includes('node.layer !== "security" && /service|server|cloud|remote|operations|dhcp/i.test(node.label)'), 'services overlay may still include security-zone labels like Voice Services');
+assert(canvas.includes('site-to-site|WAN edge path|internet\\/security edge') || canvas.includes('site-to-site|WAN edge path|internet\\/security edge|routing domain'), 'physical transport edge filter missing');
+assert(canvas.includes('scope === "boundaries"') && canvas.includes('node.objectType === "dhcp-pool" && overlays.has("services")'), 'services overlay and security boundary separation missing');
 assert(canvas.includes('cleanCanvasNote'), 'sidebar note sanitization missing');
 assert(!canvas.includes('Phase 27 models'), 'known internal phase wording is still hard-coded in canvas');
 
