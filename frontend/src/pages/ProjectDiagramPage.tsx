@@ -425,5 +425,4 @@ export function ProjectDiagramPage() {
       </details>
     </section>
   );
-  );
 }

@@ -14,9 +14,9 @@ const page = read('frontend/src/pages/ProjectDiagramPage.tsx');
 const pkg = read('package.json');
 const docs = read('docs/doc/PHASE94-DIAGRAM-USABILITY-STALE-LAYOUT-CLEANUP.md');
 
-assert(runtime.includes('version: "0.94.0"'), 'runtime version not advanced to 0.94.0');
+assert(/version: "0\.(94|95)\.0"/.test(runtime), 'runtime version not compatible with Phase 94 or later');
 assert(runtime.includes('diagramUsabilityStaleLayoutCleanup: "PHASE_94_DIAGRAM_USABILITY_STALE_LAYOUT_CLEANUP"'), 'runtime Phase 94 marker missing');
-assert(pkg.includes('"version": "0.94.0"'), 'root package version not advanced to 0.94.0');
+assert(/"version": "0\.(94|95)\.0"/.test(pkg), 'root package version not compatible with Phase 94 or later');
 assert(pkg.includes('check:phase94-diagram-usability-stale-layout-cleanup'), 'Phase 94 package script missing');
 assert(pkg.includes('check:phase84-94-release'), 'Phase 84-94 aggregate script missing');
 

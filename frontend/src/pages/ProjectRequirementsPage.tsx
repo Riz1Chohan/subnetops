@@ -1402,6 +1402,9 @@ export function ProjectRequirementsPage() {
   const currentStep = stepDefinitions[currentStepIndex] ?? stepDefinitions[0];
   const previousStep = currentStepIndex > 0 ? stepDefinitions[currentStepIndex - 1] : null;
   const nextStep = currentStepIndex < stepDefinitions.length - 1 ? stepDefinitions[currentStepIndex + 1] : null;
+  const requirementsLoadErrorMessage = projectQuery.error instanceof Error
+    ? projectQuery.error.message
+    : "SubnetOps could not load the requirements workspace right now.";
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading requirements" message="Preparing the requirements workspace for this project." />;
@@ -1411,7 +1414,7 @@ export function ProjectRequirementsPage() {
     return (
       <ErrorState
         title="Unable to load requirements"
-        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load the requirements workspace right now."}
+        message={requirementsLoadErrorMessage}
         action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
       />
     );
