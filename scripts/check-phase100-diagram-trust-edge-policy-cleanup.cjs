@@ -16,10 +16,10 @@ const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts')
 const canvas = read('frontend/src/features/diagram/components/BackendDiagramCanvas.tsx');
 const doc = read('docs/doc/PHASE100-DIAGRAM-TRUST-EDGE-POLICY-CLEANUP.md');
 
-assert(/^0\.(100|101|102|103|104|105|106|1[1-9][0-9])\.0$/.test(pkg.version), 'root package version must be 0.100.0 or later Phase 100 compatible version');
+assert(/^0\.(100|101|102|103|104|105|106|107|1[1-9][0-9])\.0$/.test(pkg.version), 'root package version must be 0.100.0 or later Phase 100 compatible version');
 assert(pkg.scripts['check:phase100-diagram-trust-edge-policy-cleanup'], 'Phase 100 script missing');
 assert(pkg.scripts['check:phase84-100-release'], 'Phase 84-100 release chain missing');
-assert(/version: \"0\.(100|101|102|103|104|105|106|1[1-9][0-9])\.0\"/.test(runtime), 'runtime version not advanced to 0.100.0 or later');
+assert(/version: \"0\.(100|101|102|103|104|105|106|107|1[1-9][0-9])\.0\"/.test(runtime), 'runtime version not advanced to 0.100.0 or later');
 assert(runtime.includes('diagramTrustEdgePolicyCleanup: "PHASE_100_DIAGRAM_TRUST_EDGE_POLICY_CLEANUP"'), 'Phase 100 runtime marker missing');
 assert(canvas.includes('Phase 100: diagram trust pass removes raw database relationship labels'), 'Phase 100 canvas marker missing');
 assert(canvas.includes('deny/block/isolate language wins before allow/approved language'), 'deny precedence policy classification guard missing');
@@ -27,12 +27,12 @@ assert(canvas.indexOf('\\bdeny\\b') < canvas.indexOf('\\ballow\\b'), 'deny class
 assert(canvas.includes('return scope === "boundaries";'), 'route domain must be kept out of regular topology canvases');
 assert(canvas.includes('return false;\n}'), 'DHCP fake-device suppression must be present');
 assert(canvas.includes('Raw model edges like summary/route-domain relationships are not professional topology links'), 'WAN raw-edge filter missing');
-assert(canvas.includes('edges.filter((edge) => edgeSemanticKind(edge) === "security-policy")') || canvas.includes('const result: BackendDiagramRenderEdge[] = (mode === "physical" || scope === "wan-cloud") ? [] : [...edges];'), 'physical/WAN raw relationship edge drop missing');
+assert(canvas.includes('edges.filter((edge) => edgeSemanticKind(edge) === "security-policy")') || canvas.includes('const result: BackendDiagramRenderEdge[] = (mode === "physical" || scope === "wan-cloud"'), 'physical/WAN raw relationship edge drop missing');
 assert(canvas.includes('if (node.objectType === "site" && (mode === "physical" || scope === "wan-cloud")) return null;'), 'site bubble suppression missing');
 assert(canvas.includes('noisyRelationshipLabel'), 'raw relationship label suppression missing');
 assert(canvas.includes('IPsec VPN tunnel to HQ'), 'explicit HQ VPN tunnel connector missing');
 assert(canvas.includes('firewall-to-core handoff'), 'edge/core handoff connector missing');
-assert(canvas.includes('Physical and WAN views show sites as containers'), 'Phase 100 user-facing topology copy missing');
+assert(canvas.includes('Each diagram mode uses its own layout contract') || canvas.includes('Physical and WAN views show sites as containers'), 'Phase 100 user-facing topology copy missing');
 assert(doc.includes('PHASE_100_DIAGRAM_TRUST_EDGE_POLICY_CLEANUP'), 'Phase 100 documentation marker missing');
 
 console.log('Phase 100 diagram trust, edge semantics, and policy cleanup checks passed.');
