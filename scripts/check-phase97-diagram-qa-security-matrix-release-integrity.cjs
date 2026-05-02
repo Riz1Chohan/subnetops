@@ -16,9 +16,9 @@ const pkg = read("package.json");
 const canvas = read("frontend/src/features/diagram/components/BackendDiagramCanvas.tsx");
 const doc = read("docs/doc/PHASE97-DIAGRAM-QA-SECURITY-MATRIX-RELEASE-INTEGRITY.md");
 
-assert(runtime.includes('version: "0.98.0"') || runtime.includes('version: "0.97.0"'), "runtime version must include Phase 97 or later");
+assert(/version: "0\.(9[7-9]|[1-9][0-9]{2,})\.0"/.test(runtime), "runtime version must include Phase 97 or later");
 assert(runtime.includes('diagramQaSecurityMatrixReleaseIntegrity: "PHASE_97_DIAGRAM_QA_SECURITY_MATRIX_RELEASE_INTEGRITY"'), "Phase 97 runtime marker missing");
-assert(pkg.includes('"version": "0.98.0"') || pkg.includes('"version": "0.97.0"'), "root package version must include Phase 97 or later");
+assert(/"version": "0\.(9[7-9]|[1-9][0-9]{2,})\.0"/.test(pkg), "root package version must include Phase 97 or later");
 assert(pkg.includes('"check:phase97-diagram-qa-security-matrix-release-integrity"'), "Phase 97 package script missing");
 assert(pkg.includes('"check:phase84-97-release"'), "Phase 84-97 release chain missing");
 
