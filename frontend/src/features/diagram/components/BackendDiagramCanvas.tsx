@@ -25,6 +25,7 @@ type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 // Phase 101: view-discipline pass locks physical views to physical edge/core objects only, makes firewall/VPN edge termination explicit, fixes underlay vs overlay styling, compacts the policy matrix, and keeps VLAN/subnet detail inside logical views.
 // Phase 102: edge-path truth makes security/VPN edge detection label-first, routes local ISP -> firewall/security edge -> core, and terminates branch VPN overlays on the HQ firewall when present.
 // Phase 103: enterprise-scale views collapse global 7+ site designs into summary cards/fabric layouts, reserve VLAN detail for per-site logical review, and stop WAN tunnels from becoming unreadable spaghetti.
+// Phase 104: enterprise WAN polish keeps Physical / Global free of overlay tunnels, renders WAN as vertical branch stubs into a shared fabric rail, prevents site-card overlap, and restores subnet detail in Logical / Per-site by default.
 // Compatibility truth from Phase 99: Physical and WAN views separate local Internet underlay from VPN overlay and internal site handoffs.
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
@@ -338,6 +339,7 @@ function siteRank(node: BackendDiagramRenderNode) {
 const PHASE103_ENTERPRISE_SITE_THRESHOLD = 7;
 const PHASE103_SITE_SUMMARY_MARKER = "PHASE_103_SITE_SUMMARY_CARD";
 const PHASE103_VPN_FABRIC_ID = "phase103-ipsec-vpn-overlay-fabric";
+const PHASE104_ENTERPRISE_WAN_FABRIC_POLISH = "PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH";
 
 function phase103SiteNodes(nodes: BackendDiagramRenderNode[]) {
   return nodes
@@ -389,6 +391,7 @@ function phase103ReadinessSummary(site: BackendDiagramRenderNode, allNodes: Back
 }
 
 function phase103WithSiteSummary(site: BackendDiagramRenderNode, allNodes: BackendDiagramRenderNode[]): BackendDiagramRenderNode {
+  void PHASE104_ENTERPRISE_WAN_FABRIC_POLISH;
   const vlans = phase103SiteMembers(allNodes, site, "vlan");
   const subnets = phase103SiteMembers(allNodes, site, "subnet");
   const segments = vlans.map(phase103SegmentName).filter(Boolean);
@@ -425,7 +428,10 @@ function isPhase103VpnFabric(node: BackendDiagramRenderNode) {
 }
 
 function addPhase103VpnFabric(nodes: BackendDiagramRenderNode[], mode: DiagramMode, scope: DiagramScope) {
-  if (scope === "site" || scope === "boundaries" || (mode !== "physical" && scope !== "wan-cloud")) return nodes;
+  void mode;
+  // Phase 104: only the WAN / Cloud view owns the enterprise overlay fabric.
+  // Physical / Global must stay a physical equipment-and-site view, not a tunnel overlay drawing.
+  if (scope !== "wan-cloud") return nodes;
   if (!isPhase103EnterpriseScale(nodes) || nodes.some(isPhase103VpnFabric)) return nodes;
   const hq = phase103SiteNodes(nodes).find((site) => /hq|head|primary/i.test(site.label)) ?? phase103SiteNodes(nodes)[0];
   const fabricNode: BackendDiagramRenderNode = {
@@ -501,8 +507,9 @@ function nodeAllowedByView(node: BackendDiagramRenderNode, mode: DiagramMode, sc
 
   if (mode === "logical") {
     if (node.objectType === "site" || node.objectType === "vlan" || node.objectType === "route-domain") return true;
-    // Subnet rows are detail density. They show when IP/addressing detail is explicitly requested.
-    if (node.objectType === "subnet" && wantsAddressing) return true;
+    // Phase 104: Logical / Per-site is the detailed engineering board. Subnets must appear by default there.
+    // Logical / Global remains summary-first for large enterprise projects.
+    if (node.objectType === "subnet" && (scope === "site" || wantsAddressing)) return true;
     if (isGatewayDevice(node)) return true;
     if (wantsSecurity && isSecurityObject(node)) return true;
     return false;
@@ -539,7 +546,7 @@ function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, sc
 
   if (mode === "logical") {
     if (edge.relationship === "site-contains-vlan") return true;
-    if (wantsAddressing && edge.relationship === "vlan-uses-subnet") return true;
+    if ((scope === "site" || wantsAddressing) && edge.relationship === "vlan-uses-subnet") return true;
     if (edge.relationship === "site-contains-device") return true;
     if (wantsSecurity && edge.overlayKeys.includes("security") && edge.relationship !== "security-zone-protects-subnet") return true;
     return false;
@@ -658,7 +665,8 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
       // not as nine or more long diagonals into the HQ edge. Smaller projects keep direct tunnel labels.
       if (vpnFabric) {
         add(branchEdge, vpnFabric, "IPsec VPN overlay fabric", "review");
-      } else {
+      } else if (!(mode === "physical" && scope === "global" && isPhase103EnterpriseScale(nodes))) {
+        // Phase 104: large Physical / Global suppresses cross-site tunnel overlays entirely; WAN / Cloud owns that view.
         add(branchEdge, hqEdge, "IPsec VPN tunnel to HQ", "review");
       }
     });
@@ -815,7 +823,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
     branches.forEach((site, index) => {
       const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 320 + (index % columns) * 390);
-      const y = enterprise ? 820 + Math.floor(index / columns) * 315 : 700 + Math.floor(index / columns) * 255;
+      const y = enterprise ? 850 + Math.floor(index / columns) * 440 : 700 + Math.floor(index / columns) * 255;
       set(site, x, y);
       setLocalInternet(site, x - 95, y + 112);
       setEdgePair(site, x - 95, x + 95, y + 245);
@@ -866,7 +874,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
   branches.forEach((site, index) => {
     const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 260 + (index % columns) * 360);
-    const y = enterprise ? 780 + Math.floor(index / columns) * 305 : 675 + Math.floor(index / columns) * 265;
+    const y = enterprise ? 820 + Math.floor(index / columns) * 420 : 675 + Math.floor(index / columns) * 265;
     set(site, x, y);
     setLocalInternet(site, x - 85, y + 105);
     setEdgePair(site, x - 85, x + 95, y + 220);
@@ -1090,7 +1098,7 @@ function calculateCanvasBounds(nodes: BackendDiagramRenderNode[], mode: DiagramM
   const siteCount = phase103SiteNodes(nodes).length;
   const enterpriseRows = Math.max(1, Math.ceil(Math.max(siteCount - 1, 0) / 3));
   const minWidth = isMatrix ? 1180 : summaryBoard ? 1780 : enterprise ? 1580 : isLogical ? 1320 : scope === "wan-cloud" ? 1120 : 1080;
-  const minHeight = isMatrix ? 760 : summaryBoard ? 980 : enterprise && scope !== "site" ? Math.max(980, 720 + enterpriseRows * 300) : isLogical ? 820 : scope === "site" ? 720 : 700;
+  const minHeight = isMatrix ? 760 : summaryBoard ? 980 : enterprise && scope !== "site" ? Math.max(1100, 760 + enterpriseRows * 430) : isLogical ? 820 : scope === "site" ? 720 : 700;
   return {
     width: Math.max(minWidth, maxX - minX + paddingLeft + paddingRight),
     height: Math.max(minHeight, maxY - minY + paddingTop + paddingBottom),
@@ -1121,6 +1129,13 @@ function edgePath(sourcePoint: { x: number; y: number }, targetPoint: { x: numbe
     return `M ${sourcePoint.x} ${sourcePoint.y} L ${elbowX} ${sourcePoint.y} L ${elbowX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`;
   }
   if ((mode === "physical" || scope === "wan-cloud") && edge && edgeSemanticKind(edge) === "vpn-overlay") {
+    // Phase 104: branch tunnel edges to the enterprise fabric become clean vertical stubs.
+    // The horizontal shared rail is rendered once by the guide, instead of nine crossing polylines.
+    if (edge.sourceNodeId === PHASE103_VPN_FABRIC_ID || edge.targetNodeId === PHASE103_VPN_FABRIC_ID) {
+      const fabricPoint = edge.sourceNodeId === PHASE103_VPN_FABRIC_ID ? sourcePoint : targetPoint;
+      const endpoint = edge.sourceNodeId === PHASE103_VPN_FABRIC_ID ? targetPoint : sourcePoint;
+      return `M ${endpoint.x} ${endpoint.y} L ${endpoint.x} ${fabricPoint.y}`;
+    }
     const railY = Math.min(sourcePoint.y, targetPoint.y) - 118;
     return `M ${sourcePoint.x} ${sourcePoint.y} L ${sourcePoint.x} ${railY} L ${targetPoint.x} ${railY} L ${targetPoint.x} ${targetPoint.y}`;
   }
@@ -1192,9 +1207,9 @@ function phase97TopologyGuides(nodes: BackendDiagramRenderNode[], bounds: Canvas
         const point = nodePoint(vpnFabric, bounds);
         return (
           <g key="phase103-vpn-fabric-guide">
-            <rect x={point.x - 310} y={point.y - 38} width={620} height={76} rx={28} fill="#f4f7ff" stroke="#aebfec" strokeWidth="1.2" opacity="0.72" />
-            <line x1={point.x - 255} y1={point.y} x2={point.x + 255} y2={point.y} stroke="#4c6fc1" strokeWidth="2.4" strokeDasharray="9 7" strokeLinecap="round" opacity="0.62" />
-            <text x={point.x} y={point.y - 18} textAnchor="middle" fontSize="12" fontWeight={900} fill="#334f91">Enterprise VPN overlay fabric</text>
+            <rect x={180} y={point.y - 38} width={Math.max(620, bounds.width - 360)} height={76} rx={28} fill="#f4f7ff" stroke="#aebfec" strokeWidth="1.2" opacity="0.72" />
+            <line x1={230} y1={point.y} x2={bounds.width - 230} y2={point.y} stroke="#4c6fc1" strokeWidth="2.4" strokeDasharray="9 7" strokeLinecap="round" opacity="0.62" />
+            <text x={bounds.width / 2} y={point.y - 18} textAnchor="middle" fontSize="12" fontWeight={900} fill="#334f91">Enterprise VPN overlay fabric</text>
           </g>
         );
       })() : null}
@@ -1483,7 +1498,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
             <BackendDiagramCanvasDefs />
             <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="#fbfdff" />
             <rect x={0} y={0} width={canvasBounds.width} height={canvasBounds.height} rx={0} fill="url(#backend-diagram-grid-major)" opacity="0.82" />
-            {mode === "logical" ? phase97LogicalSiteGuides(visibleNodes, canvasBounds) : null}
+            {mode === "logical" && !visibleNodes.some(isPhase103SiteSummaryNode) ? phase97LogicalSiteGuides(visibleNodes, canvasBounds) : null}
             {phase99SiteContainers(visibleNodes, canvasBounds, mode, scope)}
             {(mode === "physical" || scope === "wan-cloud") ? phase97TopologyGuides(visibleNodes, canvasBounds, scope) : null}
             {phase101TopologyLegend(mode, scope)}
@@ -1503,8 +1518,10 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               const professionalEdgeKind = edgeSemanticKind(edge);
               const noisyRelationshipLabel = /vlan membership|site device|site core|site edge|dhcp scope summary|dhcp-pool-serves|vlan-uses-subnet|site-contains/i.test(`${edge.relationship} ${edge.label}`);
               // Legacy Phase 94 guard strings: scope !== "wan-cloud" and !(mode === "physical" && scope === "global").
+              const enterpriseView = isPhase103EnterpriseScale(visibleNodes);
               const shouldShowLabel = linkAnnotationMode === "full"
                 && !noisyRelationshipLabel
+                && !(enterpriseView && (scope === "wan-cloud" || mode === "physical") && count > 1)
                 && (professionalEdgeKind === "vpn-overlay" || professionalEdgeKind === "internet-underlay" || professionalEdgeKind === "internal-site")
                 && (scope === "site" || scope === "wan-cloud" || count <= 1);
               return (

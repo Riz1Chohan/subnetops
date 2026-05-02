@@ -26,7 +26,7 @@ assert(canvas.includes('canvasZoom: number'), 'canvas does not receive canvas zo
 assert(canvas.includes('compactLabels = labelMode === "essential" || canvasZoom < 0.75'), 'zoom/detail-aware compact labels missing');
 assert(canvas.includes('DHCP/services are shown only in focused site drawings') || canvas.includes('Site physical can expose local VLAN/service detail only on request'), 'global DHCP/service clutter guard missing');
 assert(canvas.includes('node.objectType === "dhcp-pool" && scope === "site"'), 'DHCP summaries are still allowed to pollute global physical/WAN views');
-assert(canvas.includes('node.objectType === "subnet" && wantsAddressing'), 'logical subnet detail is not gated by addressing intent');
+assert(canvas.includes('node.objectType === "subnet" && (scope === "site" || wantsAddressing)') || canvas.includes('node.objectType === "subnet" && wantsAddressing'), 'logical subnet detail must remain controlled outside focused per-site detail views');
 assert(canvas.includes('edge.relationship === "security-zone-applies-policy"'), 'security view does not limit to primary policy-map edges');
 assert(canvas.includes('policyColumn') || canvas.includes('policyActionColumn'), 'security/boundary policy columns missing');
 assert(canvas.includes('dedupeEdgesForReadableView'), 'edge dedupe for readable physical/WAN diagrams missing');
