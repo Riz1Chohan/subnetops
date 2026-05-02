@@ -124,6 +124,21 @@ export function ProjectDiagramPage() {
   const overlayCount = activeOverlays.length;
   const canvasFileBase = `${(project?.name || "project").replace(/\s+/g, "-").toLowerCase()}-${mode}-${scope}-${overlayCount ? activeOverlays.join("-") : "baseline"}-${activeSiteName.replace(/\s+/g, "-").toLowerCase()}`;
   const authoritativeRenderSiteCount = diagramTruth.renderModel?.groups.filter((group) => group.groupType === "site").length || enrichedProject?.sites.length || 1;
+  const isEnterpriseScaleDiagram = authoritativeRenderSiteCount >= 7;
+  const viewSpecificLayerItems = useMemo(() => {
+    if (scope === "boundaries") return [];
+    if (scope === "wan-cloud") return [];
+    if (mode === "physical") return [];
+    if (mode === "logical" && scope === "global" && isEnterpriseScaleDiagram) return [];
+    return layerItems;
+  }, [mode, scope, isEnterpriseScaleDiagram]);
+  const viewSpecificLayerNotice = useMemo(() => {
+    if (scope === "boundaries") return "Security view already shows policy actions and evidence. IP/service layers are hidden here.";
+    if (scope === "wan-cloud") return "WAN view focuses on transport, ISP underlay, and VPN overlay. Use link notes for tunnel labels.";
+    if (mode === "physical") return "Physical view is equipment and edge-path only. Open Logical / Per-site for VLAN, subnet, DHCP, and gateway detail.";
+    if (mode === "logical" && scope === "global" && isEnterpriseScaleDiagram) return "Large global logical view is summarized by site. Open Logical / Per-site for full VLAN/subnet details.";
+    return "";
+  }, [mode, scope, isEnterpriseScaleDiagram]);
   const estimatedSiteCount = scope === "site" ? 1 : authoritativeRenderSiteCount;
   const estimatedBranchRows = Math.max(1, Math.ceil(Math.max(estimatedSiteCount - 1, 0) / 2));
   const canvasViewportMinHeight = mode === "physical"
@@ -213,6 +228,11 @@ export function ProjectDiagramPage() {
     setLinkAnnotationMode("minimal");
     setFocusedSiteId(enrichedProject?.sites[0]?.id || "");
   };
+
+  useEffect(() => {
+    const allowedLayers = new Set(viewSpecificLayerItems.map((item) => item.key));
+    setActiveOverlays((current) => current.filter((item) => allowedLayers.has(item)));
+  }, [viewSpecificLayerItems]);
 
   useEffect(() => {
     const svg = getCanvasSvg();
@@ -331,7 +351,7 @@ export function ProjectDiagramPage() {
               <div className="diagram-advanced-panel-body">
                 <div className="diagram-control-section" style={{ paddingTop: 0 }}>
                   <div className="diagram-toggle-grid diagram-toggle-grid-stack">
-                    {layerItems.map((item) => (
+                    {viewSpecificLayerItems.length > 0 ? viewSpecificLayerItems.map((item) => (
                       <button
                         key={item.key}
                         type="button"
@@ -341,7 +361,9 @@ export function ProjectDiagramPage() {
                         <span>{item.label}</span>
                         <small>{activeOverlays.includes(item.key) ? "On" : "Off"}</small>
                       </button>
-                    ))}
+                    )) : (
+                      <p className="muted" style={{ margin: 0, fontSize: 12, lineHeight: 1.45 }}>{viewSpecificLayerNotice}</p>
+                    )}
                   </div>
                 </div>
               </div>

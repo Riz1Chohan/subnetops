@@ -24,6 +24,7 @@ type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 // Phase 100: diagram trust pass removes raw database relationship labels from professional topology views, keeps sites as containers, forces VPN tunnels onto edge devices, hides DHCP as a fake physical device, and classifies security rules by deny/review/allow action with deny precedence.
 // Phase 101: view-discipline pass locks physical views to physical edge/core objects only, makes firewall/VPN edge termination explicit, fixes underlay vs overlay styling, compacts the policy matrix, and keeps VLAN/subnet detail inside logical views.
 // Phase 102: edge-path truth makes security/VPN edge detection label-first, routes local ISP -> firewall/security edge -> core, and terminates branch VPN overlays on the HQ firewall when present.
+// Phase 103: enterprise-scale views collapse global 7+ site designs into summary cards/fabric layouts, reserve VLAN detail for per-site logical review, and stop WAN tunnels from becoming unreadable spaghetti.
 // Compatibility truth from Phase 99: Physical and WAN views separate local Internet underlay from VPN overlay and internal site handoffs.
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
@@ -98,7 +99,7 @@ function hasSecurityFirewallLabel(node: BackendDiagramRenderNode) {
 function hasExplicitWanVpnEdgeLabel(node: BackendDiagramRenderNode) {
   const label = deviceLabelText(node);
   return node.objectType === "network-device"
-    && /(wan|vpn|sd-wan|edge)/.test(label)
+    && /\b(wan|vpn|sd-wan|edge)\b/.test(label)
     && !/core|distribution|access|switch/.test(label);
 }
 
@@ -293,7 +294,7 @@ function addLocalInternetBreakouts(nodes: BackendDiagramRenderNode[], mode: Diag
     .filter((node) => node.objectType === "site" && (scope !== "site" || !focusedSiteId || node.siteId === focusedSiteId))
     .sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
   if (sites.length === 0) return nodes;
-  const withoutGlobalWan = nodes.filter((node) => !isWanEdge(node) || isPhase99LocalInternet(node));
+  const withoutGlobalWan = nodes.filter((node) => !isWanEdge(node) || isPhase99LocalInternet(node) || isPhase103VpnFabric(node));
   const existingIds = new Set(withoutGlobalWan.map((node) => node.id));
   const localBreakouts = sites
     .map((site) => createLocalInternetNode(site, template))
@@ -332,6 +333,120 @@ function siteRank(node: BackendDiagramRenderNode) {
   if (label.includes("hq") || label.includes("head") || label.includes("primary")) return -1;
   const match = label.match(/\b(?:site|s)\s*(\d{1,2})\b/);
   return match ? Number(match[1]) : 999;
+}
+
+const PHASE103_ENTERPRISE_SITE_THRESHOLD = 7;
+const PHASE103_SITE_SUMMARY_MARKER = "PHASE_103_SITE_SUMMARY_CARD";
+const PHASE103_VPN_FABRIC_ID = "phase103-ipsec-vpn-overlay-fabric";
+
+function phase103SiteNodes(nodes: BackendDiagramRenderNode[]) {
+  return nodes
+    .filter((node) => node.objectType === "site")
+    .sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+function isPhase103EnterpriseScale(nodes: BackendDiagramRenderNode[]) {
+  return phase103SiteNodes(nodes).length >= PHASE103_ENTERPRISE_SITE_THRESHOLD;
+}
+
+function phase103SiteMembers(nodes: BackendDiagramRenderNode[], site: BackendDiagramRenderNode, objectType?: BackendDiagramRenderNode["objectType"]) {
+  return nodes.filter((node) => {
+    if (node.id === site.id) return false;
+    if (objectType && node.objectType !== objectType) return false;
+    return node.siteId === site.siteId || nodeBelongsToSite(node, site);
+  });
+}
+
+function phase103CidrFromText(value: string) {
+  return value.match(/\b(?:\d{1,3}\.){3}\d{1,3}\/\d{1,2}\b/)?.[0];
+}
+
+function phase103InferSiteBlock(site: BackendDiagramRenderNode, allNodes: BackendDiagramRenderNode[]) {
+  const noteBlock = phase103CidrFromText(`${site.label} ${site.notes.join(" ")}`);
+  if (noteBlock) return noteBlock;
+  const subnetBlock = phase103SiteMembers(allNodes, site, "subnet")
+    .map((node) => phase103CidrFromText(`${node.label} ${node.notes.join(" ")}`))
+    .find(Boolean);
+  if (!subnetBlock) return "Address block pending";
+  const match = subnetBlock.match(/^(\d{1,3})\.(\d{1,3})\./);
+  return match ? `${match[1]}.${match[2]}.0.0/16` : subnetBlock;
+}
+
+function phase103SegmentName(node: BackendDiagramRenderNode) {
+  return fullCanvasLabel(node.label)
+    .replace(/^VLAN\s*\d+\s*/i, "")
+    .replace(/^segment\s*/i, "")
+    .trim();
+}
+
+function phase103ReadinessSummary(site: BackendDiagramRenderNode, allNodes: BackendDiagramRenderNode[]) {
+  const members = phase103SiteMembers(allNodes, site);
+  const blocked = members.filter((node) => node.readiness === "blocked").length;
+  const review = members.filter((node) => node.readiness === "review").length;
+  if (blocked > 0) return `${blocked} blocker${blocked === 1 ? "" : "s"}`;
+  if (review > 0) return `${review} review item${review === 1 ? "" : "s"}`;
+  return "Ready for design review";
+}
+
+function phase103WithSiteSummary(site: BackendDiagramRenderNode, allNodes: BackendDiagramRenderNode[]): BackendDiagramRenderNode {
+  const vlans = phase103SiteMembers(allNodes, site, "vlan");
+  const subnets = phase103SiteMembers(allNodes, site, "subnet");
+  const segments = vlans.map(phase103SegmentName).filter(Boolean);
+  const uniqueSegments = Array.from(new Set(segments)).slice(0, 5);
+  const siteBlock = phase103InferSiteBlock(site, allNodes);
+  const role = siteRank(site) < 0 ? "HQ / hub" : "Branch / spoke";
+  return {
+    ...site,
+    notes: [
+      PHASE103_SITE_SUMMARY_MARKER,
+      `Role: ${role}`,
+      `Site block: ${siteBlock}`,
+      `VLANs: ${vlans.length}`,
+      `Subnets: ${subnets.length}`,
+      `Segments: ${uniqueSegments.length ? uniqueSegments.join(", ") : "No VLANs materialized"}`,
+      `Readiness: ${phase103ReadinessSummary(site, allNodes)}`,
+      "Collapsed summary. Open Logical / Per-site for full VLAN, subnet, gateway, and DHCP detail.",
+      ...site.notes.slice(0, 2),
+    ],
+  };
+}
+
+function isPhase103SiteSummaryNode(node: BackendDiagramRenderNode) {
+  return node.objectType === "site" && node.notes.includes(PHASE103_SITE_SUMMARY_MARKER);
+}
+
+function phase103SummaryValue(node: BackendDiagramRenderNode, label: string) {
+  const note = node.notes.find((item) => item.startsWith(`${label}:`));
+  return note ? note.slice(label.length + 1).trim() : "";
+}
+
+function isPhase103VpnFabric(node: BackendDiagramRenderNode) {
+  return node.id === PHASE103_VPN_FABRIC_ID;
+}
+
+function addPhase103VpnFabric(nodes: BackendDiagramRenderNode[], mode: DiagramMode, scope: DiagramScope) {
+  if (scope === "site" || scope === "boundaries" || (mode !== "physical" && scope !== "wan-cloud")) return nodes;
+  if (!isPhase103EnterpriseScale(nodes) || nodes.some(isPhase103VpnFabric)) return nodes;
+  const hq = phase103SiteNodes(nodes).find((site) => /hq|head|primary/i.test(site.label)) ?? phase103SiteNodes(nodes)[0];
+  const fabricNode: BackendDiagramRenderNode = {
+    id: PHASE103_VPN_FABRIC_ID,
+    objectId: PHASE103_VPN_FABRIC_ID,
+    objectType: "security-zone",
+    label: "IPsec VPN overlay fabric",
+    groupId: hq?.groupId,
+    layer: "routing",
+    readiness: "review",
+    truthState: "inferred",
+    x: 760,
+    y: 610,
+    sourceEngine: "routing",
+    relatedFindingIds: [],
+    notes: [
+      "Phase 103 enterprise-scale WAN summary: branch tunnels collapse into a shared VPN fabric rail so 7+ site diagrams do not turn into unreadable tunnel spaghetti.",
+      "Traffic meaning is still hub-and-spoke: local ISP underlay stays per site; secure VPN overlay terminates on the security/VPN edge when present.",
+    ],
+  };
+  return [...nodes, fabricNode];
 }
 
 function selectedOverlaySet(activeOverlays: ActiveOverlayMode[]) {
@@ -534,11 +649,18 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
     const site = sites.find((candidate) => candidate.siteId === focusedSiteId) ?? sites[0];
     connectSiteUnderlayAndInside(site);
   } else if (scope === "wan-cloud" || mode === "physical") {
+    const vpnFabric = nodes.find(isPhase103VpnFabric);
     if (hq) connectSiteUnderlayAndInside(hq);
+    if (vpnFabric) add(hqEdge, vpnFabric, "HQ VPN hub termination", "review");
     sites.filter((site) => site.id !== hq?.id).forEach((site) => {
       const branchEdge = connectSiteUnderlayAndInside(site);
-      // Overlay is drawn between branch and HQ edge devices, not from a single WAN cloud to every object.
-      add(branchEdge, hqEdge, "IPsec VPN tunnel to HQ", "review");
+      // Phase 103: enterprise-scale branch tunnels terminate on a shared overlay fabric rail,
+      // not as nine or more long diagonals into the HQ edge. Smaller projects keep direct tunnel labels.
+      if (vpnFabric) {
+        add(branchEdge, vpnFabric, "IPsec VPN overlay fabric", "review");
+      } else {
+        add(branchEdge, hqEdge, "IPsec VPN tunnel to HQ", "review");
+      }
     });
   }
 
@@ -575,13 +697,19 @@ function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: Diagr
 
   let nodes = renderModel.nodes.filter((node) => visibleIds.has(node.id));
 
+  if (isPhase103EnterpriseScale(renderModel.nodes) && mode === "logical" && scope === "global") {
+    const summaryNodes = phase103SiteNodes(renderModel.nodes).map((site) => phase103WithSiteSummary(site, renderModel.nodes));
+    return layoutNodesForView({ nodes: summaryNodes, edges: [], mode, scope, focusedSiteId, activeOverlays });
+  }
+
   // Phase 99: physical/WAN drawings should not use one global WAN cloud as a fake parent.
   // Replace raw WAN anchors with per-site local Internet breakouts, then draw VPN overlay separately.
   if (scope !== "boundaries" && (mode === "physical" || scope === "wan-cloud")) {
     nodes = addLocalInternetBreakouts(nodes, mode, scope, focusedSiteId);
+    nodes = addPhase103VpnFabric(nodes, mode, scope);
   }
 
-  const limit = scope === "boundaries" ? 80 : mode === "logical" ? 120 : 80;
+  const limit = scope === "boundaries" ? 80 : mode === "logical" ? 120 : isPhase103EnterpriseScale(nodes) ? 140 : 80;
   const limitedNodes = nodes.slice(0, limit);
   const nodeIds = new Set(limitedNodes.map((node) => node.id));
   const filteredEdges = candidateEdges.filter((edge) => nodeIds.has(edge.sourceNodeId) && nodeIds.has(edge.targetNodeId));
@@ -676,19 +804,33 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   }
 
   if (scope === "wan-cloud") {
+    const enterprise = isPhase103EnterpriseScale(nodes);
+    const vpnFabric = nodes.find(isPhase103VpnFabric);
     if (hq) {
-      set(hq, 760, 165);
-      setLocalInternet(hq, 640, 300);
-      setEdgePair(hq, 640, 880, 440);
+      set(hq, 760, 160);
+      setLocalInternet(hq, 630, 285);
+      setEdgePair(hq, 630, 890, 425);
     }
-    const branchCount = Math.max(1, branches.length);
-    const branchXs = branchCount === 1 ? [760] : branchCount === 2 ? [430, 1090] : branches.map((_, index) => 260 + index * 360);
+    if (vpnFabric) set(vpnFabric, 760, 610);
+    const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
     branches.forEach((site, index) => {
-      const x = branchXs[index] ?? (260 + index * 360);
-      const y = 700 + Math.floor(index / 4) * 245;
+      const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 320 + (index % columns) * 390);
+      const y = enterprise ? 820 + Math.floor(index / columns) * 315 : 700 + Math.floor(index / columns) * 255;
       set(site, x, y);
-      setLocalInternet(site, x - 95, y + 110);
+      setLocalInternet(site, x - 95, y + 112);
       setEdgePair(site, x - 95, x + 95, y + 245);
+    });
+    return { nodes: [...byId.values()], edges };
+  }
+
+  if (mode === "logical" && scope === "global" && orderedSites.some(isPhase103SiteSummaryNode)) {
+    const columns = orderedSites.length >= 10 ? 4 : 3;
+    orderedSites.forEach((site, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = 260 + column * 390;
+      const y = 210 + row * 240;
+      set(site, x, y);
     });
     return { nodes: [...byId.values()], edges };
   }
@@ -713,20 +855,21 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
 
   // Physical global: hub/WAN view with a clean branch fan-out.
   // Phase 99 refinement: HQ is the hub, branches are spokes, and Internet is local underlay per site.
+  const enterprise = isPhase103EnterpriseScale(nodes);
+  const vpnFabric = nodes.find(isPhase103VpnFabric);
   if (hq) {
-    set(hq, 760, 160);
-    setLocalInternet(hq, 635, 270);
-    setEdgePair(hq, 635, 865, 390);
+    set(hq, 760, 145);
+    setLocalInternet(hq, 630, 255);
+    setEdgePair(hq, 630, 890, 380);
   }
-  const branchCount = Math.max(1, branches.length);
-  const branchXs = branchCount === 1 ? [760] : branchCount === 2 ? [430, 1090] : branches.map((_, index) => 250 + (index % 4) * 350);
+  if (vpnFabric) set(vpnFabric, 760, 570);
+  const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
   branches.forEach((site, index) => {
-    const row = Math.floor(index / 4);
-    const x = branchXs[index] ?? (250 + (index % 4) * 350);
-    const y = 690 + row * 265;
+    const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 260 + (index % columns) * 360);
+    const y = enterprise ? 780 + Math.floor(index / columns) * 305 : 675 + Math.floor(index / columns) * 265;
     set(site, x, y);
-    setLocalInternet(site, x - 70, y + 105);
-    setEdgePair(site, x - 70, x + 90, y + 220);
+    setLocalInternet(site, x - 85, y + 105);
+    setEdgePair(site, x - 85, x + 95, y + 220);
   });
   return { nodes: [...byId.values()], edges };
 }
@@ -832,6 +975,33 @@ function backendArrowForReadiness(readiness: BackendDiagramRenderEdge["readiness
   return "url(#backend-arrow)";
 }
 
+function Phase103SiteSummaryCard({ node, selected }: { node: BackendDiagramRenderNode; selected: boolean }) {
+  const role = phase103SummaryValue(node, "Role") || "Site";
+  const siteBlock = phase103SummaryValue(node, "Site block") || "Address block pending";
+  const vlans = phase103SummaryValue(node, "VLANs") || "0";
+  const subnets = phase103SummaryValue(node, "Subnets") || "0";
+  const segments = phase103SummaryValue(node, "Segments") || "No VLANs materialized";
+  const readiness = phase103SummaryValue(node, "Readiness") || executionReadinessText(node.readiness);
+  const width = 315;
+  const height = 172;
+  const stroke = selected ? readinessStroke(node.readiness) : "#b9c9df";
+  return (
+    <>
+      <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={20} fill="#ffffff" stroke={stroke} strokeWidth={selected ? 2.8 : 1.5} filter={selected ? "url(#backend-diagram-device-shadow)" : undefined} />
+      <rect x={-width / 2} y={-height / 2} width={width} height={42} rx={20} fill="#f8fbff" stroke="none" />
+      <text x={-width / 2 + 18} y={-height / 2 + 26} fontSize="13" fontWeight={900} fill={backendDiagramTextFill()}>{cleanCanvasLabel(node.label, 34)}</text>
+      <text x={width / 2 - 18} y={-height / 2 + 26} textAnchor="end" fontSize="10" fontWeight={800} fill="#40699f">{role}</text>
+      <text x={-width / 2 + 18} y={-height / 2 + 66} fontSize="11" fontWeight={800} fill={backendDiagramMutedFill()}>Site block</text>
+      <text x={-width / 2 + 92} y={-height / 2 + 66} fontSize="12" fontWeight={900} fill={backendDiagramTextFill()}>{cleanCanvasLabel(siteBlock, 22)}</text>
+      <text x={-width / 2 + 18} y={-height / 2 + 91} fontSize="11" fontWeight={800} fill={backendDiagramMutedFill()}>VLANs / subnets</text>
+      <text x={-width / 2 + 122} y={-height / 2 + 91} fontSize="12" fontWeight={900} fill={backendDiagramTextFill()}>{vlans} / {subnets}</text>
+      <text x={-width / 2 + 18} y={-height / 2 + 116} fontSize="11" fontWeight={800} fill={backendDiagramMutedFill()}>Major segments</text>
+      <text x={-width / 2 + 18} y={-height / 2 + 137} fontSize="11" fontWeight={700} fill={backendDiagramTextFill()}>{cleanCanvasLabel(segments, 44)}</text>
+      <text x={-width / 2 + 18} y={height / 2 - 16} fontSize="10.5" fontWeight={800} fill={node.readiness === "blocked" ? "#c2410c" : node.readiness === "review" ? "#8a6428" : "#40699f"}>{cleanCanvasLabel(readiness, 42)}</text>
+    </>
+  );
+}
+
 function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: number) {
   const stroke = readinessStroke(node.readiness);
   const strokeWidth = selected ? 3 : node.readiness === "blocked" ? 2.2 : 1.7;
@@ -867,6 +1037,9 @@ function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: num
 }
 
 function renderNodeVisual(node: BackendDiagramRenderNode, selected: boolean, scale: number, labelMode: DiagramLabelMode, canvasZoom: number, mode: DiagramMode, scope: DiagramScope) {
+  if (mode === "logical" && scope === "global" && isPhase103SiteSummaryNode(node)) {
+    return <Phase103SiteSummaryCard node={node} selected={selected} />;
+  }
   const kind = professionalDeviceKind(node);
   const labelMax = node.objectType === "site" ? 30 : node.objectType === "vlan" ? 31 : node.objectType === "subnet" ? 28 : 26;
   const compactLabels = labelMode === "essential" || canvasZoom < 0.75;
@@ -908,12 +1081,16 @@ function calculateCanvasBounds(nodes: BackendDiagramRenderNode[], mode: DiagramM
   const maxY = Math.max(...nodes.map((node) => node.y));
   const isMatrix = scope === "boundaries";
   const isLogical = mode === "logical" && !isMatrix;
-  const paddingLeft = isMatrix ? 210 : 170;
-  const paddingTop = isMatrix ? 150 : 135;
-  const paddingRight = isMatrix ? 230 : 220;
-  const paddingBottom = isMatrix ? 170 : 190;
-  const minWidth = isMatrix ? 1180 : isLogical ? 1320 : scope === "wan-cloud" ? 1120 : 1080;
-  const minHeight = isMatrix ? 760 : isLogical ? 820 : scope === "site" ? 720 : 700;
+  const enterprise = isPhase103EnterpriseScale(nodes);
+  const summaryBoard = nodes.some(isPhase103SiteSummaryNode);
+  const paddingLeft = isMatrix ? 210 : summaryBoard ? 245 : enterprise ? 220 : 170;
+  const paddingTop = isMatrix ? 150 : summaryBoard ? 160 : enterprise ? 155 : 135;
+  const paddingRight = isMatrix ? 230 : summaryBoard ? 260 : enterprise ? 260 : 220;
+  const paddingBottom = isMatrix ? 170 : enterprise ? 270 : 190;
+  const siteCount = phase103SiteNodes(nodes).length;
+  const enterpriseRows = Math.max(1, Math.ceil(Math.max(siteCount - 1, 0) / 3));
+  const minWidth = isMatrix ? 1180 : summaryBoard ? 1780 : enterprise ? 1580 : isLogical ? 1320 : scope === "wan-cloud" ? 1120 : 1080;
+  const minHeight = isMatrix ? 760 : summaryBoard ? 980 : enterprise && scope !== "site" ? Math.max(980, 720 + enterpriseRows * 300) : isLogical ? 820 : scope === "site" ? 720 : 700;
   return {
     width: Math.max(minWidth, maxX - minX + paddingLeft + paddingRight),
     height: Math.max(minHeight, maxY - minY + paddingTop + paddingBottom),
@@ -937,11 +1114,15 @@ function executionReadinessText(readiness: BackendDiagramRenderNode["readiness"]
   return "Unknown";
 }
 
-function edgePath(sourcePoint: { x: number; y: number }, targetPoint: { x: number; y: number }, mode: DiagramMode, scope: DiagramScope) {
+function edgePath(sourcePoint: { x: number; y: number }, targetPoint: { x: number; y: number }, mode: DiagramMode, scope: DiagramScope, edge?: BackendDiagramRenderEdge) {
   const midX = (sourcePoint.x + targetPoint.x) / 2;
   if (scope === "boundaries") {
     const elbowX = sourcePoint.x + Math.max(130, Math.min(270, Math.abs(targetPoint.x - sourcePoint.x) * 0.48));
     return `M ${sourcePoint.x} ${sourcePoint.y} L ${elbowX} ${sourcePoint.y} L ${elbowX} ${targetPoint.y} L ${targetPoint.x} ${targetPoint.y}`;
+  }
+  if ((mode === "physical" || scope === "wan-cloud") && edge && edgeSemanticKind(edge) === "vpn-overlay") {
+    const railY = Math.min(sourcePoint.y, targetPoint.y) - 118;
+    return `M ${sourcePoint.x} ${sourcePoint.y} L ${sourcePoint.x} ${railY} L ${targetPoint.x} ${railY} L ${targetPoint.x} ${targetPoint.y}`;
   }
   if (mode === "physical" || scope === "wan-cloud") {
     return `M ${sourcePoint.x} ${sourcePoint.y} L ${targetPoint.x} ${targetPoint.y}`;
@@ -1003,9 +1184,20 @@ function phase97LogicalSiteGuides(nodes: BackendDiagramRenderNode[], bounds: Can
 
 function phase97TopologyGuides(nodes: BackendDiagramRenderNode[], bounds: CanvasBounds, scope: DiagramScope) {
   const localInternetNodes = nodes.filter(isPhase99LocalInternet);
-  if (localInternetNodes.length === 0) return null;
+  const vpnFabric = nodes.find(isPhase103VpnFabric);
+  if (localInternetNodes.length === 0 && !vpnFabric) return null;
   return (
     <g className="phase99-topology-guides" aria-hidden="true">
+      {vpnFabric ? (() => {
+        const point = nodePoint(vpnFabric, bounds);
+        return (
+          <g key="phase103-vpn-fabric-guide">
+            <rect x={point.x - 310} y={point.y - 38} width={620} height={76} rx={28} fill="#f4f7ff" stroke="#aebfec" strokeWidth="1.2" opacity="0.72" />
+            <line x1={point.x - 255} y1={point.y} x2={point.x + 255} y2={point.y} stroke="#4c6fc1" strokeWidth="2.4" strokeDasharray="9 7" strokeLinecap="round" opacity="0.62" />
+            <text x={point.x} y={point.y - 18} textAnchor="middle" fontSize="12" fontWeight={900} fill="#334f91">Enterprise VPN overlay fabric</text>
+          </g>
+        );
+      })() : null}
       {localInternetNodes.map((internet) => {
         const point = nodePoint(internet, bounds);
         return (
@@ -1020,7 +1212,7 @@ function phase97TopologyGuides(nodes: BackendDiagramRenderNode[], bounds: Canvas
 }
 
 function phase99SiteContainers(nodes: BackendDiagramRenderNode[], bounds: CanvasBounds, mode: DiagramMode, scope: DiagramScope) {
-  if (scope === "boundaries" || mode !== "physical") return null;
+  if (scope === "boundaries" || (mode !== "physical" && scope !== "wan-cloud")) return null;
   const sites = nodes.filter((node) => node.objectType === "site");
   if (sites.length === 0) return null;
   return (
@@ -1304,7 +1496,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               const midX = (sourcePoint.x + targetPoint.x) / 2;
               const midY = (sourcePoint.y + targetPoint.y) / 2;
               const stroke = edgeStroke(edge);
-              const path = edgePath(sourcePoint, targetPoint, mode, scope);
+              const path = edgePath(sourcePoint, targetPoint, mode, scope, edge);
               const count = edgeLabelCounts.get(edge.label) ?? 0;
               const seen = labelSeen.get(edge.label) ?? 0;
               labelSeen.set(edge.label, seen + 1);
