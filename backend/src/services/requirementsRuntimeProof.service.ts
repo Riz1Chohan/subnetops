@@ -26,6 +26,7 @@ export const REQUIREMENTS_RUNTIME_RELEASE = {
   enterpriseScaleCanvasLayout: "PHASE_103_ENTERPRISE_SCALE_CANVAS_AND_LAYOUT",
   enterpriseWanFabricPolish: "PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH",
   engineerGradeWanTopology: "PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY",
+    engineerGradeDiagramFinalPass: "PHASE_106_ENGINEER_GRADE_DIAGRAM_FINAL_PASS",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;

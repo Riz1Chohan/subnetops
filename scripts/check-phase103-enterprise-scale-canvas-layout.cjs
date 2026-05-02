@@ -13,7 +13,7 @@ const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.s
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE103-ENTERPRISE-SCALE-CANVAS-LAYOUT.md', 'utf8');
 
-assert(/^0\.(103|104|105)\.0$/.test(pkg.version), 'package version must be 0.103.0 or a compatible newer diagram release');
+assert(/^0\.(103|104|105|106)\.0$/.test(pkg.version), 'package version must be 0.103.0 or a compatible newer diagram release');
 assert(runtime.includes('enterpriseScaleCanvasLayout: "PHASE_103_ENTERPRISE_SCALE_CANVAS_AND_LAYOUT"'), 'runtime marker missing');
 assert(doc.includes('PHASE_103_ENTERPRISE_SCALE_CANVAS_AND_LAYOUT'), 'phase 103 documentation marker missing');
 
@@ -23,7 +23,7 @@ assert(canvas.includes('phase103WithSiteSummary'), 'site summary builder missing
 assert(canvas.includes('IPsec VPN overlay fabric'), 'VPN fabric node/label missing');
 assert(canvas.includes('HQ VPN hub termination'), 'HQ fabric termination edge missing');
 assert(canvas.includes('mode === "logical" && scope === "global" && orderedSites.some(isPhase103SiteSummaryNode)'), 'large logical global summary layout missing');
-assert(canvas.includes('scope === "wan-cloud"') && (canvas.includes('const columns = enterprise ? 3') || canvas.includes('branches.length >= 8 ? 5 : 4')), 'WAN branch grid layout missing');
+assert(canvas.includes('scope === "wan-cloud"') && (canvas.includes('const columns = enterprise ? 3') || canvas.includes('branches.length >= 8 ? 5 : 4') || canvas.includes('phase106EnterpriseColumns(branches.length)')), 'WAN branch grid layout missing');
 assert(canvas.includes('edgeSemanticKind(edge) === "vpn-overlay"'), 'VPN orthogonal rail path missing');
 assert(canvas.includes('Open Logical / Per-site for full VLAN, subnet, gateway, and DHCP detail'), 'global summary detail handoff missing');
 assert(!canvas.includes('/\x08(wan|vpn|sd-wan|edge)\x08/'), 'broken word-boundary regex must not be present');
