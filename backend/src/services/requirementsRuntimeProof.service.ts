@@ -4,7 +4,7 @@ import { ensureCanViewProject } from "./access.service.js";
 
 export const REQUIREMENTS_RUNTIME_RELEASE = {
   phase: "PHASE_84_DESIGN_TRUST_SNAPSHOT_POLICY_RECONCILIATION",
-  version: "0.101.0",
+  version: "0.102.0",
   compileFix: "PHASE_85_RENDER_COMPILE_FIXES_FOR_PHASE_84",
   renderBuildCleanup: "PHASE_86_RENDER_BUILD_CLEANUP",
   truthStabilization: "PHASE_87_READINESS_POLICY_WARNING_REPORT_DIAGRAM_STABILIZATION",
@@ -22,6 +22,7 @@ export const REQUIREMENTS_RUNTIME_RELEASE = {
   topologySemanticsRealNetworkLayout: "PHASE_99_TOPOLOGY_SEMANTICS_REAL_NETWORK_LAYOUT",
   diagramTrustEdgePolicyCleanup: "PHASE_100_DIAGRAM_TRUST_EDGE_POLICY_CLEANUP",
   diagramViewDisciplineEdgeTruth: "PHASE_101_DIAGRAM_VIEW_DISCIPLINE_EDGE_TRUTH",
+  edgePathTruthFirewallVpnTermination: "PHASE_102_EDGE_PATH_TRUTH_FIREWALL_VPN_TERMINATION",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;

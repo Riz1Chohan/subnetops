@@ -23,6 +23,7 @@ type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 // Phase 99: topology semantics now separate local Internet underlay, VPN overlay, and internal site handoff paths so WAN views stop drawing one magic cloud to every site.
 // Phase 100: diagram trust pass removes raw database relationship labels from professional topology views, keeps sites as containers, forces VPN tunnels onto edge devices, hides DHCP as a fake physical device, and classifies security rules by deny/review/allow action with deny precedence.
 // Phase 101: view-discipline pass locks physical views to physical edge/core objects only, makes firewall/VPN edge termination explicit, fixes underlay vs overlay styling, compacts the policy matrix, and keeps VLAN/subnet detail inside logical views.
+// Phase 102: edge-path truth makes security/VPN edge detection label-first, routes local ISP -> firewall/security edge -> core, and terminates branch VPN overlays on the HQ firewall when present.
 // Compatibility truth from Phase 99: Physical and WAN views separate local Internet underlay from VPN overlay and internal site handoffs.
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
@@ -81,11 +82,49 @@ function isGatewayDevice(node: BackendDiagramRenderNode) {
   return node.objectType === "network-device" && /gateway|router|firewall|core|edge/i.test(`${node.label} ${node.notes.join(" ")}`);
 }
 
+function deviceLabelText(node: BackendDiagramRenderNode) {
+  return node.label.toLowerCase();
+}
+
+function deviceNotesText(node: BackendDiagramRenderNode) {
+  return node.notes.join(" ").toLowerCase();
+}
+
+function hasSecurityFirewallLabel(node: BackendDiagramRenderNode) {
+  const label = deviceLabelText(node);
+  return node.objectType === "network-device" && /firewall|fortigate|palo\s*alto|pa-?\d+|asa|srx|perimeter|security\s*firewall/.test(label);
+}
+
+function hasExplicitWanVpnEdgeLabel(node: BackendDiagramRenderNode) {
+  const label = deviceLabelText(node);
+  return node.objectType === "network-device"
+    && /(wan|vpn|sd-wan|edge)/.test(label)
+    && !/core|distribution|access|switch/.test(label);
+}
+
+function isSecurityOrVpnEdgeDevice(node: BackendDiagramRenderNode) {
+  if (hasSecurityFirewallLabel(node) || hasExplicitWanVpnEdgeLabel(node)) return true;
+  const label = deviceLabelText(node);
+  const notes = deviceNotesText(node);
+  // Phase 102: notes may say a core gateway participates in security/VPN decisions, but that
+  // must not let a "Core Gateway" steal the firewall/security-edge role. Only use notes as a
+  // fallback when the label itself is not clearly a core/distribution/router/access device.
+  if (/core|gateway|router|distribution|switch|access/.test(label)) return false;
+  return /firewall|perimeter|security edge|vpn edge|terminates vpn|ipsec termination/.test(notes);
+}
+
+function isCoreInsideDevice(node: BackendDiagramRenderNode) {
+  const label = deviceLabelText(node);
+  if (hasSecurityFirewallLabel(node)) return false;
+  return node.objectType === "network-device" && /core|distribution|gateway|router|l3/.test(label);
+}
+
 function deviceRoleWeight(node: BackendDiagramRenderNode) {
-  const text = `${node.label} ${node.notes.join(" ")}`.toLowerCase();
-  if (/firewall|perimeter|security/.test(text)) return 10;
-  if (/core|gateway|router|l3|distribution/.test(text)) return 20;
-  if (/switch|access/.test(text)) return 30;
+  const label = deviceLabelText(node);
+  if (isSecurityOrVpnEdgeDevice(node)) return 10;
+  if (/wan|vpn|edge/.test(label)) return 18;
+  if (isCoreInsideDevice(node)) return 24;
+  if (/switch|access/.test(label)) return 34;
   return 50;
 }
 
@@ -123,12 +162,25 @@ function sortedSiteDevices(nodes: BackendDiagramRenderNode[], site?: BackendDiag
     .sort((a, b) => deviceRoleWeight(a) - deviceRoleWeight(b) || a.label.localeCompare(b.label));
 }
 
+function securityOrVpnEdgeForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
+  const devices = sortedSiteDevices(nodes, site);
+  return devices.find(hasSecurityFirewallLabel)
+    ?? devices.find(hasExplicitWanVpnEdgeLabel)
+    ?? devices.find(isSecurityOrVpnEdgeDevice);
+}
+
+function coreInsideDeviceForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode, edgeDevice?: BackendDiagramRenderNode) {
+  const devices = sortedSiteDevices(nodes, site).filter((node) => node.id !== edgeDevice?.id);
+  return devices.find(isCoreInsideDevice)
+    ?? devices.find((node) => !isSecurityOrVpnEdgeDevice(node));
+}
+
 function firewallForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
-  return sortedSiteDevices(nodes, site).find((node) => /firewall|perimeter|security/i.test(`${node.label} ${node.notes.join(" ")}`));
+  return securityOrVpnEdgeForSite(nodes, site);
 }
 
 function gatewayForSite(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
-  return sortedSiteDevices(nodes, site).find((node) => /core|gateway|router|l3|distribution/i.test(`${node.label} ${node.notes.join(" ")}`));
+  return coreInsideDeviceForSite(nodes, site, securityOrVpnEdgeForSite(nodes, site));
 }
 
 function isExternalAnchor(node: BackendDiagramRenderNode) {
@@ -452,8 +504,9 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
   const sites = nodes.filter((node) => node.objectType === "site").sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
   const hq = sites.find((site) => /hq|head|primary/i.test(site.label)) ?? sites[0];
   // Phase 101: VPN must terminate on the security/VPN edge when a firewall exists.
-  // If no firewall exists for that site, fall back to the router/gateway and visually treat it as the WAN/VPN edge.
-  const hqEdge = firewallForSite(nodes, hq) ?? gatewayForSite(nodes, hq) ?? sortedSiteDevices(nodes, hq)[0];
+  // Phase 102: VPN must terminate on the label-identified security/VPN edge when present.
+  // Do not let a core gateway steal the firewall role just because notes mention security or VPN context.
+  const hqEdge = securityOrVpnEdgeForSite(nodes, hq) ?? coreInsideDeviceForSite(nodes, hq) ?? sortedSiteDevices(nodes, hq)[0];
 
   const add = (source: BackendDiagramRenderNode | undefined, target: BackendDiagramRenderNode | undefined, label: string, readiness: BackendDiagramRenderEdge["readiness"] = "ready") => {
     if (!source || !target || source.id === target.id || hasPresentationEdge(result, source, target, label)) return;
@@ -462,16 +515,15 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
 
   const connectSiteUnderlayAndInside = (site: BackendDiagramRenderNode | undefined) => {
     if (!site) return undefined;
-    const firewall = firewallForSite(nodes, site);
-    const gateway = gatewayForSite(nodes, site);
     const firstDevice = sortedSiteDevices(nodes, site)[0];
-    const edgeDevice = firewall ?? gateway ?? firstDevice;
-    const coreDevice = gateway && gateway.id !== edgeDevice?.id ? gateway : undefined;
+    const edgeDevice = securityOrVpnEdgeForSite(nodes, site) ?? coreInsideDeviceForSite(nodes, site) ?? firstDevice;
+    const coreDevice = coreInsideDeviceForSite(nodes, site, edgeDevice);
     const localInternet = localInternetForSite(nodes, site);
 
-    // Phase 101: draw the real edge path: local ISP -> VPN/security edge -> core/distribution.
+    // Phase 102 edge-path truth: local ISP/Internet -> security or VPN edge -> core/distribution.
     // Legacy Phase 99 guard phrase: local internet handoff.
-    // This stops the firewall from looking like decoration beside the topology.
+    // Legacy Phase 101 guard phrase: firewall-to-core handoff.
+    // This stops the firewall from looking like disconnected decoration beside the topology.
     add(localInternet, edgeDevice, "local ISP underlay", "ready");
     add(edgeDevice, coreDevice, "firewall-to-core handoff", "ready");
 
@@ -733,15 +785,18 @@ function automaticIconScale(nodeCount: number, scope: DiagramScope) {
 }
 
 function professionalDeviceKind(node: BackendDiagramRenderNode): DeviceKind | null {
+  const label = deviceLabelText(node);
   const text = `${node.objectType} ${node.label} ${node.notes.join(" ")}`.toLowerCase();
   if (node.objectType === "dhcp-pool") return "server";
   if (node.objectType === "route-domain" || node.objectType === "route-intent") return "cloud-edge";
   if (node.objectType === "security-zone" && /wan|internet|wide area/.test(text)) return "internet";
   if (node.objectType !== "network-device") return null;
-  if (/firewall|security boundary|perimeter/.test(text)) return "firewall";
-  if (/switch|layer-3|l3/.test(text) && /core|hq/.test(text)) return "core-switch";
-  if (/switch|access/.test(text)) return "access-switch";
-  if (/cloud/.test(text)) return "cloud-edge";
+  // Phase 102: icon role is label-first. Notes can mention security/VPN without turning a
+  // core gateway into a firewall icon.
+  if (hasSecurityFirewallLabel(node)) return "firewall";
+  if (/core|distribution|layer-3|l3/.test(label)) return "core-switch";
+  if (/switch|access/.test(label)) return "access-switch";
+  if (/cloud/.test(label)) return "cloud-edge";
   return "router";
 }
 

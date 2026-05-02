@@ -48,7 +48,7 @@ function findForbiddenDirs(dir, names, results = []) {
 
 const rootPkg = JSON.parse(read("package.json"));
 assert(/^0\.(99|1[0-9]{2})\.0$/.test(rootPkg.version), "root package version must be 0.99.0 or later Phase 100 compatible version");
-assert(rootPkg.scripts["check:phase84-99-release"] || rootPkg.scripts["check:phase84-100-release"] || rootPkg.scripts["check:phase84-101-release"], "phase84-99, phase84-100, or phase84-101 release chain missing");
+assert(rootPkg.scripts["check:phase84-99-release"] || rootPkg.scripts["check:phase84-100-release"] || rootPkg.scripts["check:phase84-101-release"] || rootPkg.scripts["check:phase84-102-release"], "phase84-99, phase84-100, phase84-101, or phase84-102 release chain missing");
 
 const render = read("render.yaml");
 assert(render.includes("subnetops-backend"), "render.yaml missing backend service");
