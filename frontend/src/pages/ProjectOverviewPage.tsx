@@ -740,6 +740,61 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 1 truth source ledger</h2>
+          {designCore?.phase1TraceabilityControl ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Label coverage", `${designCore.phase1TraceabilityControl.outputLabelCoverage.labelledOutputCount}/${designCore.phase1TraceabilityControl.outputLabelCoverage.requiredOutputCount}`)}
+                {summaryCard("Review outputs", designCore.phase1TraceabilityControl.outputLabelCoverage.reviewRequiredCount)}
+                {summaryCard("Captured lineage", designCore.phase1TraceabilityControl.requirementLineageCoverage.capturedCount)}
+                {summaryCard("Full lineage", designCore.phase1TraceabilityControl.requirementLineageCoverage.fullCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 1 labels backend outputs by source, confidence, proof status, requirement lineage, and consumer path. This prevents saved form data, inferred objects, and computed review evidence from pretending to be implementation-ready truth.
+              </p>
+              {designCore.phase1TraceabilityControl.outputLabelCoverage.missingLabelCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Missing output labels</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.phase1TraceabilityControl.outputLabelCoverage.missingLabels.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Major backend output groups have Phase 1 source/proof labels.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Output</th>
+                      <th align="left">Source type</th>
+                      <th align="left">Proof</th>
+                      <th align="left">Consumers</th>
+                      <th align="left">Review reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase1TraceabilityControl.outputLabels.slice(0, 14).map((item) => (
+                      <tr key={item.outputKey}>
+                        <td>{item.outputLabel}<br /><span className="muted">{item.sourceEngine}</span></td>
+                        <td>{item.sourceType}</td>
+                        <td>{item.proofStatus}<br /><span className="muted">{item.confidence}</span></td>
+                        <td>{item.consumerPath.slice(0, 4).join(", ")}</td>
+                        <td>{item.reviewReason || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 1 truth source ledger is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>

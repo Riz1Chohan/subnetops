@@ -93,6 +93,17 @@ export function buildPlanningInputCoverageSummary(project: ProjectWithDesignData
   };
 }
 
+function sourceRequirementId(sourceArea: PlanningInputDisciplineItem["sourceArea"], key: string) {
+  return `${sourceArea}:${key}`;
+}
+
+function confidenceForInput(impact: PlanningInputDisciplineItem["impact"], reflectedInOutputs: boolean): PlanningInputDisciplineItem["confidence"] {
+  if (!reflectedInOutputs) return impact === "direct" ? "medium" : "advisory";
+  if (impact === "direct") return "high";
+  if (impact === "indirect") return "medium";
+  return "advisory";
+}
+
 export function buildPlanningInputDisciplineSummary(
   planningInputCoverage: PlanningInputCoverageSummary,
   routingIntent: RoutingIntentSummary,
@@ -189,6 +200,17 @@ export function buildPlanningInputDisciplineSummary(
       outputAreas: input.outputAreas,
       reflectedInOutputs,
       reflectionNotes,
+      sourceType: input.sourceArea === "discovery" ? "IMPORTED" : "USER_PROVIDED",
+      sourceRequirementIds: [sourceRequirementId(input.sourceArea, input.key)],
+      sourceObjectIds: [],
+      sourceEngine: "designCore.planningInputDiscipline",
+      confidence: confidenceForInput(input.impact, reflectedInOutputs),
+      proofStatus: reflectedInOutputs ? "PROVEN" : input.impact === "not-yet-implemented" ? "NOT_DESIGN_DRIVING" : "REVIEW_REQUIRED",
+      reviewReason: reflectedInOutputs
+        ? undefined
+        : input.impact === "not-yet-implemented"
+          ? "Captured but not currently design-driving: this input is intentionally labelled as future-engine or unsupported for current synthesis."
+          : "Requires manual review: this captured planning input is not reflected in backend design outputs yet.",
     };
   });
 

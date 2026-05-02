@@ -1095,7 +1095,94 @@ export interface EnterpriseAllocatorPostureSummary {
 }
 
 
-export interface BackendTraceabilityItem {
+export type DesignTruthSourceType =
+  | "USER_PROVIDED"
+  | "REQUIREMENT_MATERIALIZED"
+  | "BACKEND_COMPUTED"
+  | "ENGINE2_DURABLE"
+  | "INFERRED"
+  | "ESTIMATED"
+  | "IMPORTED"
+  | "REVIEW_REQUIRED"
+  | "UNSUPPORTED";
+
+export type DesignProofStatus =
+  | "PROVEN"
+  | "PARTIAL"
+  | "REVIEW_REQUIRED"
+  | "NOT_DESIGN_DRIVING"
+  | "UNSUPPORTED"
+  | "DRAFT_ONLY";
+
+export type RequirementPropagationLifecycleStatus =
+  | "NOT_CAPTURED"
+  | "CAPTURED_ONLY"
+  | "MATERIALIZED"
+  | "PARTIALLY_PROPAGATED"
+  | "FULLY_PROPAGATED"
+  | "REVIEW_REQUIRED"
+  | "BLOCKED"
+  | "UNSUPPORTED";
+
+export type DesignTraceConfidence = "high" | "medium" | "low" | "advisory";
+
+export interface DesignSourceTraceLabel {
+  sourceType: DesignTruthSourceType;
+  sourceRequirementIds: string[];
+  sourceObjectIds: string[];
+  sourceEngine: string;
+  confidence: DesignTraceConfidence;
+  proofStatus: DesignProofStatus;
+  reviewReason?: string;
+}
+
+export interface DesignOutputTruthLabel extends DesignSourceTraceLabel {
+  outputKey: string;
+  outputLabel: string;
+  consumerPath: string[];
+}
+
+export interface RequirementPropagationTraceItem extends DesignSourceTraceLabel {
+  requirementId: string;
+  sourceArea: "requirements" | "discovery" | "platform";
+  sourceKey: string;
+  sourceValue: string;
+  lifecycleStatus: RequirementPropagationLifecycleStatus;
+  normalizedRequirementSignal: string;
+  materializedSourceObjects: string[];
+  backendDesignCoreInputs: string[];
+  engineOutputs: string[];
+  frontendConsumers: string[];
+  reportExportConsumers: string[];
+  diagramConsumers: string[];
+  validationReadinessImpact: string;
+}
+
+export interface Phase1PlanningTraceabilityControlSummary {
+  contractVersion: "PHASE1_PLANNING_INPUT_DISCIPLINE_TRACEABILITY";
+  sourceTypePolicy: Array<{ sourceType: DesignTruthSourceType; rule: string }>;
+  outputLabels: DesignOutputTruthLabel[];
+  requirementLineage: RequirementPropagationTraceItem[];
+  outputLabelCoverage: {
+    requiredOutputCount: number;
+    labelledOutputCount: number;
+    reviewRequiredCount: number;
+    unsupportedCount: number;
+    missingLabelCount: number;
+    missingLabels: string[];
+  };
+  requirementLineageCoverage: {
+    capturedCount: number;
+    fullCount: number;
+    partialCount: number;
+    reviewRequiredCount: number;
+    notDesignDrivingCount: number;
+    unsupportedCount: number;
+  };
+  notes: string[];
+}
+
+export interface BackendTraceabilityItem extends DesignSourceTraceLabel {
   sourceArea: "requirements" | "discovery" | "platform";
   sourceKey: string;
   sourceLabel: string;
@@ -1107,7 +1194,8 @@ export interface BackendTraceabilityItem {
   validationEvidence?: string;
   diagramEvidence?: string;
   reportEvidence?: string;
-  confidence: "high" | "medium" | "advisory";
+  consumerPath: string[];
+  propagationLifecycleStatus: RequirementPropagationLifecycleStatus;
 }
 
 export interface RequirementImpactInventoryItem {
@@ -1292,6 +1380,7 @@ export interface DesignCoreSnapshot {
   vendorNeutralImplementationTemplates?: VendorNeutralImplementationTemplateModel;
   proposedRows: DesignCoreProposalRow[];
   traceability?: BackendTraceabilityItem[];
+  phase1TraceabilityControl?: Phase1PlanningTraceabilityControlSummary;
   requirementsCoverage?: RequirementsCoverageSummary;
   requirementsImpactClosure?: RequirementsImpactClosureSummary;
   requirementsScenarioProof?: RequirementsScenarioProofSummary;

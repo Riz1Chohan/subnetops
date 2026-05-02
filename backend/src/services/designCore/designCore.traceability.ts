@@ -15,6 +15,18 @@ function confidenceForRequirement(impact: "direct" | "indirect" | "evidence", ca
   return "advisory";
 }
 
+function sourceRequirementId(sourceArea: DesignTraceabilityItem["sourceArea"], key: string) {
+  return `${sourceArea}:${key}`;
+}
+
+function lifecycleForCaptured(captured: boolean): DesignTraceabilityItem["propagationLifecycleStatus"] {
+  return captured ? "PARTIALLY_PROPAGATED" : "NOT_CAPTURED";
+}
+
+function proofStatusForCaptured(captured: boolean): DesignTraceabilityItem["proofStatus"] {
+  return captured ? "PARTIAL" : "NOT_DESIGN_DRIVING";
+}
+
 export function buildTraceability(project: ProjectTraceabilityInput): DesignTraceabilityItem[] {
   const requirements = parseJsonMap(project.requirementsJson);
   const discovery = parseJsonMap(project.discoveryJson);
@@ -22,6 +34,7 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
   const traceability: DesignTraceabilityItem[] = [];
 
   for (const item of buildRequirementImpactInventory(requirements)) {
+    const sourceId = sourceRequirementId("requirements", item.key);
     traceability.push({
       sourceArea: "requirements",
       sourceKey: item.key,
@@ -35,6 +48,16 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
       diagramEvidence: item.diagramConsequence,
       reportEvidence: item.reportConsequence,
       confidence: confidenceForRequirement(item.impact, item.captured),
+      sourceType: item.captured ? "USER_PROVIDED" : "UNSUPPORTED",
+      sourceRequirementIds: [sourceId],
+      sourceObjectIds: [],
+      sourceEngine: "designCore.traceability",
+      proofStatus: proofStatusForCaptured(item.captured),
+      reviewReason: item.captured
+        ? "Captured requirement has a traceability row; Phase 1 closure decides whether it is fully design-driving."
+        : "Captured but not currently design-driving: requirement was not provided by the user.",
+      consumerPath: ["backend design-core", "frontend traceability", "report/export traceability", "diagram impact when relevant"],
+      propagationLifecycleStatus: lifecycleForCaptured(item.captured),
     });
   }
 
@@ -48,6 +71,7 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
   ) => {
     const text = valueAsString(sourceValue);
     if (!text) return;
+    const sourceId = sourceRequirementId(sourceArea, sourceKey);
     traceability.push({
       sourceArea,
       sourceKey,
@@ -61,6 +85,14 @@ export function buildTraceability(project: ProjectTraceabilityInput): DesignTrac
       diagramEvidence: "Displayed when the backend render model exposes a matching object or relationship.",
       reportEvidence: "Included in backend design-core traceability and report truth sections.",
       confidence,
+      sourceType: sourceArea === "discovery" ? "IMPORTED" : "USER_PROVIDED",
+      sourceRequirementIds: [sourceId],
+      sourceObjectIds: [],
+      sourceEngine: "designCore.traceability",
+      proofStatus: "PARTIAL",
+      reviewReason: "Requires manual review: this input is captured outside the requirements materializer and needs consumer-specific proof before implementation authority.",
+      consumerPath: ["backend design-core", "frontend traceability", "report/export traceability", "diagram impact when relevant"],
+      propagationLifecycleStatus: "PARTIALLY_PROPAGATED",
     });
   };
 

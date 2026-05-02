@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "check:phase1-planning-traceability": "node scripts/check-phase1-planning-traceability.cjs",
+    "check:phase1-107-release": "npm run check:phase1-planning-traceability && npm run check:phase0-107-release",
     "check:phase0-engine-inventory": "node scripts/check-phase0-engine-inventory.cjs",
     "check:phase0-107-release": "npm run check:phase0-engine-inventory && npm run check:phase84-107-release",
     "check:phase84-design-trust-policy": "node scripts/check-phase84-design-trust-policy.cjs",
