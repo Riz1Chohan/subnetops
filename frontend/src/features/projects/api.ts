@@ -1,5 +1,6 @@
 import { api } from "../../lib/api";
 import type { Project, ProjectDetail, Site, Vlan } from "../../lib/types";
+import type { Phase2RequirementsMaterializationControlSummary } from "../../lib/designCoreSnapshot";
 
 export type RequirementsRuntimeProof = {
   release?: { phase: string; version: string; saveRoute: string; proofRoute: string };
@@ -31,6 +32,7 @@ export type RequirementsMaterializationResponse = {
     impactInventoryCount: number;
     directImpactCount: number;
     reviewNotes: string[];
+    phase2MaterializationPolicy?: Phase2RequirementsMaterializationControlSummary;
   } | null;
   requirementsFieldCoverage?: {
     expectedFields: number;

@@ -223,6 +223,69 @@ export interface DesignTraceabilityItem extends DesignSourceTraceLabel {
   propagationLifecycleStatus: RequirementPropagationLifecycleStatus;
 }
 
+
+export type RequirementMaterializationDisposition =
+  | "MATERIALIZED_OBJECT"
+  | "ENGINE_INPUT_SIGNAL"
+  | "VALIDATION_BLOCKER"
+  | "REVIEW_ITEM"
+  | "EXPLICIT_NO_OP"
+  | "UNSUPPORTED";
+
+export type RequirementMaterializationStatus =
+  | "materialized"
+  | "engine-input-signal"
+  | "validation-blocker"
+  | "review-required"
+  | "explicit-no-op"
+  | "unsupported"
+  | "policy-missing";
+
+export interface RequirementMaterializationOutcome {
+  key: string;
+  label: string;
+  category: string;
+  expectedDisposition: RequirementMaterializationDisposition;
+  normalizedSignal: string;
+  createdObjectTypes: string[];
+  updatedObjectTypes: string[];
+  backendDesignCoreInputs: string[];
+  affectedEngines: string[];
+  validationImpact: string;
+  frontendImpact: string[];
+  reportImpact: string;
+  diagramImpact: string;
+  noOpReason: string;
+  reviewRequiredWhen: string[];
+  unsupportedReason?: string;
+  confidence: "high" | "medium" | "low" | "advisory";
+  sourceValue: string;
+  captured: boolean;
+  active: boolean;
+  materializationStatus: RequirementMaterializationStatus;
+  evidenceObjectIds: string[];
+  actualEvidence: string[];
+  reviewReason?: string;
+}
+
+export interface Phase2RequirementsMaterializationControlSummary {
+  contractVersion: "PHASE2_REQUIREMENTS_MATERIALIZATION_POLICY_CONTRACT";
+  totalPolicyCount: number;
+  capturedFieldCount: number;
+  activeFieldCount: number;
+  materializedObjectCount: number;
+  engineInputSignalCount: number;
+  validationBlockerCount: number;
+  reviewItemCount: number;
+  explicitNoOpCount: number;
+  unsupportedCount: number;
+  policyMissingCount: number;
+  silentDropCount: number;
+  silentDropKeys: string[];
+  fieldOutcomes: RequirementMaterializationOutcome[];
+  notes: string[];
+}
+
 export interface CurrentStateBoundarySummary {
   configuredObjectCount: number;
   proposedObjectCount: number;
@@ -1593,6 +1656,7 @@ export interface DesignCoreSnapshot {
   planningInputCoverage: PlanningInputCoverageSummary;
   planningInputDiscipline: PlanningInputDisciplineSummary;
   phase1TraceabilityControl: Phase1PlanningTraceabilityControlSummary;
+  phase2RequirementsMaterialization: Phase2RequirementsMaterializationControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;
   requirementsScenarioProof: RequirementsScenarioProofSummary;

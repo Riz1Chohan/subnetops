@@ -40,6 +40,7 @@ import {
 import { getProjectDesignData } from "./designCore/designCore.repository.js";
 import { buildNetworkObjectModel } from "./designCore/designCore.networkObjectModel.js";
 import { buildPhase1PlanningTraceabilityControl } from "./designCore/designCore.phase1TraceabilityControl.js";
+import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
 import {
@@ -1308,6 +1309,15 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     requirementsImpactClosure,
     networkObjectModel,
   });
+  const phase2RequirementsMaterialization = buildRequirementMaterializationPolicySummary(
+    parseRequirementsForMaterializationPolicy(project.requirementsJson),
+    {
+      sites: project.sites,
+      dhcpScopes: project.dhcpScopes,
+      addressingRows,
+    },
+  );
+
   const phase1TraceabilityControl = buildPhase1PlanningTraceabilityControl({
     traceability,
     planningInputDiscipline,
@@ -1452,6 +1462,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     planningInputCoverage,
     planningInputDiscipline,
     phase1TraceabilityControl,
+    phase2RequirementsMaterialization,
     requirementsCoverage,
     requirementsImpactClosure,
     requirementsScenarioProof,

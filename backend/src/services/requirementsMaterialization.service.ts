@@ -4,6 +4,7 @@ import { addChangeLog } from "./changeLog.service.js";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { buildRequirementImpactInventory, REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
+import { buildRequirementMaterializationPolicySummary, type RequirementMaterializationPolicySummary } from "./requirementsMaterialization.policy.js";
 
 export type RequirementsMaterializationSummary = {
   createdSites: number;
@@ -16,6 +17,7 @@ export type RequirementsMaterializationSummary = {
   impactInventoryCount: number;
   directImpactCount: number;
   reviewNotes: string[];
+  phase2MaterializationPolicy: RequirementMaterializationPolicySummary;
 };
 
 type MaterializerTx = {
@@ -585,6 +587,10 @@ export async function materializeRequirementsForProject(
   const existingSites = await tx.site.findMany({ where: { projectId }, include: { vlans: true }, orderBy: { createdAt: "asc" } });
   const segments = buildSegments(requirements);
   const impactInventory = buildRequirementImpactInventory(requirements);
+  const phase2MaterializationPolicyBefore = buildRequirementMaterializationPolicySummary(requirements, {
+    sites: existingSites,
+    dhcpScopes: [],
+  });
   const directImpactCount = impactInventory.filter((item) => item.impact === "direct" && item.captured).length;
   const reviewNotes = [
     "Requirement-derived objects are conservative starting points. They must be reviewed before implementation.",
@@ -708,6 +714,15 @@ export async function materializeRequirementsForProject(
     }
   }
 
+  const refreshedSitesForPolicy = await tx.site.findMany({ where: { projectId }, include: { vlans: true }, orderBy: { createdAt: "asc" } });
+  const refreshedDhcpScopesForPolicy = tx.designDhcpScope
+    ? await Promise.all(refreshedSitesForPolicy.map(async (site) => tx.designDhcpScope?.findFirst({ where: { projectId, siteId: site.id, addressFamily: "IPV4" } }))).then((rows) => rows.filter(Boolean) as Array<{ id?: string; vlanId?: string | null; scopeCidr?: string | null }>)
+    : [];
+  const phase2MaterializationPolicy = buildRequirementMaterializationPolicySummary(requirements, {
+    sites: refreshedSitesForPolicy,
+    dhcpScopes: refreshedDhcpScopesForPolicy,
+  });
+
   const summary = {
     createdSites,
     updatedSites,
@@ -718,7 +733,12 @@ export async function materializeRequirementsForProject(
     consumedFields: consumedRequirementFields(requirements),
     impactInventoryCount: impactInventory.length,
     directImpactCount,
-    reviewNotes,
+    reviewNotes: [
+      ...reviewNotes,
+      `Phase 2 materialization policy evaluated ${phase2MaterializationPolicy.totalPolicyCount} requirement field policy row(s); ${phase2MaterializationPolicy.silentDropCount} active field(s) are silently dropped.`,
+      `Pre-save materialization policy active fields: ${phase2MaterializationPolicyBefore.activeFieldCount}.`,
+    ],
+    phase2MaterializationPolicy,
   };
 
   if (createdSites || updatedSites || createdVlans || updatedVlans || createdDhcpScopes || updatedDhcpScopes) {

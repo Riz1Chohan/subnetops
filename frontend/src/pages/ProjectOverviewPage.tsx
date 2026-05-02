@@ -795,6 +795,59 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 2 requirements materialization policy</h2>
+          {designCore?.phase2RequirementsMaterialization ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Policy rows", designCore.phase2RequirementsMaterialization.totalPolicyCount)}
+                {summaryCard("Active fields", designCore.phase2RequirementsMaterialization.activeFieldCount)}
+                {summaryCard("Materialized", designCore.phase2RequirementsMaterialization.materializedObjectCount)}
+                {summaryCard("Review/blocker", designCore.phase2RequirementsMaterialization.reviewItemCount + designCore.phase2RequirementsMaterialization.validationBlockerCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 2 forces every saved requirement into a declared materialization policy: materialized object, backend input signal, validation blocker, review item, explicit no-op, or unsupported. The UI only shows backend-declared outcomes.
+              </p>
+              {designCore.phase2RequirementsMaterialization.silentDropCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Active requirements with no materialization path</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.phase2RequirementsMaterialization.silentDropKeys.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>No active requirement is silently dropped by the Phase 2 policy ledger.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Policy</th>
+                      <th align="left">Status</th>
+                      <th align="left">Evidence / review</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase2RequirementsMaterialization.fieldOutcomes.filter((item) => item.captured).slice(0, 16).map((item) => (
+                      <tr key={item.key}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.expectedDisposition}<br /><span className="muted">{item.confidence}</span></td>
+                        <td>{item.materializationStatus}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{item.actualEvidence.slice(0, 2).join(" ") || item.reviewReason || item.noOpReason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 2 materialization policy ledger is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>
