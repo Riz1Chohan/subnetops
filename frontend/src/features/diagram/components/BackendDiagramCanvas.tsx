@@ -22,6 +22,7 @@ type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 // Phase 98 compatibility copy for prior static gates: Canvas expands with topology size. Detail panels stay out of the way until an object is selected. Policy rules are grouped by allow/review/deny lanes.
 // Phase 99: topology semantics now separate local Internet underlay, VPN overlay, and internal site handoff paths so WAN views stop drawing one magic cloud to every site.
 // Phase 100: diagram trust pass removes raw database relationship labels from professional topology views, keeps sites as containers, forces VPN tunnels onto edge devices, hides DHCP as a fake physical device, and classifies security rules by deny/review/allow action with deny precedence.
+// Phase 101: view-discipline pass locks physical views to physical edge/core objects only, makes firewall/VPN edge termination explicit, fixes underlay vs overlay styling, compacts the policy matrix, and keeps VLAN/subnet detail inside logical views.
 // Compatibility truth from Phase 99: Physical and WAN views separate local Internet underlay from VPN overlay and internal site handoffs.
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
@@ -88,9 +89,37 @@ function deviceRoleWeight(node: BackendDiagramRenderNode) {
   return 50;
 }
 
+function normalizedSiteTokens(site?: BackendDiagramRenderNode) {
+  if (!site) return [] as string[];
+  const label = site.label.toLowerCase();
+  const tokens = new Set<string>();
+  if (/hq|head|primary/.test(label)) tokens.add("hq");
+  const siteMatch = label.match(/\bsite\s*(\d{1,2})\b/);
+  const shortMatch = label.match(/\bs\s*(\d{1,2})\b/);
+  const number = siteMatch?.[1] ?? shortMatch?.[1];
+  if (number) {
+    tokens.add(`site ${number}`);
+    tokens.add(`s${number}`);
+  }
+  const code = siteCodeFromLabel(site.label).toLowerCase();
+  if (code) tokens.add(code);
+  return [...tokens].filter(Boolean);
+}
+
+function regexEscape(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function nodeBelongsToSite(node: BackendDiagramRenderNode, site?: BackendDiagramRenderNode) {
+  if (!site) return false;
+  if (node.siteId && site.siteId && node.siteId === site.siteId) return true;
+  const text = `${node.label} ${node.notes.join(" ")}`.toLowerCase();
+  return normalizedSiteTokens(site).some((token) => token.length > 1 && new RegExp(`\\b${regexEscape(token)}\\b`, "i").test(text));
+}
+
 function sortedSiteDevices(nodes: BackendDiagramRenderNode[], site?: BackendDiagramRenderNode) {
   return nodes
-    .filter((node) => site && node.siteId === site.siteId && node.objectType === "network-device")
+    .filter((node) => node.objectType === "network-device" && nodeBelongsToSite(node, site))
     .sort((a, b) => deviceRoleWeight(a) - deviceRoleWeight(b) || a.label.localeCompare(b.label));
 }
 
@@ -295,9 +324,10 @@ function nodeAllowedByView(node: BackendDiagramRenderNode, mode: DiagramMode, sc
 
   if (mode === "physical") {
     if (node.objectType === "site" || isGatewayDevice(node) || isWanEdge(node)) return true;
-    // Keep global physical/WAN drawings readable. DHCP/services are shown only in focused site drawings; site physical can expose local VLAN/service detail only on request.
-    if (node.objectType === "vlan" && scope === "site" && wantsAddressing) return true;
-    if (node.objectType === "subnet" && scope === "site" && wantsAddressing) return true;
+    // Phase 101 view discipline: physical topology is not a subnet chart. VLAN/subnet/DHCP
+    // detail stays in logical views or details panels even when IP/service overlays are toggled on.
+    // Compatibility with Phase 96 promise: DHCP/services are shown only in focused site drawings.
+    void wantsAddressing;
     if (wantsSecurity && isSecurityObject(node)) return true;
     return false;
   }
@@ -333,7 +363,9 @@ function edgeAllowedByView(edge: BackendDiagramRenderEdge, mode: DiagramMode, sc
 
   if (mode === "physical") {
     if (edge.overlayKeys.includes("routing") && /site-to-site|WAN edge path|internet\/security edge|vpn|tunnel/i.test(edge.label)) return true;
-    if (wantsAddressing && scope === "site" && (edge.relationship === "site-contains-vlan" || edge.relationship === "vlan-uses-subnet")) return true;
+    // Phase 101: no VLAN/subnet membership edges in physical drawings. IP overlays may annotate
+    // devices later, but must not create logical topology objects inside the physical canvas.
+    void wantsAddressing;
     if (wantsSecurity && edge.overlayKeys.includes("security") && edge.relationship !== "security-zone-protects-subnet") return true;
     return false;
   }
@@ -398,7 +430,7 @@ function hasPresentationEdge(edges: BackendDiagramRenderEdge[], a?: BackendDiagr
 
 function presentationEdge(id: string, source: BackendDiagramRenderNode, target: BackendDiagramRenderNode, label: string, readiness: BackendDiagramRenderEdge["readiness"] = "ready"): BackendDiagramRenderEdge {
   return {
-    id: `phase100-${id}-${source.id}-${target.id}`.slice(0, 160),
+    id: `phase101-${id}-${source.id}-${target.id}`.slice(0, 160),
     relationship: "network-link-terminates-on-device",
     sourceNodeId: source.id,
     targetNodeId: target.id,
@@ -406,7 +438,7 @@ function presentationEdge(id: string, source: BackendDiagramRenderNode, target: 
     readiness,
     overlayKeys: ["routing"],
     relatedObjectIds: [source.objectId, target.objectId].filter(Boolean),
-    notes: ["Professional topology connector: underlay, overlay, and internal handoff are rendered as separate network meanings rather than raw database relationships."],
+    notes: ["Professional topology connector: transport handoff, secure tunnel, and internal handoff are rendered as separate network meanings rather than raw database relationships."],
   };
 }
 
@@ -419,6 +451,8 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
     : [...edges];
   const sites = nodes.filter((node) => node.objectType === "site").sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
   const hq = sites.find((site) => /hq|head|primary/i.test(site.label)) ?? sites[0];
+  // Phase 101: VPN must terminate on the security/VPN edge when a firewall exists.
+  // If no firewall exists for that site, fall back to the router/gateway and visually treat it as the WAN/VPN edge.
   const hqEdge = firewallForSite(nodes, hq) ?? gatewayForSite(nodes, hq) ?? sortedSiteDevices(nodes, hq)[0];
 
   const add = (source: BackendDiagramRenderNode | undefined, target: BackendDiagramRenderNode | undefined, label: string, readiness: BackendDiagramRenderEdge["readiness"] = "ready") => {
@@ -432,11 +466,14 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
     const gateway = gatewayForSite(nodes, site);
     const firstDevice = sortedSiteDevices(nodes, site)[0];
     const edgeDevice = firewall ?? gateway ?? firstDevice;
+    const coreDevice = gateway && gateway.id !== edgeDevice?.id ? gateway : undefined;
     const localInternet = localInternetForSite(nodes, site);
 
-    // Phase 99: Internet/ISP is local underlay per site. It is not the enterprise topology hub.
-    add(localInternet, edgeDevice, "local internet handoff", "ready");
-    add(firewall, gateway, "firewall-to-core handoff", "ready");
+    // Phase 101: draw the real edge path: local ISP -> VPN/security edge -> core/distribution.
+    // Legacy Phase 99 guard phrase: local internet handoff.
+    // This stops the firewall from looking like decoration beside the topology.
+    add(localInternet, edgeDevice, "local ISP underlay", "ready");
+    add(edgeDevice, coreDevice, "firewall-to-core handoff", "ready");
 
     return edgeDevice;
   };
@@ -566,15 +603,10 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const site = orderedSites.find((candidate) => candidate.siteId === params.focusedSiteId) ?? orderedSites[0];
     if (mode === "physical") {
       set(site, 560, 150);
-      if (site) setLocalInternet(site, 560, 285);
-      if (site) setEdgePair(site, 405, 715, 455);
-      const physicalVlans = nodes.filter((node) => node.siteId === site?.siteId && (node.objectType === "vlan" || node.objectType === "subnet"));
-      const vlans = physicalVlans.filter((node) => node.objectType === "vlan");
-      const subnets = physicalVlans.filter((node) => node.objectType === "subnet");
-      const columnX = [245, 560, 875];
-      vlans.forEach((vlan, index) => set(vlan, columnX[index % columnX.length], 650 + Math.floor(index / columnX.length) * 88));
-      subnets.forEach((subnet, index) => set(subnet, columnX[index % columnX.length], 688 + Math.floor(index / columnX.length) * 88));
-      if (site && shouldShowDhcpSummary(params.activeOverlays)) setDhcpBadges(site, 1010, 565);
+      if (site) setLocalInternet(site, 360, 300);
+      if (site) setEdgePair(site, 560, 760, 455);
+      // Phase 101: physical per-site view remains an equipment/path diagram only.
+      // VLAN/subnet cards are deliberately absent here; use Logical / Per-site for segmentation detail.
       return { nodes: [...byId.values()], edges };
     }
 
@@ -594,7 +626,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   if (scope === "wan-cloud") {
     if (hq) {
       set(hq, 760, 165);
-      setLocalInternet(hq, 760, 300);
+      setLocalInternet(hq, 640, 300);
       setEdgePair(hq, 640, 880, 440);
     }
     const branchCount = Math.max(1, branches.length);
@@ -603,7 +635,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
       const x = branchXs[index] ?? (260 + index * 360);
       const y = 700 + Math.floor(index / 4) * 245;
       set(site, x, y);
-      setLocalInternet(site, x, y + 110);
+      setLocalInternet(site, x - 95, y + 110);
       setEdgePair(site, x - 95, x + 95, y + 245);
     });
     return { nodes: [...byId.values()], edges };
@@ -631,7 +663,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   // Phase 99 refinement: HQ is the hub, branches are spokes, and Internet is local underlay per site.
   if (hq) {
     set(hq, 760, 160);
-    setLocalInternet(hq, 990, 280);
+    setLocalInternet(hq, 635, 270);
     setEdgePair(hq, 635, 865, 390);
   }
   const branchCount = Math.max(1, branches.length);
@@ -641,7 +673,7 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const x = branchXs[index] ?? (250 + (index % 4) * 350);
     const y = 690 + row * 265;
     set(site, x, y);
-    setLocalInternet(site, x - 140, y + 105);
+    setLocalInternet(site, x - 70, y + 105);
     setEdgePair(site, x - 70, x + 90, y + 220);
   });
   return { nodes: [...byId.values()], edges };
@@ -664,11 +696,15 @@ function readinessStroke(readiness: BackendDiagramRenderNode["readiness"] | Back
 }
 
 function edgeSemanticKind(edge: BackendDiagramRenderEdge) {
-  const text = `${edge.relationship} ${edge.label} ${edge.notes.join(" ")}`.toLowerCase();
-  if (/ipsec|vpn|tunnel|dmvpn|sd-wan|overlay/.test(text)) return "vpn-overlay";
-  if (/local internet|internet handoff|isp|underlay/.test(text)) return "internet-underlay";
-  if (/firewall-to-core|site core|site edge|handoff|site-contains-device/.test(text)) return "internal-site";
-  if (/security|policy|nat/.test(text)) return "security-policy";
+  // Phase 101 trust fix: classify from structured relationship/label first. Generic notes can mention
+  // transport and tunnel concepts together, so notes must not accidentally turn every connector into a VPN tunnel.
+  const primary = `${edge.relationship} ${edge.label}`.toLowerCase();
+  if (/ipsec|vpn|tunnel|dmvpn|sd-wan|overlay/.test(primary)) return "vpn-overlay";
+  if (/local internet|local isp|internet handoff|isp|underlay/.test(primary)) return "internet-underlay";
+  if (/firewall-to-core|site core|site edge|handoff|site-contains-device/.test(primary)) return "internal-site";
+  if (/security|policy|nat/.test(primary)) return "security-policy";
+  const notes = edge.notes.join(" ").toLowerCase();
+  if (/security|policy|nat/.test(notes)) return "security-policy";
   return "topology";
 }
 
@@ -777,7 +813,7 @@ function nodeShape(node: BackendDiagramRenderNode, selected: boolean, scale: num
 
 function renderNodeVisual(node: BackendDiagramRenderNode, selected: boolean, scale: number, labelMode: DiagramLabelMode, canvasZoom: number, mode: DiagramMode, scope: DiagramScope) {
   const kind = professionalDeviceKind(node);
-  const labelMax = node.objectType === "site" ? 26 : node.objectType === "subnet" ? 24 : 23;
+  const labelMax = node.objectType === "site" ? 30 : node.objectType === "vlan" ? 31 : node.objectType === "subnet" ? 28 : 26;
   const compactLabels = labelMode === "essential" || canvasZoom < 0.75;
 
   if (kind) {
@@ -945,8 +981,8 @@ function phase99SiteContainers(nodes: BackendDiagramRenderNode[], bounds: Canvas
         const bottom = Math.max(...ys) + 96;
         return (
           <g key={`phase99-site-container-${site.id}`}>
-            <rect x={left} y={top} width={Math.max(310, right - left)} height={Math.max(220, bottom - top)} rx={24} fill="#f8fbff" stroke="#d8e2f0" strokeWidth="1.2" opacity="0.55" />
-            <text x={left + 22} y={top + 28} fontSize="12" fontWeight={800} fill="#64748b">{cleanCanvasLabel(site.label, 34)}</text>
+            <rect x={left} y={top} width={Math.max(310, right - left)} height={Math.max(220, bottom - top)} rx={24} fill="#f8fbff" stroke="#b9c9df" strokeWidth="1.6" opacity="0.74" />
+            <text x={left + 22} y={top + 28} fontSize="13" fontWeight={900} fill="#334762">{cleanCanvasLabel(site.label, 38)}</text>
           </g>
         );
       })}
@@ -954,8 +990,9 @@ function phase99SiteContainers(nodes: BackendDiagramRenderNode[], bounds: Canvas
   );
 }
 
-function phase99TopologyLegend(scope: DiagramScope) {
-  if (scope === "boundaries") return null;
+// Legacy Phase 99 symbol kept for static compatibility: phase99TopologyLegend.
+function phase101TopologyLegend(mode: DiagramMode, scope: DiagramScope) {
+  if (scope === "boundaries" || (mode !== "physical" && scope !== "wan-cloud")) return null;
   const rows = [
     { label: "Local Internet / ISP underlay", stroke: "#c68a2c", dash: undefined },
     { label: "IPsec VPN overlay tunnel", stroke: "#4c6fc1", dash: "9 7" },
@@ -1017,33 +1054,45 @@ function buildSecurityMatrixRows(nodes: BackendDiagramRenderNode[], edges: Backe
     .filter((row) => row.allow.length + row.review.length + row.deny.length > 0 || !/transit/i.test(row.zone.label));
 }
 
+function policyActionBadge(policy: BackendDiagramRenderNode) {
+  const action = policyActionKey(policy);
+  if (action === "allow") return { label: "ALLOW", color: "#315f46", border: "#9fc6af", background: "#f1fbf5" };
+  if (action === "deny") return { label: "DENY", color: "#8a341f", border: "#e7b29d", background: "#fff6f1" };
+  return { label: "REVIEW", color: "#805b1d", border: "#dec58d", background: "#fffaf0" };
+}
+
 function SecurityPolicyCell({ policies, emptyLabel, onSelectObject }: { policies: BackendDiagramRenderNode[]; emptyLabel: string; onSelectObject: (id: string) => void }) {
-  if (!policies.length) return <span className="muted">{emptyLabel}</span>;
+  if (!policies.length) return <span className="muted" style={{ fontSize: 13 }}>{emptyLabel}</span>;
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      {policies.map((policy) => (
-        <button
-          key={policy.id}
-          type="button"
-          onClick={() => onSelectObject(policy.id)}
-          style={{
-            width: "100%",
-            textAlign: "left",
-            border: `1px solid ${readinessStroke(policy.readiness)}`,
-            background: "#ffffff",
-            borderRadius: 12,
-            padding: "9px 10px",
-            color: backendDiagramTextFill(),
-            fontWeight: 700,
-            lineHeight: 1.34,
-            whiteSpace: "normal",
-            cursor: "pointer",
-          }}
-          title={fullCanvasLabel(policy.label)}
-        >
-          {policySummary(policy)}
-        </button>
-      ))}
+    <div style={{ display: "grid", gap: 7 }}>
+      {policies.map((policy) => {
+        const badge = policyActionBadge(policy);
+        return (
+          <button
+            key={policy.id}
+            type="button"
+            onClick={() => onSelectObject(policy.id)}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              border: `1px solid ${badge.border}`,
+              background: "#ffffff",
+              borderRadius: 12,
+              padding: "8px 9px",
+              color: backendDiagramTextFill(),
+              fontWeight: 700,
+              lineHeight: 1.28,
+              whiteSpace: "normal",
+              cursor: "pointer",
+              boxShadow: "0 6px 18px rgba(75, 101, 137, 0.08)",
+            }}
+            title={fullCanvasLabel(policy.label)}
+          >
+            <span style={{ display: "inline-block", marginRight: 7, marginBottom: 4, padding: "2px 6px", borderRadius: 999, border: `1px solid ${badge.border}`, background: badge.background, color: badge.color, fontSize: 10, letterSpacing: "0.05em", fontWeight: 900 }}>{badge.label}</span>
+            {policySummary(policy)}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1053,7 +1102,7 @@ function SecurityPolicyMatrixPanel({ nodes, edges, filteredEvidenceCount, onSele
   const zoneCount = nodes.filter((node) => node.objectType === "security-zone").length;
   const policyCount = nodes.filter(isPolicyNode).length;
   return (
-    <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", background: "#f8fbff", maxHeight: "calc(100vh - 220px)", minHeight: 560 }}>
+    <div style={{ overflow: "auto", borderRadius: 18, border: "1px solid var(--border-subtle, #d8e2f0)", background: "#f8fbff", maxHeight: "calc(100vh - 220px)", minHeight: 520 }}>
       <div style={{ minWidth: 1040, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div>
@@ -1066,13 +1115,13 @@ function SecurityPolicyMatrixPanel({ nodes, edges, filteredEvidenceCount, onSele
             <span className="badge-soft">Filtered evidence {filteredEvidenceCount}</span>
           </div>
         </div>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 10px", tableLayout: "fixed" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 8px", tableLayout: "fixed" }}>
           <thead>
             <tr>
-              <th style={{ width: "21%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Source zone</th>
-              <th style={{ width: "26%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Allowed / permitted</th>
-              <th style={{ width: "26%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Review required</th>
-              <th style={{ width: "27%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Denied / isolated</th>
+              <th style={{ width: "18%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Source zone</th>
+              <th style={{ width: "27%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Allowed / permitted</th>
+              <th style={{ width: "27%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Review required</th>
+              <th style={{ width: "28%", textAlign: "left", padding: "10px 12px", color: backendDiagramMutedFill(), fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Denied / isolated</th>
             </tr>
           </thead>
           <tbody>
@@ -1086,7 +1135,7 @@ function SecurityPolicyMatrixPanel({ nodes, edges, filteredEvidenceCount, onSele
                   >
                     {fullCanvasLabel(row.zone.label)}
                   </button>
-                  <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>{executionReadinessText(row.zone.readiness)}</p>
+                  {row.zone.readiness === "ready" ? null : <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>{row.zone.readiness === "blocked" ? "Needs implementation evidence" : executionReadinessText(row.zone.readiness)}</p>}
                 </td>
                 <td style={{ verticalAlign: "top", padding: 12, borderTop: "1px solid #dbe6f3", borderBottom: "1px solid #dbe6f3" }}>
                   <SecurityPolicyCell policies={row.allow} emptyLabel="No explicit allow rule shown" onSelectObject={onSelectObject} />
@@ -1170,7 +1219,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
         <div>
           <strong>{canvasTitle}</strong>
           <p className="muted" style={{ margin: "6px 0 0 0" }}>
-            Showing {visibleNodes.length} object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {friendlyScopeLabel(scope)}. {scope === "boundaries" ? "Policy rules are shown as readable matrix rows, not a raw relationship graph." : "Physical and WAN views show sites as containers, local ISP underlay separately, and VPN overlay tunnels terminating on edge devices."}
+            Showing {visibleNodes.length} object(s) and {visibleEdges.length} relationship(s). View: {mode}; scope: {friendlyScopeLabel(scope)}. {scope === "boundaries" ? "Policy rules are shown as readable matrix rows, not a raw relationship graph." : "Physical and WAN views show sites as containers, local ISP underlay separately, VPN overlay tunnels terminating on the security edge when present, and VLAN detail reserved for logical views."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1190,7 +1239,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
             {mode === "logical" ? phase97LogicalSiteGuides(visibleNodes, canvasBounds) : null}
             {phase99SiteContainers(visibleNodes, canvasBounds, mode, scope)}
             {(mode === "physical" || scope === "wan-cloud") ? phase97TopologyGuides(visibleNodes, canvasBounds, scope) : null}
-            {phase99TopologyLegend(scope)}
+            {phase101TopologyLegend(mode, scope)}
             {visibleEdges.map((edge) => {
               const source = nodeById.get(edge.sourceNodeId);
               const target = nodeById.get(edge.targetNodeId);
