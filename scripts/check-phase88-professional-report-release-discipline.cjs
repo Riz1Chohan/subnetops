@@ -14,8 +14,8 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE88-PROFESSIONAL-REPORT-RELEASE-DISCIPLINE.md');
 
 assert(runtime.includes('professionalReportHardening: "PHASE_88_PROFESSIONAL_REPORT_RELEASE_DISCIPLINE"'), 'runtime Phase 88 marker missing');
-assert(/version:\s*"0\.(8[8-9]|9[0-9])\.0"/.test(runtime), 'compatible runtime version missing for Phase 88 or later');
-assert(/"version":\s*"0\.(8[8-9]|9[0-9])\.0"/.test(pkg), 'compatible package version missing for Phase 88 or later');
+assert(/version:\s*"0\.(8[8-9]|9[0-9]|1[0-9]{2})\.0"/.test(runtime), 'compatible runtime version missing for Phase 88 or later');
+assert(/"version":\s*"0\.(8[8-9]|9[0-9]|1[0-9]{2})\.0"/.test(pkg), 'compatible package version missing for Phase 88 or later');
 assert(pkg.includes('check:phase88-professional-report-release-discipline'), 'Phase 88 check script not wired');
 assert(pkg.includes('check:phase84-88-release'), 'Phase 84-88 aggregate check missing');
 
@@ -26,8 +26,8 @@ assert(report.includes('replace(/\\bPHASE_\\d+_[A-Z0-9_]+\\b/g'), 'professional 
 assert(report.includes('reportMode === "professional" ? professionalizeReportForAudience(report) : report'), 'professional mode is not sanitized while technical/full-proof stays intact');
 assert(report.includes('if (reportMode === "full-proof") report.sections.push(phase40Section, phase42Section)'), 'full-proof report mode was accidentally removed');
 
-assert(phase84.includes('compatible runtime version') && phase84.includes('0\\.(8[4-9]|9[0-9])'), 'Phase 84 static check is still pinned to an obsolete runtime version');
-assert(phase85.includes('compatible runtime version') && phase85.includes('0\\.(8[5-9]|9[0-9])'), 'Phase 85 static check is still pinned to an obsolete runtime version');
+assert(phase84.includes('compatible runtime version') && phase84.includes('1[0-9]{2}'), 'Phase 84 static check is still pinned to an obsolete runtime version');
+assert(phase85.includes('compatible runtime version') && phase85.includes('1[0-9]{2}'), 'Phase 85 static check is still pinned to an obsolete runtime version');
 assert(!phase86.includes('runtime version was not advanced to 0.86.0') && phase86.includes('at least 0.86.0'), 'Phase 86 static check is still pinned to exactly 0.86.0');
 assert(docs.includes('PHASE_88_PROFESSIONAL_REPORT_RELEASE_DISCIPLINE'), 'Phase 88 doc marker missing');
 

@@ -12,8 +12,8 @@ const pkg = read('package.json');
 const docs = read('docs/doc/PHASE89-PROFESSIONAL-REPORT-AUDIENCE-CLEANUP.md');
 
 assert(runtime.includes('professionalAudienceCleanup: "PHASE_89_PROFESSIONAL_REPORT_AUDIENCE_CLEANUP"'), 'runtime Phase 89 marker missing');
-assert(/version:\s*"0\.(8[9]|9[0-9])\.0"/.test(runtime), 'compatible runtime version missing for Phase 89 or later');
-assert(/"version":\s*"0\.(8[9]|9[0-9])\.0"/.test(pkg), 'compatible package version missing for Phase 89 or later');
+assert(/version:\s*"0\.(8[9]|9[0-9]|1[0-9]{2})\.0"/.test(runtime), 'compatible runtime version missing for Phase 89 or later');
+assert(/"version":\s*"0\.(8[9]|9[0-9]|1[0-9]{2})\.0"/.test(pkg), 'compatible package version missing for Phase 89 or later');
 assert(pkg.includes('check:phase89-professional-report-audience-cleanup'), 'Phase 89 package script missing');
 assert(pkg.includes('check:phase84-89-release'), 'Phase 84-89 aggregate script missing');
 

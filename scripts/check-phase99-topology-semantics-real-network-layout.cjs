@@ -16,10 +16,10 @@ const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts')
 const canvas = read('frontend/src/features/diagram/components/BackendDiagramCanvas.tsx');
 const doc = read('docs/doc/PHASE99-TOPOLOGY-SEMANTICS-REAL-NETWORK-LAYOUT.md');
 
-assert(pkg.version === '0.99.0', 'root package version must be 0.99.0');
+assert(/^0\.(99|1[0-9]{2})\.0$/.test(pkg.version), 'root package version must be 0.99.0 or later Phase 100 compatible version');
 assert(pkg.scripts['check:phase99-topology-semantics-real-network-layout'], 'Phase 99 script missing');
 assert(pkg.scripts['check:phase84-99-release'], 'Phase 84-99 release chain missing');
-assert(runtime.includes('version: "0.99.0"'), 'runtime version not advanced to 0.99.0');
+assert(/version:\s*"0\.(99|1[0-9]{2})\.0"/.test(runtime), 'runtime version not advanced to 0.99.0 or later Phase 100 compatible version');
 assert(runtime.includes('topologySemanticsRealNetworkLayout: "PHASE_99_TOPOLOGY_SEMANTICS_REAL_NETWORK_LAYOUT"'), 'Phase 99 runtime marker missing');
 assert(canvas.includes('Phase 99: topology semantics now separate local Internet underlay, VPN overlay, and internal site handoff paths'), 'Phase 99 canvas marker missing');
 assert(canvas.includes('createLocalInternetNode'), 'local Internet breakout node factory missing');

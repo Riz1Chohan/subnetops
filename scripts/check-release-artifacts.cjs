@@ -11,6 +11,21 @@ const assert = (condition, message) => {
   }
 };
 
+function findForbiddenDirs(dir, names, results = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const full = path.join(dir, entry.name);
+    const rel = path.relative(root, full).replace(/\\/g, "/");
+    if (names.has(entry.name)) {
+      results.push(rel);
+      continue;
+    }
+    if (entry.name === ".git") continue;
+    findForbiddenDirs(full, names, results);
+  }
+  return results;
+}
+
 [
   "package.json",
   "README.md",
@@ -32,8 +47,8 @@ const assert = (condition, message) => {
 ].forEach((file) => assert(exists(file), `${file} missing`));
 
 const rootPkg = JSON.parse(read("package.json"));
-assert(rootPkg.version === "0.99.0", "root package version must be 0.99.0");
-assert(rootPkg.scripts["check:phase84-99-release"], "phase84-99 release chain missing");
+assert(/^0\.(99|1[0-9]{2})\.0$/.test(rootPkg.version), "root package version must be 0.99.0 or later Phase 100 compatible version");
+assert(rootPkg.scripts["check:phase84-99-release"] || rootPkg.scripts["check:phase84-100-release"], "phase84-99 or phase84-100 release chain missing");
 
 const render = read("render.yaml");
 assert(render.includes("subnetops-backend"), "render.yaml missing backend service");
@@ -49,5 +64,7 @@ const forbidden = [
 for (const item of forbidden) {
   assert(!exists(item), `${item} should not be committed in release package`);
 }
+const nestedForbidden = findForbiddenDirs(root, new Set(["node_modules", "dist"]));
+assert(nestedForbidden.length === 0, `nested build/dependency artifacts should not be committed: ${nestedForbidden.join(", ")}`);
 
 console.log("Release artifact integrity checks passed.");
