@@ -26,6 +26,7 @@ type ViewScope = { mode: DiagramMode; scope: DiagramScope };
 // Phase 102: edge-path truth makes security/VPN edge detection label-first, routes local ISP -> firewall/security edge -> core, and terminates branch VPN overlays on the HQ firewall when present.
 // Phase 103: enterprise-scale views collapse global 7+ site designs into summary cards/fabric layouts, reserve VLAN detail for per-site logical review, and stop WAN tunnels from becoming unreadable spaghetti.
 // Phase 104: enterprise WAN polish keeps Physical / Global free of overlay tunnels, renders WAN as vertical branch stubs into a shared fabric rail, prevents site-card overlap, and restores subnet detail in Logical / Per-site by default.
+// Phase 105: engineer-grade WAN topology removes all raw cross-site model edges from physical/WAN drawings, uses fixed enterprise site cards, and makes WAN fabric a single clean rail with branch stubs only.
 // Compatibility truth from Phase 99: Physical and WAN views separate local Internet underlay from VPN overlay and internal site handoffs.
 
 function professionalNodeKind(node: BackendDiagramRenderNode) {
@@ -340,6 +341,7 @@ const PHASE103_ENTERPRISE_SITE_THRESHOLD = 7;
 const PHASE103_SITE_SUMMARY_MARKER = "PHASE_103_SITE_SUMMARY_CARD";
 const PHASE103_VPN_FABRIC_ID = "phase103-ipsec-vpn-overlay-fabric";
 const PHASE104_ENTERPRISE_WAN_FABRIC_POLISH = "PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH";
+const PHASE105_ENGINEER_GRADE_WAN_TOPOLOGY = "PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY";
 
 function phase103SiteNodes(nodes: BackendDiagramRenderNode[]) {
   return nodes
@@ -392,6 +394,7 @@ function phase103ReadinessSummary(site: BackendDiagramRenderNode, allNodes: Back
 
 function phase103WithSiteSummary(site: BackendDiagramRenderNode, allNodes: BackendDiagramRenderNode[]): BackendDiagramRenderNode {
   void PHASE104_ENTERPRISE_WAN_FABRIC_POLISH;
+  void PHASE105_ENGINEER_GRADE_WAN_TOPOLOGY;
   const vlans = phase103SiteMembers(allNodes, site, "vlan");
   const subnets = phase103SiteMembers(allNodes, site, "subnet");
   const segments = vlans.map(phase103SegmentName).filter(Boolean);
@@ -620,9 +623,10 @@ function supplementPresentationEdges(nodes: BackendDiagramRenderNode[], edges: B
   if (scope === "boundaries") return edges;
   // Phase 100: physical and WAN diagrams are professional topology drawings, not raw relationship graphs.
   // Drop model-derived WAN/site/device summary edges first, then add deterministic underlay/overlay/handoff connectors.
-  const result = (mode === "physical" || scope === "wan-cloud")
-    ? edges.filter((edge) => edgeSemanticKind(edge) === "security-policy")
-    : [...edges];
+  // Phase 105: never let raw backend relationship/model edges leak into professional physical/WAN drawings.
+  // Those raw edges are what created the remaining diagonal spaghetti in 10-site projects.
+  // Security policy evidence belongs in the Security / Boundaries matrix, not in the WAN topology canvas.
+  const result: BackendDiagramRenderEdge[] = (mode === "physical" || scope === "wan-cloud") ? [] : [...edges];
   const sites = nodes.filter((node) => node.objectType === "site").sort((a, b) => siteRank(a) - siteRank(b) || a.label.localeCompare(b.label, undefined, { numeric: true }));
   const hq = sites.find((site) => /hq|head|primary/i.test(site.label)) ?? sites[0];
   // Phase 101: VPN must terminate on the security/VPN edge when a firewall exists.
@@ -815,18 +819,24 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
     const enterprise = isPhase103EnterpriseScale(nodes);
     const vpnFabric = nodes.find(isPhase103VpnFabric);
     if (hq) {
-      set(hq, 760, 160);
-      setLocalInternet(hq, 630, 285);
-      setEdgePair(hq, 630, 890, 425);
+      set(hq, 760, 150);
+      setLocalInternet(hq, 610, 220);
+      setEdgePair(hq, 610, 910, 340);
     }
-    if (vpnFabric) set(vpnFabric, 760, 610);
-    const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
+    if (vpnFabric) set(vpnFabric, 760, 520);
+    // Phase 105: enterprise WAN uses a compact fabric board, not a 3-column vertical scroll wall.
+    // Ten-site projects become 5 columns x 2 rows, which reads like an engineer-facing WAN summary.
+    const columns = enterprise ? (branches.length >= 8 ? 5 : 4) : Math.min(4, Math.max(1, branches.length));
+    const startX = enterprise ? (columns >= 5 ? 300 : 390) : (branches.length === 1 ? 760 : 320);
+    const gapX = enterprise ? 340 : 390;
+    const startY = enterprise ? 710 : 700;
+    const gapY = enterprise ? 320 : 255;
     branches.forEach((site, index) => {
-      const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 320 + (index % columns) * 390);
-      const y = enterprise ? 850 + Math.floor(index / columns) * 440 : 700 + Math.floor(index / columns) * 255;
+      const x = startX + (index % columns) * gapX;
+      const y = startY + Math.floor(index / columns) * gapY;
       set(site, x, y);
-      setLocalInternet(site, x - 95, y + 112);
-      setEdgePair(site, x - 95, x + 95, y + 245);
+      setLocalInternet(site, x - 70, y + 78);
+      setEdgePair(site, x - 70, x + 88, y + 210);
     });
     return { nodes: [...byId.values()], edges };
   }
@@ -862,22 +872,25 @@ function layoutNodesForView(params: PreparedDiagram & { mode: DiagramMode; scope
   }
 
   // Physical global: hub/WAN view with a clean branch fan-out.
-  // Phase 99 refinement: HQ is the hub, branches are spokes, and Internet is local underlay per site.
+  // Physical global: equipment/site inventory view, not a WAN overlay view.
+  // Phase 105: no VPN fabric, no cross-site tunnel rail, and no long inter-site edges in Physical / Global.
   const enterprise = isPhase103EnterpriseScale(nodes);
-  const vpnFabric = nodes.find(isPhase103VpnFabric);
   if (hq) {
     set(hq, 760, 145);
-    setLocalInternet(hq, 630, 255);
-    setEdgePair(hq, 630, 890, 380);
+    setLocalInternet(hq, 610, 220);
+    setEdgePair(hq, 610, 910, 340);
   }
-  if (vpnFabric) set(vpnFabric, 760, 570);
-  const columns = enterprise ? 3 : Math.min(4, Math.max(1, branches.length));
+  const columns = enterprise ? (branches.length >= 8 ? 5 : 4) : Math.min(4, Math.max(1, branches.length));
+  const startX = enterprise ? (columns >= 5 ? 300 : 390) : (branches.length === 1 ? 760 : 260);
+  const gapX = enterprise ? 340 : 360;
+  const startY = enterprise ? 650 : 675;
+  const gapY = enterprise ? 300 : 265;
   branches.forEach((site, index) => {
-    const x = enterprise ? 340 + (index % columns) * 430 : (branches.length === 1 ? 760 : 260 + (index % columns) * 360);
-    const y = enterprise ? 820 + Math.floor(index / columns) * 420 : 675 + Math.floor(index / columns) * 265;
+    const x = startX + (index % columns) * gapX;
+    const y = startY + Math.floor(index / columns) * gapY;
     set(site, x, y);
-    setLocalInternet(site, x - 85, y + 105);
-    setEdgePair(site, x - 85, x + 95, y + 220);
+    setLocalInternet(site, x - 70, y + 78);
+    setEdgePair(site, x - 70, x + 88, y + 205);
   });
   return { nodes: [...byId.values()], edges };
 }
@@ -1199,7 +1212,8 @@ function phase97LogicalSiteGuides(nodes: BackendDiagramRenderNode[], bounds: Can
 
 function phase97TopologyGuides(nodes: BackendDiagramRenderNode[], bounds: CanvasBounds, scope: DiagramScope) {
   const localInternetNodes = nodes.filter(isPhase99LocalInternet);
-  const vpnFabric = nodes.find(isPhase103VpnFabric);
+  // Phase 105: a fabric guide is only valid in WAN / Cloud. Physical / Global must not show overlay fabric furniture.
+  const vpnFabric = scope === "wan-cloud" ? nodes.find(isPhase103VpnFabric) : undefined;
   if (localInternetNodes.length === 0 && !vpnFabric) return null;
   return (
     <g className="phase99-topology-guides" aria-hidden="true">
@@ -1230,6 +1244,29 @@ function phase99SiteContainers(nodes: BackendDiagramRenderNode[], bounds: Canvas
   if (scope === "boundaries" || (mode !== "physical" && scope !== "wan-cloud")) return null;
   const sites = nodes.filter((node) => node.objectType === "site");
   if (sites.length === 0) return null;
+  const enterpriseFixedCards = isPhase103EnterpriseScale(nodes) && (scope === "wan-cloud" || (mode === "physical" && scope === "global"));
+  if (enterpriseFixedCards) {
+    return (
+      <g className="phase105-enterprise-site-cards" aria-hidden="true">
+        {sites.map((site) => {
+          const point = nodePoint(site, bounds);
+          const isHub = siteRank(site) < 0;
+          const width = isHub ? 500 : 300;
+          const height = isHub ? 310 : 285;
+          const left = point.x - width / 2;
+          const top = point.y - 72;
+          return (
+            <g key={`phase105-site-card-${site.id}`}>
+              <rect x={left} y={top} width={width} height={height} rx={24} fill="#f8fbff" stroke="#b9c9df" strokeWidth="1.5" opacity="0.68" />
+              <rect x={left} y={top} width={width} height={46} rx={24} fill="#f3f8ff" stroke="none" opacity="0.7" />
+              <text x={left + 20} y={top + 29} fontSize="13" fontWeight={900} fill="#334762">{cleanCanvasLabel(site.label, 38)}</text>
+              <text x={left + width - 20} y={top + 29} textAnchor="end" fontSize="10" fontWeight={900} fill="#40699f">{isHub ? "HQ / hub" : "Branch / spoke"}</text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
   return (
     <g className="phase99-site-containers" aria-hidden="true">
       {sites.map((site) => {
@@ -1397,7 +1434,7 @@ function SecurityPolicyMatrixPanel({ nodes, edges, filteredEvidenceCount, onSele
                   >
                     {fullCanvasLabel(row.zone.label)}
                   </button>
-                  {row.zone.readiness === "ready" ? null : <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>{row.zone.readiness === "blocked" ? "Needs implementation evidence" : executionReadinessText(row.zone.readiness)}</p>}
+                  {row.zone.readiness === "blocked" ? <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>Implementation blocker</p> : null}
                 </td>
                 <td style={{ verticalAlign: "top", padding: 12, borderTop: "1px solid #dbe6f3", borderBottom: "1px solid #dbe6f3" }}>
                   <SecurityPolicyCell policies={row.allow} emptyLabel="No explicit allow rule shown" onSelectObject={onSelectObject} />
