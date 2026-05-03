@@ -18,6 +18,23 @@ run_migrate_deploy() {
   npx prisma migrate deploy
 }
 
+recover_known_v1_migration_drift() {
+  echo "Checking for known V1 brownfield migration drift..."
+  if node ./scripts/recover-v1-brownfield-migration.mjs; then
+    echo "Resolving Prisma history for 20260429103000_v1_brownfield_conflict_resolution."
+    npx prisma migrate resolve --applied 20260429103000_v1_brownfield_conflict_resolution
+    return 0
+  fi
+
+  recovery_status=$?
+  if [ "$recovery_status" = "2" ]; then
+    echo "No targeted V1 brownfield migration recovery was applicable."
+  else
+    echo "Targeted V1 brownfield migration recovery failed with status $recovery_status."
+  fi
+  return "$recovery_status"
+}
+
 if [ "$PRISMA_SYNC_ON_BOOT" = "true" ]; then
   if [ "$PRISMA_SYNC_STRATEGY" = "migrate" ]; then
     if run_migrate_deploy; then
@@ -25,7 +42,11 @@ if [ "$PRISMA_SYNC_ON_BOOT" = "true" ]; then
     else
       status=$?
       echo "Prisma migrate deploy failed with status $status."
-      if [ "$PRISMA_BASELINE_EXISTING_DB" = "true" ]; then
+
+      if recover_known_v1_migration_drift; then
+        echo "Retrying Prisma migrate deploy after targeted V1 migration recovery."
+        run_migrate_deploy
+      elif [ "$PRISMA_BASELINE_EXISTING_DB" = "true" ]; then
         echo "PRISMA_BASELINE_EXISTING_DB=true: marking existing migrations as applied, then retrying migrate deploy."
         for migration_dir in prisma/migrations/*; do
           if [ -d "$migration_dir" ]; then
@@ -39,6 +60,7 @@ if [ "$PRISMA_SYNC_ON_BOOT" = "true" ]; then
         echo "Migration failed. If this is an existing Render DB previously created with prisma db push, either:"
         echo "  1) create a fresh empty database, or"
         echo "  2) temporarily set PRISMA_BASELINE_EXISTING_DB=true for one deploy, then set it back to false."
+        echo "This deploy also checks for the known V1 brownfield relation-exists drift automatically."
         exit "$status"
       fi
     fi
