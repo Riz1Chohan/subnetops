@@ -1109,6 +1109,52 @@ export async function getCsvRows(projectId: string) {
       }
     }
 
+
+
+    if (designCore.phase7StandardsRulebookControl) {
+      const phase7 = designCore.phase7StandardsRulebookControl;
+      rows.push({
+        Section: "Phase 7 Standards Rulebook Contract",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: phase7.contractVersion,
+        Value: `${phase7.overallReadiness} | ${phase7.passRuleCount} pass / ${phase7.blockingRuleCount} block / ${phase7.reviewRuleCount} review / ${phase7.warningRuleCount} warn`,
+        Notes: `Applicable ${phase7.applicableRuleCount}/${phase7.ruleCount}; requirement-activated ${phase7.requirementActivatedRuleCount}; exceptions required ${phase7.exceptionRequiredRuleCount}; role ${phase7.rulebookRole}`,
+      });
+
+      for (const row of phase7.ruleRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 7 Active Standards Rules",
+          Scope: row.enforcementState,
+          Name: row.ruleId,
+          Key: row.severity,
+          Value: row.title,
+          Notes: `Applicability: ${row.applicabilityCondition}; engines: ${joinCsvList(row.affectedEngines, "none")}; requirements: ${joinCsvList(row.requirementRelationships, "none")}; remediation: ${row.remediationGuidance}; exception: ${row.exceptionPolicy}`,
+        });
+      }
+
+      for (const activation of phase7.requirementActivations.slice(0, 80)) {
+        rows.push({
+          Section: "Phase 7 Requirement-to-Standards Activation",
+          Scope: activation.readinessImpact,
+          Name: activation.requirementKey,
+          Key: activation.lifecycleStatus,
+          Value: joinCsvList(activation.activatedRuleIds, "No standards rule activated"),
+          Notes: `Blocking ${joinCsvList(activation.blockingRuleIds, "none")}; review ${joinCsvList(activation.reviewRuleIds, "none")}; evidence ${joinCsvList(activation.evidence, "none")}`,
+        });
+      }
+
+      for (const finding of phase7.findings.slice(0, 80)) {
+        rows.push({
+          Section: "Phase 7 Standards Findings",
+          Scope: finding.severity,
+          Name: finding.ruleId,
+          Key: finding.code,
+          Value: finding.title,
+          Notes: `${finding.detail}; remediation ${finding.remediationGuidance}`,
+        });
+      }
+    }
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;
       rows.push({

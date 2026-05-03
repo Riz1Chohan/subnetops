@@ -158,6 +158,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const phase4CidrAddressingTruth = designCore.phase4CidrAddressingTruth && typeof designCore.phase4CidrAddressingTruth === "object" ? designCore.phase4CidrAddressingTruth : null;
   const phase5EnterpriseIpamTruth = designCore.phase5EnterpriseIpamTruth && typeof designCore.phase5EnterpriseIpamTruth === "object" ? designCore.phase5EnterpriseIpamTruth : null;
   const phase6DesignCoreOrchestrator = designCore.phase6DesignCoreOrchestrator && typeof designCore.phase6DesignCoreOrchestrator === "object" ? designCore.phase6DesignCoreOrchestrator : null;
+  const phase7StandardsRulebookControl = designCore.phase7StandardsRulebookControl && typeof designCore.phase7StandardsRulebookControl === "object" ? designCore.phase7StandardsRulebookControl : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -492,6 +493,70 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       });
     }
 
+
+
+    if (includeTechnicalEvidence && phase7StandardsRulebookControl) {
+      const phase7RuleRows = asArray(phase7StandardsRulebookControl?.ruleRows)
+        .slice(0, 30)
+        .map((row: any) => [
+          asString(row.ruleId, "rule"),
+          asString(row.enforcementState, "review"),
+          asString(row.severity, "WARNING"),
+          joinText(asArray(row.requirementRelationships).slice(0, 5), "—"),
+          asString(row.remediationGuidance, "—"),
+        ]);
+
+      const phase7RequirementRows = asArray(phase7StandardsRulebookControl?.requirementActivations)
+        .slice(0, 24)
+        .map((item: any) => [
+          asString(item.requirementKey, "requirement"),
+          asString(item.lifecycleStatus, "captured"),
+          asString(item.readinessImpact, "review"),
+          joinText(asArray(item.activatedRuleIds).slice(0, 5), "—"),
+          joinText(asArray(item.evidence).slice(0, 2), "—"),
+        ]);
+
+      const phase7FindingRows = asArray(phase7StandardsRulebookControl?.findings)
+        .slice(0, 24)
+        .map((finding: any) => [
+          asString(finding.ruleId, "rule"),
+          asString(finding.severity, "WARNING"),
+          asString(finding.affectedEngine, "standards"),
+          asString(finding.title, "finding"),
+          asString(finding.remediationGuidance, "—"),
+        ]);
+
+      report.sections.push({
+        title: "Phase 7 Standards Alignment / Rulebook Contract",
+        summary: "Standards are evaluated as active rules with applicability, severity, affected engines/objects, requirement relationships, remediation guidance, and exception policy. They are not decorative credibility text.",
+        tables: [
+          {
+            title: "Phase 7 Rulebook Summary",
+            headers: ["Gate", "Status", "Evidence"],
+            rows: [
+              ["Contract", asString(phase7StandardsRulebookControl.contractVersion, "missing"), asString(phase7StandardsRulebookControl.rulebookRole, "active rulebook")],
+              ["Overall readiness", asString(phase7StandardsRulebookControl.overallReadiness, "review"), `${phase7StandardsRulebookControl.passRuleCount ?? 0} pass; ${phase7StandardsRulebookControl.blockingRuleCount ?? 0} block; ${phase7StandardsRulebookControl.reviewRuleCount ?? 0} review; ${phase7StandardsRulebookControl.warningRuleCount ?? 0} warning.`],
+              ["Requirement activation", `${phase7StandardsRulebookControl.requirementActivatedRuleCount ?? 0} rule(s)`, `${phase7StandardsRulebookControl.exceptionRequiredRuleCount ?? 0} exception/review item(s); ${phase7StandardsRulebookControl.findings?.length ?? 0} finding(s).`],
+            ],
+          },
+          {
+            title: "Phase 7 Active Standards Rules",
+            headers: ["Rule", "State", "Severity", "Requirement relationship", "Remediation"],
+            rows: compactRows(phase7RuleRows, [["No Phase 7 rule rows", "—", "—", "—", "—"]]),
+          },
+          {
+            title: "Phase 7 Requirement-to-Standards Activation",
+            headers: ["Requirement", "Lifecycle", "Readiness", "Activated rules", "Evidence"],
+            rows: compactRows(phase7RequirementRows, [["No Phase 7 requirement activation rows", "—", "not-applicable", "—", "—"]]),
+          },
+          {
+            title: "Phase 7 Standards Findings",
+            headers: ["Rule", "Severity", "Affected engine", "Finding", "Remediation"],
+            rows: compactRows(phase7FindingRows, [["No Phase 7 standards findings", "INFO", "—", "—", "—"]]),
+          },
+        ],
+      });
+    }
     if (includeTechnicalEvidence && enterpriseAllocatorPosture) {
       addressingSection.tables.push({
         title: "Enterprise Address Allocator Readiness",

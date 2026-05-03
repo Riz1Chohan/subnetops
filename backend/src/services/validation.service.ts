@@ -1060,6 +1060,22 @@ export async function runValidation(projectId: string) {
     }
   }
 
+
+  if (designSnapshot?.phase7StandardsRulebookControl) {
+    const phase7 = designSnapshot.phase7StandardsRulebookControl;
+    for (const finding of phase7.findings) {
+      results.push(makeItem({
+        projectId,
+        severity: finding.severity === "BLOCKING" ? "ERROR" : finding.severity === "INFO" ? "INFO" : "WARNING",
+        ruleCode: finding.code,
+        title: finding.title,
+        message: `${finding.detail} Affected engine: ${finding.affectedEngine}.`,
+        entityType: "PROJECT",
+        entityId: projectId,
+      }));
+    }
+  }
+
   addRequirementsHonestyValidation(results, projectId, project, designSnapshot);
 
   if (results.length === 0) {

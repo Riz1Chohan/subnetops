@@ -1227,6 +1227,112 @@ export function ProjectOverviewPage() {
           )}
         </div>
 
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 7 standards rulebook control</h2>
+          {designCore?.phase7StandardsRulebookControl ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.phase7StandardsRulebookControl.overallReadiness)}
+                {summaryCard("Applicable rules", `${designCore.phase7StandardsRulebookControl.applicableRuleCount}/${designCore.phase7StandardsRulebookControl.ruleCount}`)}
+                {summaryCard("Blockers", designCore.phase7StandardsRulebookControl.blockingRuleCount)}
+                {summaryCard("Req-linked rules", designCore.phase7StandardsRulebookControl.requirementActivatedRuleCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 7 makes standards active: every standards row carries applicability, severity, affected engines/objects, remediation, exception policy, and requirement relationships. This page displays backend standards truth; it does not invent pass/fail status.
+              </p>
+              {designCore.phase7StandardsRulebookControl.overallReadiness === "BLOCKED" ? (
+                <div className="trust-note danger">
+                  <strong>Standards blockers remain.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Required standards failures must block false implementation readiness until remediated or explicitly exception-reviewed.</p>
+                </div>
+              ) : designCore.phase7StandardsRulebookControl.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Standards are active but review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Some rules need engineering review or exception evidence before the design can be treated as clean.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>Phase 7 found no standards blockers or review-required rule gaps.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Rule</th>
+                      <th align="left">State</th>
+                      <th align="left">Requirement relationship</th>
+                      <th align="left">Affected engines</th>
+                      <th align="left">Remediation / exception</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase7StandardsRulebookControl.ruleRows.slice(0, 18).map((row) => (
+                      <tr key={row.ruleId}>
+                        <td>{row.ruleId}<br /><span className="muted">{row.title}</span></td>
+                        <td>{row.enforcementState}<br /><span className="muted">{row.severity} / {row.strength}</span></td>
+                        <td>{row.requirementRelationships.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{row.affectedEngines.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{row.remediationGuidance}<br /><span className="muted">Exception: {row.exceptionPolicy}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Activated rules</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase7StandardsRulebookControl.requirementActivations.slice(0, 14).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.requirementValue}</span></td>
+                        <td>{item.lifecycleStatus}</td>
+                        <td>{item.readinessImpact}</td>
+                        <td>{item.activatedRuleIds.slice(0, 6).join(", ") || "—"}</td>
+                        <td>{item.evidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.phase7StandardsRulebookControl.findings.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Severity</th>
+                        <th align="left">Affected engine</th>
+                        <th align="left">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.phase7StandardsRulebookControl.findings.slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.ruleId}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.severity}<br /><span className="muted">{finding.code}</span></td>
+                          <td>{finding.affectedEngine}</td>
+                          <td>{finding.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 7 standards rulebook control is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (

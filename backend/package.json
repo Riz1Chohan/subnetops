@@ -37,7 +37,8 @@
     "engine:selftest:phase75-golden-requirements": "tsx src/services/requirementsGoldenScenarios.selftest.ts",
     "engine:selftest:phase4-addressing": "tsx src/lib/phase4CidrAddressing.selftest.ts",
     "engine:selftest:phase5-enterprise-ipam": "tsx src/lib/phase5EnterpriseIpam.selftest.ts",
-    "engine:selftest:phase6-design-core-orchestrator": "tsx src/lib/phase6DesignCoreOrchestrator.selftest.ts"
+    "engine:selftest:phase6-design-core-orchestrator": "tsx src/lib/phase6DesignCoreOrchestrator.selftest.ts",
+    "engine:selftest:phase7-standards-rulebook": "tsx src/lib/phase7StandardsRulebook.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

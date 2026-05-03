@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "check:phase7-standards-rulebook": "node scripts/check-phase7-standards-rulebook.cjs",
+    "check:phase7-107-release": "npm run check:phase7-standards-rulebook && npm run check:phase6-107-release",
     "check:phase6-design-core-orchestrator": "node scripts/check-phase6-design-core-orchestrator.cjs",
     "check:phase6-107-release": "npm run check:phase6-design-core-orchestrator && npm run check:phase5-107-release",
     "check:phase5-enterprise-ipam": "node scripts/check-phase5-enterprise-ipam.cjs",

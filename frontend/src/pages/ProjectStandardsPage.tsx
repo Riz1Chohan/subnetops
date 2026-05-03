@@ -103,6 +103,41 @@ export function ProjectStandardsPage() {
         </div>
       </div>
 
+
+
+      {designCore?.phase7StandardsRulebookControl ? (
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <div className="summary-grid">
+            {kpiCard("Rulebook readiness", designCore.phase7StandardsRulebookControl.overallReadiness, "Backend-evaluated standards state.")}
+            {kpiCard("Applicable rules", `${designCore.phase7StandardsRulebookControl.applicableRuleCount}/${designCore.phase7StandardsRulebookControl.ruleCount}`, "Rules with active applicability.")}
+            {kpiCard("Standards blockers", designCore.phase7StandardsRulebookControl.blockingRuleCount, "Must block false readiness.")}
+            {kpiCard("Requirement-linked", designCore.phase7StandardsRulebookControl.requirementActivatedRuleCount, "Rules activated by saved requirements.")}
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Rule</th>
+                  <th align="left">State</th>
+                  <th align="left">Applicability</th>
+                  <th align="left">Remediation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {designCore.phase7StandardsRulebookControl.ruleRows.slice(0, 12).map((row) => (
+                  <tr key={row.ruleId}>
+                    <td>{row.ruleId}<br /><span className="muted">{row.title}</span></td>
+                    <td>{row.enforcementState}<br /><span className="muted">{row.severity}</span></td>
+                    <td>{row.applicabilityCondition}</td>
+                    <td>{row.remediationGuidance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {kpiCard("Standards", synthesized.configurationStandards.length, "Core rules engineers should follow across the environment.")}
         {kpiCard("Template artifacts", synthesized.configurationTemplates.length, "Reusable build artifacts for device roles and control planes.")}

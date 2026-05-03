@@ -460,6 +460,72 @@ export interface StandardsAlignmentSummary {
   notes: string[];
 }
 
+export type Phase7StandardsApplicabilityState = "APPLICABLE" | "NOT_APPLICABLE" | "REVIEW_REQUIRED" | "UNSUPPORTED";
+export type Phase7StandardsSeverity = "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO";
+export type Phase7StandardsEnforcementState = "PASS" | "WARN" | "BLOCK" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+export type Phase7StandardsReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+
+export interface Phase7StandardsRuleRow {
+  ruleId: string;
+  title: string;
+  authority: StandardsRule["authority"];
+  strength: StandardsRule["strength"];
+  applicabilityState: Phase7StandardsApplicabilityState;
+  applicabilityCondition: string;
+  severity: Phase7StandardsSeverity;
+  enforcementState: Phase7StandardsEnforcementState;
+  affectedEngines: string[];
+  affectedObjectIds: string[];
+  remediationGuidance: string;
+  requirementRelationships: string[];
+  exceptionPolicy: string;
+  evidence: string[];
+  notes: string[];
+}
+
+export interface Phase7StandardsRequirementActivation {
+  requirementKey: string;
+  requirementValue: string;
+  lifecycleStatus: RequirementPropagationLifecycleStatus;
+  activatedRuleIds: string[];
+  blockingRuleIds: string[];
+  reviewRuleIds: string[];
+  readinessImpact: "PASSED" | "REVIEW_REQUIRED" | "BLOCKING" | "NOT_APPLICABLE";
+  evidence: string[];
+}
+
+export interface Phase7StandardsFinding {
+  id: string;
+  severity: Phase7StandardsSeverity;
+  code: "STANDARDS_RULE_BLOCKER" | "STANDARDS_RULE_REVIEW_REQUIRED" | "STANDARDS_RULE_WARNING";
+  ruleId: string;
+  title: string;
+  detail: string;
+  affectedEngine: string;
+  affectedObjectIds: string[];
+  remediationGuidance: string;
+  readinessImpact: Phase7StandardsSeverity;
+}
+
+export interface Phase7StandardsAlignmentRulebookControlSummary {
+  contractVersion: "PHASE7_STANDARDS_ALIGNMENT_RULEBOOK_CONTRACT";
+  rulebookRole: "ACTIVE_STANDARDS_RULEBOOK_NOT_DECORATIVE_TEXT";
+  ruleCount: number;
+  applicableRuleCount: number;
+  passRuleCount: number;
+  warningRuleCount: number;
+  reviewRuleCount: number;
+  blockingRuleCount: number;
+  notApplicableRuleCount: number;
+  requirementActivatedRuleCount: number;
+  exceptionRequiredRuleCount: number;
+  overallReadiness: Phase7StandardsReadiness;
+  ruleRows: Phase7StandardsRuleRow[];
+  requirementActivations: Phase7StandardsRequirementActivation[];
+  findings: Phase7StandardsFinding[];
+  notes: string[];
+}
+
 export interface ActivePlanningInputSummary {
   sourceArea: PlanningInputAuditItem["sourceArea"];
   key: string;
@@ -1991,6 +2057,7 @@ export interface DesignCoreSnapshot {
   phase4CidrAddressingTruth: Phase4CidrAddressingTruthControlSummary;
   phase5EnterpriseIpamTruth: Phase5EnterpriseIpamTruthControlSummary;
   phase6DesignCoreOrchestrator: Phase6DesignCoreOrchestratorControlSummary;
+  phase7StandardsRulebookControl: Phase7StandardsAlignmentRulebookControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;
   requirementsScenarioProof: RequirementsScenarioProofSummary;

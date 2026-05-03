@@ -44,6 +44,7 @@ import { buildPhase3RequirementsClosureControl } from "./designCore/designCore.p
 import { buildPhase4CidrAddressingTruthControl } from "./designCore/designCore.phase4CidrAddressingTruthControl.js";
 import { buildPhase5EnterpriseIpamTruthControl } from "./designCore/designCore.phase5EnterpriseIpamTruthControl.js";
 import { buildPhase6DesignCoreOrchestratorControl } from "./designCore/designCore.phase6DesignCoreOrchestratorControl.js";
+import { buildPhase7StandardsRulebookControl } from "./designCore/designCore.phase7StandardsRulebookControl.js";
 import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
@@ -1492,6 +1493,16 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     issues,
   });
 
+  // PHASE7_STANDARDS_ALIGNMENT_RULEBOOK_CONTRACT: active standards applicability/severity/remediation proof surface.
+  const phase7StandardsRulebookControl = buildPhase7StandardsRulebookControl({
+    requirementsJson: project.requirementsJson,
+    siteCount: project.sites.length,
+    standardsAlignment,
+    phase3RequirementsClosure,
+    networkObjectModel,
+    issues,
+  });
+
   return {
     projectId: project.id,
     projectName: project.name,
@@ -1535,6 +1546,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     phase4CidrAddressingTruth,
     phase5EnterpriseIpamTruth,
     phase6DesignCoreOrchestrator,
+    phase7StandardsRulebookControl,
     requirementsCoverage,
     requirementsImpactClosure,
     requirementsScenarioProof,
