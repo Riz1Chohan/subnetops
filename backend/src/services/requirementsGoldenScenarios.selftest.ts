@@ -539,6 +539,10 @@ async function runScenario(scenario: GoldenScenario) {
   assert(snapshot.requirementsScenarioProof.expectedSignalCount >= scenario.expectedScenarioSignalsAtLeast, `${scenario.id}: scenario proof signal count too low`);
   assert(snapshot.requirementsScenarioProof.passedSignalCount >= scenario.expectedScenarioPassesAtLeast, `${scenario.id}: scenario proof passed ${snapshot.requirementsScenarioProof.passedSignalCount}/${snapshot.requirementsScenarioProof.expectedSignalCount}, expected at least ${scenario.expectedScenarioPassesAtLeast}`);
   assert(snapshot.requirementsScenarioProof.passedSignalCount > 0, `${scenario.id}: scenario proof regressed to 0 passed signals`);
+  assert(snapshot.phase3RequirementsClosure.contractVersion === "PHASE3_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF", `${scenario.id}: Phase 3 closure contract missing`);
+  assert(snapshot.phase3RequirementsClosure.activeRequirementCount > 0, `${scenario.id}: Phase 3 closure found no active requirements`);
+  assert(snapshot.phase3RequirementsClosure.closureMatrix.length >= snapshot.phase2RequirementsMaterialization.totalPolicyCount, `${scenario.id}: Phase 3 closure matrix did not cover Phase 2 policy rows`);
+  assert(snapshot.phase3RequirementsClosure.goldenScenarioClosures.some((item) => item.relevant), `${scenario.id}: Phase 3 did not mark any golden scenario relevant`);
 
   return {
     id: scenario.id,
@@ -551,6 +555,8 @@ async function runScenario(scenario: GoldenScenario) {
     routeIntents: snapshot.networkObjectModel.routingSegmentation.summary.routeIntentCount,
     scenarioProof: `${snapshot.requirementsScenarioProof.passedSignalCount}/${snapshot.requirementsScenarioProof.expectedSignalCount}`,
     scenarioStatus: snapshot.requirementsScenarioProof.status,
+    phase3Closure: `${snapshot.phase3RequirementsClosure.fullPropagatedCount}/${snapshot.phase3RequirementsClosure.activeRequirementCount}`,
+    phase3Blocked: snapshot.phase3RequirementsClosure.blockedCount,
   };
 }
 

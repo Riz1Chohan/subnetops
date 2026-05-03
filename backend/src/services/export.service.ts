@@ -946,6 +946,39 @@ export async function getCsvRows(projectId: string) {
       });
     }
 
+    if (designCore.phase3RequirementsClosure) {
+      rows.push({
+        Section: "Phase 3 Requirements Closure",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: designCore.phase3RequirementsClosure.contractVersion,
+        Value: `${designCore.phase3RequirementsClosure.fullPropagatedCount} full / ${designCore.phase3RequirementsClosure.partialPropagatedCount} partial / ${designCore.phase3RequirementsClosure.reviewRequiredCount} review / ${designCore.phase3RequirementsClosure.blockedCount} blocked`,
+        Notes: `Missing consumers ${designCore.phase3RequirementsClosure.missingConsumerCount}; active requirements ${designCore.phase3RequirementsClosure.activeRequirementCount}`,
+      });
+
+      for (const item of designCore.phase3RequirementsClosure.closureMatrix.filter((field) => field.active || field.consumerCoverage.captured).slice(0, 80)) {
+        rows.push({
+          Section: "Phase 3 Requirements Closure",
+          Scope: item.category,
+          Name: item.label,
+          Key: item.lifecycleStatus,
+          Value: joinCsvList(item.actualAffectedEngines, "No actual consumers recorded"),
+          Notes: `Requirement key ${item.key} | readiness ${item.readinessImpact} | missing ${joinCsvList(item.missingConsumers, "none")} | evidence ${joinCsvList(item.evidence, "none")}`,
+        });
+      }
+
+      for (const scenario of designCore.phase3RequirementsClosure.goldenScenarioClosures.filter((item) => item.relevant)) {
+        rows.push({
+          Section: "Phase 3 Golden Scenario Closure",
+          Scope: scenario.id,
+          Name: scenario.label,
+          Key: scenario.lifecycleStatus,
+          Value: joinCsvList(scenario.requiredRequirementKeys, "No keys recorded"),
+          Notes: `Blocking ${joinCsvList(scenario.blockingRequirementKeys, "none")} | Review ${joinCsvList(scenario.reviewRequirementKeys, "none")} | Missing ${joinCsvList(scenario.missingRequirementKeys, "none")}`,
+        });
+      }
+    }
+
 
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;

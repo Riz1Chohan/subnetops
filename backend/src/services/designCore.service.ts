@@ -40,6 +40,7 @@ import {
 import { getProjectDesignData } from "./designCore/designCore.repository.js";
 import { buildNetworkObjectModel } from "./designCore/designCore.networkObjectModel.js";
 import { buildPhase1PlanningTraceabilityControl } from "./designCore/designCore.phase1TraceabilityControl.js";
+import { buildPhase3RequirementsClosureControl } from "./designCore/designCore.phase3RequirementsClosureControl.js";
 import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
@@ -1424,6 +1425,17 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     implementationPlan: networkObjectModel.implementationPlan,
   });
 
+  const phase3RequirementsClosure = buildPhase3RequirementsClosureControl({
+    phase2RequirementsMaterialization,
+    requirementsImpactClosure,
+    requirementsScenarioProof,
+    traceability,
+    addressingRows,
+    networkObjectModel,
+    reportTruth,
+    diagramTruth,
+  });
+
   return {
     projectId: project.id,
     projectName: project.name,
@@ -1463,6 +1475,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     planningInputDiscipline,
     phase1TraceabilityControl,
     phase2RequirementsMaterialization,
+    phase3RequirementsClosure,
     requirementsCoverage,
     requirementsImpactClosure,
     requirementsScenarioProof,

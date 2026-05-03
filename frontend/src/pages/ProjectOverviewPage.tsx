@@ -847,6 +847,85 @@ export function ProjectOverviewPage() {
           )}
         </div>
 
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 3 requirements closure matrix</h2>
+          {designCore?.phase3RequirementsClosure ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Active requirements", designCore.phase3RequirementsClosure.activeRequirementCount)}
+                {summaryCard("Full propagation", designCore.phase3RequirementsClosure.fullPropagatedCount)}
+                {summaryCard("Review/blocking", designCore.phase3RequirementsClosure.reviewRequiredCount + designCore.phase3RequirementsClosure.blockedCount)}
+                {summaryCard("Missing consumers", designCore.phase3RequirementsClosure.missingConsumerCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 3 is the nothing-got-lost checker. Each active requirement must prove capture, normalization, materialization or explicit review, backend consumption, readiness impact, frontend visibility, report/export evidence, and diagram impact when relevant. Missing consumers stay visible instead of being hidden.
+              </p>
+              {designCore.phase3RequirementsClosure.blockedCount > 0 || designCore.phase3RequirementsClosure.reviewRequiredCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Some requirements are still blocked or review-required.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.phase3RequirementsClosure.blockedCount} blocked, {designCore.phase3RequirementsClosure.reviewRequiredCount} review-required, {designCore.phase3RequirementsClosure.partialPropagatedCount} partially propagated.
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Phase 3 found no blocked or review-required active requirement rows.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Actual engines</th>
+                      <th align="left">Missing consumers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase3RequirementsClosure.closureMatrix.filter((item) => item.active || item.consumerCoverage.captured).slice(0, 18).map((item) => (
+                      <tr key={item.requirementId}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.lifecycleStatus}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{item.readinessImpact}</td>
+                        <td>{item.actualAffectedEngines.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{item.missingConsumers.slice(0, 5).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Golden scenario</th>
+                      <th align="left">Status</th>
+                      <th align="left">Required keys</th>
+                      <th align="left">Blocking / review keys</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase3RequirementsClosure.goldenScenarioClosures.filter((item) => item.relevant).slice(0, 10).map((scenario) => (
+                      <tr key={scenario.id}>
+                        <td>{scenario.label}</td>
+                        <td>{scenario.lifecycleStatus}</td>
+                        <td>{scenario.requiredRequirementKeys.slice(0, 6).join(", ")}</td>
+                        <td>{[...scenario.blockingRequirementKeys, ...scenario.reviewRequirementKeys].slice(0, 8).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 3 requirements closure matrix is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (

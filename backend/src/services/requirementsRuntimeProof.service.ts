@@ -28,6 +28,7 @@ export const REQUIREMENTS_RUNTIME_RELEASE = {
   engineerGradeWanTopology: "PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY",
   engineerGradeDiagramFinalPass: "PHASE_106_ENGINEER_GRADE_DIAGRAM_FINAL_PASS",
   diagramLayoutContractRewrite: "PHASE_107_DIAGRAM_LAYOUT_CONTRACT_REWRITE",
+  phase3RequirementsClosureControl: "PHASE3_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF",
   saveRoute: "PATCH /api/projects/:projectId/requirements",
   proofRoute: "GET /api/projects/:projectId/requirements-runtime-proof",
 } as const;

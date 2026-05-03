@@ -151,6 +151,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const enterpriseAllocatorPosture = designCore.enterpriseAllocatorPosture && typeof designCore.enterpriseAllocatorPosture === "object" ? designCore.enterpriseAllocatorPosture : null;
   const requirementsImpactClosure = designCore.requirementsImpactClosure && typeof designCore.requirementsImpactClosure === "object" ? designCore.requirementsImpactClosure : null;
   const requirementsScenarioProof = designCore.requirementsScenarioProof && typeof designCore.requirementsScenarioProof === "object" ? designCore.requirementsScenarioProof : null;
+  const phase3RequirementsClosure = designCore.phase3RequirementsClosure && typeof designCore.phase3RequirementsClosure === "object" ? designCore.phase3RequirementsClosure : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -276,11 +277,34 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         joinText(asArray(signal.missingEvidence), "—"),
       ]);
 
+
+    const phase3Rows = asArray(phase3RequirementsClosure?.closureMatrix)
+      .filter((item: any) => item?.active || item?.consumerCoverage?.captured)
+      .slice(0, 35)
+      .map((item: any) => [
+        asString(item.label, asString(item.key, "Requirement")),
+        asString(item.lifecycleStatus, "review"),
+        asString(item.readinessImpact, "review"),
+        joinText(asArray(item.actualAffectedEngines).slice(0, 5), "—"),
+        joinText(asArray(item.missingConsumers).slice(0, 5), "—"),
+      ]);
+
+    const phase3ScenarioRows = asArray(phase3RequirementsClosure?.goldenScenarioClosures)
+      .filter((item: any) => item?.relevant)
+      .slice(0, 12)
+      .map((item: any) => [
+        asString(item.label, asString(item.id, "Scenario")),
+        asString(item.lifecycleStatus, "review"),
+        joinText(asArray(item.requiredRequirementKeys).slice(0, 8), "—"),
+        joinText([...asArray(item.blockingRequirementKeys), ...asArray(item.reviewRequirementKeys)].slice(0, 8), "—"),
+      ]);
+
     report.sections.push({
       title: "Requirement Traceability and Scenario Proof",
       paragraphs: [
         `Requirement impact closure status: ${asString(requirementsImpactClosure?.completionStatus, "unavailable")} • captured fields: ${requirementsImpactClosure?.capturedFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0} • handled/inventoried fields: ${requirementsImpactClosure?.handledFieldCount ?? requirementsImpactClosure?.totalFieldCount ?? 0}/${requirementsImpactClosure?.totalFieldCount ?? 0} • explicitly unused/not captured: ${requirementsImpactClosure?.explicitlyUnusedFieldCount ?? requirementsImpactClosure?.notCapturedFieldCount ?? 0}.`,
         `Scenario proof: ${asString(requirementsScenarioProof?.scenarioName, "unavailable")} • status: ${asString(requirementsScenarioProof?.status, "unavailable")} • passed signals: ${requirementsScenarioProof?.passedSignalCount ?? 0}/${requirementsScenarioProof?.expectedSignalCount ?? 0}.`,
+        `Phase 3 closure: ${phase3RequirementsClosure?.fullPropagatedCount ?? 0} fully propagated, ${phase3RequirementsClosure?.partialPropagatedCount ?? 0} partially propagated, ${phase3RequirementsClosure?.reviewRequiredCount ?? 0} review-required, ${phase3RequirementsClosure?.blockedCount ?? 0} blocked, ${phase3RequirementsClosure?.missingConsumerCount ?? 0} missing consumer link(s).`,
         "This section is included so exported reports show where selected requirements changed the actual plan evidence instead of hiding requirement selections as unverified form data.",
       ],
       tables: [
@@ -293,6 +317,16 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           title: "Requirement Scenario Proof",
           headers: ["Signal", "Result", "Requirement Keys", "Evidence", "Missing Evidence"],
           rows: compactRows(scenarioRows, [["No scenario proof rows", "—", "—", "—", "—"]]),
+        },
+        {
+          title: "Phase 3 Requirements Closure Matrix",
+          headers: ["Requirement", "Lifecycle", "Readiness", "Actual Consumers", "Missing Consumers"],
+          rows: compactRows(phase3Rows, [["No Phase 3 closure rows", "—", "—", "—", "—"]]),
+        },
+        {
+          title: "Phase 3 Golden Scenario Closure",
+          headers: ["Scenario", "Status", "Required Keys", "Blocking / Review Keys"],
+          rows: compactRows(phase3ScenarioRows, [["No selected Phase 3 scenario rows", "not-applicable", "—", "—"]]),
         },
       ],
     });

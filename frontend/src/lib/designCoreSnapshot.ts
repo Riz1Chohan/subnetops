@@ -1346,6 +1346,78 @@ export interface RequirementsScenarioProofSummary {
 }
 
 
+
+
+export type Phase3ReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "UNSUPPORTED";
+export type Phase3ScenarioClosureStatus = "passed" | "review-required" | "blocked" | "not-applicable";
+
+export interface Phase3RequirementConsumerCoverage {
+  captured: boolean;
+  normalized: boolean;
+  materialized: boolean;
+  backendConsumed: boolean;
+  addressingConsumed: boolean;
+  routingConsumed: boolean;
+  securityConsumed: boolean;
+  implementationConsumed: boolean;
+  validationConsumed: boolean;
+  frontendVisible: boolean;
+  reportVisible: boolean;
+  diagramVisible: boolean;
+  scenarioProven: boolean;
+}
+
+export interface Phase3RequirementClosureMatrixRow {
+  requirementId: string;
+  key: string;
+  label: string;
+  category: string;
+  sourceValue: string;
+  active: boolean;
+  lifecycleStatus: RequirementPropagationLifecycleStatus;
+  readinessImpact: Phase3ReadinessImpact;
+  expectedAffectedEngines: string[];
+  actualAffectedEngines: string[];
+  missingConsumers: string[];
+  consumerCoverage: Phase3RequirementConsumerCoverage;
+  evidence: string[];
+  reviewReason?: string;
+}
+
+export interface Phase3GoldenScenarioClosure {
+  id: string;
+  label: string;
+  relevant: boolean;
+  requiredRequirementKeys: string[];
+  lifecycleStatus: Phase3ScenarioClosureStatus;
+  missingRequirementKeys: string[];
+  blockingRequirementKeys: string[];
+  reviewRequirementKeys: string[];
+  evidence: string[];
+}
+
+export interface Phase3RequirementsClosureControlSummary {
+  contractVersion: "PHASE3_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF";
+  totalRequirementCount: number;
+  capturedRequirementCount: number;
+  activeRequirementCount: number;
+  fullPropagatedCount: number;
+  partialPropagatedCount: number;
+  materializedOnlyCount: number;
+  capturedOnlyCount: number;
+  reviewRequiredCount: number;
+  blockedCount: number;
+  unsupportedCount: number;
+  notCapturedCount: number;
+  missingConsumerCount: number;
+  scenarioPassedCount: number;
+  scenarioReviewCount: number;
+  scenarioBlockedCount: number;
+  closureMatrix: Phase3RequirementClosureMatrixRow[];
+  goldenScenarioClosures: Phase3GoldenScenarioClosure[];
+  notes: string[];
+}
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -1445,6 +1517,7 @@ export interface DesignCoreSnapshot {
   traceability?: BackendTraceabilityItem[];
   phase1TraceabilityControl?: Phase1PlanningTraceabilityControlSummary;
   phase2RequirementsMaterialization?: Phase2RequirementsMaterializationControlSummary;
+  phase3RequirementsClosure?: Phase3RequirementsClosureControlSummary;
   requirementsCoverage?: RequirementsCoverageSummary;
   requirementsImpactClosure?: RequirementsImpactClosureSummary;
   requirementsScenarioProof?: RequirementsScenarioProofSummary;
