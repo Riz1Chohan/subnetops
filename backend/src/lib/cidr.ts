@@ -84,7 +84,11 @@ export function parseCidr(input: string): ParsedCidr {
 
   const [ipText, prefixText] = parts;
   const ip = ipText.trim();
-  const prefix = Number(prefixText.trim());
+  const prefixValue = prefixText.trim();
+  if (!/^\d+$/.test(prefixValue) || (prefixValue.length > 1 && prefixValue.startsWith("0"))) {
+    throw new Error(`Invalid CIDR: ${input}`);
+  }
+  const prefix = Number(prefixValue);
 
   if (!ip || !isValidIpv4(ip) || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
     throw new Error(`Invalid CIDR: ${input}`);
@@ -179,6 +183,76 @@ export function isNetworkAddress(cidr: ParsedCidr, ip: string): boolean {
 
 export function isBroadcastAddress(cidr: ParsedCidr, ip: string): boolean {
   return ipv4ToInt(ip) === cidr.broadcast;
+}
+
+export type HostUsabilityStatus =
+  | "usable"
+  | "invalid-ip"
+  | "outside-subnet"
+  | "network-address"
+  | "broadcast-address"
+  | "role-incompatible";
+
+export interface HostUsabilityResult {
+  usable: boolean;
+  status: HostUsabilityStatus;
+  canonicalCidr: string;
+  role: SegmentRole;
+  explanation: string;
+}
+
+export function validateHostUsability(cidr: ParsedCidr, ip: string, role: SegmentRole = "OTHER"): HostUsabilityResult {
+  const canonical = `${intToIpv4(cidr.network)}/${cidr.prefix}`;
+  if (!isValidIpv4(ip)) {
+    return {
+      usable: false,
+      status: "invalid-ip",
+      canonicalCidr: canonical,
+      role,
+      explanation: `${ip} is not valid IPv4 notation.`,
+    };
+  }
+
+  const value = ipv4ToInt(ip);
+  if (value < cidr.network || value > cidr.broadcast) {
+    return {
+      usable: false,
+      status: "outside-subnet",
+      canonicalCidr: canonical,
+      role,
+      explanation: `${ip} is outside ${canonical}.`,
+    };
+  }
+
+  if (cidr.prefix === 32) {
+    return role === "LOOPBACK"
+      ? { usable: true, status: "usable", canonicalCidr: canonical, role, explanation: `${ip} is the loopback /32 host address.` }
+      : { usable: false, status: "role-incompatible", canonicalCidr: canonical, role, explanation: `${canonical} is only usable as a single host when the segment role is LOOPBACK.` };
+  }
+
+  if (cidr.prefix === 31) {
+    return role === "WAN_TRANSIT"
+      ? { usable: true, status: "usable", canonicalCidr: canonical, role, explanation: `${ip} is usable on a /31 WAN transit link.` }
+      : { usable: false, status: "role-incompatible", canonicalCidr: canonical, role, explanation: `${canonical} is only treated as two usable host addresses when the segment role is WAN_TRANSIT.` };
+  }
+
+  if (value === cidr.network) {
+    return { usable: false, status: "network-address", canonicalCidr: canonical, role, explanation: `${ip} is the network address of ${canonical}.` };
+  }
+
+  if (value === cidr.broadcast) {
+    return { usable: false, status: "broadcast-address", canonicalCidr: canonical, role, explanation: `${ip} is the broadcast address of ${canonical}.` };
+  }
+
+  return { usable: true, status: "usable", canonicalCidr: canonical, role, explanation: `${ip} is a usable host address inside ${canonical}.` };
+}
+
+export function isUsableHostIp(cidr: ParsedCidr, ip: string, role: SegmentRole = "OTHER"): boolean {
+  return validateHostUsability(cidr, ip, role).usable;
+}
+
+export function validateGatewayForSubnet(cidr: ParsedCidr, gatewayIp: string, role: SegmentRole = "OTHER"): HostUsabilityResult {
+  return validateHostUsability(cidr, gatewayIp, role);
 }
 
 export function suggestedGatewayPattern(ip: string): boolean {

@@ -643,6 +643,74 @@ export interface Phase3RequirementsClosureControlSummary {
   notes: string[];
 }
 
+
+
+export type Phase4ReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "NOT_APPLICABLE";
+export type Phase4CidrProofStatus = "passed" | "warning" | "blocked";
+
+export interface Phase4CidrEdgeCaseProof {
+  id: string;
+  label: string;
+  status: Phase4CidrProofStatus;
+  evidence: string[];
+  selftest: string;
+}
+
+export interface Phase4RequirementAddressingMatrixRow {
+  requirementKey: string;
+  sourceValue: string;
+  active: boolean;
+  expectedAddressingImpact: string;
+  affectedRoles: SegmentRole[];
+  materializedAddressingEvidence: string[];
+  missingAddressingEvidence: string[];
+  readinessImpact: Phase4ReadinessImpact;
+  notes: string[];
+}
+
+export interface Phase4AddressingTruthRow {
+  rowId: string;
+  siteId: string;
+  siteName: string;
+  vlanId: number;
+  vlanName: string;
+  role: SegmentRole;
+  sourceSubnetCidr: string;
+  canonicalSubnetCidr?: string;
+  proposedSubnetCidr?: string;
+  estimatedHosts: number | null;
+  requiredUsableHosts?: number;
+  recommendedPrefix?: number;
+  usableHosts?: number;
+  capacityState: "unknown" | "fits" | "undersized";
+  gatewayState: "valid" | "invalid" | "fallback";
+  inSiteBlock: boolean | null;
+  allocatorParentCidr?: string;
+  allocatorExplanation?: string;
+  readinessImpact: Phase4ReadinessImpact;
+  blockers: string[];
+  evidence: string[];
+}
+
+export interface Phase4CidrAddressingTruthControlSummary {
+  contractVersion: "PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH";
+  totalAddressRowCount: number;
+  validSubnetCount: number;
+  invalidSubnetCount: number;
+  undersizedSubnetCount: number;
+  gatewayIssueCount: number;
+  siteBlockIssueCount: number;
+  overlapIssueCount: number;
+  deterministicProposalCount: number;
+  blockedProposalCount: number;
+  requirementDrivenAddressingCount: number;
+  requirementAddressingGapCount: number;
+  edgeCaseProofs: Phase4CidrEdgeCaseProof[];
+  requirementAddressingMatrix: Phase4RequirementAddressingMatrixRow[];
+  addressingTruthRows: Phase4AddressingTruthRow[];
+  notes: string[];
+}
+
 export interface PlanningInputDisciplineItem extends DesignSourceTraceLabel {
   sourceArea: PlanningInputAuditItem["sourceArea"];
   key: string;
@@ -1730,6 +1798,7 @@ export interface DesignCoreSnapshot {
   phase1TraceabilityControl: Phase1PlanningTraceabilityControlSummary;
   phase2RequirementsMaterialization: Phase2RequirementsMaterializationControlSummary;
   phase3RequirementsClosure: Phase3RequirementsClosureControlSummary;
+  phase4CidrAddressingTruth: Phase4CidrAddressingTruthControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;
   requirementsScenarioProof: RequirementsScenarioProofSummary;

@@ -41,6 +41,7 @@ import { getProjectDesignData } from "./designCore/designCore.repository.js";
 import { buildNetworkObjectModel } from "./designCore/designCore.networkObjectModel.js";
 import { buildPhase1PlanningTraceabilityControl } from "./designCore/designCore.phase1TraceabilityControl.js";
 import { buildPhase3RequirementsClosureControl } from "./designCore/designCore.phase3RequirementsClosureControl.js";
+import { buildPhase4CidrAddressingTruthControl } from "./designCore/designCore.phase4CidrAddressingTruthControl.js";
 import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
@@ -48,17 +49,15 @@ import {
   canonicalCidr,
   cidrsOverlap,
   classifySegmentRole,
-  containsIp,
   describeSubnet,
   intToIpv4,
-  isBroadcastAddress,
-  isNetworkAddress,
   isValidIpv4,
   parseCidr,
   recommendedPrefixForHosts,
   recommendedCapacityPlanForHosts,
   suggestedGatewayPattern,
   usableHostCount,
+  validateGatewayForSubnet,
   type ParsedCidr,
   type SegmentRole,
 } from "../lib/cidr.js";
@@ -81,7 +80,7 @@ import {
   type PlanningInputAuditSummary,
 } from "../lib/planningInputAudit.js";
 
-import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
+import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
 
 type ProjectWithDesignData = NonNullable<Awaited<ReturnType<typeof getProjectDesignData>>>;
 type SiteBlockRecord = DesignCoreSiteBlock & { parsed?: ParsedCidr };
@@ -647,24 +646,27 @@ function buildAddressingRows(project: ProjectWithDesignData, siteBlocks: SiteBlo
             entityType: "VLAN",
             entityId: vlan.id,
           });
-        } else if (!containsIp(parsed, vlan.gatewayIp) || isNetworkAddress(parsed, vlan.gatewayIp) || isBroadcastAddress(parsed, vlan.gatewayIp)) {
-          baseRow.gatewayState = "fallback";
-          baseRow.proposedGatewayIp = defaultGatewayForSubnet(parsed, role);
-          notes.push("Saved gateway is not a usable host inside the subnet. The backend design core should fall back to a computed gateway when proposing downstream service ranges.");
-          pushIssue(issues, {
-            severity: "ERROR",
-            code: "GATEWAY_UNUSABLE",
-            title: `Unusable gateway on VLAN ${vlan.vlanId}`,
-            detail: `${vlan.gatewayIp} is not a usable host inside ${baseRow.canonicalSubnetCidr}.`,
-            entityType: "VLAN",
-            entityId: vlan.id,
-          });
         } else {
-          baseRow.gatewayState = "valid";
-          baseRow.effectiveGatewayIp = vlan.gatewayIp;
-          baseRow.gatewayConvention = classifyGatewayConvention(parsed, vlan.gatewayIp, role);
-          if (!suggestedGatewayPattern(vlan.gatewayIp) && role !== "LOOPBACK" && role !== "WAN_TRANSIT") {
-            notes.push("Gateway uses a custom convention instead of first or last usable.");
+          const gatewayValidation = validateGatewayForSubnet(parsed, vlan.gatewayIp, role);
+          if (!gatewayValidation.usable) {
+            baseRow.gatewayState = "fallback";
+            baseRow.proposedGatewayIp = defaultGatewayForSubnet(parsed, role);
+            notes.push(`Saved gateway is not role-usable: ${gatewayValidation.explanation} The backend design core should fall back to a computed gateway when proposing downstream service ranges.`);
+            pushIssue(issues, {
+              severity: "ERROR",
+              code: "GATEWAY_UNUSABLE",
+              title: `Unusable gateway on VLAN ${vlan.vlanId}`,
+              detail: `${vlan.gatewayIp} is not a usable ${role} gateway inside ${baseRow.canonicalSubnetCidr}: ${gatewayValidation.explanation}`,
+              entityType: "VLAN",
+              entityId: vlan.id,
+            });
+          } else {
+            baseRow.gatewayState = "valid";
+            baseRow.effectiveGatewayIp = vlan.gatewayIp;
+            baseRow.gatewayConvention = classifyGatewayConvention(parsed, vlan.gatewayIp, role);
+            if (!suggestedGatewayPattern(vlan.gatewayIp) && role !== "LOOPBACK" && role !== "WAN_TRANSIT") {
+              notes.push("Gateway uses a custom convention instead of first or last usable.");
+            }
           }
         }
       } catch {
@@ -1436,6 +1438,17 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     diagramTruth,
   });
 
+
+  // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH: Engine 1 CIDR/addressing proof surface.
+  const phase4CidrAddressingTruth = buildPhase4CidrAddressingTruthControl({
+    siteBlocks,
+    addressingRows,
+    proposedRows: proposals,
+    issues,
+    phase2RequirementsMaterialization,
+    phase3RequirementsClosure,
+  });
+
   return {
     projectId: project.id,
     projectName: project.name,
@@ -1476,6 +1489,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     phase1TraceabilityControl,
     phase2RequirementsMaterialization,
     phase3RequirementsClosure,
+    phase4CidrAddressingTruth,
     requirementsCoverage,
     requirementsImpactClosure,
     requirementsScenarioProof,
@@ -1507,4 +1521,4 @@ export async function getDesignCoreSnapshotForExport(projectId: string) {
   const project = await getProjectDesignData(projectId);
   return buildDesignCoreSnapshot(project);
 }
-export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignTruthSourceType, DesignProofStatus, DesignTraceConfidence, DesignSourceTraceLabel, DesignOutputTruthLabel, RequirementPropagationTraceItem, Phase1PlanningTraceabilityControlSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
+export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignTruthSourceType, DesignProofStatus, DesignTraceConfidence, DesignSourceTraceLabel, DesignOutputTruthLabel, RequirementPropagationTraceItem, Phase1PlanningTraceabilityControlSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";

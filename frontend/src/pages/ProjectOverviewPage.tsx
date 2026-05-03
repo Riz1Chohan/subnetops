@@ -1,4 +1,5 @@
 import { Link, useLocation, useParams } from "react-router-dom";
+// PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 import { useMemo } from "react";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
@@ -923,6 +924,106 @@ export function ProjectOverviewPage() {
             </>
           ) : (
             <p className="muted" style={{ margin: 0 }}>Phase 3 requirements closure matrix is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 4 CIDR/addressing truth</h2>
+          {designCore?.phase4CidrAddressingTruth ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Address rows", designCore.phase4CidrAddressingTruth.totalAddressRowCount)}
+                {summaryCard("Undersized", designCore.phase4CidrAddressingTruth.undersizedSubnetCount)}
+                {summaryCard("Gateway issues", designCore.phase4CidrAddressingTruth.gatewayIssueCount)}
+                {summaryCard("Requirement gaps", designCore.phase4CidrAddressingTruth.requirementAddressingGapCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 4 is the Engine 1 proof gate: CIDR canonicalization, invalid CIDR rejection, /0-/32 edge behavior, role-aware gateway safety, deterministic allocator evidence, and requirement-driven subnet sizing. It does not pretend to be Enterprise IPAM; that is Phase 5.
+              </p>
+              {designCore.phase4CidrAddressingTruth.requirementAddressingGapCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Some active requirements still lack concrete addressing evidence.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.phase4CidrAddressingTruth.requirementAddressingGapCount} addressing requirement row(s) are review-required or blocking.
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Phase 4 found no active requirement-to-addressing gaps.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Affected roles</th>
+                      <th align="left">Evidence / missing proof</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase4CidrAddressingTruth.requirementAddressingMatrix.filter((item) => item.active).slice(0, 16).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{item.readinessImpact}</td>
+                        <td>{item.affectedRoles.slice(0, 6).join(", ")}</td>
+                        <td>{item.materializedAddressingEvidence[0] || item.missingAddressingEvidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">VLAN</th>
+                      <th align="left">CIDR</th>
+                      <th align="left">Capacity</th>
+                      <th align="left">Gateway / site block</th>
+                      <th align="left">Blockers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase4CidrAddressingTruth.addressingTruthRows.slice(0, 18).map((row) => (
+                      <tr key={row.rowId}>
+                        <td>{row.siteName} VLAN {row.vlanId}<br /><span className="muted">{row.vlanName} / {row.role}</span></td>
+                        <td>{row.canonicalSubnetCidr || row.sourceSubnetCidr}<br /><span className="muted">proposal {row.proposedSubnetCidr || "—"}</span></td>
+                        <td>{row.capacityState}<br /><span className="muted">/{row.recommendedPrefix ?? "—"} for {row.requiredUsableHosts ?? "—"} usable</span></td>
+                        <td>{row.gatewayState}<br /><span className="muted">site block {String(row.inSiteBlock)}</span></td>
+                        <td>{row.blockers.slice(0, 4).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">CIDR proof</th>
+                      <th align="left">Status</th>
+                      <th align="left">Selftest</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase4CidrAddressingTruth.edgeCaseProofs.map((proof) => (
+                      <tr key={proof.id}>
+                        <td>{proof.label}</td>
+                        <td>{proof.status}</td>
+                        <td>{proof.selftest}</td>
+                        <td>{proof.evidence[0]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 4 CIDR/addressing truth control is not available in this backend snapshot yet.</p>
           )}
         </div>
 

@@ -4,15 +4,13 @@ import {
   canonicalCidr,
   cidrsOverlap,
   classifySegmentRole,
-  containsIp,
   describeRange,
   describeSubnet,
-  isBroadcastAddress,
-  isNetworkAddress,
   isValidIpv4,
   parseCidr,
   recommendedPrefixForHosts,
   usableHostCount,
+  validateGatewayForSubnet,
   type SegmentRole,
 } from "../lib/cidr.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
@@ -840,48 +838,26 @@ export async function runValidation(projectId: string) {
         );
       }
 
-      if (!containsIp(parsedCidr, vlan.gatewayIp)) {
+      const gatewayValidation = validateGatewayForSubnet(parsedCidr, vlan.gatewayIp, role);
+      if (!gatewayValidation.usable) {
+        const ruleCode = gatewayValidation.status === "outside-subnet"
+          ? "GATEWAY_OUTSIDE_SUBNET"
+          : gatewayValidation.status === "network-address"
+            ? "GATEWAY_IS_NETWORK_ADDRESS"
+            : gatewayValidation.status === "broadcast-address"
+              ? "GATEWAY_IS_BROADCAST_ADDRESS"
+              : "GATEWAY_ROLE_UNUSABLE";
         results.push(
           makeItem({
             projectId,
             severity: "ERROR",
-            ruleCode: "GATEWAY_OUTSIDE_SUBNET",
-            title: `Gateway outside subnet on VLAN ${vlan.vlanId}`,
-            message: `Gateway ${vlan.gatewayIp} is not inside ${canonical}. Valid address range is ${describeRange(parsedCidr)}.`,
+            ruleCode,
+            title: `Gateway is not role-usable on VLAN ${vlan.vlanId}`,
+            message: `${gatewayValidation.explanation} Valid address range is ${describeRange(parsedCidr)}.`,
             entityType: "VLAN",
             entityId: vlan.id,
           }),
         );
-      } else {
-        const shouldSkipNetworkBroadcastChecks = parsedCidr.prefix === 31 && role === "WAN_TRANSIT";
-
-        if (!shouldSkipNetworkBroadcastChecks && isNetworkAddress(parsedCidr, vlan.gatewayIp)) {
-          results.push(
-            makeItem({
-              projectId,
-              severity: "ERROR",
-              ruleCode: "GATEWAY_IS_NETWORK_ADDRESS",
-              title: `Gateway uses network address on VLAN ${vlan.vlanId}`,
-              message: `Gateway ${vlan.gatewayIp} matches the network address of ${canonical}.`,
-              entityType: "VLAN",
-              entityId: vlan.id,
-            }),
-          );
-        }
-
-        if (!shouldSkipNetworkBroadcastChecks && isBroadcastAddress(parsedCidr, vlan.gatewayIp)) {
-          results.push(
-            makeItem({
-              projectId,
-              severity: "ERROR",
-              ruleCode: "GATEWAY_IS_BROADCAST_ADDRESS",
-              title: `Gateway uses broadcast address on VLAN ${vlan.vlanId}`,
-              message: `Gateway ${vlan.gatewayIp} matches the broadcast address of ${canonical}.`,
-              entityType: "VLAN",
-              entityId: vlan.id,
-            }),
-          );
-        }
       }
 
       const usableHosts = usableHostCount(parsedCidr, role);

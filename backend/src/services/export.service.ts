@@ -1,4 +1,5 @@
 import { prisma } from "../db/prisma.js";
+// PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 import { getDesignCoreSnapshotForExport } from "./designCore.service.js";
 import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 import { runValidation } from "./validation.service.js";
@@ -979,6 +980,40 @@ export async function getCsvRows(projectId: string) {
       }
     }
 
+
+    if (designCore.phase4CidrAddressingTruth) {
+      const phase4 = designCore.phase4CidrAddressingTruth;
+      rows.push({
+        Section: "Phase 4 CIDR Addressing Truth",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: phase4.contractVersion,
+        Value: `${phase4.validSubnetCount} valid / ${phase4.invalidSubnetCount} invalid / ${phase4.undersizedSubnetCount} undersized / ${phase4.gatewayIssueCount} gateway issue(s)`,
+        Notes: `Requirement addressing gaps ${phase4.requirementAddressingGapCount}; deterministic proposals ${phase4.deterministicProposalCount}; blocked proposals ${phase4.blockedProposalCount}`,
+      });
+
+      for (const item of phase4.requirementAddressingMatrix.filter((field) => field.active).slice(0, 80)) {
+        rows.push({
+          Section: "Phase 4 Requirement Addressing Matrix",
+          Scope: item.readinessImpact,
+          Name: item.requirementKey,
+          Key: item.affectedRoles.join(", "),
+          Value: joinCsvList(item.materializedAddressingEvidence, "No addressing evidence recorded"),
+          Notes: `Source value ${item.sourceValue} | Missing ${joinCsvList(item.missingAddressingEvidence, "none")} | Expected ${item.expectedAddressingImpact}`,
+        });
+      }
+
+      for (const row of phase4.addressingTruthRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 4 Addressing Row Truth",
+          Scope: row.siteName,
+          Name: `VLAN ${row.vlanId} ${row.vlanName}`,
+          Key: row.readinessImpact,
+          Value: `${row.canonicalSubnetCidr || row.sourceSubnetCidr} / proposed ${row.proposedSubnetCidr || "none"}`,
+          Notes: `Role ${row.role}; capacity ${row.capacityState}; gateway ${row.gatewayState}; blockers ${joinCsvList(row.blockers, "none")}`,
+        });
+      }
+    }
 
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;

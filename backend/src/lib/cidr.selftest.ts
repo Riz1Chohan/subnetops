@@ -10,6 +10,8 @@ import {
   isNetworkAddress,
   lastUsableIp,
   parseCidr,
+  isUsableHostIp,
+  validateGatewayForSubnet,
   recommendedPrefixForHosts,
   recommendedCapacityPlanForHosts,
   usableHostCount,
@@ -109,6 +111,9 @@ run("strict CIDR parsing rejects malformed, leading-zero, and extra-slash input"
   assert.throws(() => parseCidr("10.0.0.0/24/extra"));
   assert.throws(() => parseCidr("010.0.0.0/24"));
   assert.throws(() => parseCidr("256.0.0.1/24"));
+  assert.throws(() => parseCidr("10.0.0.0/+24"));
+  assert.throws(() => parseCidr("10.0.0.0/24.0"));
+  assert.throws(() => parseCidr("10.0.0.0/024"));
 });
 
 run("CIDR boundary prefixes /0 and /1 remain unsigned-safe", () => {
@@ -125,4 +130,19 @@ run("/30 /31 /32 usable behavior is role-aware and canonical", () => {
 
 run("adjacent subnets that only touch at boundaries do not overlap", () => {
   assert.equal(cidrsOverlap(parseCidr("10.0.0.0/25"), parseCidr("10.0.0.128/25")), false);
+});
+
+run("role-aware host usability allows /31 WAN endpoints and /32 loopbacks only", () => {
+  assert.equal(isUsableHostIp(parseCidr("10.0.0.8/31"), "10.0.0.8", "WAN_TRANSIT"), true);
+  assert.equal(isUsableHostIp(parseCidr("10.0.0.8/31"), "10.0.0.8", "USER"), false);
+  assert.equal(isUsableHostIp(parseCidr("10.0.0.9/32"), "10.0.0.9", "LOOPBACK"), true);
+  assert.equal(isUsableHostIp(parseCidr("10.0.0.9/32"), "10.0.0.9", "USER"), false);
+});
+
+run("gateway validation explains outside, network, broadcast, and role-incompatible cases", () => {
+  assert.equal(validateGatewayForSubnet(parseCidr("10.0.0.0/24"), "10.0.0.1", "USER").status, "usable");
+  assert.equal(validateGatewayForSubnet(parseCidr("10.0.0.0/24"), "10.0.0.0", "USER").status, "network-address");
+  assert.equal(validateGatewayForSubnet(parseCidr("10.0.0.0/24"), "10.0.1.1", "USER").status, "outside-subnet");
+  assert.equal(validateGatewayForSubnet(parseCidr("10.0.0.0/31"), "10.0.0.0", "WAN_TRANSIT").status, "usable");
+  assert.equal(validateGatewayForSubnet(parseCidr("10.0.0.0/31"), "10.0.0.0", "USER").status, "role-incompatible");
 });

@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "check:phase4-cidr-addressing": "node scripts/check-phase4-cidr-addressing.cjs",
+    "check:phase4-107-release": "npm run check:phase4-cidr-addressing && npm run check:phase3-107-release",
     "check:phase3-requirements-closure": "node scripts/check-phase3-requirements-closure.cjs",
     "check:phase3-107-release": "npm run check:phase3-requirements-closure && npm run check:phase2-107-release",
     "check:phase2-requirements-materialization": "node scripts/check-phase2-requirements-materialization.cjs",

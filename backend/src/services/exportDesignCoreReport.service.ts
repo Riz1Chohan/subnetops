@@ -1,4 +1,5 @@
 import type { ProfessionalReport } from "./export.types.js";
+// PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 
 export type ProfessionalReportMode = "professional" | "technical" | "full-proof";
 
@@ -152,6 +153,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const requirementsImpactClosure = designCore.requirementsImpactClosure && typeof designCore.requirementsImpactClosure === "object" ? designCore.requirementsImpactClosure : null;
   const requirementsScenarioProof = designCore.requirementsScenarioProof && typeof designCore.requirementsScenarioProof === "object" ? designCore.requirementsScenarioProof : null;
   const phase3RequirementsClosure = designCore.phase3RequirementsClosure && typeof designCore.phase3RequirementsClosure === "object" ? designCore.phase3RequirementsClosure : null;
+  const phase4CidrAddressingTruth = designCore.phase4CidrAddressingTruth && typeof designCore.phase4CidrAddressingTruth === "object" ? designCore.phase4CidrAddressingTruth : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -338,6 +340,48 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       ...addressingSection.paragraphs,
       `Authoritative design snapshot: ${asString(authority?.mode, "authoritative")} • generated: ${generatedAt} • engineer review required.`,
     ];
+
+    if (includeTechnicalEvidence && phase4CidrAddressingTruth) {
+      const phase4RequirementRows = asArray(phase4CidrAddressingTruth?.requirementAddressingMatrix)
+        .filter((item: any) => item?.active)
+        .slice(0, 24)
+        .map((item: any) => [
+          asString(item.requirementKey, "requirement"),
+          asString(item.readinessImpact, "review"),
+          joinText(asArray(item.affectedRoles).slice(0, 6), "—"),
+          joinText(asArray(item.materializedAddressingEvidence).slice(0, 2), joinText(asArray(item.missingAddressingEvidence).slice(0, 2), "—")),
+        ]);
+
+      const phase4AddressRows = asArray(phase4CidrAddressingTruth?.addressingTruthRows)
+        .slice(0, 30)
+        .map((row: any) => [
+          `${asString(row.siteName, "Site")} VLAN ${row.vlanId ?? "—"}`,
+          asString(row.canonicalSubnetCidr, asString(row.sourceSubnetCidr, "—")),
+          `${asString(row.capacityState, "unknown")} /${row.recommendedPrefix ?? "—"}`,
+          `${asString(row.gatewayState, "review")} / site-block ${String(row.inSiteBlock ?? "unknown")}`,
+          joinText(asArray(row.blockers).slice(0, 4), "none"),
+        ]);
+
+      addressingSection.tables.push({
+        title: "Phase 4 CIDR Addressing Truth",
+        headers: ["Gate", "Status", "Evidence"],
+        rows: [
+          ["CIDR edge cases", `${phase4CidrAddressingTruth?.edgeCaseProofs?.length ?? 0} proof rows`, "Canonicalization, invalid CIDR rejection, /0-/32 behavior, overlap detection, and role-aware gateway safety."],
+          ["Address rows", `${phase4CidrAddressingTruth?.validSubnetCount ?? 0} valid / ${phase4CidrAddressingTruth?.invalidSubnetCount ?? 0} invalid`, `${phase4CidrAddressingTruth?.undersizedSubnetCount ?? 0} undersized; ${phase4CidrAddressingTruth?.gatewayIssueCount ?? 0} gateway issue(s).`],
+          ["Requirement addressing", `${phase4CidrAddressingTruth?.requirementDrivenAddressingCount ?? 0} driven / ${phase4CidrAddressingTruth?.requirementAddressingGapCount ?? 0} gap(s)`, "Requirement-driven addressing evidence is proven from Engine 1 rows, not frontend-only calculations."],
+        ],
+      });
+      addressingSection.tables.push({
+        title: "Phase 4 Requirement Addressing Matrix",
+        headers: ["Requirement", "Readiness", "Affected Roles", "Evidence / Missing Proof"],
+        rows: compactRows(phase4RequirementRows, [["No active Phase 4 addressing requirement rows", "not-applicable", "—", "—"]]),
+      });
+      addressingSection.tables.push({
+        title: "Phase 4 Addressing Row Truth",
+        headers: ["VLAN", "CIDR", "Capacity", "Gateway / Site Block", "Blockers"],
+        rows: compactRows(phase4AddressRows, [["No Phase 4 addressing rows", "—", "—", "—", "—"]]),
+      });
+    }
 
     if (includeTechnicalEvidence && enterpriseAllocatorPosture) {
       addressingSection.tables.push({
