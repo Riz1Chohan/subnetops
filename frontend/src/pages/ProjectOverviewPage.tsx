@@ -1128,6 +1128,106 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 6 design-core orchestrator control</h2>
+          {designCore?.phase6DesignCoreOrchestrator ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Sections", `${designCore.phase6DesignCoreOrchestrator.presentSnapshotSectionCount}/${designCore.phase6DesignCoreOrchestrator.requiredSnapshotSectionCount}`)}
+                {summaryCard("Readiness", designCore.phase6DesignCoreOrchestrator.overallReadiness)}
+                {summaryCard("Boundary findings", designCore.phase6DesignCoreOrchestrator.boundaryFindings.length)}
+                {summaryCard("Frontend truth risks", designCore.phase6DesignCoreOrchestrator.frontendIndependentTruthRiskCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 6 is the design-core coordinator contract. It proves the snapshot is organized into named backend-owned sections: source inputs, materialized objects, addressing truth, durable IPAM truth, object/graph truth, routing, security, implementation, report, diagram, and readiness. The frontend displays this ledger; it does not compute engineering truth independently.
+              </p>
+              {designCore.phase6DesignCoreOrchestrator.overallReadiness === "BLOCKED" ? (
+                <div className="trust-note danger">
+                  <strong>Design-core orchestration has blocking boundary issues.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Missing snapshot sections or upstream blockers must stay visible; downstream pages must not paper over them.</p>
+                </div>
+              ) : designCore.phase6DesignCoreOrchestrator.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Design-core orchestration is present but review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>The coordinator is working, but some sections carry review-required evidence from upstream engines.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>Phase 6 found no missing orchestrator snapshot sections.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Snapshot section</th>
+                      <th align="left">Owner</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Consumers</th>
+                      <th align="left">Proof</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase6DesignCoreOrchestrator.sectionRows.slice(0, 16).map((row) => (
+                      <tr key={row.sectionKey}>
+                        <td>{row.label}<br /><span className="muted">{row.snapshotPath}</span></td>
+                        <td>{row.ownerEngine}<br /><span className="muted">{row.sourceType}</span></td>
+                        <td>{row.readiness}<br /><span className="muted">{row.blockerCount} block / {row.reviewCount} review</span></td>
+                        <td>{row.downstreamConsumers.slice(0, 4).join(", ")}</td>
+                        <td>{row.proofGates.slice(0, 3).join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Dependency</th>
+                      <th align="left">Path</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase6DesignCoreOrchestrator.dependencyEdges.slice(0, 12).map((edge) => (
+                      <tr key={edge.id}>
+                        <td>{edge.relationship}</td>
+                        <td>{edge.sourceSectionKey} → {edge.targetSectionKey}</td>
+                        <td>{edge.evidence.slice(0, 2).join(" ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.phase6DesignCoreOrchestrator.boundaryFindings.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Severity</th>
+                        <th align="left">Path</th>
+                        <th align="left">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.phase6DesignCoreOrchestrator.boundaryFindings.slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.code}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.severity}<br /><span className="muted">{finding.readinessImpact}</span></td>
+                          <td>{finding.affectedSnapshotPath}</td>
+                          <td>{finding.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 6 design-core orchestrator control is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>

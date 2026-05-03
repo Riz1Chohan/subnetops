@@ -218,6 +218,19 @@ const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>>
     impact: "A requirement-driven address need exists, but Engine 2 has not proven durable pool/allocation ownership or has recorded review gaps.",
     recommendation: "Use the Phase 5 requirement-to-IPAM matrix to materialize, approve, or explicitly review the affected IPAM objects.",
   },
+
+  DESIGN_CORE_ORCHESTRATOR_SECTION_MISSING: {
+    impact: "A required design-core snapshot section is missing, so a downstream page, report, or diagram could be tempted to invent engineering truth.",
+    recommendation: "Restore the Phase 6 orchestrator section and rerun validation before trusting frontend/report/diagram consumers.",
+  },
+  DESIGN_CORE_ORCHESTRATOR_SECTION_BLOCKED: {
+    impact: "The design-core coordinator is exposing an upstream blocker that must remain visible across UI, reports, diagrams, and readiness gates.",
+    recommendation: "Resolve the upstream section blocker instead of hiding it in downstream consumers.",
+  },
+  DESIGN_CORE_ORCHESTRATOR_SECTION_REVIEW_REQUIRED: {
+    impact: "The design-core section is present but review-gated; downstream consumers must preserve the review label.",
+    recommendation: "Review the affected snapshot section and clear or explicitly accept the upstream review condition.",
+  },
   VALIDATION_PASSED: {
     impact: "No current blocker was detected by the saved validation checks, but this is not a live-network discovery result.",
     recommendation: "Continue engineer review against live inventory, business policy, and vendor implementation requirements.",
@@ -1025,6 +1038,22 @@ export async function runValidation(projectId: string) {
         ruleCode: "IPAM_REQUIREMENT_PROPAGATION_GAP",
         title: `Requirement ${item.requirementKey} has unresolved Engine 2 IPAM impact`,
         message: `${item.label}. ${item.missingIpamEvidence.slice(0, 3).join(" ") || item.expectedIpamImpact}`,
+        entityType: "PROJECT",
+        entityId: projectId,
+      }));
+    }
+  }
+
+
+  if (designSnapshot?.phase6DesignCoreOrchestrator) {
+    const phase6 = designSnapshot.phase6DesignCoreOrchestrator;
+    for (const finding of phase6.boundaryFindings) {
+      results.push(makeItem({
+        projectId,
+        severity: finding.severity === "ERROR" ? "ERROR" : finding.severity === "WARNING" ? "WARNING" : "INFO",
+        ruleCode: finding.code,
+        title: finding.title,
+        message: finding.detail,
         entityType: "PROJECT",
         entityId: projectId,
       }));

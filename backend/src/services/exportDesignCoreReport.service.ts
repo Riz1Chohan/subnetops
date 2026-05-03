@@ -1,6 +1,7 @@
 import type { ProfessionalReport } from "./export.types.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 // PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
+// PHASE6_DESIGN_CORE_ORCHESTRATOR_CONTRACT
 
 export type ProfessionalReportMode = "professional" | "technical" | "full-proof";
 
@@ -156,6 +157,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const phase3RequirementsClosure = designCore.phase3RequirementsClosure && typeof designCore.phase3RequirementsClosure === "object" ? designCore.phase3RequirementsClosure : null;
   const phase4CidrAddressingTruth = designCore.phase4CidrAddressingTruth && typeof designCore.phase4CidrAddressingTruth === "object" ? designCore.phase4CidrAddressingTruth : null;
   const phase5EnterpriseIpamTruth = designCore.phase5EnterpriseIpamTruth && typeof designCore.phase5EnterpriseIpamTruth === "object" ? designCore.phase5EnterpriseIpamTruth : null;
+  const phase6DesignCoreOrchestrator = designCore.phase6DesignCoreOrchestrator && typeof designCore.phase6DesignCoreOrchestrator === "object" ? designCore.phase6DesignCoreOrchestrator : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -424,6 +426,69 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         title: "Phase 5 Requirement-to-IPAM Matrix",
         headers: ["Requirement", "Readiness", "Approved / Candidate / Proposal-only", "Evidence / Missing Proof"],
         rows: compactRows(phase5RequirementRows, [["No active Phase 5 IPAM requirement rows", "not-applicable", "—", "—"]]),
+      });
+    }
+
+
+
+    if (includeTechnicalEvidence && phase6DesignCoreOrchestrator) {
+      const phase6SectionRows = asArray(phase6DesignCoreOrchestrator?.sectionRows)
+        .slice(0, 30)
+        .map((row: any) => [
+          asString(row.label, "Section"),
+          asString(row.ownerEngine, "backend"),
+          `${asString(row.readiness, "review")} | ${row.blockerCount ?? 0} blocker / ${row.reviewCount ?? 0} review`,
+          joinText(asArray(row.downstreamConsumers).slice(0, 4), "—"),
+          joinText(asArray(row.proofGates).slice(0, 3), "—"),
+        ]);
+
+      const phase6DependencyRows = asArray(phase6DesignCoreOrchestrator?.dependencyEdges)
+        .slice(0, 24)
+        .map((edge: any) => [
+          asString(edge.relationship, "dependency"),
+          `${asString(edge.sourceSectionKey, "source")} -> ${asString(edge.targetSectionKey, "target")}`,
+          joinText(asArray(edge.evidence).slice(0, 2), "—"),
+        ]);
+
+      const phase6FindingRows = asArray(phase6DesignCoreOrchestrator?.boundaryFindings)
+        .slice(0, 24)
+        .map((finding: any) => [
+          asString(finding.code, "finding"),
+          asString(finding.severity, "INFO"),
+          asString(finding.readinessImpact, "REVIEW_REQUIRED"),
+          asString(finding.affectedSnapshotPath, "snapshot"),
+          asString(finding.detail, "—"),
+        ]);
+
+      report.sections.push({
+        title: "Phase 6 Design-Core Orchestrator Contract",
+        summary: "Design-core is the backend coordinator: it exposes named snapshot sections and dependency edges so frontend, report, and diagram consumers do not invent engineering truth.",
+        tables: [
+          {
+            title: "Phase 6 Orchestrator Summary",
+            headers: ["Gate", "Status", "Evidence"],
+            rows: [
+              ["Contract", asString(phase6DesignCoreOrchestrator.contractVersion, "missing"), asString(phase6DesignCoreOrchestrator.orchestratorRole, "coordinator")],
+              ["Snapshot sections", `${phase6DesignCoreOrchestrator.presentSnapshotSectionCount ?? 0}/${phase6DesignCoreOrchestrator.requiredSnapshotSectionCount ?? 0} present`, `${phase6DesignCoreOrchestrator.missingSnapshotSectionCount ?? 0} missing; ${phase6DesignCoreOrchestrator.frontendIndependentTruthRiskCount ?? 0} frontend truth risks.`],
+              ["Overall readiness", asString(phase6DesignCoreOrchestrator.overallReadiness, "review"), `${phase6DesignCoreOrchestrator.boundaryFindings?.length ?? 0} boundary finding(s); ${phase6DesignCoreOrchestrator.requirementContextGapCount ?? 0} requirement-context gap(s).`],
+            ],
+          },
+          {
+            title: "Phase 6 Snapshot Boundary Sections",
+            headers: ["Section", "Owner", "Readiness", "Consumers", "Proof gates"],
+            rows: compactRows(phase6SectionRows, [["No Phase 6 section rows", "—", "—", "—", "—"]]),
+          },
+          {
+            title: "Phase 6 Orchestrator Dependency Edges",
+            headers: ["Dependency", "Path", "Evidence"],
+            rows: compactRows(phase6DependencyRows, [["No Phase 6 dependency edges", "—", "—"]]),
+          },
+          {
+            title: "Phase 6 Boundary Findings",
+            headers: ["Finding", "Severity", "Readiness", "Snapshot Path", "Detail"],
+            rows: compactRows(phase6FindingRows, [["No Phase 6 boundary findings", "INFO", "READY", "—", "—"]]),
+          },
+        ],
       });
     }
 

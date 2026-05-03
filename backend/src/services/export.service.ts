@@ -1,3 +1,4 @@
+// PHASE6_DESIGN_CORE_ORCHESTRATOR_CONTRACT
 import { prisma } from "../db/prisma.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 // PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
@@ -1057,6 +1058,53 @@ export async function getCsvRows(projectId: string) {
           Key: finding.readinessImpact,
           Value: finding.title,
           Notes: finding.detail,
+        });
+      }
+    }
+
+
+
+    if (designCore.phase6DesignCoreOrchestrator) {
+      const phase6 = designCore.phase6DesignCoreOrchestrator;
+      rows.push({
+        Section: "Phase 6 Design-Core Orchestrator Contract",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: phase6.contractVersion,
+        Value: `${phase6.overallReadiness} | ${phase6.presentSnapshotSectionCount}/${phase6.requiredSnapshotSectionCount} sections present`,
+        Notes: `Boundary findings ${phase6.boundaryFindings.length}; missing sections ${phase6.missingSnapshotSectionCount}; frontend truth risks ${phase6.frontendIndependentTruthRiskCount}; role ${phase6.orchestratorRole}`,
+      });
+
+      for (const row of phase6.sectionRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 6 Snapshot Boundary Sections",
+          Scope: row.readiness,
+          Name: row.label,
+          Key: row.snapshotPath,
+          Value: `${row.ownerEngine} | ${row.sourceType} | ${row.itemCount} item(s)`,
+          Notes: `Consumers ${joinCsvList(row.downstreamConsumers, "none")}; proof ${joinCsvList(row.proofGates, "none")}; report ${row.reportImpact}; diagram ${row.diagramImpact}`,
+        });
+      }
+
+      for (const edge of phase6.dependencyEdges.slice(0, 80)) {
+        rows.push({
+          Section: "Phase 6 Orchestrator Dependency Edges",
+          Scope: edge.required ? "required" : "optional",
+          Name: edge.relationship,
+          Key: `${edge.sourceSectionKey} -> ${edge.targetSectionKey}`,
+          Value: joinCsvList(edge.evidence, "No evidence recorded"),
+          Notes: edge.id,
+        });
+      }
+
+      for (const finding of phase6.boundaryFindings.slice(0, 80)) {
+        rows.push({
+          Section: "Phase 6 Boundary Findings",
+          Scope: finding.severity,
+          Name: finding.code,
+          Key: finding.readinessImpact,
+          Value: finding.title,
+          Notes: `${finding.affectedSnapshotPath} | ${finding.detail}`,
         });
       }
     }

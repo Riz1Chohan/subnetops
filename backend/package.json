@@ -36,7 +36,8 @@
     "engine:selftest:cidr-core": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:phase4-addressing",
     "engine:selftest:phase75-golden-requirements": "tsx src/services/requirementsGoldenScenarios.selftest.ts",
     "engine:selftest:phase4-addressing": "tsx src/lib/phase4CidrAddressing.selftest.ts",
-    "engine:selftest:phase5-enterprise-ipam": "tsx src/lib/phase5EnterpriseIpam.selftest.ts"
+    "engine:selftest:phase5-enterprise-ipam": "tsx src/lib/phase5EnterpriseIpam.selftest.ts",
+    "engine:selftest:phase6-design-core-orchestrator": "tsx src/lib/phase6DesignCoreOrchestrator.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

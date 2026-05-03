@@ -1587,6 +1587,95 @@ export interface Phase4CidrAddressingTruthControlSummary {
   notes: string[];
 }
 
+
+
+export type Phase6SectionKey =
+  | "sourceInputs"
+  | "materializedObjects"
+  | "addressingTruth"
+  | "enterpriseIpamTruth"
+  | "standardsTruth"
+  | "objectModelTruth"
+  | "graphTruth"
+  | "routingTruth"
+  | "securityTruth"
+  | "implementationTruth"
+  | "reportTruth"
+  | "diagramTruth"
+  | "readinessTruth";
+
+export type Phase6SectionSourceType =
+  | "BACKEND_COORDINATED"
+  | "BACKEND_COMPUTED"
+  | "BACKEND_CONTROL_LEDGER"
+  | "ENGINE1_PLANNER"
+  | "ENGINE2_DURABLE_AUTHORITY"
+  | "REVIEW_GATED";
+
+export type Phase6OrchestratorReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+
+export interface Phase6OrchestratorSectionRow {
+  sectionKey: Phase6SectionKey;
+  label: string;
+  snapshotPath: string;
+  ownerEngine: string;
+  sourceType: Phase6SectionSourceType;
+  inputPaths: string[];
+  outputPaths: string[];
+  downstreamConsumers: string[];
+  requirementContextRequired: boolean;
+  requirementContextEvidence: string[];
+  reportImpact: string;
+  diagramImpact: string;
+  validationReadinessImpact: string;
+  proofGates: string[];
+  present: boolean;
+  itemCount: number;
+  reviewCount: number;
+  blockerCount: number;
+  readiness: Phase6OrchestratorReadiness;
+  notes: string[];
+}
+
+export interface Phase6OrchestratorDependencyEdge {
+  id: string;
+  sourceSectionKey: Phase6SectionKey;
+  targetSectionKey: Phase6SectionKey;
+  relationship: string;
+  required: boolean;
+  evidence: string[];
+}
+
+export interface Phase6OrchestratorBoundaryFinding {
+  id: string;
+  severity: "INFO" | "WARNING" | "ERROR";
+  code: string;
+  title: string;
+  detail: string;
+  affectedSnapshotPath: string;
+  readinessImpact: Phase6OrchestratorReadiness;
+}
+
+export interface Phase6DesignCoreOrchestratorControlSummary {
+  contractVersion: "PHASE6_DESIGN_CORE_ORCHESTRATOR_CONTRACT";
+  orchestratorRole: "DESIGN_CORE_COORDINATOR_NOT_GOD_FILE";
+  coordinatorRule: string;
+  requirementContextPaths: string[];
+  requiredSnapshotSectionCount: number;
+  presentSnapshotSectionCount: number;
+  missingSnapshotSectionCount: number;
+  sectionRows: Phase6OrchestratorSectionRow[];
+  dependencyEdges: Phase6OrchestratorDependencyEdge[];
+  boundaryFindings: Phase6OrchestratorBoundaryFinding[];
+  frontendIndependentTruthRiskCount: number;
+  requirementContextGapCount: number;
+  reportContextGapCount: number;
+  diagramContextGapCount: number;
+  readinessContextGapCount: number;
+  overallReadiness: Phase6OrchestratorReadiness;
+  notes: string[];
+}
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -1689,6 +1778,7 @@ export interface DesignCoreSnapshot {
   phase3RequirementsClosure?: Phase3RequirementsClosureControlSummary;
   phase4CidrAddressingTruth?: Phase4CidrAddressingTruthControlSummary;
   phase5EnterpriseIpamTruth?: Phase5EnterpriseIpamTruthControlSummary;
+  phase6DesignCoreOrchestrator?: Phase6DesignCoreOrchestratorControlSummary;
   requirementsCoverage?: RequirementsCoverageSummary;
   requirementsImpactClosure?: RequirementsImpactClosureSummary;
   requirementsScenarioProof?: RequirementsScenarioProofSummary;
