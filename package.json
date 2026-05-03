@@ -4,6 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "check:phase5-enterprise-ipam": "node scripts/check-phase5-enterprise-ipam.cjs",
+    "check:phase5-107-release": "npm run check:phase5-enterprise-ipam && npm run check:phase4-107-release",
     "check:phase4-cidr-addressing": "node scripts/check-phase4-cidr-addressing.cjs",
     "check:phase4-107-release": "npm run check:phase4-cidr-addressing && npm run check:phase3-107-release",
     "check:phase3-requirements-closure": "node scripts/check-phase3-requirements-closure.cjs",

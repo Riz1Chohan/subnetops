@@ -1,5 +1,6 @@
 import { prisma } from "../db/prisma.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
+// PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 import { getDesignCoreSnapshotForExport } from "./designCore.service.js";
 import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 import { runValidation } from "./validation.service.js";
@@ -1011,6 +1012,51 @@ export async function getCsvRows(projectId: string) {
           Key: row.readinessImpact,
           Value: `${row.canonicalSubnetCidr || row.sourceSubnetCidr} / proposed ${row.proposedSubnetCidr || "none"}`,
           Notes: `Role ${row.role}; capacity ${row.capacityState}; gateway ${row.gatewayState}; blockers ${joinCsvList(row.blockers, "none")}`,
+        });
+      }
+    }
+
+    if (designCore.phase5EnterpriseIpamTruth) {
+      const phase5 = designCore.phase5EnterpriseIpamTruth;
+      rows.push({
+        Section: "Phase 5 Enterprise IPAM Durable Authority",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: phase5.contractVersion,
+        Value: `${phase5.overallReadiness} | ${phase5.durablePoolCount} pools / ${phase5.durableAllocationCount} allocations / ${phase5.approvedAllocationCount} approved`,
+        Notes: `Proposal-only ${phase5.engine1ProposalOnlyCount}; blockers ${phase5.conflictBlockerCount}; review ${phase5.reviewRequiredCount}; stale ${phase5.staleAllocationCount}; hash ${phase5.currentInputHash}`,
+      });
+
+      for (const row of phase5.reconciliationRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 5 Engine1-Engine2 Reconciliation",
+          Scope: row.siteName,
+          Name: `VLAN ${row.vlanId} ${row.vlanName}`,
+          Key: row.reconciliationState,
+          Value: `${row.engine1PlannedCidr} -> ${row.engine2AllocationCidr || "proposal-only"}`,
+          Notes: `Readiness ${row.readinessImpact}; pool ${row.engine2PoolName || "none"}; route domain ${row.routeDomainKey}; blockers ${joinCsvList(row.blockers, "none")}; review ${joinCsvList(row.reviewReasons, "none")}`,
+        });
+      }
+
+      for (const item of phase5.requirementIpamMatrix.filter((field) => field.active).slice(0, 80)) {
+        rows.push({
+          Section: "Phase 5 Requirement-to-IPAM Matrix",
+          Scope: item.readinessImpact,
+          Name: item.requirementKey,
+          Key: `${item.approvedAllocationCount} approved / ${item.durableCandidateCount} candidate / ${item.engine1ProposalOnlyCount} proposal-only`,
+          Value: joinCsvList(item.materializedIpamEvidence, "No IPAM evidence recorded"),
+          Notes: `Missing ${joinCsvList(item.missingIpamEvidence, "none")} | Expected ${item.expectedIpamImpact}`,
+        });
+      }
+
+      for (const finding of phase5.conflictRows.slice(0, 80)) {
+        rows.push({
+          Section: "Phase 5 Enterprise IPAM Findings",
+          Scope: finding.severity,
+          Name: finding.code,
+          Key: finding.readinessImpact,
+          Value: finding.title,
+          Notes: finding.detail,
         });
       }
     }

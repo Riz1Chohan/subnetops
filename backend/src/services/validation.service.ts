@@ -206,6 +206,18 @@ const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>>
     impact: "Overlapping subnets can break routing, firewall policy, DHCP scopes, and site-to-site reachability.",
     recommendation: "Assign non-overlapping subnet ranges and rerun validation.",
   },
+  IPAM_DURABLE_AUTHORITY_BLOCKED: {
+    impact: "Engine 1 planned addressing is not safe to implement while Engine 2 durable IPAM reports a blocker such as brownfield overlap, stale approval, reserved pool breach, DHCP conflict, or reservation conflict.",
+    recommendation: "Resolve the Engine 2 IPAM blocker, update the durable allocation/approval/ledger state, and rerun validation before implementation handoff.",
+  },
+  IPAM_DURABLE_AUTHORITY_REVIEW_REQUIRED: {
+    impact: "The subnet may be mathematically valid, but it is not durable IPAM authority yet. Treating it as ready would create split-brain addressing risk.",
+    recommendation: "Materialize the Engine 1 plan row into Engine 2, record approval or review state, and clear any DHCP/reservation/brownfield review notes.",
+  },
+  IPAM_REQUIREMENT_PROPAGATION_GAP: {
+    impact: "A requirement-driven address need exists, but Engine 2 has not proven durable pool/allocation ownership or has recorded review gaps.",
+    recommendation: "Use the Phase 5 requirement-to-IPAM matrix to materialize, approve, or explicitly review the affected IPAM objects.",
+  },
   VALIDATION_PASSED: {
     impact: "No current blocker was detected by the saved validation checks, but this is not a live-network discovery result.",
     recommendation: "Continue engineer review against live inventory, business policy, and vendor implementation requirements.",
@@ -979,6 +991,45 @@ export async function runValidation(projectId: string) {
     }
   }
 
+
+  if (designSnapshot?.phase5EnterpriseIpamTruth) {
+    const phase5 = designSnapshot.phase5EnterpriseIpamTruth;
+    for (const row of phase5.reconciliationRows) {
+      if (row.readinessImpact === "BLOCKING") {
+        results.push(makeItem({
+          projectId,
+          severity: "ERROR",
+          ruleCode: "IPAM_DURABLE_AUTHORITY_BLOCKED",
+          title: `Engine 2 IPAM blocks VLAN ${row.vlanId}`,
+          message: `${row.siteName} VLAN ${row.vlanId} ${row.vlanName} is ${row.reconciliationState}: ${[...row.blockers, ...row.reviewReasons].join(" ") || "Engine 2 durable authority is blocking this row."}`,
+          entityType: "VLAN",
+          entityId: row.rowId,
+        }));
+      } else if (row.readinessImpact === "REVIEW_REQUIRED") {
+        results.push(makeItem({
+          projectId,
+          severity: "WARNING",
+          ruleCode: "IPAM_DURABLE_AUTHORITY_REVIEW_REQUIRED",
+          title: `Engine 2 IPAM review required for VLAN ${row.vlanId}`,
+          message: `${row.siteName} VLAN ${row.vlanId} ${row.vlanName} is ${row.reconciliationState}: ${[...row.reviewReasons, ...row.evidence].slice(0, 3).join(" ")}`,
+          entityType: "VLAN",
+          entityId: row.rowId,
+        }));
+      }
+    }
+
+    for (const item of phase5.requirementIpamMatrix.filter((field) => field.active && field.readinessImpact !== "PASSED" && field.readinessImpact !== "NOT_APPLICABLE")) {
+      results.push(makeItem({
+        projectId,
+        severity: item.readinessImpact === "BLOCKING" ? "ERROR" : "WARNING",
+        ruleCode: "IPAM_REQUIREMENT_PROPAGATION_GAP",
+        title: `Requirement ${item.requirementKey} has unresolved Engine 2 IPAM impact`,
+        message: `${item.label}. ${item.missingIpamEvidence.slice(0, 3).join(" ") || item.expectedIpamImpact}`,
+        entityType: "PROJECT",
+        entityId: projectId,
+      }));
+    }
+  }
 
   addRequirementsHonestyValidation(results, projectId, project, designSnapshot);
 

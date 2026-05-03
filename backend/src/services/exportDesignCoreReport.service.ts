@@ -1,5 +1,6 @@
 import type { ProfessionalReport } from "./export.types.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
+// PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 
 export type ProfessionalReportMode = "professional" | "technical" | "full-proof";
 
@@ -154,6 +155,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const requirementsScenarioProof = designCore.requirementsScenarioProof && typeof designCore.requirementsScenarioProof === "object" ? designCore.requirementsScenarioProof : null;
   const phase3RequirementsClosure = designCore.phase3RequirementsClosure && typeof designCore.phase3RequirementsClosure === "object" ? designCore.phase3RequirementsClosure : null;
   const phase4CidrAddressingTruth = designCore.phase4CidrAddressingTruth && typeof designCore.phase4CidrAddressingTruth === "object" ? designCore.phase4CidrAddressingTruth : null;
+  const phase5EnterpriseIpamTruth = designCore.phase5EnterpriseIpamTruth && typeof designCore.phase5EnterpriseIpamTruth === "object" ? designCore.phase5EnterpriseIpamTruth : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -380,6 +382,48 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         title: "Phase 4 Addressing Row Truth",
         headers: ["VLAN", "CIDR", "Capacity", "Gateway / Site Block", "Blockers"],
         rows: compactRows(phase4AddressRows, [["No Phase 4 addressing rows", "—", "—", "—", "—"]]),
+      });
+    }
+
+    if (includeTechnicalEvidence && phase5EnterpriseIpamTruth) {
+      const phase5ReconciliationRows = asArray(phase5EnterpriseIpamTruth?.reconciliationRows)
+        .slice(0, 30)
+        .map((row: any) => [
+          `${asString(row.siteName, "Site")} VLAN ${row.vlanId ?? "—"}`,
+          asString(row.engine1PlannedCidr, "—"),
+          asString(row.engine2AllocationCidr, "proposal-only"),
+          asString(row.reconciliationState, "review"),
+          joinText([...asArray(row.blockers), ...asArray(row.reviewReasons)].slice(0, 3), joinText(asArray(row.evidence).slice(0, 2), "—")),
+        ]);
+
+      const phase5RequirementRows = asArray(phase5EnterpriseIpamTruth?.requirementIpamMatrix)
+        .filter((item: any) => item?.active)
+        .slice(0, 24)
+        .map((item: any) => [
+          asString(item.requirementKey, "requirement"),
+          asString(item.readinessImpact, "review"),
+          `${item.approvedAllocationCount ?? 0} approved / ${item.durableCandidateCount ?? 0} candidate / ${item.engine1ProposalOnlyCount ?? 0} proposal-only`,
+          joinText(asArray(item.materializedIpamEvidence).slice(0, 2), joinText(asArray(item.missingIpamEvidence).slice(0, 2), "—")),
+        ]);
+
+      addressingSection.tables.push({
+        title: "Phase 5 Enterprise IPAM Durable Authority",
+        headers: ["Gate", "Status", "Evidence"],
+        rows: [
+          ["Engine relationship", asString(phase5EnterpriseIpamTruth.overallReadiness, "review"), "Engine 1 is planner; Engine 2 is durable IPAM authority; design-core reconciles split-brain states."],
+          ["Durable objects", `${phase5EnterpriseIpamTruth.durablePoolCount ?? 0} pools / ${phase5EnterpriseIpamTruth.durableAllocationCount ?? 0} allocations`, `${phase5EnterpriseIpamTruth.dhcpScopeCount ?? 0} DHCP scopes; ${phase5EnterpriseIpamTruth.reservationCount ?? 0} reservations; ${phase5EnterpriseIpamTruth.brownfieldNetworkCount ?? 0} brownfield networks.`],
+          ["Review gates", `${phase5EnterpriseIpamTruth.conflictBlockerCount ?? 0} blockers / ${phase5EnterpriseIpamTruth.reviewRequiredCount ?? 0} review`, `${phase5EnterpriseIpamTruth.engine1ProposalOnlyCount ?? 0} Engine 1 proposal-only row(s); ${phase5EnterpriseIpamTruth.staleAllocationCount ?? 0} stale allocation(s).`],
+        ],
+      });
+      addressingSection.tables.push({
+        title: "Phase 5 Engine 1 / Engine 2 Reconciliation",
+        headers: ["VLAN", "Engine 1 Planned CIDR", "Engine 2 Durable CIDR", "State", "Proof / Review"],
+        rows: compactRows(phase5ReconciliationRows, [["No Phase 5 reconciliation rows", "—", "—", "—", "—"]]),
+      });
+      addressingSection.tables.push({
+        title: "Phase 5 Requirement-to-IPAM Matrix",
+        headers: ["Requirement", "Readiness", "Approved / Candidate / Proposal-only", "Evidence / Missing Proof"],
+        rows: compactRows(phase5RequirementRows, [["No active Phase 5 IPAM requirement rows", "not-applicable", "—", "—"]]),
       });
     }
 

@@ -711,6 +711,107 @@ export interface Phase4CidrAddressingTruthControlSummary {
   notes: string[];
 }
 
+
+export type Phase5IpamReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "NOT_APPLICABLE";
+export type Phase5IpamReconciliationState =
+  | "ENGINE1_PROPOSAL_ONLY"
+  | "ENGINE2_DURABLE_CANDIDATE"
+  | "ENGINE2_APPROVED_ALLOCATION"
+  | "ENGINE2_APPROVED_WITH_REVIEW_NOTES"
+  | "ENGINE2_CONFLICT_REVIEW_BLOCKER"
+  | "ENGINE2_STALE_ALLOCATION_REVIEW"
+  | "ENGINE2_POOL_BLOCKED"
+  | "ENGINE2_DHCP_CONFLICT_REVIEW"
+  | "ENGINE2_RESERVATION_CONFLICT_REVIEW";
+
+export interface Phase5EngineRelationshipSummary {
+  engine1Role: string;
+  engine2Role: string;
+  designCoreRole: string;
+}
+
+export interface Phase5EnterpriseIpamReconciliationRow {
+  rowId: string;
+  siteId: string;
+  siteName: string;
+  vlanId: number;
+  vlanName: string;
+  role: SegmentRole;
+  engine1PlannedCidr: string;
+  engine1ProposedCidr?: string;
+  engine2AllocationId?: string;
+  engine2AllocationCidr?: string;
+  engine2AllocationStatus?: string;
+  engine2PoolId?: string;
+  engine2PoolName?: string;
+  routeDomainKey: string;
+  sourceTruth: "ENGINE1_PLANNED" | "ENGINE2_DURABLE";
+  reconciliationState: Phase5IpamReconciliationState;
+  readinessImpact: Phase5IpamReadinessImpact;
+  approvedHashMatches: boolean;
+  currentInputHash: string;
+  dhcpScopeIds: string[];
+  reservationIds: string[];
+  blockers: string[];
+  reviewReasons: string[];
+  evidence: string[];
+}
+
+export interface Phase5EnterpriseIpamRequirementMatrixRow {
+  requirementKey: string;
+  label: string;
+  active: boolean;
+  expectedIpamImpact: string;
+  plannedNeedCount: number;
+  engine1ProposalOnlyCount: number;
+  durableCandidateCount: number;
+  approvedAllocationCount: number;
+  conflictOrReviewBlockerCount: number;
+  materializedIpamEvidence: string[];
+  missingIpamEvidence: string[];
+  readinessImpact: Phase5IpamReadinessImpact;
+  notes: string[];
+}
+
+export interface Phase5EnterpriseIpamConflictRow {
+  id: string;
+  code: string;
+  severity: "info" | "review" | "blocked";
+  title: string;
+  detail: string;
+  readinessImpact: Phase5IpamReadinessImpact;
+}
+
+export interface Phase5EnterpriseIpamTruthControlSummary {
+  contractVersion: "PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW";
+  engineRelationship: Phase5EngineRelationshipSummary;
+  routeDomainCount: number;
+  durablePoolCount: number;
+  durableAllocationCount: number;
+  dhcpScopeCount: number;
+  reservationCount: number;
+  brownfieldNetworkCount: number;
+  approvalCount: number;
+  ledgerEntryCount: number;
+  currentInputHash: string;
+  overallReadiness: Phase5IpamReadinessImpact;
+  engine1ProposalOnlyCount: number;
+  durableCandidateCount: number;
+  approvedAllocationCount: number;
+  staleAllocationCount: number;
+  conflictBlockerCount: number;
+  reviewRequiredCount: number;
+  dhcpConflictCount: number;
+  reservationConflictCount: number;
+  brownfieldConflictCount: number;
+  reservePolicyConflictCount: number;
+  activeRequirementIpamGapCount: number;
+  reconciliationRows: Phase5EnterpriseIpamReconciliationRow[];
+  requirementIpamMatrix: Phase5EnterpriseIpamRequirementMatrixRow[];
+  conflictRows: Phase5EnterpriseIpamConflictRow[];
+  notes: string[];
+}
+
 export interface PlanningInputDisciplineItem extends DesignSourceTraceLabel {
   sourceArea: PlanningInputAuditItem["sourceArea"];
   key: string;
@@ -1799,6 +1900,7 @@ export interface DesignCoreSnapshot {
   phase2RequirementsMaterialization: Phase2RequirementsMaterializationControlSummary;
   phase3RequirementsClosure: Phase3RequirementsClosureControlSummary;
   phase4CidrAddressingTruth: Phase4CidrAddressingTruthControlSummary;
+  phase5EnterpriseIpamTruth: Phase5EnterpriseIpamTruthControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;
   requirementsScenarioProof: RequirementsScenarioProofSummary;

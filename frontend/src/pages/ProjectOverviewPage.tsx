@@ -1028,6 +1028,106 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 5 Enterprise IPAM durable authority</h2>
+          {designCore?.phase5EnterpriseIpamTruth ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.phase5EnterpriseIpamTruth.overallReadiness)}
+                {summaryCard("Proposal-only", designCore.phase5EnterpriseIpamTruth.engine1ProposalOnlyCount)}
+                {summaryCard("Approved", designCore.phase5EnterpriseIpamTruth.approvedAllocationCount)}
+                {summaryCard("Block/review", designCore.phase5EnterpriseIpamTruth.conflictBlockerCount + designCore.phase5EnterpriseIpamTruth.reviewRequiredCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 5 reconciles Engine 1 planned addressing with Engine 2 durable IPAM authority. Engine 1 remains the mathematical planner; Engine 2 owns route domains, pools, allocations, DHCP scopes, reservations, brownfield conflicts, approvals, and the ledger. A subnet cannot look implementation-ready while Engine 2 says it is proposal-only, stale, conflicted, or review-required.
+              </p>
+              {designCore.phase5EnterpriseIpamTruth.overallReadiness === "BLOCKING" ? (
+                <div className="trust-note danger">
+                  <strong>Engine 2 has blocking durable-IPAM issues.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Resolve pool/allocation/brownfield/DHCP/reservation/approval blockers before implementation readiness.</p>
+                </div>
+              ) : designCore.phase5EnterpriseIpamTruth.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Engine 2 still needs durable allocation review.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Proposal-only rows are not durable IPAM authority.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>Phase 5 found no active Engine 2 authority gaps.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">VLAN / role</th>
+                      <th align="left">Engine 1</th>
+                      <th align="left">Engine 2</th>
+                      <th align="left">State</th>
+                      <th align="left">Review proof</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase5EnterpriseIpamTruth.reconciliationRows.slice(0, 18).map((row) => (
+                      <tr key={row.rowId}>
+                        <td>{row.siteName} VLAN {row.vlanId}<br /><span className="muted">{row.vlanName} / {row.role}</span></td>
+                        <td>{row.engine1PlannedCidr}<br /><span className="muted">proposal {row.engine1ProposedCidr || "—"}</span></td>
+                        <td>{row.engine2AllocationCidr || "—"}<br /><span className="muted">{row.engine2PoolName || "no pool"} / {row.routeDomainKey}</span></td>
+                        <td>{row.reconciliationState}<br /><span className="muted">{row.readinessImpact}</span></td>
+                        <td>{row.blockers[0] || row.reviewReasons[0] || row.evidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Counts</th>
+                      <th align="left">Evidence / missing proof</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase5EnterpriseIpamTruth.requirementIpamMatrix.filter((item) => item.active).slice(0, 16).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.label}</span></td>
+                        <td>{item.readinessImpact}</td>
+                        <td>{item.approvedAllocationCount} approved / {item.durableCandidateCount} candidate / {item.engine1ProposalOnlyCount} proposal-only</td>
+                        <td>{item.materializedIpamEvidence[0] || item.missingIpamEvidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Engine 2 finding</th>
+                      <th align="left">Severity</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase5EnterpriseIpamTruth.conflictRows.slice(0, 18).map((finding) => (
+                      <tr key={finding.id}>
+                        <td>{finding.code}<br /><span className="muted">{finding.title}</span></td>
+                        <td>{finding.severity}</td>
+                        <td>{finding.readinessImpact}</td>
+                        <td>{finding.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 5 Enterprise IPAM durable authority control is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>
