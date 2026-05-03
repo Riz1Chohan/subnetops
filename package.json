@@ -1,0 +1,10 @@
+{
+  "name": "subnetops",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check": "npm run check:v1",
+    "check:v1": "node scripts/check-v1-release.cjs"
+  }
+}

@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: subnetops-db
+    environment:
+      POSTGRES_DB: subnetops
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - subnetops-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d subnetops"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    container_name: subnetops-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/subnetops?schema=public
+      CORS_ORIGIN: http://localhost:4173
+      JWT_SECRET: change-this-in-production
+      NODE_ENV: production
+      PRISMA_SYNC_ON_BOOT: "true"
+      PRISMA_SYNC_STRATEGY: migrate
+      DB_PUSH_ON_BOOT: "false"
+      SEED_DEMO_ON_BOOT: "false"
+      AUTOMATION_SWEEP_ENABLED: "true"
+      AUTOMATION_SWEEP_INTERVAL_MS: 300000
+      SEND_REAL_EMAILS: "false"
+      SMTP_FROM: no-reply@subnetops.local
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: subnetops-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "4173:80"
+
+volumes:
+  subnetops-db-data:
