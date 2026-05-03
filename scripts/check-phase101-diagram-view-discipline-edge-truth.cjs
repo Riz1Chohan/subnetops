@@ -16,7 +16,7 @@ const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts')
 const canvas = read('frontend/src/features/diagram/components/BackendDiagramCanvas.tsx');
 const doc = read('docs/doc/PHASE101-DIAGRAM-VIEW-DISCIPLINE-EDGE-TRUTH.md');
 
-assert(/^0\.(101|102|103|104|105|106|107)\.0$/.test(pkg.version), 'root package version must be 0.101.0 or later compatible release version');
+assert(/^0\.(101|102|103|104|105|106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'root package version must be 0.101.0 or later compatible release version');
 assert(pkg.scripts['check:phase101-diagram-view-discipline-edge-truth'], 'Phase 101 script missing');
 assert(pkg.scripts['check:phase84-101-release'], 'Phase 84-101 release chain missing');
 assert(/version: \"0\.(101|102|103|104|105|106|107)\.0\"/.test(runtime), 'runtime version not advanced to a compatible Phase 101+ version');

@@ -1,3 +1,4 @@
+// PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: canvas evidence panel displays backend-only diagram proof.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BackendDiagramCanvas } from "../features/diagram/components/BackendDiagramCanvas";
@@ -74,6 +75,7 @@ export function ProjectDiagramPage() {
 
   const { synthesized, authority, designCore } = useAuthoritativeDesign(projectId, seedProject ?? project, baseSites, baseVlans, requirementsProfile);
   const diagramTruth = useMemo(() => buildDiagramTruthModel(designCore), [designCore]);
+  const phase16DiagramTruth = designCore?.phase16DiagramTruth;
 
   const sites = baseSites.length > 0
     ? baseSites
@@ -443,6 +445,32 @@ export function ProjectDiagramPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><span className={truthBadgeClass(diagramTruth.overallReadiness)}>{diagramTruth.overallReadiness === "unknown" ? "Truth pending" : diagramTruth.overallReadiness === "blocked" ? "Diagram truth blocked" : diagramTruth.overallReadiness === "review" ? "Diagram truth under review" : "Diagram truth ready"}</span><span className="badge-soft">Devices {diagramTruth.topologySummary.deviceCount}</span><span className="badge-soft">Links {diagramTruth.topologySummary.linkCount}</span><span className="badge-soft">Route domains {diagramTruth.topologySummary.routeDomainCount}</span><span className="badge-soft">Security zones {diagramTruth.topologySummary.securityZoneCount}</span></div>
           </div>
           {diagramTruth.emptyStateReason ? <div className="trust-note"><p className="muted" style={{ margin: 0 }}><strong>Why the diagram is limited:</strong> {diagramTruth.emptyStateReason}</p></div> : null}
+          {phase16DiagramTruth ? (
+            <div className="trust-note" style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <strong>Phase 16 diagram truth contract</strong>
+                  <p className="muted" style={{ margin: "4px 0 0 0" }}>Backend-only renderer authority: every visual node needs backend object identity, every edge needs relationship evidence, and each mode has its own purpose.</p>
+                </div>
+                <span className={truthBadgeClass(phase16DiagramTruth.overallReadiness)}>{phase16DiagramTruth.overallReadiness}</span>
+              </div>
+              <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+                <div className="summary-card"><div className="muted">Backend authored</div><div className="value">{phase16DiagramTruth.backendAuthored ? "Yes" : "No"}</div><div className="muted">Frontend cannot invent topology.</div></div>
+                <div className="summary-card"><div className="muted">Render coverage</div><div className="value">{phase16DiagramTruth.renderNodeCount}/{phase16DiagramTruth.renderEdgeCount}</div><div className="muted">Nodes / edges with lineage checks.</div></div>
+                <div className="summary-card"><div className="muted">Mode contracts</div><div className="value">{phase16DiagramTruth.modeContractCount}</div><div className="muted">Physical, logical, WAN/cloud, security, per-site, implementation.</div></div>
+                <div className="summary-card"><div className="muted">Truth visibility</div><div className="value">{phase16DiagramTruth.inferredOrReviewVisibleCount}</div><div className="muted">Inferred/review evidence remains visible.</div></div>
+              </div>
+              <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "start" }}>
+                {phase16DiagramTruth.modeContracts.slice(0, 6).map((item) => (
+                  <div key={item.mode} className="summary-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}><div className="muted">{item.mode}</div><span className={truthBadgeClass(item.readinessImpact)}>{item.status}</span></div>
+                    <div style={{ fontWeight: 800, marginTop: 8 }}>{item.evidenceCount} evidence item(s)</div>
+                    <div className="muted" style={{ marginTop: 6 }}>{item.purpose}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>{diagramTruth.overlaySummaries.map((item) => <div key={item.key} className="summary-card"><div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}><div className="muted">{item.label}</div><span className={truthBadgeClass(item.readiness)}>{item.readiness}</span></div><div className="value">{item.count}</div><div className="muted" style={{ marginTop: 6 }}>{item.detail}</div></div>)}</div>
           <div className="grid-2" style={{ alignItems: "start" }}><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>Top cross-check hotspots</h3>{diagramTruth.hotspots.length === 0 ? <p className="muted" style={{ margin: 0 }}>No major routing, security, or implementation hotspots are currently surfaced by design truth.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{diagramTruth.hotspots.map((item, index) => <li key={`${item.scopeLabel}-${item.title}-${index}`} style={{ marginBottom: 8 }}><strong>{item.scopeLabel} — {item.title}:</strong> {item.detail}</li>)}</ul>}</div><div><h3 style={{ marginTop: 0, marginBottom: 8 }}>How to use the canvas honestly</h3><ul style={{ margin: 0, paddingLeft: 18 }}><li style={{ marginBottom: 8 }}><strong>Addressing:</strong> confirm site blocks, gateway anchors, and orphaned rows before trusting labels.</li><li style={{ marginBottom: 8 }}><strong>Routing:</strong> compare displayed paths against route intents, reachability checks, and next-hop review items.</li><li style={{ marginBottom: 8 }}><strong>Security:</strong> cross-check zone boundaries, required flows, and NAT coverage instead of assuming visual adjacency means permission.</li><li style={{ marginBottom: 0 }}><strong>Implementation:</strong> blocked implementation or verification items still override a clean-looking canvas.</li></ul></div></div>
         </div>

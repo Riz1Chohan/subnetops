@@ -81,6 +81,7 @@ export function ProjectSecurityPage() {
   const criticalFindings = synthesized.segmentationReview.filter((item) => item.severity === "critical").length;
   const warningFindings = synthesized.segmentationReview.filter((item) => item.severity === "warning").length;
   const backendSecurityFlow = designCore?.networkObjectModel?.securityPolicyFlow;
+  const phase12SecurityPolicy = designCore?.phase12SecurityPolicyFlow;
   const backendPolicyMatrix = backendSecurityFlow?.policyMatrix ?? [];
   const backendRuleOrderReviews = backendSecurityFlow?.ruleOrderReviews ?? [];
   const backendNatReviews = backendSecurityFlow?.natReviews ?? [];
@@ -305,7 +306,18 @@ export function ProjectSecurityPage() {
               <span className="badge-soft">implicit deny gaps {backendSecurityFlow.summary.implicitDenyGapCount}</span>
               <span className="badge-soft">shadowed rules {backendSecurityFlow.summary.shadowedRuleCount}</span>
               <span className="badge-soft">logging gaps {backendSecurityFlow.summary.loggingGapCount}</span>
+              {phase12SecurityPolicy ? <span className={phase12SecurityPolicy.overallReadiness === "BLOCKED" ? "badge badge-error" : phase12SecurityPolicy.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge badge-info"}>phase 12 {phase12SecurityPolicy.overallReadiness}</span> : null}
+              {phase12SecurityPolicy ? <span className="badge-soft">flow consequences {phase12SecurityPolicy.flowConsequenceCount}</span> : null}
+              {phase12SecurityPolicy ? <span className="badge-soft">requirement gaps {phase12SecurityPolicy.activeRequirementSecurityGapCount}</span> : null}
             </div>
+
+            {phase12SecurityPolicy ? (
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 12 }}>
+                <div><h3 style={{ marginTop: 0, marginBottom: 6 }}>Phase 12 security policy flow control</h3><p className="muted" style={{ margin: 0 }}>This is the strict backend control layer for zone-to-zone matrix, service dependencies, NAT, logging, broad permits, shadowing, and explicit requirement-to-flow consequences. It is not firewall command generation.</p></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing</th></tr></thead><tbody>{phase12SecurityPolicy.requirementSecurityMatrix.slice(0, 10).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">Phase 12 state</th><th align="left">Review reason</th></tr></thead><tbody>{phase12SecurityPolicy.flowConsequences.slice(0, 12).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{row.phase12PolicyState}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
+              </div>
+            ) : null}
 
             <div style={{ overflowX: "auto" }}>
               <table>

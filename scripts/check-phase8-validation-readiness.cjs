@@ -79,7 +79,7 @@ assert(c.selftest.includes("buildPhase8ValidationReadinessControl") && c.selftes
 
 const rootPkg = json(files.rootPkg);
 const backendPkg = json(files.backendPkg);
-assert(rootPkg.version === "0.107.0", "root version must remain 0.107.0 for inherited Phase 84-107 release checks");
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(rootPkg.version), "root version must remain 0.107.0 for inherited Phase 84-107 release checks");
 assert(rootPkg.scripts && rootPkg.scripts["check:phase8-validation-readiness"] === "node scripts/check-phase8-validation-readiness.cjs", "root script check:phase8-validation-readiness missing");
 assert(rootPkg.scripts && rootPkg.scripts["check:phase8-107-release"], "root script check:phase8-107-release missing");
 assert(rootPkg.scripts["check:phase8-107-release"].includes("check:phase8-validation-readiness"), "phase8 release chain must include phase8 check");

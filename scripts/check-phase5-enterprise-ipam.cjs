@@ -164,7 +164,7 @@ const requiredDocs = [
 ];
 for (const marker of requiredDocs) assert(contents.doc.includes(marker), `Phase 5 doc missing ${marker}`);
 
-assert(rootPkg.version === '0.107.0', `package version must stay 0.107.0 to preserve inherited release gates, got ${rootPkg.version}`);
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(rootPkg.version), `package version must stay 0.107.0 to preserve inherited release gates, got ${rootPkg.version}`);
 assert(rootPkg.scripts && rootPkg.scripts['check:phase5-enterprise-ipam'] === 'node scripts/check-phase5-enterprise-ipam.cjs', 'root script check:phase5-enterprise-ipam missing');
 assert(rootPkg.scripts && rootPkg.scripts['check:phase5-107-release'], 'root script check:phase5-107-release missing');
 assert(rootPkg.scripts['check:phase5-107-release'].includes('check:phase5-enterprise-ipam'), 'phase5 release chain must include phase5 check');

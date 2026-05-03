@@ -208,6 +208,18 @@ export type CommentTaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type CommentTargetType = "PROJECT" | "SITE" | "VLAN";
 
 
+export interface Phase19AIDraftAuthority {
+  contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT";
+  state: "AI_DRAFT";
+  sourceType: "AI_DRAFT";
+  proofStatus: "DRAFT_ONLY";
+  reviewRequired: true;
+  notAuthoritative: true;
+  materializationRequired: true;
+  downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED";
+  conversionGates: string[];
+}
+
 export interface AIPlanDraft {
   project: {
     name: string;
@@ -239,6 +251,7 @@ export interface AIPlanDraft {
   assumptions: string[];
   reviewChecklist: string[];
   provider: "local" | "openai";
+  authority: Phase19AIDraftAuthority;
 }
 
 export interface AIValidationExplanation {

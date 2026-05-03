@@ -12,7 +12,7 @@ const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.s
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE104-ENTERPRISE-WAN-FABRIC-POLISH.md', 'utf8');
 
-assert(/^0\.(104|105|106|107)\.0$/.test(pkg.version), 'package version must be 0.104.0 or compatible newer diagram release');
+assert(/^0\.(104|105|106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'package version must be 0.104.0 or compatible newer diagram release');
 assert(runtime.includes('enterpriseWanFabricPolish: "PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH"'), 'runtime Phase 104 marker missing');
 assert(doc.includes('PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH'), 'Phase 104 documentation marker missing');
 assert(canvas.includes('PHASE_104_ENTERPRISE_WAN_FABRIC_POLISH'), 'canvas Phase 104 marker missing');

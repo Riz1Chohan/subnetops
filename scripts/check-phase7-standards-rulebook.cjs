@@ -86,7 +86,7 @@ assert(c.selftest.includes('buildPhase7StandardsRulebookControl') && c.selftest.
 
 const rootPkg = json(files.rootPkg);
 const backendPkg = json(files.backendPkg);
-assert(rootPkg.version === '0.107.0', 'root version must remain 0.107.0 for inherited Phase 84-107 release checks');
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(rootPkg.version), 'root version must remain 0.107.0 for inherited Phase 84-107 release checks');
 assert(rootPkg.scripts && rootPkg.scripts['check:phase7-standards-rulebook'] === 'node scripts/check-phase7-standards-rulebook.cjs', 'root script check:phase7-standards-rulebook missing');
 assert(rootPkg.scripts && rootPkg.scripts['check:phase7-107-release'], 'root script check:phase7-107-release missing');
 assert(rootPkg.scripts['check:phase7-107-release'].includes('check:phase7-standards-rulebook'), 'phase7 release chain must include phase7 check');

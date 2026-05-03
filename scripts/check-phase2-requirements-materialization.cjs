@@ -122,7 +122,7 @@ const requiredDocs = [
 ];
 for (const marker of requiredDocs) assert(doc.includes(marker), `Phase 2 doc missing ${marker}`);
 
-assert(pkg.version === '0.107.0', `package version must stay 0.107.0 to preserve inherited release gates, got ${pkg.version}`);
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(pkg.version), `package version must stay 0.107.0 to preserve inherited release gates, got ${pkg.version}`);
 assert(pkg.scripts && pkg.scripts['check:phase2-requirements-materialization'] === 'node scripts/check-phase2-requirements-materialization.cjs', 'root script check:phase2-requirements-materialization missing');
 assert(pkg.scripts && pkg.scripts['check:phase2-107-release'], 'root script check:phase2-107-release missing');
 assert(pkg.scripts['check:phase2-107-release'].includes('check:phase2-requirements-materialization'), 'phase2 release chain must include phase2 check');

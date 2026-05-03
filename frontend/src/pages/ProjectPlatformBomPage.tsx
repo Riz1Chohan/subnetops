@@ -49,7 +49,8 @@ export function ProjectPlatformBomPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const { synthesized, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const { synthesized, authority, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const phase17PlatformBomFoundation = designCore?.phase17PlatformBomFoundation;
 
   const updateProjectMutation = useUpdateProject(projectId);
   const [state, setState] = useState<PlatformProfileState>(emptyPlatformProfileState());
@@ -156,6 +157,43 @@ export function ProjectPlatformBomPage() {
         {summaryCard("Hardware categories", foundation.totals.hardwareCategories, "Switching, security, wireless, WAN, support, and physical support.")}
         {summaryCard("Review-heavy items", foundation.totals.reviewItems, "Items that still need engineering or procurement review.")}
         {summaryCard("Transit-aware design", synthesized.wanLinks.length, "WAN and edge links influencing the BOM foundation.")}
+      </div>
+
+
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Phase 17 Platform/BOM foundation contract</h2>
+            <p className="muted" style={{ margin: "8px 0 0" }}>
+              PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT backend-controlled advisory BOM evidence. This panel is the hard stop against fake SKUs, fake pricing, fake PoE precision, and frontend-only procurement truth.
+            </p>
+          </div>
+          {phase17PlatformBomFoundation ? <span className="badge-soft">{phase17PlatformBomFoundation.overallReadiness}</span> : <span className="badge-soft">Backend evidence loading</span>}
+        </div>
+        {phase17PlatformBomFoundation ? (
+          <>
+            <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+              {summaryCard("Backend BOM rows", phase17PlatformBomFoundation.rowCount, phase17PlatformBomFoundation.procurementAuthority)}
+              {summaryCard("Requirement drivers", phase17PlatformBomFoundation.requirementDriverCount, "Every BOM effect keeps source requirement evidence.")}
+              {summaryCard("Local ports/site", phase17PlatformBomFoundation.localPortDemandPerSite, `${phase17PlatformBomFoundation.growthMarginPercent}% growth margin included.`)}
+              {summaryCard("PoE endpoints/site", phase17PlatformBomFoundation.poeDemandPerSite, "Endpoint count only; watt budget requires device classes.")}
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead><tr><th align="left">Category</th><th align="left">Item</th><th align="left">Qty</th><th align="left">Confidence</th><th align="left">Source requirements</th><th align="left">Manual review gate</th></tr></thead>
+                <tbody>
+                  {phase17PlatformBomFoundation.rows.slice(0, 9).map((item) => (
+                    <tr key={`${item.category}-${item.item}-phase17`}><td>{item.category}</td><td>{item.item}</td><td>{item.quantity} {item.unit}</td><td>{item.confidence} / {item.readinessImpact}</td><td>{item.sourceRequirementIds.slice(0, 4).join(", ")}{item.sourceRequirementIds.length > 4 ? "…" : ""}</td><td>{item.manualReviewNote}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="trust-note"><strong>Proof boundary</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{phase17PlatformBomFoundation.proofBoundary.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="trust-note"><strong>Review-required items</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{phase17PlatformBomFoundation.reviewItems.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
+            </div>
+          </>
+        ) : <p className="muted" style={{ margin: 0 }}>Backend Phase 17 evidence is not available yet. Keep the local table advisory and do not use it as procurement authority.</p>}
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>

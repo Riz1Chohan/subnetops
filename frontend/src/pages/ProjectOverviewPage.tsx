@@ -61,6 +61,8 @@ export function ProjectOverviewPage() {
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const requirementsReadiness = planningReadinessSummary(requirementsProfile);
   const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const phase19AiDraftHelper = designCore?.phase19AiDraftHelper;
+  const phase20FinalProofPass = designCore?.phase20FinalProofPass;
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -210,6 +212,51 @@ export function ProjectOverviewPage() {
           <p className="muted" style={{ marginTop: 8 }}>{project.description || "No description yet."}</p>
         </div>
       </div>
+
+      {phase19AiDraftHelper && (!selectedSection || selectedSection === "summary") ? (
+        <div className="panel" style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Phase 19 AI draft/helper boundary — PHASE19_AI_DRAFT_HELPER_CONTRACT</h2>
+              <p className="muted" style={{ margin: 0 }}>AI is draft-only. It can seed reviewed structured inputs, but it is not engineering authority for addressing, routing, security, reports, diagrams, or implementation.</p>
+            </div>
+            <span className={phase19AiDraftHelper.overallReadiness === "BLOCKED" ? "badge badge-danger" : phase19AiDraftHelper.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>{phase19AiDraftHelper.overallReadiness}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge-soft">Authority {phase19AiDraftHelper.aiAuthority}</span>
+            <span className="badge-soft">AI objects {phase19AiDraftHelper.aiDerivedObjectCount}</span>
+            <span className="badge-soft">Review required {phase19AiDraftHelper.reviewRequiredObjectCount}</span>
+            <span className="badge-soft">Gates {phase19AiDraftHelper.enforcedGateCount}/{phase19AiDraftHelper.gateCount}</span>
+          </div>
+          {phase19AiDraftHelper.draftObjectRows.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {phase19AiDraftHelper.draftObjectRows.slice(0, 5).map((item) => <li key={item.objectId}><strong>{item.objectLabel}</strong> — {item.state} / {item.proofStatus}</li>)}
+            </ul>
+          ) : <p className="muted" style={{ margin: 0 }}>No saved AI-derived object markers detected.</p>}
+        </div>
+      ) : null}
+
+      {phase20FinalProofPass && (!selectedSection || selectedSection === "summary") ? (
+        <div className="panel" style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Phase 20 final proof pass — PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT</h2>
+              <p className="muted" style={{ margin: 0 }}>This is the final cross-engine proof gate. It proves scenarios, engine contracts, release gates, report/export truth, and diagram/frontend boundaries without claiming A+ authority.</p>
+            </div>
+            <span className={phase20FinalProofPass.overallReadiness === "BLOCKED" ? "badge badge-danger" : phase20FinalProofPass.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>{phase20FinalProofPass.overallReadiness}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge-soft">Target {phase20FinalProofPass.releaseTarget}</span>
+            <span className="badge-soft">Scenarios {phase20FinalProofPass.scenarioProofReadyCount}/{phase20FinalProofPass.scenarioCount}</span>
+            <span className="badge-soft">Engine rows {phase20FinalProofPass.engineProofReadyCount}/{phase20FinalProofPass.engineProofCount}</span>
+            <span className="badge-soft">Gates {phase20FinalProofPass.passedGateCount}/{phase20FinalProofPass.gateCount}</span>
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {phase20FinalProofPass.releaseGates.slice(0, 4).map((gate) => <li key={gate.gateKey}><strong>{gate.gate}</strong> — {gate.state}</li>)}
+          </ul>
+          <p className="muted" style={{ margin: 0 }}>Blocked scenarios: {phase20FinalProofPass.scenarioBlockedCount}. Review-required scenarios: {phase20FinalProofPass.scenarioReviewCount}. This panel is deliberately a proof status, not a marketing badge.</p>
+        </div>
+      ) : null}
 
       {!isFocusedSectionView ? (
         <UsageBanner
@@ -1472,6 +1519,16 @@ export function ProjectOverviewPage() {
             <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual protocol rows</th><th align="left">Missing</th></tr></thead><tbody>{designCore.phase11RoutingSegmentation.requirementRoutingMatrix.slice(0, 14).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualProtocolIntentIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingProtocolCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
             <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Protocol/review row</th><th align="left">Category</th><th align="left">State</th><th align="left">Readiness</th><th align="left">Review reason</th></tr></thead><tbody>{designCore.phase11RoutingSegmentation.protocolIntents.slice(0, 18).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.id}</span></td><td>{row.category}</td><td>{row.controlState}</td><td>{row.readinessImpact}</td><td>{row.reviewReason || "—"}</td></tr>))}</tbody></table></div>
           </>) : (<p className="muted" style={{ margin: 0 }}>Phase 11 routing segmentation protocol-aware planning is not available in this backend snapshot yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 12 security policy flow</h2>
+          {designCore?.phase12SecurityPolicyFlow ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.phase12SecurityPolicyFlow.overallReadiness)}{summaryCard("Flow consequences", designCore.phase12SecurityPolicyFlow.flowConsequenceCount)}{summaryCard("Requirement gaps", designCore.phase12SecurityPolicyFlow.activeRequirementSecurityGapCount)}{summaryCard("NAT/logging gaps", `${designCore.phase12SecurityPolicyFlow.missingNatCount}/${designCore.phase12SecurityPolicyFlow.loggingGapCount}`)}</div>
+            <p className="muted" style={{ margin: 0 }}>Phase 12 renders backend security policy flow evidence only. Zone-to-zone posture, business service dependencies, NAT, logging, broad permits, duplicate/shadowed intent, and policy consequence summaries are review-gated planning evidence, not firewall configuration.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing security categories</th></tr></thead><tbody>{designCore.phase12SecurityPolicyFlow.requirementSecurityMatrix.slice(0, 14).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">Phase 12 state</th><th align="left">Review reason</th></tr></thead><tbody>{designCore.phase12SecurityPolicyFlow.flowConsequences.slice(0, 18).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{row.phase12PolicyState}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Phase 12 security policy flow control is not available in this backend snapshot yet.</p>)}
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>

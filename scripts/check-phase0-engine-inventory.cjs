@@ -26,12 +26,12 @@ const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 assert(inventory.includes('PHASE0_ENGINE_INVENTORY'), 'inventory export missing');
 assert(inventory.includes('PHASE0_PROPAGATION_CONTRACT'), 'propagation contract export missing');
 assert(inventory.includes('PHASE0_REQUIREMENT_FIELD_GROUPS'), 'requirement field groups export missing');
-assert(inventory.includes('PHASE0_ENGINE_INVENTORY_EXPECTED_PHASES = 19'), 'expected 19 engine rows marker missing');
+assert(inventory.includes('PHASE0_ENGINE_INVENTORY_EXPECTED_PHASES = 20'), 'expected 20 engine rows marker missing');
 assert(inventory.includes('validatePhase0EngineInventory'), 'inventory validator export missing');
 
 const rowMatches = [...inventory.matchAll(/phase:\s*(\d+)/g)].map((match) => Number(match[1]));
-assert(rowMatches.length === 19, `expected 19 inventory rows, found ${rowMatches.length}`);
-for (let phase = 1; phase <= 19; phase += 1) {
+assert(rowMatches.length === 20, `expected 20 inventory rows, found ${rowMatches.length}`);
+for (let phase = 1; phase <= 20; phase += 1) {
   assert(rowMatches.includes(phase), `missing phase ${phase} inventory row`);
 }
 
@@ -55,6 +55,7 @@ const requiredEngineNames = [
   'Platform/BOM foundation',
   'Discovery/current-state',
   'AI draft/helper',
+  'Final cross-engine proof pass',
 ];
 for (const name of requiredEngineNames) assert(inventory.includes(name), `missing inventory engine: ${name}`);
 

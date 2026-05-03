@@ -1,6 +1,6 @@
 {
   "name": "subnetops-release",
-  "version": "0.107.0",
+  "version": "0.112.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
@@ -75,6 +75,24 @@
     "check:phase10-design-graph": "node scripts/check-phase10-design-graph.cjs",
     "check:phase10-107-release": "npm run check:phase10-design-graph && npm run check:phase9-107-release",
     "check:phase11-routing-segmentation": "node scripts/check-phase11-routing-segmentation.cjs",
-    "check:phase11-107-release": "npm run check:phase11-routing-segmentation && npm run check:phase10-107-release"
+    "check:phase11-107-release": "npm run check:phase11-routing-segmentation && npm run check:phase10-107-release",
+    "check:phase12-security-policy-flow": "node scripts/check-phase12-security-policy-flow.cjs",
+    "check:phase12-107-release": "npm run check:phase12-security-policy-flow && npm run check:phase11-107-release",
+    "check:phase13-implementation-planning": "node scripts/check-phase13-implementation-planning.cjs",
+    "check:phase13-107-release": "npm run check:phase13-implementation-planning && npm run check:phase12-107-release",
+    "check:phase14-implementation-templates": "node scripts/check-phase14-implementation-templates.cjs",
+    "check:phase14-107-release": "npm run check:phase14-implementation-templates && npm run check:phase13-107-release",
+    "check:phase15-report-export-truth": "node scripts/check-phase15-report-export-truth.cjs",
+    "check:phase15-107-release": "npm run check:phase15-report-export-truth && npm run check:phase14-107-release",
+    "check:phase16-diagram-truth-renderer-layout": "node scripts/check-phase16-diagram-truth-renderer-layout.cjs",
+    "check:phase16-108-release": "npm run check:phase16-diagram-truth-renderer-layout && npm run check:phase15-107-release",
+    "check:phase17-platform-bom-foundation": "node scripts/check-phase17-platform-bom-foundation.cjs",
+    "check:phase17-109-release": "npm run check:phase17-platform-bom-foundation && npm run check:phase16-108-release",
+    "check:phase18-discovery-current-state": "node scripts/check-phase18-discovery-current-state.cjs",
+    "check:phase18-110-release": "npm run check:phase18-discovery-current-state && npm run check:phase17-109-release",
+    "check:phase19-ai-draft-helper": "node scripts/check-phase19-ai-draft-helper.cjs",
+    "check:phase19-111-release": "npm run check:phase19-ai-draft-helper && npm run check:phase18-110-release",
+    "check:phase20-final-proof-pass": "node scripts/check-phase20-final-proof-pass.cjs",
+    "check:phase20-112-release": "npm run check:phase20-final-proof-pass && npm run check:phase19-111-release"
   }
 }

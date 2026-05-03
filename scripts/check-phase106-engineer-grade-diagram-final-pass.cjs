@@ -9,7 +9,7 @@ const canvas = fs.readFileSync('frontend/src/features/diagram/components/Backend
 const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.service.ts', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE106-ENGINEER-GRADE-DIAGRAM-FINAL-PASS.md', 'utf8');
-assert(/^0\.(106|107)\.0$/.test(pkg.version), 'package version must be 0.106.0 or compatible newer diagram release');
+assert(/^0\.(106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'package version must be 0.106.0 or compatible newer diagram release');
 assert(canvas.includes('PHASE_106_ENGINEER_GRADE_DIAGRAM_FINAL_PASS'), 'Phase 106 marker missing in canvas');
 assert(runtime.includes('PHASE_106_ENGINEER_GRADE_DIAGRAM_FINAL_PASS'), 'Phase 106 marker missing in runtime proof');
 assert(doc.includes('PHASE_106_ENGINEER_GRADE_DIAGRAM_FINAL_PASS'), 'Phase 106 documentation marker missing');

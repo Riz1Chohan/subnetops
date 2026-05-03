@@ -12,7 +12,7 @@ const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.s
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE105-ENGINEER-GRADE-WAN-TOPOLOGY.md', 'utf8');
 
-assert(/^0\.(105|106|107)\.0$/.test(pkg.version), 'package version must be 0.105.0 or compatible newer diagram release');
+assert(/^0\.(105|106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'package version must be 0.105.0 or compatible newer diagram release');
 assert(runtime.includes('engineerGradeWanTopology: "PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY"'), 'runtime Phase 105 marker missing');
 assert(doc.includes('PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY'), 'Phase 105 documentation marker missing');
 assert(canvas.includes('PHASE_105_ENGINEER_GRADE_WAN_TOPOLOGY'), 'canvas Phase 105 marker missing');

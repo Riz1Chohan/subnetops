@@ -21,6 +21,18 @@ export interface AIDraftVlan {
   notes?: string;
 }
 
+export interface Phase19AIDraftAuthority {
+  contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT";
+  state: "AI_DRAFT";
+  sourceType: "AI_DRAFT";
+  proofStatus: "DRAFT_ONLY";
+  reviewRequired: true;
+  notAuthoritative: true;
+  materializationRequired: true;
+  downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED";
+  conversionGates: string[];
+}
+
 export interface AIPlanDraft {
   project: {
     name: string;
@@ -35,6 +47,7 @@ export interface AIPlanDraft {
   assumptions: string[];
   reviewChecklist: string[];
   provider: "local" | "openai";
+  authority: Phase19AIDraftAuthority;
 }
 
 export interface AIValidationExplanation {
@@ -74,6 +87,28 @@ function extractCount(prompt: string, pattern: RegExp, fallback: number) {
   if (!match) return fallback;
   const value = Number(match[1]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function phase19DraftAuthority(): Phase19AIDraftAuthority {
+  return {
+    contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT",
+    state: "AI_DRAFT",
+    sourceType: "AI_DRAFT",
+    proofStatus: "DRAFT_ONLY",
+    reviewRequired: true,
+    notAuthoritative: true,
+    materializationRequired: true,
+    downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED",
+    conversionGates: [
+      "User selective review/apply action",
+      "Structured requirement/source object conversion",
+      "Requirements materialization",
+      "Validation/readiness review",
+      "Engine 1 addressing proof",
+      "Engine 2 IPAM reconciliation when relevant",
+      "Standards and traceability checks",
+    ],
+  };
 }
 
 function nextSiteOctet(index: number) {
@@ -240,6 +275,7 @@ function localPlanDraft(prompt: string): AIPlanDraft {
     assumptions,
     reviewChecklist,
     provider: "local",
+    authority: phase19DraftAuthority(),
   };
 }
 
@@ -281,6 +317,7 @@ async function tryOpenAIPlanDraft(prompt: string): Promise<AIPlanDraft | null> {
       assumptions: parsed.assumptions || ["Review the generated draft carefully before saving."],
       reviewChecklist: parsed.reviewChecklist || ["Confirm the project details, sites, VLANs, and gateways before applying the draft."],
       provider: "openai",
+      authority: phase19DraftAuthority(),
     };
   } catch {
     return null;

@@ -129,3 +129,8 @@ Phase 0 adds the missing control layer:
 - this document as the roadmap control sheet.
 
 The next real fix must be Phase 1: planning input discipline / traceability. Do not jump to routing, reports, diagrams, BOM, discovery, or AI.
+
+
+## Phase 20 inventory update
+
+The control sheet now includes Phase 20 — Final cross-engine proof pass. This phase consumes the Phase 1 through Phase 19 control summaries and produces `phase20FinalProofPass` evidence for cross-engine scenarios, release gates, report/export truth, diagram truth, validation impact, and the explicit A-/A planning platform — not A+ — release boundary.

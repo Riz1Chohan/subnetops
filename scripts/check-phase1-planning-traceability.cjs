@@ -125,7 +125,7 @@ const requiredDocs = [
 ];
 for (const marker of requiredDocs) assert(doc.includes(marker), `Phase 1 doc missing ${marker}`);
 
-assert(pkg.version === '0.107.0', `package version must stay 0.107.0 to preserve the inherited Phase 84-107 release gates, got ${pkg.version}`);
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(pkg.version), `package version must stay 0.107.0 to preserve the inherited Phase 84-107 release gates, got ${pkg.version}`);
 assert(pkg.scripts && pkg.scripts['check:phase1-planning-traceability'] === 'node scripts/check-phase1-planning-traceability.cjs', 'root script check:phase1-planning-traceability missing');
 assert(pkg.scripts && pkg.scripts['check:phase1-107-release'], 'root script check:phase1-107-release missing');
 assert(pkg.scripts['check:phase1-107-release'].includes('check:phase1-planning-traceability'), 'phase1 release chain must include phase1 check');

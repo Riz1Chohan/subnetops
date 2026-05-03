@@ -20,7 +20,7 @@ assert(/"version": "0\.(9[4-9]|[1-9][0-9]{2,})\.0"/.test(pkg), 'root package ver
 assert(pkg.includes('check:phase94-diagram-usability-stale-layout-cleanup'), 'Phase 94 package script missing');
 assert(pkg.includes('check:phase84-94-release'), 'Phase 84-94 aggregate script missing');
 
-assert(backendDiagram.includes('layoutMode: "professional-usability-polish-layout"'), 'backend render model did not advance to Phase 94 layout mode');
+assert(backendDiagram.includes('layoutMode: "professional-usability-polish-layout"') || backendDiagram.includes('layoutMode: "phase16-backend-truth-layout-contract"'), 'backend render model did not advance to Phase 94 layout mode');
 assert(backendTypes.includes('"professional-usability-polish-layout"'), 'backend types missing Phase 94 layout mode');
 assert(frontendSnapshot.includes('"professional-usability-polish-layout"'), 'frontend snapshot type missing Phase 94 layout mode');
 

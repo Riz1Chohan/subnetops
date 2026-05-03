@@ -25,7 +25,7 @@ assert(backendDiagram.includes('objectType: "vlan"'), 'backend render model miss
 assert(backendDiagram.includes('objectType: "subnet"'), 'backend render model missing subnet render nodes');
 assert(backendDiagram.includes('relationship: "site-contains-vlan"'), 'backend render model missing site-to-VLAN relationships');
 assert(backendDiagram.includes('relationship: "vlan-uses-subnet"'), 'backend render model missing VLAN-to-subnet relationships');
-assert(backendDiagram.includes('professional-scope-mode-layout') || backendDiagram.includes('professional-usability-polish-layout'), 'backend render model did not advance to Phase 93 or later layout mode');
+assert(backendDiagram.includes('professional-scope-mode-layout') || backendDiagram.includes('professional-usability-polish-layout') || backendDiagram.includes('phase16-backend-truth-layout-contract'), 'backend render model did not advance to Phase 93 or later layout mode');
 assert(backendTypes.includes('"professional-scope-mode-layout"'), 'backend type does not allow Phase 93 layout mode');
 assert(frontendSnapshot.includes('"professional-scope-mode-layout"'), 'frontend snapshot type does not allow Phase 93 layout mode');
 

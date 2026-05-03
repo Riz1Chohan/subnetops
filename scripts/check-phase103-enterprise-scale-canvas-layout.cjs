@@ -13,7 +13,7 @@ const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.s
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE103-ENTERPRISE-SCALE-CANVAS-LAYOUT.md', 'utf8');
 
-assert(/^0\.(103|104|105|106|107)\.0$/.test(pkg.version), 'package version must be 0.103.0 or a compatible newer diagram release');
+assert(/^0\.(103|104|105|106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'package version must be 0.103.0 or a compatible newer diagram release');
 assert(runtime.includes('enterpriseScaleCanvasLayout: "PHASE_103_ENTERPRISE_SCALE_CANVAS_AND_LAYOUT"'), 'runtime marker missing');
 assert(doc.includes('PHASE_103_ENTERPRISE_SCALE_CANVAS_AND_LAYOUT'), 'phase 103 documentation marker missing');
 

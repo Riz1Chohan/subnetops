@@ -1,3 +1,5 @@
+// PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT report wiring
+// PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: professional report exposes diagram mode contracts.
 import type { ProfessionalReport } from "./export.types.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
 // PHASE5_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
@@ -124,6 +126,13 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const reportTruth = designCore.reportTruth && typeof designCore.reportTruth === "object" ? designCore.reportTruth : null;
   const diagramTruth = designCore.diagramTruth && typeof designCore.diagramTruth === "object" ? designCore.diagramTruth : null;
   const vendorNeutralTemplates = designCore.vendorNeutralImplementationTemplates && typeof designCore.vendorNeutralImplementationTemplates === "object" ? designCore.vendorNeutralImplementationTemplates : null;
+  const phase14ImplementationTemplates = designCore.phase14ImplementationTemplates && typeof designCore.phase14ImplementationTemplates === "object" ? designCore.phase14ImplementationTemplates : null;
+  const phase15ReportExportTruth = designCore.phase15ReportExportTruth && typeof designCore.phase15ReportExportTruth === "object" ? designCore.phase15ReportExportTruth : null;
+  const phase16DiagramTruth = designCore.phase16DiagramTruth && typeof designCore.phase16DiagramTruth === "object" ? designCore.phase16DiagramTruth : null;
+  const phase17PlatformBomFoundation = designCore.phase17PlatformBomFoundation && typeof designCore.phase17PlatformBomFoundation === "object" ? designCore.phase17PlatformBomFoundation : null;
+  const phase18DiscoveryCurrentState = designCore.phase18DiscoveryCurrentState && typeof designCore.phase18DiscoveryCurrentState === "object" ? designCore.phase18DiscoveryCurrentState : null;
+  const phase19AiDraftHelper = designCore.phase19AiDraftHelper && typeof designCore.phase19AiDraftHelper === "object" ? designCore.phase19AiDraftHelper : null;
+  const phase20FinalProofPass = designCore.phase20FinalProofPass && typeof designCore.phase20FinalProofPass === "object" ? designCore.phase20FinalProofPass : null;
   const networkDevices = Array.isArray(networkObjectModel?.devices) ? networkObjectModel.devices : [];
   const networkInterfaces = Array.isArray(networkObjectModel?.interfaces) ? networkObjectModel.interfaces : [];
   const securityZones = Array.isArray(networkObjectModel?.securityZones) ? networkObjectModel.securityZones : [];
@@ -162,6 +171,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const phase8ValidationReadiness = designCore.phase8ValidationReadiness && typeof designCore.phase8ValidationReadiness === "object" ? designCore.phase8ValidationReadiness : null;
   const phase9NetworkObjectModel = designCore.phase9NetworkObjectModel && typeof designCore.phase9NetworkObjectModel === "object" ? designCore.phase9NetworkObjectModel : null;
   const phase10DesignGraph = designCore.phase10DesignGraph && typeof designCore.phase10DesignGraph === "object" ? designCore.phase10DesignGraph : null;
+  const phase12SecurityPolicyFlow = designCore.phase12SecurityPolicyFlow && typeof designCore.phase12SecurityPolicyFlow === "object" ? designCore.phase12SecurityPolicyFlow : null;
+  const phase13ImplementationPlanning = designCore.phase13ImplementationPlanning && typeof designCore.phase13ImplementationPlanning === "object" ? designCore.phase13ImplementationPlanning : null;
   const phase11RoutingSegmentation = designCore.phase11RoutingSegmentation && typeof designCore.phase11RoutingSegmentation === "object" ? designCore.phase11RoutingSegmentation : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
@@ -338,6 +349,43 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           title: "Phase 3 Golden Scenario Closure",
           headers: ["Scenario", "Status", "Required Keys", "Blocking / Review Keys"],
           rows: compactRows(phase3ScenarioRows, [["No selected Phase 3 scenario rows", "not-applicable", "—", "—"]]),
+        },
+      ],
+    });
+  }
+
+
+  if (phase15ReportExportTruth) {
+    report.sections.push({
+      title: "Report Requirement Traceability Matrix",
+      paragraphs: [
+        "This matrix is the Phase 15 deliverable gate. It prevents the exported report from claiming design consequences that cannot be traced back to requirements, backend engines, frontend locations, report sections, diagram impact, and readiness status.",
+        `Report/export readiness: ${asString(phase15ReportExportTruth.overallReadiness, "review")} • ${phase15ReportExportTruth.traceabilityRowCount ?? 0} traceability row(s) • ${phase15ReportExportTruth.missingTraceabilityConsumerCount ?? 0} missing consumer link(s).`,
+      ],
+      tables: [
+        {
+          title: "Requirement Traceability Matrix",
+          headers: ["Requirement", "Design Consequence", "Engines Affected", "Frontend Location", "Report Section", "Diagram Impact", "Readiness"],
+          rows: compactRows(asArray(phase15ReportExportTruth.traceabilityMatrix).slice(0, 40).map((row: any) => [
+            asString(row.requirementLabel, asString(row.requirementKey, "Requirement")),
+            asString(row.designConsequence, "Captured but not currently design-driving"),
+            joinText(asArray(row.enginesAffected).slice(0, 5), "none"),
+            asString(row.frontendLocation, "ProjectReportPage"),
+            asString(row.reportSection, "Requirement Traceability Matrix"),
+            asString(row.diagramImpact, "No visual impact or not applicable"),
+            asString(row.readinessStatus, "REVIEW_REQUIRED"),
+          ]), [["No traceability rows", "No requirement-output lineage is exportable", "—", "ProjectRequirementsPage", "Requirement Traceability Matrix", "No diagram impact proven", "REVIEW_REQUIRED"]]),
+        },
+        {
+          title: "Report Truth Labels",
+          headers: ["Truth Label", "Count", "Report Usage", "Readiness", "Evidence"],
+          rows: compactRows(asArray(phase15ReportExportTruth.truthLabelRows).map((row: any) => [
+            asString(row.truthLabel, "REVIEW_REQUIRED"),
+            String(row.count ?? 0),
+            asString(row.reportUsage, "Review required"),
+            asString(row.readinessImpact, "REVIEW_REQUIRED"),
+            joinText(asArray(row.evidence).slice(0, 3), "—"),
+          ]), [["REVIEW_REQUIRED", "0", "No truth labels emitted", "REVIEW_REQUIRED", "Add backend truth labels before final export"]]),
         },
       ],
     });
@@ -638,6 +686,172 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       report.sections.push({ title: "Phase 11 Routing Segmentation Protocol-Aware Planning", paragraphs: ["Phase 11 makes routing honest: connected/default/static/summary route rows are planning evidence, while OSPF, BGP, ECMP, redistribution, cloud route tables, route leaking, and asymmetric routing are explicit review or simulation-unavailable controls unless authoritative inputs exist. It is not a packet simulator."], tables: [{ title: "Phase 11 Routing Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(phase11RoutingSegmentation.contract, "missing"), asString(phase11RoutingSegmentation.role, "routing review control")], ["Overall readiness", asString(phase11RoutingSegmentation.overallReadiness, "review"), `${phase11RoutingSegmentation.protocolIntentCount ?? 0} protocol row(s); ${phase11RoutingSegmentation.simulationUnavailableCount ?? 0} simulation-unavailable; ${phase11RoutingSegmentation.activeRequirementRoutingGapCount ?? 0} active requirement gap(s).`], ["Protocol review", `${phase11RoutingSegmentation.ospfReviewCount ?? 0} OSPF; ${phase11RoutingSegmentation.bgpReviewCount ?? 0} BGP; ${phase11RoutingSegmentation.ecmpReviewCount ?? 0} ECMP`, `${phase11RoutingSegmentation.cloudRouteTableReviewCount ?? 0} cloud route-table review(s); ${phase11RoutingSegmentation.routeLeakingReviewCount ?? 0} route-leaking review(s).`]] }, { title: "Phase 11 Requirement Routing Matrix", headers: ["Requirement", "Active", "Readiness", "Actual", "Missing"], rows: compactRows(asArray(phase11RoutingSegmentation.requirementRoutingMatrix).slice(0, 30).map((row: any) => [asString(row.requirementLabel), String(Boolean(row.active)), asString(row.readinessImpact), joinText(asArray(row.actualProtocolIntentIds).slice(0, 5), "none"), joinText(asArray(row.missingProtocolCategories), "none")]), [["No Phase 11 requirement rows", "—", "—", "—", "—"]]) }, { title: "Phase 11 Protocol Intent / Review Rows", headers: ["Name", "Category", "State", "Readiness", "Review reason"], rows: compactRows(asArray(phase11RoutingSegmentation.protocolIntents).slice(0, 36).map((row: any) => [asString(row.name), asString(row.category), asString(row.controlState), asString(row.readinessImpact), asString(row.reviewReason, "none")]), [["No Phase 11 protocol rows", "—", "—", "—", "—"]]) }, { title: "Phase 11 Routing Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase11RoutingSegmentation.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "PHASE11_ROUTING_SEGMENTATION_REVIEW_COMPLETE", "READY", "No Phase 11 findings", "Continue engineer review."]]) }] });
     }
 
+    if (includeTechnicalEvidence && phase12SecurityPolicyFlow) {
+      report.sections.push({ title: "Phase 12 Security Policy Flow", paragraphs: ["Phase 12 makes security policy review strict without pretending to be vendor firewall configuration. It surfaces zone-to-zone policy posture, business-service flow consequences, NAT review, logging review, broad permit review, shadowing review, and requirement-security propagation evidence from backend design-core truth."], tables: [{ title: "Phase 12 Security Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(phase12SecurityPolicyFlow.contract, "missing"), asString(phase12SecurityPolicyFlow.role, "security policy flow control")], ["Overall readiness", asString(phase12SecurityPolicyFlow.overallReadiness, "review"), `${phase12SecurityPolicyFlow.flowConsequenceCount ?? 0} flow consequence(s); ${phase12SecurityPolicyFlow.zonePolicyReviewCount ?? 0} zone policy row(s); ${phase12SecurityPolicyFlow.activeRequirementSecurityGapCount ?? 0} active requirement gap(s).`], ["NAT/logging review", `${phase12SecurityPolicyFlow.natReviewCount ?? 0} NAT review(s); ${phase12SecurityPolicyFlow.missingNatCount ?? 0} missing NAT`, `${phase12SecurityPolicyFlow.loggingReviewCount ?? 0} logging review(s); ${phase12SecurityPolicyFlow.loggingGapCount ?? 0} logging gap(s).`], ["Shadowing / broad permits", `${phase12SecurityPolicyFlow.shadowedRuleCount ?? 0} shadowed rule(s)`, `${phase12SecurityPolicyFlow.overbroadPolicyCount ?? 0} overbroad policy row(s); ${phase12SecurityPolicyFlow.reviewRequiredCount ?? 0} review-required row(s).`]] }, { title: "Phase 12 Requirement Security Matrix", headers: ["Requirement", "Active", "Readiness", "Actual flows", "Missing categories"], rows: compactRows(asArray(phase12SecurityPolicyFlow.requirementSecurityMatrix).slice(0, 30).map((row: any) => [asString(row.requirementLabel), String(Boolean(row.active)), asString(row.readinessImpact), joinText(asArray(row.actualFlowRequirementIds).slice(0, 5), "none"), joinText(asArray(row.missingSecurityCategories), "none")]), [["No Phase 12 requirement rows", "—", "—", "—", "—"]]) }, { title: "Phase 12 Flow Consequences", headers: ["Flow", "Source", "Destination", "Action", "State", "Reason"], rows: compactRows(asArray(phase12SecurityPolicyFlow.flowConsequences).slice(0, 36).map((row: any) => [asString(row.name), asString(row.sourceZoneName), asString(row.destinationZoneName), asString(row.expectedAction), asString(row.phase12PolicyState), asString(row.reviewReason, asString(row.consequenceSummary, "none"))]), [["No Phase 12 flow rows", "—", "—", "—", "—", "—"]]) }, { title: "Phase 12 NAT / Logging / Shadowing Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase12SecurityPolicyFlow.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "PHASE12_SECURITY_POLICY_FLOW_CONTROLLED", "READY", "No Phase 12 findings", "Continue engineer review."]]) }] });
+    }
+
+
+    if (includeTechnicalEvidence && phase13ImplementationPlanning) {
+      report.sections.push({ title: "Phase 13 Implementation Planning", paragraphs: ["Phase 13 gates implementation planning on verified backend source objects, requirement lineage, dependencies, preconditions, verification evidence, rollback actions, risk, and readiness state. It is not vendor command generation."], tables: [{ title: "Phase 13 Implementation Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(phase13ImplementationPlanning.contract, "missing"), asString(phase13ImplementationPlanning.role, "implementation planning control")], ["Overall readiness", asString(phase13ImplementationPlanning.overallReadiness, "review"), `${phase13ImplementationPlanning.stepGateCount ?? 0} step gate(s); ${phase13ImplementationPlanning.blockedStepGateCount ?? 0} blocked; ${phase13ImplementationPlanning.reviewStepGateCount ?? 0} review.`], ["Evidence gates", `${phase13ImplementationPlanning.verificationEvidenceGateCount ?? 0} verification / ${phase13ImplementationPlanning.rollbackGateCount ?? 0} rollback`, `${phase13ImplementationPlanning.requirementLineageGapCount ?? 0} requirement lineage gap(s); ${phase13ImplementationPlanning.sourceObjectGapCount ?? 0} source object gap(s).`]] }, { title: "Phase 13 Step Gates", headers: ["Step", "Category", "Readiness", "Sources", "Requirements", "Rollback / review"], rows: compactRows(asArray(phase13ImplementationPlanning.stepGates).slice(0, 40).map((row: any) => [asString(row.title), asString(row.category), asString(row.readinessImpact), joinText(asArray(row.sourceObjectIds).slice(0, 4), "none"), joinText(asArray(row.sourceRequirementIds).slice(0, 4), "none"), asString(row.reviewReason, asString(row.rollbackStep, "missing rollback"))]), [["No Phase 13 step gates", "—", "—", "—", "—", "—"]]) }, { title: "Phase 13 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase13ImplementationPlanning.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "PHASE13_IMPLEMENTATION_PLANNING_CONTROLLED", "READY", "No Phase 13 findings", "Continue to Phase 14 vendor-neutral templates."]]) }] });
+    }
+
+    if (includeTechnicalEvidence && phase14ImplementationTemplates) {
+      report.sections.push({ title: "Phase 14 Vendor-Neutral Implementation Templates", paragraphs: ["Phase 14 compiles vendor-neutral templates from the backend implementation plan and Phase 13 gates. It exposes variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command-generation boundaries without emitting vendor CLI/cloud commands."], tables: [{ title: "Phase 14 Template Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(phase14ImplementationTemplates.contract, "missing"), asString(phase14ImplementationTemplates.role, "vendor-neutral template control")], ["Overall readiness", asString(phase14ImplementationTemplates.overallReadiness, "review"), `${phase14ImplementationTemplates.templateCount ?? 0} template gate(s); ${phase14ImplementationTemplates.blockedTemplateCount ?? 0} blocked; ${phase14ImplementationTemplates.reviewTemplateCount ?? 0} review.`], ["Command generation", phase14ImplementationTemplates.commandGenerationAllowed ? "enabled" : "disabled", `${phase14ImplementationTemplates.vendorSpecificCommandCount ?? 0} vendor command(s); ${phase14ImplementationTemplates.commandLeakCount ?? 0} command leak(s).`]] }, { title: "Phase 14 Template Gates", headers: ["Template", "Domain", "Readiness", "Sources", "Requirements", "Evidence", "Rollback"], rows: compactRows(asArray(phase14ImplementationTemplates.templateGates).slice(0, 40).map((row: any) => [asString(row.title), asString(row.domain), asString(row.readinessImpact), joinText(asArray(row.sourceObjectIds).slice(0, 4), "none"), joinText(asArray(row.sourceRequirementIds).slice(0, 4), "none"), joinText(asArray(row.evidenceRequired).slice(0, 3), "missing evidence"), asString(row.rollbackRequirement, "missing rollback")]), [["No Phase 14 template gates", "—", "—", "—", "—", "—", "—"]]) }, { title: "Phase 14 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase14ImplementationTemplates.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "PHASE14_VENDOR_NEUTRAL_TEMPLATES_CONTROLLED", "READY", "No Phase 14 findings", "Continue to report/export truth without vendor command generation."]]) }] });
+    }
+
+
+    if (includeTechnicalEvidence && phase15ReportExportTruth) {
+      report.sections.push({
+        title: "Phase 15 Report and Export Truth",
+        paragraphs: [
+          "Phase 15 makes PDF, DOCX, CSV, and the report page obey backend evidence. It requires the report structure, truth labels, requirement traceability matrix, diagram impact, review-required items, assumptions/limitations, and appendices to stay aligned with backend design-core truth.",
+        ],
+        tables: [
+          {
+            title: "Phase 15 Report Section Gates",
+            headers: ["Section", "Report Section", "Frontend", "Readiness", "Truth Labels", "Blockers"],
+            rows: compactRows(asArray(phase15ReportExportTruth.sectionGates).map((row: any) => [
+              asString(row.title),
+              asString(row.reportSection),
+              asString(row.frontendLocation),
+              asString(row.readinessImpact, "REVIEW_REQUIRED"),
+              joinText(asArray(row.truthLabels), "—"),
+              joinText(asArray(row.blockers).slice(0, 3), "none"),
+            ]), [["No Phase 15 section gates", "—", "—", "REVIEW_REQUIRED", "—", "Add report section gates"]]),
+          },
+          {
+            title: "Phase 15 Findings",
+            headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"],
+            rows: compactRows(asArray(phase15ReportExportTruth.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [
+              asString(finding.severity),
+              asString(finding.code),
+              asString(finding.readinessImpact),
+              asString(finding.title),
+              asString(finding.remediation),
+            ]), [["PASSED", "PHASE15_REPORT_EXPORT_TRUTH_CONTROLLED", "READY", "No Phase 15 findings", "Continue to Phase 16 diagram truth."]]),
+          },
+        ],
+      });
+    }
+
+
+    if (includeTechnicalEvidence && phase16DiagramTruth) {
+      report.sections.push({
+        title: "Phase 16 Diagram Truth / Renderer / Layout",
+        paragraphs: [
+          "Phase 16 locks diagrams to backend truth. The canvas may lay out backend renderModel data, but it must not invent topology, hide inferred/review states, or draw relationships that the design graph cannot prove.",
+        ],
+        tables: [
+          {
+            title: "Phase 16 Diagram Contract Summary",
+            headers: ["Gate", "Status", "Evidence"],
+            rows: [
+              ["Contract", asString(phase16DiagramTruth.contract, "missing"), asString(phase16DiagramTruth.role, "diagram truth control")],
+              ["Overall readiness", asString(phase16DiagramTruth.overallReadiness, "REVIEW_REQUIRED"), `${phase16DiagramTruth.renderNodeCount ?? 0} render node(s); ${phase16DiagramTruth.renderEdgeCount ?? 0} render edge(s); ${phase16DiagramTruth.modeContractCount ?? 0} mode contract(s).`],
+              ["Backend identity", phase16DiagramTruth.backendAuthored ? "BACKEND_AUTHORED" : "NOT_BACKEND_AUTHORED", `${phase16DiagramTruth.nodesWithoutBackendObjectId ?? 0} node identity gap(s); ${phase16DiagramTruth.edgesWithoutRelatedObjects ?? 0} edge lineage gap(s).`],
+            ],
+          },
+          {
+            title: "Phase 16 Mode Contracts",
+            headers: ["Mode", "Status", "Readiness", "Evidence", "Purpose"],
+            rows: compactRows(asArray(phase16DiagramTruth.modeContracts).map((row: any) => [
+              asString(row.mode),
+              asString(row.status),
+              asString(row.readinessImpact),
+              String(row.evidenceCount ?? 0),
+              asString(row.purpose, "Review mode purpose."),
+            ]), [["No mode contracts", "BLOCKED", "BLOCKED", "0", "Add backend diagram mode contracts"]]),
+          },
+          {
+            title: "Phase 16 Findings",
+            headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"],
+            rows: compactRows(asArray(phase16DiagramTruth.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [
+              asString(finding.severity),
+              asString(finding.code),
+              asString(finding.readinessImpact),
+              asString(finding.title),
+              asString(finding.remediation),
+            ]), [["PASSED", "PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTROLLED", "READY", "No Phase 16 findings", "Continue to Phase 17 BOM without weakening diagram truth."]]),
+          },
+        ],
+      });
+    }
+
+    if (includeTechnicalEvidence && phase17PlatformBomFoundation) {
+      report.sections.push({
+        title: "Phase 17 Platform/BOM Foundation",
+        paragraphs: ["PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT moves the Platform/BOM work from frontend-only estimates into backend-controlled advisory evidence. It still does not generate final vendor SKUs, pricing, optics, license tiers, or PoE watt budgets."],
+        tables: [
+          { title: "Phase 17 BOM Contract Summary", headers: ["Gate", "Status", "Evidence"], rows: [
+            ["Contract", asString(phase17PlatformBomFoundation.contract, "missing"), asString(phase17PlatformBomFoundation.role, "platform/BOM control")],
+            ["Procurement authority", asString(phase17PlatformBomFoundation.procurementAuthority, "ADVISORY_ONLY_NOT_FINAL_SKU"), asString(phase17PlatformBomFoundation.sourceOfTruthLevel, "backend-computed-advisory-estimate")],
+            ["Overall readiness", asString(phase17PlatformBomFoundation.overallReadiness, "REVIEW_REQUIRED"), `${phase17PlatformBomFoundation.rowCount ?? 0} row(s); ${phase17PlatformBomFoundation.requirementDriverCount ?? 0} requirement driver(s); ${phase17PlatformBomFoundation.placeholderRowCount ?? 0} placeholder row(s).`],
+            ["Demand basis", `${phase17PlatformBomFoundation.siteCount ?? 0} site(s), ${phase17PlatformBomFoundation.usersPerSite ?? 0} users/site`, `${phase17PlatformBomFoundation.localPortDemandPerSite ?? 0} local port(s)/site; ${phase17PlatformBomFoundation.poeDemandPerSite ?? 0} PoE endpoint(s)/site.`],
+          ]},
+          { title: "Phase 17 BOM Rows", headers: ["Category", "Item", "Quantity", "Confidence", "Source Requirements", "Manual Review"], rows: compactRows(asArray(phase17PlatformBomFoundation.rows).map((row: any) => [asString(row.category), asString(row.item), `${asString(row.quantity)} ${asString(row.unit)}`, `${asString(row.confidence)} / ${asString(row.readinessImpact)}`, joinText(asArray(row.sourceRequirementIds), "none"), asString(row.manualReviewNote, "Engineering review required.")]), [["No BOM rows", "Backend BOM rows missing", "0", "BLOCKED", "none", "Add Phase 17 row evidence."]]) },
+          { title: "Phase 17 Requirement Drivers", headers: ["Requirement", "Value", "Readiness", "Affected Rows", "Evidence"], rows: compactRows(asArray(phase17PlatformBomFoundation.requirementDrivers).map((driver: any) => [asString(driver.requirementId), asString(driver.value), asString(driver.readinessImpact), joinText(asArray(driver.affectedRows), "none"), asString(driver.evidence)]), [["No drivers", "not captured", "BLOCKED", "none", "Add requirement-to-BOM propagation evidence."]]) },
+          { title: "Phase 17 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase17PlatformBomFoundation.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "PHASE17_ADVISORY_BOM_NOT_VENDOR_CATALOG", "ADVISORY_READY", "BOM is advisory only", "Continue to Phase 18 discovery/current-state without faking procurement precision."]]) },
+        ],
+      });
+    }
+
+    if (includeTechnicalEvidence && phase18DiscoveryCurrentState) {
+      report.sections.push({
+        title: "Phase 18 Discovery/Current-State",
+        paragraphs: ["PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT promotes discovery/current-state into backend-controlled evidence while refusing fake live discovery. Manual notes, imported artifacts, validated imports, conflicts, and review-required states stay separated."],
+        tables: [
+          { title: "Phase 18 Discovery Contract Summary", headers: ["Gate", "Status", "Evidence"], rows: [
+            ["Contract", asString(phase18DiscoveryCurrentState.contract, "missing"), asString(phase18DiscoveryCurrentState.role, "manual discovery boundary")],
+            ["Current-state authority", asString(phase18DiscoveryCurrentState.currentStateAuthority, "manual/imported evidence only"), asString(phase18DiscoveryCurrentState.sourceOfTruthLevel, "manual-discovery-boundary")],
+            ["Overall readiness", asString(phase18DiscoveryCurrentState.overallReadiness, "REVIEW_REQUIRED"), `${phase18DiscoveryCurrentState.areaRowCount ?? 0} area(s); ${phase18DiscoveryCurrentState.importTargetCount ?? 0} import target(s); ${phase18DiscoveryCurrentState.openTaskCount ?? 0} open task(s).`],
+            ["Evidence mix", `manual=${phase18DiscoveryCurrentState.manuallyEnteredEvidenceCount ?? 0}; imported=${phase18DiscoveryCurrentState.importedEvidenceCount ?? 0}; validated=${phase18DiscoveryCurrentState.validatedEvidenceCount ?? 0}`, `conflicting=${phase18DiscoveryCurrentState.conflictingEvidenceCount ?? 0}; review=${phase18DiscoveryCurrentState.reviewRequiredCount ?? 0}`],
+          ]},
+          { title: "Phase 18 Discovery Areas", headers: ["Area", "State", "Readiness", "Required For", "Review Reason"], rows: compactRows(asArray(phase18DiscoveryCurrentState.areaRows).map((row: any) => [asString(row.area), asString(row.state), asString(row.readinessImpact), joinText(asArray(row.requiredFor), "none"), asString(row.reviewReason)]), [["No discovery areas", "NOT_PROVIDED", "NOT_READY", "none", "Add discovery/current-state area evidence."]]) },
+          { title: "Phase 18 Import Targets", headers: ["Target", "State", "Readiness", "Required For", "Reconciliation Need"], rows: compactRows(asArray(phase18DiscoveryCurrentState.importTargets).map((target: any) => [asString(target.target), asString(target.state), asString(target.readinessImpact), joinText(asArray(target.requiredFor), "none"), asString(target.reconciliationNeed)]), [["No import targets", "NOT_PROVIDED", "NOT_READY", "none", "Add structured import targets."]]) },
+          { title: "Phase 18 Requirement-created Tasks", headers: ["Requirement", "Task", "Priority", "State", "Blockers"], rows: compactRows(asArray(phase18DiscoveryCurrentState.tasks).map((task: any) => [asString(task.requirementId), asString(task.title), asString(task.priority), `${asString(task.state)} / ${asString(task.readinessImpact)}`, joinText(asArray(task.blockers), "none")]), [["No tasks", "No requirement-created discovery tasks", "LOW", "NOT_READY", "Add brownfield/migration/current-state requirements."]]) },
+          { title: "Phase 18 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase18DiscoveryCurrentState.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "PHASE18_MANUAL_DISCOVERY_BOUNDARY", "NOT_READY", "Discovery is manual/imported only", "Do not claim live discovery until importers/parsers exist."]]) },
+        ],
+      });
+    }
+
+
+    if (includeTechnicalEvidence && phase19AiDraftHelper) {
+      report.sections.push({
+        title: "Phase 19 AI Draft/Helper",
+        paragraphs: ["PHASE19_AI_DRAFT_HELPER_CONTRACT keeps AI as a draft/review assistant only. AI can suggest requirements, sites, VLANs, and explanations, but deterministic backend engines remain the source of engineering truth."],
+        tables: [
+          { title: "Phase 19 AI Contract Summary", headers: ["Gate", "Status", "Evidence"], rows: [
+            ["Contract", asString(phase19AiDraftHelper.contract, "missing"), asString(phase19AiDraftHelper.role, "AI draft helper")],
+            ["AI authority", asString(phase19AiDraftHelper.aiAuthority, "DRAFT_ONLY_NOT_AUTHORITATIVE"), asString(phase19AiDraftHelper.sourceOfTruthLevel, "ai-draft-only-review-gated")],
+            ["Overall readiness", asString(phase19AiDraftHelper.overallReadiness, "SAFE_DRAFT_ONLY"), `${phase19AiDraftHelper.aiDerivedObjectCount ?? 0} AI-derived object(s); ${phase19AiDraftHelper.reviewRequiredObjectCount ?? 0} review-required object(s).`],
+            ["Apply policy", asString(phase19AiDraftHelper.draftApplyPolicy, "selective review required"), `Provider mode: ${asString(phase19AiDraftHelper.providerMode, "not-used")}`],
+          ]},
+          { title: "Phase 19 Gates", headers: ["Gate", "State", "Blocks Authority", "Consumer Impact"], rows: compactRows(asArray(phase19AiDraftHelper.gateRows).map((row: any) => [asString(row.gate), asString(row.state), row.blocksAuthority ? "yes" : "no", asString(row.consumerImpact)]), [["AI draft-only authority", "ENFORCED", "yes", "AI cannot feed outputs without review."]]) },
+          { title: "Phase 19 AI-Derived Objects", headers: ["Object", "Type", "State", "Proof", "Notes"], rows: compactRows(asArray(phase19AiDraftHelper.draftObjectRows).map((row: any) => [asString(row.objectLabel), asString(row.objectType), asString(row.state), asString(row.proofStatus), joinText(asArray(row.notes), "review required")]), [["No AI-derived objects", "none", "NO_AI_DRAFT", "DRAFT_ONLY", "No saved AI authority risk detected."]]) },
+          { title: "Phase 19 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase19AiDraftHelper.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "PHASE19_AI_DRAFT_ONLY_BOUNDARY", "SAFE_DRAFT_ONLY", "AI helper is draft-only", "Use deterministic engines as authority."]]) },
+        ],
+      });
+    }
+
+    if (includeTechnicalEvidence && phase20FinalProofPass) {
+      report.sections.push({
+        title: "Phase 20 Final Cross-Engine Proof Pass",
+        paragraphs: ["PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT is the final proof gate. It does not add features; it proves the requirement-to-engine-to-validation-to-report/diagram/export chain and keeps the release target honest: A-/A planning platform, not A+ authority."],
+        tables: [
+          { title: "Phase 20 Final Proof Summary", headers: ["Gate", "Status", "Evidence"], rows: [
+            ["Contract", asString(phase20FinalProofPass.contract, "missing"), asString(phase20FinalProofPass.role, "final proof gate")],
+            ["Release target", asString(phase20FinalProofPass.releaseTarget, "A_MINUS_A_PLANNING_PLATFORM_NOT_A_PLUS"), asString(phase20FinalProofPass.sourceOfTruthLevel, "final-cross-engine-proof-gate")],
+            ["Overall readiness", asString(phase20FinalProofPass.overallReadiness, "REVIEW_REQUIRED"), `${phase20FinalProofPass.scenarioCount ?? 0} scenario(s); ${phase20FinalProofPass.engineProofCount ?? 0} engine proof row(s); ${phase20FinalProofPass.gateCount ?? 0} release gate(s).`],
+            ["Gate mix", `${phase20FinalProofPass.passedGateCount ?? 0} passed; ${phase20FinalProofPass.reviewGateCount ?? 0} review; ${phase20FinalProofPass.blockedGateCount ?? 0} blocked`, `${phase20FinalProofPass.scenarioBlockedCount ?? 0} blocked scenario(s); ${phase20FinalProofPass.engineProofBlockedCount ?? 0} blocked engine proof row(s).`],
+          ]},
+          { title: "Phase 20 Release Gates", headers: ["Gate", "State", "Evidence", "Remediation"], rows: compactRows(asArray(phase20FinalProofPass.releaseGates).map((gate: any) => [asString(gate.gate), asString(gate.state), joinText(asArray(gate.evidence), "no evidence"), asString(gate.remediation)]), [["No release gates", "BLOCKED", "Final proof gate missing", "Restore Phase 20 release gates."]]) },
+          { title: "Phase 20 Cross-Engine Scenarios", headers: ["Scenario", "Readiness", "Requirements Covered", "Missing Evidence"], rows: compactRows(asArray(phase20FinalProofPass.scenarioRows).map((row: any) => [asString(row.scenarioName), asString(row.readinessImpact), joinText(asArray(row.requirementsCovered), "none"), joinText(asArray(row.missingEvidence), "none")]), [["No scenarios", "BLOCKED", "none", "Add Phase 20 scenario proof rows."]]) },
+          { title: "Phase 20 Engine Proof Rows", headers: ["Phase", "Engine", "Status", "Focus", "Blockers"], rows: compactRows(asArray(phase20FinalProofPass.engineProofRows).map((row: any) => [`Phase ${asString(row.phase)}`, asString(row.engineKey), `${asString(row.status)} / ${asString(row.readinessImpact)}`, asString(row.proofFocus), joinText(asArray(row.blockers), "none")]), [["No engine rows", "missing", "BLOCKED", "Final proof missing", "Restore Phase 20 engine proof rows."]]) },
+          { title: "Phase 20 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(phase20FinalProofPass.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "PHASE20_RELEASE_TARGET_BOUNDARY", "REVIEW_REQUIRED", "A-/A planning platform, not A+", "Keep release claims honest."]]) },
+        ],
+      });
+    }
+
     if (includeTechnicalEvidence && enterpriseAllocatorPosture) {
       addressingSection.tables.push({
         title: "Enterprise Address Allocator Readiness",
@@ -895,6 +1109,35 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
             diagramTruth.renderModel.summary?.backendAuthored ? "Yes" : "No",
             asString(diagramTruth.renderModel.summary?.layoutMode, "backend-deterministic-grid"),
           ]],
+        });
+      }
+
+      if (designCore.phase16DiagramTruth) {
+        routingSection.tables.push({
+          title: "Phase 16 Diagram Truth / Renderer / Layout Contract",
+          headers: ["Readiness", "Backend Authored", "Nodes", "Edges", "Mode Contracts", "Node ID Gaps", "Edge Lineage Gaps", "Visible Weak Truth"],
+          rows: [[
+            asString(designCore.phase16DiagramTruth.overallReadiness, "review"),
+            designCore.phase16DiagramTruth.backendAuthored ? "Yes" : "No",
+            String(designCore.phase16DiagramTruth.renderNodeCount ?? 0),
+            String(designCore.phase16DiagramTruth.renderEdgeCount ?? 0),
+            String(designCore.phase16DiagramTruth.modeContractCount ?? 0),
+            String(designCore.phase16DiagramTruth.nodesWithoutBackendObjectId ?? 0),
+            String(designCore.phase16DiagramTruth.edgesWithoutRelatedObjects ?? 0),
+            String(designCore.phase16DiagramTruth.inferredOrReviewVisibleCount ?? 0),
+          ]],
+        });
+        routingSection.tables.push({
+          title: "Phase 16 Diagram Mode Contracts",
+          headers: ["Mode", "Status", "Readiness", "Evidence", "Purpose", "Required Backend Evidence"],
+          rows: designCore.phase16DiagramTruth.modeContracts.map((item: any) => [
+            asString(item.mode, "mode"),
+            asString(item.status, "review"),
+            asString(item.readinessImpact, "review"),
+            String(item.evidenceCount ?? 0),
+            asString(item.purpose, "Review mode purpose."),
+            joinText(asArray(item.requiredBackendEvidence), "none"),
+          ]),
         });
       }
 

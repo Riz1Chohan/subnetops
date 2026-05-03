@@ -133,8 +133,10 @@ export function ProjectLayout() {
 
   const activeStage = isDiagramWorkspace ? undefined : stageGroups.find((group) => activeForPath(location.pathname, group.matchers))?.key ?? "discovery";
 
+  // PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT: discovery card exposes backend manual/imported current-state proof.
   const discoveryLinks: WorkspaceLink[] = [
     { key: "summary", label: "Current state summary", path: `/projects/${projectId}/discovery?section=summary`, description: "Project baseline and saved discovery state." },
+    { key: "contract", label: "Backend contract", path: `/projects/${projectId}/discovery?section=contract`, description: "Phase 18 manual/imported current-state proof." },
     { key: "extraction", label: "Extraction preview", path: `/projects/${projectId}/discovery?section=extraction`, description: "What discovery is already feeding into design." },
     { key: "authority", label: "Authority lift", path: `/projects/${projectId}/discovery?section=authority`, description: "Discovery-backed route and boundary anchors." },
     { key: "inputs", label: "Paste inputs", path: `/projects/${projectId}/discovery?section=inputs`, description: "Current-state notes, inventory, risks, and constraints." },

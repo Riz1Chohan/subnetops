@@ -12,7 +12,7 @@ const runtime = fs.readFileSync('backend/src/services/requirementsRuntimeProof.s
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const doc = fs.readFileSync('docs/doc/PHASE107-DIAGRAM-LAYOUT-CONTRACT-REWRITE.md', 'utf8');
 
-assert(pkg.version === '0.107.0', 'package version must be 0.107.0');
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(pkg.version), 'package version must be 0.107.0, 0.108.0, 0.109.0, 0.110.0, or 0.111.0');
 assert(canvas.includes('PHASE_107_DIAGRAM_LAYOUT_CONTRACT_REWRITE'), 'Phase 107 marker missing in canvas');
 assert(runtime.includes('PHASE_107_DIAGRAM_LAYOUT_CONTRACT_REWRITE'), 'Phase 107 marker missing in runtime proof');
 assert(doc.includes('PHASE_107_DIAGRAM_LAYOUT_CONTRACT_REWRITE'), 'Phase 107 documentation marker missing');

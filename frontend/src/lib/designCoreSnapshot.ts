@@ -507,6 +507,18 @@ export interface IpReservation extends Phase9NetworkObjectProvenanceFields {
   notes: string[];
 }
 
+export type Phase12SecurityPolicyReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase12SecurityPolicyState = "REQUIRED" | "RECOMMENDED" | "BLOCKED" | "MISSING" | "OVERBROAD" | "SHADOWED" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+export type Phase12SecurityControlCategory = "zone-matrix" | "business-service" | "default-deny" | "guest-isolation" | "management-plane" | "dmz-exposure" | "remote-access" | "cloud-hybrid" | "nat" | "logging" | "broad-permit" | "shadowing" | "policy-consequence" | "voice" | "iot-printer-camera";
+export interface Phase12RequirementSecurityMatrixRow { requirementKey: string; requirementLabel: string; active: boolean; expectedSecurityCategories: Phase12SecurityControlCategory[]; actualFlowRequirementIds: string[]; actualPolicyMatrixRowIds: string[]; missingSecurityCategories: Phase12SecurityControlCategory[]; readinessImpact: Phase12SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase12ZonePolicyReviewRow { id: string; sourceZoneId: string; sourceZoneName: string; sourceZoneRole: SecurityZone["zoneRole"]; destinationZoneId: string; destinationZoneName: string; destinationZoneRole: SecurityZone["zoneRole"]; defaultPosture: SecurityPolicyMatrixRow["defaultPosture"]; explicitPolicyRuleIds: string[]; requiredFlowIds: string[]; natRequiredFlowIds: string[]; phase12PolicyState: Phase12SecurityPolicyState; readinessImpact: Phase12SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase12FlowConsequenceRow { id: string; flowRequirementId: string; name: string; sourceZoneName: string; destinationZoneName: string; expectedAction: SecurityFlowRequirement["expectedAction"]; observedPolicyAction?: SecurityFlowRequirement["observedPolicyAction"]; serviceNames: string[]; natRequired: boolean; loggingRequired: boolean; matchedPolicyRuleIds: string[]; matchedNatRuleIds: string[]; requirementKeys: string[]; phase12PolicyState: Phase12SecurityPolicyState; readinessImpact: Phase12SecurityPolicyReadiness; consequenceSummary: string; reviewReason?: string; notes: string[]; }
+export interface Phase12NatReviewRow { id: string; natReviewId: string; natRuleId: string; natRuleName: string; sourceZoneName: string; destinationZoneName?: string; status: SecurityNatReview["status"]; coveredFlowRequirementIds: string[]; missingFlowRequirementIds: string[]; phase12PolicyState: Phase12SecurityPolicyState; readinessImpact: Phase12SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase12LoggingReviewRow { id: string; flowRequirementId: string; flowName: string; required: boolean; matchedPolicyRuleIds: string[]; phase12PolicyState: Phase12SecurityPolicyState; readinessImpact: Phase12SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase12ShadowingReviewRow { id: string; ruleId: string; ruleName: string; sequence: number; action: PolicyRule["action"]; broadMatch: boolean; shadowsRuleIds: string[]; shadowedByRuleIds: string[]; phase12PolicyState: Phase12SecurityPolicyState; readinessImpact: Phase12SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase12SecurityPolicyFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: Phase12SecurityPolicyReadiness; remediation: string; }
+export interface Phase12SecurityPolicyFlowControlSummary { contract: "PHASE12_SECURITY_POLICY_FLOW_CONTRACT"; role: "ZONE_SERVICE_NAT_LOGGING_POLICY_REVIEW_NOT_FIREWALL_CONFIG"; overallReadiness: Phase12SecurityPolicyReadiness; serviceObjectCount: number; serviceGroupCount: number; zonePolicyReviewCount: number; flowConsequenceCount: number; requirementSecurityMatrixCount: number; activeRequirementSecurityGapCount: number; requiredFlowCount: number; missingFlowCount: number; blockedFlowCount: number; overbroadPolicyCount: number; shadowedRuleCount: number; loggingReviewCount: number; loggingGapCount: number; natReviewCount: number; missingNatCount: number; reviewRequiredCount: number; findingCount: number; blockingFindingCount: number; reviewFindingCount: number; policyReadiness: "ready" | "review" | "blocked"; natReadiness: "ready" | "review" | "blocked"; requirementSecurityMatrix: Phase12RequirementSecurityMatrixRow[]; zonePolicyReviews: Phase12ZonePolicyReviewRow[]; flowConsequences: Phase12FlowConsequenceRow[]; natReviews: Phase12NatReviewRow[]; loggingReviews: Phase12LoggingReviewRow[]; shadowingReviews: Phase12ShadowingReviewRow[]; findings: Phase12SecurityPolicyFinding[]; notes: string[]; }
+
 export interface RouteIntent {
   id: string;
   name: string;
@@ -981,6 +993,16 @@ export interface ImplementationPlanModel {
 
 
 
+
+
+export type Phase13ImplementationReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase13ImplementationState = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "DRAFT_ONLY" | "UNSUPPORTED";
+export interface Phase13ImplementationStageGateRow { stageId: string; stageName: string; stageType: ImplementationPlanStageType; sequence: number; stepIds: string[]; readyStepIds: string[]; reviewStepIds: string[]; blockedStepIds: string[]; exitCriteria: string[]; readinessImpact: Phase13ImplementationReadiness; blockers: string[]; evidence: string[]; notes: string[]; }
+export interface Phase13ImplementationStepGateRow { stepId: string; title: string; stageId: string; category: ImplementationPlanStepCategory; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; sourceObjectIds: string[]; sourceRequirementIds: string[]; sourceTruthState?: NetworkObjectTruthState; preconditions: string[]; operatorAction: string; verificationEvidence: string[]; rollbackStep: string; riskLevel: ImplementationPlanStep["riskLevel"]; dependencyStepIds: string[]; blockingDependencyIds: string[]; readinessState: Phase13ImplementationState; readinessImpact: Phase13ImplementationReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase13ImplementationDependencyGateRow { dependencyId: string; sourceStepId?: string; targetStepId?: string; sourceObjectId?: string; targetObjectId?: string; relationship: ImplementationDependencyGraphEdge["relationship"]; required: boolean; readinessImpact: Phase13ImplementationReadiness; evidence: string[]; notes: string[]; }
+export interface Phase13ImplementationFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedStepIds: string[]; readinessImpact: Phase13ImplementationReadiness; remediation: string; }
+export interface Phase13ImplementationPlanningControlSummary { contract: "PHASE13_IMPLEMENTATION_PLANNING_CONTRACT"; role: "VERIFIED_SOURCE_OBJECT_GATED_IMPLEMENTATION_PLAN_NOT_VENDOR_CONFIG"; overallReadiness: Phase13ImplementationReadiness; stageGateCount: number; stepGateCount: number; readyStepGateCount: number; reviewStepGateCount: number; blockedStepGateCount: number; highRiskStepCount: number; highRiskStepWithSafetyGateCount: number; dependencyGateCount: number; graphBackedDependencyCount: number; verificationEvidenceGateCount: number; rollbackGateCount: number; requirementLineageGapCount: number; sourceObjectGapCount: number; blockedFindingCount: number; reviewFindingCount: number; findingCount: number; implementationReadiness: ImplementationPlanSummary["implementationReadiness"]; stageGates: Phase13ImplementationStageGateRow[]; stepGates: Phase13ImplementationStepGateRow[]; dependencyGates: Phase13ImplementationDependencyGateRow[]; findings: Phase13ImplementationFinding[]; notes: string[]; }
+
 export type VendorNeutralImplementationTemplateReadiness = "ready" | "review" | "blocked";
 
 export interface VendorNeutralImplementationTemplateSummary {
@@ -1061,6 +1083,35 @@ export interface VendorNeutralImplementationTemplateModel {
   templates: VendorNeutralImplementationTemplate[];
   proofBoundary: string[];
 }
+
+
+export type Phase14ImplementationTemplateDomain =
+  | "addressing"
+  | "vlans"
+  | "dhcp"
+  | "routing"
+  | "security-policy"
+  | "nat"
+  | "wan"
+  | "cloud-edge"
+  | "monitoring"
+  | "validation"
+  | "rollback";
+export type Phase14ImplementationTemplateReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export interface Phase14ImplementationTemplateDomainRow { domain: Phase14ImplementationTemplateDomain; templateCount: number; readyTemplateCount: number; reviewTemplateCount: number; blockedTemplateCount: number; readinessImpact: Phase14ImplementationTemplateReadiness; templateIds: string[]; evidence: string[]; }
+export interface Phase14ImplementationTemplateGateRow { templateId: string; stepId: string; title: string; domain: Phase14ImplementationTemplateDomain; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; readinessImpact: Phase14ImplementationTemplateReadiness; sourceObjectIds: string[]; sourceRequirementIds: string[]; variableIds: string[]; requiredVariableCount: number; missingDataBlockers: string[]; vendorNeutralActions: string[]; evidenceRequired: string[]; rollbackRequirement: string; commandGenerationAllowed: false; commandGenerationDisabledReason: string; linkedVerificationCheckIds: string[]; linkedRollbackActionIds: string[]; dependencyStepIds: string[]; proofBoundary: string[]; notes: string[]; }
+export interface Phase14ImplementationTemplateFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedTemplateIds: string[]; readinessImpact: Phase14ImplementationTemplateReadiness; remediation: string; }
+export interface Phase14ImplementationTemplateControlSummary { contract: "PHASE14_VENDOR_NEUTRAL_IMPLEMENTATION_TEMPLATES_CONTRACT"; role: "VENDOR_NEUTRAL_TEMPLATES_NO_PLATFORM_COMMANDS_SOURCE_OBJECT_GATED"; overallReadiness: Phase14ImplementationTemplateReadiness; commandGenerationAllowed: false; vendorSpecificCommandCount: 0; templateCount: number; domainCount: number; readyTemplateCount: number; reviewTemplateCount: number; blockedTemplateCount: number; sourceObjectGapCount: number; requirementLineageGapCount: number; variableGapCount: number; evidenceGapCount: number; rollbackGapCount: number; commandLeakCount: number; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; domainRows: Phase14ImplementationTemplateDomainRow[]; templateGates: Phase14ImplementationTemplateGateRow[]; findings: Phase14ImplementationTemplateFinding[]; proofBoundary: string[]; notes: string[]; }
+
+
+export type Phase15ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase15ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "ENGINE2_DURABLE" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
+export interface Phase15ReportSectionGateRow { sectionKey: string; title: string; required: boolean; readinessImpact: Phase15ReportExportTruthReadiness; reportSection: string; frontendLocation: string; truthLabels: Phase15ReportTruthLabel[]; evidence: string[]; blockers: string[]; }
+export interface Phase15ReportTraceabilityMatrixRow { requirementKey: string; requirementLabel: string; designConsequence: string; enginesAffected: string[]; frontendLocation: string; reportSection: string; diagramImpact: string; readinessStatus: Phase15ReportExportTruthReadiness; missingConsumers: string[]; sourceObjectIds: string[]; }
+export interface Phase15ReportTruthLabelRow { truthLabel: Phase15ReportTruthLabel; count: number; reportUsage: string; readinessImpact: Phase15ReportExportTruthReadiness; evidence: string[]; }
+export interface Phase15ReportExportTruthFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedSectionKeys: string[]; readinessImpact: Phase15ReportExportTruthReadiness; remediation: string; }
+export interface Phase15ReportExportTruthControlSummary { contract: "PHASE15_REPORT_EXPORT_TRUTH_CONTRACT"; role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE"; overallReadiness: Phase15ReportExportTruthReadiness; requiredSectionCount: number; readySectionCount: number; reviewSectionCount: number; blockedSectionCount: number; traceabilityRowCount: number; missingTraceabilityConsumerCount: number; truthLabelRowCount: number; blockedTruthLabelCount: number; pdfDocxCsvCovered: boolean; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; sectionGates: Phase15ReportSectionGateRow[]; traceabilityMatrix: Phase15ReportTraceabilityMatrixRow[]; truthLabelRows: Phase15ReportTruthLabelRow[]; findings: Phase15ReportExportTruthFinding[]; proofBoundary: string[]; notes: string[]; }
+
 export type BackendDesignTruthReadiness = "ready" | "review" | "blocked" | "unknown";
 export interface BackendTruthFinding { title: string; detail: string; severity: "ERROR" | "WARNING" | "INFO"; source: "design-graph" | "routing" | "security" | "implementation" | "validation"; }
 export interface BackendReportTruthVerificationSummary { checkType: string; totalCount: number; blockedCount: number; reviewCount: number; readyCount: number; }
@@ -1134,7 +1185,10 @@ export interface BackendDiagramRenderModel {
     groupCount: number;
     overlayCount: number;
     backendAuthored: true;
-    layoutMode: "backend-deterministic-grid" | "professional-topology-layout" | "professional-view-separated-layout" | "professional-scope-mode-layout" | "professional-usability-polish-layout";
+    layoutMode: "backend-deterministic-grid" | "professional-topology-layout" | "professional-view-separated-layout" | "professional-scope-mode-layout" | "professional-usability-polish-layout" | "phase16-backend-truth-layout-contract";
+    contractId?: "PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT";
+    truthContract?: "backend-only-render-model";
+    modeCount?: number;
   };
   nodes: BackendDiagramRenderNode[];
   edges: BackendDiagramRenderEdge[];
@@ -1153,6 +1207,40 @@ export interface BackendDiagramTruthModel {
   hotspots: BackendDiagramTruthHotspot[];
   renderModel: BackendDiagramRenderModel;
 }
+
+export type Phase16DiagramTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase16DiagramModeKey = "physical" | "logical" | "wan-cloud" | "security" | "per-site" | "implementation";
+export interface Phase16DiagramModeContractRow { contract: "PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT"; mode: Phase16DiagramModeKey; purpose: string; allowedRenderLayers: BackendDiagramRenderLayer[]; requiredBackendEvidence: string[]; forbiddenFrontendBehavior: string[]; status: "AVAILABLE" | "REVIEW_REQUIRED" | "BLOCKED"; readinessImpact: Phase16DiagramTruthReadiness; evidenceCount: number; notes: string[]; }
+export interface Phase16DiagramRenderCoverageRow { rowType: "node" | "edge"; renderId: string; backendObjectId: string; objectType?: DesignGraphNodeObjectType; relationship?: string; truthState?: NetworkObjectTruthState; readiness: BackendDesignTruthReadiness; hasBackendIdentity: boolean; hasTruthState: boolean; hasReadiness: boolean; sourceEngine: string; relatedFindingIds: string[]; modeImpacts: Phase16DiagramModeKey[]; }
+export interface Phase16DiagramTruthFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedRenderIds: string[]; readinessImpact: Phase16DiagramTruthReadiness; remediation: string; }
+export interface Phase16DiagramTruthControlSummary { contract: "PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT"; role: "BACKEND_ONLY_DIAGRAM_RENDERER_NO_PRETTY_GARBAGE"; overallReadiness: Phase16DiagramTruthReadiness; backendAuthored: boolean; renderNodeCount: number; renderEdgeCount: number; modeContractCount: number; blockedModeCount: number; reviewModeCount: number; nodesWithoutBackendObjectId: number; edgesWithoutRelatedObjects: number; inferredOrReviewVisibleCount: number; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; modeContracts: Phase16DiagramModeContractRow[]; renderCoverage: Phase16DiagramRenderCoverageRow[]; findings: Phase16DiagramTruthFinding[]; proofBoundary: string[]; notes: string[]; }
+
+
+export type Phase17PlatformBomReadiness = "ADVISORY_READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase17PlatformBomConfidence = "estimated" | "review" | "placeholder";
+export interface Phase17PlatformBomRow { contract: "PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT"; category: string; item: string; quantity: number | string; unit: string; scope: string; calculationBasis: string; sourceRequirementIds: string[]; sourceObjectIds: string[]; confidence: Phase17PlatformBomConfidence; readinessImpact: Phase17PlatformBomReadiness; manualReviewNote: string; notes: string[]; }
+export interface Phase17PlatformBomRequirementDriver { contract: "PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT"; requirementId: string; value: string; affectedRows: string[]; evidence: string; readinessImpact: Phase17PlatformBomReadiness; }
+export interface Phase17PlatformBomFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedRows: string[]; readinessImpact: Phase17PlatformBomReadiness; remediation: string; }
+export interface Phase17PlatformBomFoundationControlSummary { contract: "PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT"; role: "BACKEND_CONTROLLED_ADVISORY_BOM_NO_FAKE_SKUS"; sourceOfTruthLevel: "backend-computed-advisory-estimate"; procurementAuthority: "ADVISORY_ONLY_NOT_FINAL_SKU"; overallReadiness: Phase17PlatformBomReadiness; siteCount: number; usersPerSite: number; totalEstimatedUsers: number; growthMarginPercent: number; localPortDemandPerSite: number; poeDemandPerSite: number; modeledDeviceCount: number; modeledInterfaceCount: number; rowCount: number; estimatedRowCount: number; reviewRowCount: number; placeholderRowCount: number; requirementDriverCount: number; rows: Phase17PlatformBomRow[]; requirementDrivers: Phase17PlatformBomRequirementDriver[]; assumptions: string[]; licensingPlaceholders: string[]; reviewItems: string[]; findings: Phase17PlatformBomFinding[]; totals: { lineItems: number; hardwareCategories: number; reviewItems: number; placeholderItems: number; }; proofBoundary: string[]; notes: string[]; }
+
+
+export type Phase18DiscoveryReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "NOT_READY";
+export type Phase18DiscoveryState = "NOT_PROVIDED" | "MANUALLY_ENTERED" | "IMPORTED" | "VALIDATED" | "CONFLICTING" | "REVIEW_REQUIRED";
+export interface Phase18DiscoveryAreaRow { contract: "PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT"; areaKey: string; area: string; state: Phase18DiscoveryState; sourceType: string; requiredFor: string[]; evidenceCount: number; sourceRequirementIds: string[]; sourceObjectIds: string[]; readinessImpact: Phase18DiscoveryReadiness; reviewReason: string; notes: string[]; }
+export interface Phase18DiscoveryImportTargetRow { contract: "PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT"; targetKey: string; target: string; state: Phase18DiscoveryState; sourceExamples: string[]; requiredFor: string[]; sourceRequirementIds: string[]; readinessImpact: Phase18DiscoveryReadiness; reconciliationNeed: string; notes: string[]; }
+export interface Phase18DiscoveryTask { contract: "PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT"; taskId: string; requirementId: string; title: string; detail: string; linkedTargets: string[]; priority: "HIGH" | "MEDIUM" | "LOW"; state: "OPEN" | "REVIEW_READY" | "COMPLETE"; readinessImpact: Phase18DiscoveryReadiness; blockers: string[]; }
+export interface Phase18DiscoveryRequirementDriver { contract: "PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT"; requirementId: string; value: string; affectedAreas: string[]; affectedImportTargets: string[]; generatedTaskIds: string[]; evidence: string; readinessImpact: Phase18DiscoveryReadiness; }
+export interface Phase18DiscoveryFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedAreas: string[]; affectedImportTargets: string[]; readinessImpact: Phase18DiscoveryReadiness; remediation: string; }
+export interface Phase18DiscoveryCurrentStateControlSummary { contract: "PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT"; role: "MANUAL_DISCOVERY_BOUNDARY_NO_LIVE_DISCOVERY_CLAIMS"; sourceOfTruthLevel: "manual-discovery-boundary"; currentStateAuthority: "MANUAL_OR_IMPORTED_EVIDENCE_ONLY_NOT_LIVE_DISCOVERY"; overallReadiness: Phase18DiscoveryReadiness; brownfieldMode: string; importReadiness: string; siteCount: number; savedSiteCount: number; modeledDeviceCount: number; modeledInterfaceCount: number; configuredObjectCount: number; discoveredObjectCount: number; persistedIpamObjectCount: number; areaRowCount: number; importTargetCount: number; taskCount: number; openTaskCount: number; requirementDriverCount: number; manuallyEnteredEvidenceCount: number; importedEvidenceCount: number; validatedEvidenceCount: number; conflictingEvidenceCount: number; reviewRequiredCount: number; stateCounts: Record<Phase18DiscoveryState, number>; areaRows: Phase18DiscoveryAreaRow[]; importTargets: Phase18DiscoveryImportTargetRow[]; tasks: Phase18DiscoveryTask[]; requirementDrivers: Phase18DiscoveryRequirementDriver[]; findings: Phase18DiscoveryFinding[]; proofBoundary: string[]; notes: string[]; }
+
+
+export type Phase19AiDraftReadiness = "SAFE_DRAFT_ONLY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase19AiDraftState = "NO_AI_DRAFT" | "AI_DRAFT" | "REVIEW_REQUIRED" | "CONVERTED_TO_STRUCTURED_INPUT" | "VALIDATED_AFTER_REVIEW" | "BLOCKED";
+export type Phase19AiGateState = "ENFORCED" | "REVIEW_REQUIRED" | "MISSING";
+export interface Phase19AiDraftGateRow { contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT"; gateKey: string; gate: string; required: true; state: Phase19AiGateState; evidence: string[]; blocksAuthority: boolean; consumerImpact: string; }
+export interface Phase19AiDraftObjectRow { contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT"; objectId: string; objectType: "project" | "requirement-profile" | "site" | "vlan" | "validation-explanation" | "note"; objectLabel: string; state: Phase19AiDraftState; sourceType: "AI_DRAFT"; proofStatus: "DRAFT_ONLY" | "REVIEW_REQUIRED"; downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED"; sourceRequirementIds: string[]; reviewRequired: boolean; materializationPath: string[]; notes: string[]; }
+export interface Phase19AiDraftFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjects: string[]; readinessImpact: Phase19AiDraftReadiness; remediation: string; }
+export interface Phase19AiDraftHelperControlSummary { contract: "PHASE19_AI_DRAFT_HELPER_CONTRACT"; role: "AI_DRAFT_HELPER_NOT_ENGINEERING_AUTHORITY"; sourceOfTruthLevel: "ai-draft-only-review-gated"; aiAuthority: "DRAFT_ONLY_NOT_AUTHORITATIVE"; overallReadiness: Phase19AiDraftReadiness; draftApplyPolicy: "SELECTIVE_REVIEW_REQUIRED_BEFORE_STRUCTURED_SAVE"; aiDerivedObjectCount: number; reviewRequiredObjectCount: number; gateCount: number; enforcedGateCount: number; missingGateCount: number; hasAiDraftMetadata: boolean; hasAiAppliedObjects: boolean; providerMode: "local" | "openai" | "unknown" | "not-used"; gateRows: Phase19AiDraftGateRow[]; draftObjectRows: Phase19AiDraftObjectRow[]; findings: Phase19AiDraftFinding[]; proofBoundary: string[]; notes: string[]; }
 
 export interface NetworkObjectModel {
   summary: NetworkObjectModelSummary;
@@ -1958,6 +2046,15 @@ export interface Phase8ValidationReadinessControlSummary {
   notes: string[];
 }
 
+
+export type Phase20ProofReadiness = "PROOF_READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase20ReleaseGateState = "PASSED" | "REVIEW_REQUIRED" | "BLOCKED";
+export interface Phase20EngineProofRow { contract: "PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT"; phase: number; engineKey: string; expectedContract: string; status: "PROVEN" | "REVIEW_REQUIRED" | "BLOCKED" | "MISSING" | "CONTRACT_GAP"; readinessImpact: Phase20ProofReadiness; proofFocus: string; evidence: string[]; blockers: string[]; }
+export interface Phase20ScenarioProofRow { contract: "PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT"; scenarioKey: string; scenarioName: string; requirementsCovered: string[]; expectedProofChain: string[]; expectedEnginePhases: number[]; actualEvidence: string[]; missingEvidence: string[]; readinessImpact: Phase20ProofReadiness; notes: string[]; }
+export interface Phase20ReleaseGateRow { contract: "PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT"; gateKey: string; gate: string; required: true; state: Phase20ReleaseGateState; evidence: string[]; remediation: string; }
+export interface Phase20Finding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedItems: string[]; readinessImpact: Phase20ProofReadiness; remediation: string; }
+export interface Phase20FinalProofPassControlSummary { contract: "PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT"; role: "FINAL_CROSS_ENGINE_REQUIREMENT_TO_RELEASE_PROOF_GATE"; releaseTarget: "A_MINUS_A_PLANNING_PLATFORM_NOT_A_PLUS"; sourceOfTruthLevel: "final-cross-engine-proof-gate"; overallReadiness: Phase20ProofReadiness; scenarioCount: number; scenarioProofReadyCount: number; scenarioReviewCount: number; scenarioBlockedCount: number; engineProofCount: number; engineProofReadyCount: number; engineProofReviewCount: number; engineProofBlockedCount: number; gateCount: number; passedGateCount: number; reviewGateCount: number; blockedGateCount: number; scenarioRows: Phase20ScenarioProofRow[]; engineProofRows: Phase20EngineProofRow[]; releaseGates: Phase20ReleaseGateRow[]; findings: Phase20Finding[]; proofBoundary: string[]; notes: string[]; }
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -2066,6 +2163,15 @@ export interface DesignCoreSnapshot {
   phase9NetworkObjectModel?: Phase9NetworkObjectModelControlSummary;
   phase10DesignGraph?: Phase10DesignGraphControlSummary;
   phase11RoutingSegmentation?: Phase11RoutingSegmentationControlSummary;
+  phase12SecurityPolicyFlow?: Phase12SecurityPolicyFlowControlSummary;
+  phase13ImplementationPlanning?: Phase13ImplementationPlanningControlSummary;
+  phase14ImplementationTemplates?: Phase14ImplementationTemplateControlSummary;
+  phase15ReportExportTruth?: Phase15ReportExportTruthControlSummary;
+  phase16DiagramTruth?: Phase16DiagramTruthControlSummary;
+  phase17PlatformBomFoundation?: Phase17PlatformBomFoundationControlSummary;
+  phase18DiscoveryCurrentState?: Phase18DiscoveryCurrentStateControlSummary;
+  phase19AiDraftHelper?: Phase19AiDraftHelperControlSummary;
+  phase20FinalProofPass?: Phase20FinalProofPassControlSummary;
   requirementsCoverage?: RequirementsCoverageSummary;
   requirementsImpactClosure?: RequirementsImpactClosureSummary;
   requirementsScenarioProof?: RequirementsScenarioProofSummary;

@@ -1,3 +1,6 @@
+// PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT export wiring
+// PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT CSV/export evidence wiring
+// PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: CSV/export rows expose backend-only diagram proof.
 // PHASE6_DESIGN_CORE_ORCHESTRATOR_CONTRACT
 import { prisma } from "../db/prisma.js";
 // PHASE4_ENGINE1_CIDR_ADDRESSING_TRUTH
@@ -841,6 +844,57 @@ export async function getCsvRows(projectId: string) {
       Value: designCore.reportTruth.overallReadinessLabel,
       Notes: `Routing ${designCore.reportTruth.readiness.routing} | Security ${designCore.reportTruth.readiness.security} | NAT ${designCore.reportTruth.readiness.nat} | Blocked findings ${designCore.reportTruth.blockedFindings.length} | Review findings ${designCore.reportTruth.reviewFindings.length}`,
     });
+    if (designCore.phase15ReportExportTruth) {
+      rows.push({
+        Section: "Phase 15 Report Export Truth",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: "Report/export readiness",
+        Value: designCore.phase15ReportExportTruth.overallReadiness,
+        Notes: `${designCore.phase15ReportExportTruth.requiredSectionCount} required section gate(s); ${designCore.phase15ReportExportTruth.traceabilityRowCount} traceability row(s); PDF/DOCX/CSV covered ${designCore.phase15ReportExportTruth.pdfDocxCsvCovered ? "yes" : "no"}`,
+      });
+      for (const section of designCore.phase15ReportExportTruth.sectionGates) {
+        rows.push({
+          Section: "Phase 15 Report Section Gates",
+          Scope: section.sectionKey,
+          Name: section.title,
+          Key: section.readinessImpact,
+          Value: section.reportSection,
+          Notes: `Frontend: ${section.frontendLocation} | Truth labels: ${joinCsvList(section.truthLabels, "none")} | Evidence: ${joinCsvList(section.evidence, "none")} | Blockers: ${joinCsvList(section.blockers, "none")}`,
+        });
+      }
+      for (const trace of designCore.phase15ReportExportTruth.traceabilityMatrix) {
+        rows.push({
+          Section: "Requirement Traceability Matrix",
+          Scope: trace.requirementKey,
+          Name: trace.requirementLabel,
+          Key: trace.readinessStatus,
+          Value: trace.designConsequence,
+          Notes: `Engines: ${joinCsvList(trace.enginesAffected, "none")} | Frontend: ${trace.frontendLocation} | Report: ${trace.reportSection} | Diagram: ${trace.diagramImpact} | Missing consumers: ${joinCsvList(trace.missingConsumers, "none")}`,
+        });
+      }
+      for (const label of designCore.phase15ReportExportTruth.truthLabelRows) {
+        rows.push({
+          Section: "Phase 15 Truth Labels",
+          Scope: label.truthLabel,
+          Name: label.truthLabel,
+          Key: label.readinessImpact,
+          Value: String(label.count),
+          Notes: `${label.reportUsage} | Evidence: ${joinCsvList(label.evidence, "none")}`,
+        });
+      }
+      for (const finding of designCore.phase15ReportExportTruth.findings) {
+        rows.push({
+          Section: "Phase 15 Report Export Findings",
+          Scope: joinCsvList(finding.affectedSectionKeys, "project"),
+          Name: finding.title,
+          Key: `${finding.severity} | ${finding.code}`,
+          Value: finding.detail,
+          Notes: finding.remediation,
+        });
+      }
+    }
+
     rows.push({
       Section: "Diagram Truth",
       Scope: "Project",
@@ -849,6 +903,72 @@ export async function getCsvRows(projectId: string) {
       Value: `${designCore.diagramTruth.renderModel.summary.nodeCount} render nodes / ${designCore.diagramTruth.renderModel.summary.edgeCount} render edges`,
       Notes: `Modeled devices ${designCore.diagramTruth.topologySummary.deviceCount} | Interfaces ${designCore.diagramTruth.topologySummary.interfaceCount} | Links ${designCore.diagramTruth.topologySummary.linkCount} | Route domains ${designCore.diagramTruth.topologySummary.routeDomainCount} | Security zones ${designCore.diagramTruth.topologySummary.securityZoneCount} | Empty-state ${designCore.diagramTruth.emptyStateReason ?? designCore.diagramTruth.renderModel.emptyState?.reason ?? "none"}`,
     });
+
+    if (designCore.phase16DiagramTruth) {
+      rows.push({
+        Section: "Phase 16 Diagram Truth",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: designCore.phase16DiagramTruth.overallReadiness,
+        Value: `${designCore.phase16DiagramTruth.renderNodeCount} backend render nodes / ${designCore.phase16DiagramTruth.renderEdgeCount} backend render edges`,
+        Notes: `Contract ${designCore.phase16DiagramTruth.contract} | Backend-authored ${designCore.phase16DiagramTruth.backendAuthored ? "yes" : "no"} | Node ID gaps ${designCore.phase16DiagramTruth.nodesWithoutBackendObjectId} | Edge lineage gaps ${designCore.phase16DiagramTruth.edgesWithoutRelatedObjects}`,
+      });
+      for (const mode of designCore.phase16DiagramTruth.modeContracts) {
+        rows.push({
+          Section: "Phase 16 Diagram Mode Contracts",
+          Scope: mode.mode,
+          Name: mode.purpose,
+          Key: `${mode.status} | ${mode.readinessImpact}`,
+          Value: `${mode.evidenceCount} evidence item(s)`,
+          Notes: `Required evidence: ${joinCsvList(mode.requiredBackendEvidence, "none")}`,
+        });
+      }
+      for (const finding of designCore.phase16DiagramTruth.findings) {
+        rows.push({
+          Section: "Phase 16 Diagram Findings",
+          Scope: joinCsvList(finding.affectedRenderIds, "project"),
+          Name: finding.title,
+          Key: `${finding.severity} | ${finding.code}`,
+          Value: finding.detail,
+          Notes: finding.remediation,
+        });
+      }
+    }
+
+
+    if (designCore.phase17PlatformBomFoundation) {
+      rows.push({ Section: "Phase 17 Platform/BOM Foundation", Scope: "Project", Name: designCore.projectName, Key: designCore.phase17PlatformBomFoundation.overallReadiness, Value: `${designCore.phase17PlatformBomFoundation.rowCount} BOM row(s) / ${designCore.phase17PlatformBomFoundation.requirementDriverCount} requirement driver(s)`, Notes: `Contract ${designCore.phase17PlatformBomFoundation.contract} | Authority ${designCore.phase17PlatformBomFoundation.procurementAuthority} | Source ${designCore.phase17PlatformBomFoundation.sourceOfTruthLevel} | Placeholder rows ${designCore.phase17PlatformBomFoundation.placeholderRowCount}` });
+      for (const bomRow of designCore.phase17PlatformBomFoundation.rows) rows.push({ Section: "Phase 17 BOM Rows", Scope: bomRow.category, Name: bomRow.item, Key: `${bomRow.confidence} | ${bomRow.readinessImpact}`, Value: `${bomRow.quantity} ${bomRow.unit}`, Notes: `Basis: ${bomRow.calculationBasis} | Requirements: ${joinCsvList(bomRow.sourceRequirementIds, "none")} | Review: ${bomRow.manualReviewNote}` });
+      for (const driver of designCore.phase17PlatformBomFoundation.requirementDrivers) rows.push({ Section: "Phase 17 BOM Requirement Drivers", Scope: driver.requirementId, Name: driver.requirementId, Key: driver.readinessImpact, Value: driver.value, Notes: `${driver.evidence} Rows: ${joinCsvList(driver.affectedRows, "none")}` });
+      for (const finding of designCore.phase17PlatformBomFoundation.findings) rows.push({ Section: "Phase 17 BOM Findings", Scope: joinCsvList(finding.affectedRows, "project"), Name: finding.title, Key: `${finding.severity} | ${finding.code}`, Value: finding.detail, Notes: finding.remediation });
+    }
+
+    // PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT: CSV export distinguishes manual, imported, validated, conflicting, and review-required current-state evidence.
+    if (designCore.phase18DiscoveryCurrentState) {
+      rows.push({ Section: "Phase 18 Discovery/Current-State", Scope: "Project", Name: designCore.projectName, Key: designCore.phase18DiscoveryCurrentState.overallReadiness, Value: `${designCore.phase18DiscoveryCurrentState.areaRowCount} discovery area(s) / ${designCore.phase18DiscoveryCurrentState.importTargetCount} import target(s) / ${designCore.phase18DiscoveryCurrentState.taskCount} task(s)`, Notes: `Contract ${designCore.phase18DiscoveryCurrentState.contract} | Authority ${designCore.phase18DiscoveryCurrentState.currentStateAuthority} | Role ${designCore.phase18DiscoveryCurrentState.role}` });
+      for (const area of designCore.phase18DiscoveryCurrentState.areaRows) rows.push({ Section: "Phase 18 Discovery Areas", Scope: area.area, Name: area.area, Key: `${area.state} | ${area.readinessImpact}`, Value: `${area.evidenceCount} evidence line(s)`, Notes: `Required for: ${joinCsvList(area.requiredFor, "none")} | Requirements: ${joinCsvList(area.sourceRequirementIds, "none")} | Review: ${area.reviewReason}` });
+      for (const target of designCore.phase18DiscoveryCurrentState.importTargets) rows.push({ Section: "Phase 18 Discovery Import Targets", Scope: target.target, Name: target.target, Key: `${target.state} | ${target.readinessImpact}`, Value: joinCsvList(target.sourceExamples, "examples not listed"), Notes: `Required for: ${joinCsvList(target.requiredFor, "none")} | Reconciliation: ${target.reconciliationNeed}` });
+      for (const task of designCore.phase18DiscoveryCurrentState.tasks) rows.push({ Section: "Phase 18 Discovery Tasks", Scope: task.requirementId, Name: task.title, Key: `${task.priority} | ${task.state} | ${task.readinessImpact}`, Value: task.detail, Notes: `Targets: ${joinCsvList(task.linkedTargets, "none")} | Blockers: ${joinCsvList(task.blockers, "none")}` });
+      for (const finding of designCore.phase18DiscoveryCurrentState.findings) rows.push({ Section: "Phase 18 Discovery Findings", Scope: joinCsvList([...finding.affectedAreas, ...finding.affectedImportTargets], "project"), Name: finding.title, Key: `${finding.severity} | ${finding.code}`, Value: finding.detail, Notes: finding.remediation });
+    }
+
+
+    // PHASE19_AI_DRAFT_HELPER_CONTRACT: CSV export labels AI as draft-only and review-required, never authority.
+    if (designCore.phase19AiDraftHelper) {
+      rows.push({ Section: "Phase 19 AI Draft/Helper", Scope: "Project", Name: designCore.projectName, Key: designCore.phase19AiDraftHelper.overallReadiness, Value: `${designCore.phase19AiDraftHelper.aiDerivedObjectCount} AI-derived object(s) / ${designCore.phase19AiDraftHelper.reviewRequiredObjectCount} review-required object(s)`, Notes: `Contract ${designCore.phase19AiDraftHelper.contract} | Authority ${designCore.phase19AiDraftHelper.aiAuthority} | Role ${designCore.phase19AiDraftHelper.role}` });
+      for (const gate of designCore.phase19AiDraftHelper.gateRows) rows.push({ Section: "Phase 19 AI Gates", Scope: gate.gateKey, Name: gate.gate, Key: gate.state, Value: gate.blocksAuthority ? "Blocks authority" : "Does not block authority", Notes: `${joinCsvList(gate.evidence, "no evidence")} | Consumer impact: ${gate.consumerImpact}` });
+      for (const object of designCore.phase19AiDraftHelper.draftObjectRows) rows.push({ Section: "Phase 19 AI-Derived Objects", Scope: object.objectType, Name: object.objectLabel, Key: `${object.state} | ${object.proofStatus}`, Value: object.downstreamAuthority, Notes: `Requirements: ${joinCsvList(object.sourceRequirementIds, "none")} | Path: ${joinCsvList(object.materializationPath, "none")}` });
+      for (const finding of designCore.phase19AiDraftHelper.findings) rows.push({ Section: "Phase 19 AI Findings", Scope: joinCsvList(finding.affectedObjects, "project"), Name: finding.title, Key: `${finding.severity} | ${finding.code}`, Value: finding.detail, Notes: finding.remediation });
+    }
+
+    // PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT: CSV export carries final engine/scenario/release-gate proof without A+ overclaim.
+    if (designCore.phase20FinalProofPass) {
+      rows.push({ Section: "Phase 20 Final Proof", Scope: "Project", Name: designCore.projectName, Key: designCore.phase20FinalProofPass.overallReadiness, Value: `${designCore.phase20FinalProofPass.scenarioCount} scenario(s) / ${designCore.phase20FinalProofPass.engineProofCount} engine proof row(s) / ${designCore.phase20FinalProofPass.gateCount} release gate(s)`, Notes: `Contract ${designCore.phase20FinalProofPass.contract} | Target ${designCore.phase20FinalProofPass.releaseTarget} | Role ${designCore.phase20FinalProofPass.role}` });
+      for (const gate of designCore.phase20FinalProofPass.releaseGates) rows.push({ Section: "Phase 20 Release Gates", Scope: gate.gateKey, Name: gate.gate, Key: gate.state, Value: joinCsvList(gate.evidence, "no evidence"), Notes: gate.remediation });
+      for (const scenario of designCore.phase20FinalProofPass.scenarioRows) rows.push({ Section: "Phase 20 Cross-Engine Scenarios", Scope: scenario.scenarioKey, Name: scenario.scenarioName, Key: scenario.readinessImpact, Value: joinCsvList(scenario.requirementsCovered, "none"), Notes: `Phases: ${joinCsvList(scenario.expectedEnginePhases.map((phase) => `Phase ${phase}`), "none")} | Missing: ${joinCsvList(scenario.missingEvidence, "none")}` });
+      for (const engine of designCore.phase20FinalProofPass.engineProofRows) rows.push({ Section: "Phase 20 Engine Proof Rows", Scope: `Phase ${engine.phase}`, Name: engine.engineKey, Key: `${engine.status} | ${engine.readinessImpact}`, Value: engine.expectedContract, Notes: `${engine.proofFocus} | Evidence: ${joinCsvList(engine.evidence, "none")} | Blockers: ${joinCsvList(engine.blockers, "none")}` });
+      for (const finding of designCore.phase20FinalProofPass.findings) rows.push({ Section: "Phase 20 Findings", Scope: joinCsvList(finding.affectedItems, "project"), Name: finding.title, Key: `${finding.severity} | ${finding.code}`, Value: finding.detail, Notes: finding.remediation });
+    }
 
     for (const finding of designCore.reportTruth.blockedFindings) {
       rows.push({
@@ -1223,6 +1343,16 @@ export async function getCsvRows(projectId: string) {
       for (const row of phase11.protocolIntents.slice(0, 180)) rows.push({ Section: "Phase 11 Protocol Intent Rows", Scope: row.readinessImpact, Name: row.name, Key: `${row.category} | ${row.controlState}`, Value: `Routes ${joinCsvList(row.sourceRouteIntentIds, "none")}; objects ${joinCsvList(row.sourceObjectIds, "none")}`, Notes: `Requirements ${joinCsvList(row.requirementKeys, "none")}; evidence ${joinCsvList(row.evidence, "none")}; review ${row.reviewReason ?? "none"}` });
       for (const row of phase11.requirementRoutingMatrix.slice(0, 120)) rows.push({ Section: "Phase 11 Requirement Routing Matrix", Scope: row.readinessImpact, Name: row.requirementLabel, Key: `${row.requirementKey} | active=${row.active}`, Value: `Actual ${joinCsvList(row.actualProtocolIntentIds, "none")}; missing ${joinCsvList(row.missingProtocolCategories, "none")}`, Notes: `Expected ${joinCsvList(row.expectedProtocolCategories, "none")}; evidence ${joinCsvList(row.evidence, "none")}` });
       for (const finding of phase11.findings.slice(0, 120)) rows.push({ Section: "Phase 11 Routing Findings", Scope: finding.severity, Name: finding.code, Key: finding.readinessImpact, Value: finding.title, Notes: `${finding.detail}; remediation ${finding.remediation}` });
+    }
+
+    if (designCore.phase12SecurityPolicyFlow) {
+      const phase12 = designCore.phase12SecurityPolicyFlow;
+      rows.push({ Section: "Phase 12 Security Policy Flow", Item: "Readiness", Value: String(phase12.overallReadiness), Notes: `${phase12.flowConsequenceCount} flow consequence(s); ${phase12.zonePolicyReviewCount} zone policy row(s); ${phase12.activeRequirementSecurityGapCount} active requirement gap(s)` });
+      for (const row of phase12.requirementSecurityMatrix ?? []) rows.push({ Section: "Phase 12 Requirement Security Matrix", Item: row.requirementLabel, Value: String(row.readinessImpact), Notes: `${row.active ? "active" : "inactive"}; missing=${(row.missingSecurityCategories ?? []).join(", ") || "none"}; flows=${(row.actualFlowRequirementIds ?? []).join(", ") || "none"}` });
+      for (const row of phase12.flowConsequences ?? []) rows.push({ Section: "Phase 12 Flow Consequences", Item: row.name, Value: String(row.phase12PolicyState), Notes: `${row.sourceZoneName} -> ${row.destinationZoneName}; expected=${row.expectedAction}; ${row.reviewReason ?? row.consequenceSummary}` });
+      for (const row of phase12.zonePolicyReviews ?? []) rows.push({ Section: "Phase 12 Zone Policy Matrix", Item: `${row.sourceZoneName} -> ${row.destinationZoneName}`, Value: String(row.phase12PolicyState), Notes: `${row.defaultPosture}; rules=${row.explicitPolicyRuleIds.length}; flows=${row.requiredFlowIds.length}; nat=${row.natRequiredFlowIds.length}` });
+      for (const row of phase12.natReviews ?? []) rows.push({ Section: "Phase 12 NAT Review", Item: row.natRuleName, Value: String(row.phase12PolicyState), Notes: `${row.sourceZoneName} -> ${row.destinationZoneName ?? "review"}; missing=${row.missingFlowRequirementIds.join(", ") || "none"}` });
+      for (const finding of phase12.findings ?? []) rows.push({ Section: "Phase 12 Security Findings", Item: finding.code, Value: String(finding.readinessImpact), Notes: `${finding.title}: ${finding.remediation}` });
     }
 
     if (designCore.vendorNeutralImplementationTemplates) {

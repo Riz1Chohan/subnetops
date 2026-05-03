@@ -1,3 +1,6 @@
+// PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT validation wiring
+// PHASE17_PLATFORM_BOM_FOUNDATION_CONTRACT validation wiring
+// PHASE16_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: validation consumes diagram truth findings.
 import type { EntityType, ValidationSeverity } from "../lib/domainTypes.js";
 import { prisma } from "../db/prisma.js";
 import {
@@ -1127,6 +1130,65 @@ export async function runValidation(projectId: string) {
   if (designSnapshot?.phase11RoutingSegmentation) {
     for (const finding of designSnapshot.phase11RoutingSegmentation.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
       results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE11_ROUTING_SEGMENTATION_BLOCKING" : "PHASE11_ROUTING_SEGMENTATION_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+
+  if (designSnapshot?.phase12SecurityPolicyFlow) {
+    for (const finding of designSnapshot.phase12SecurityPolicyFlow.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE12_SECURITY_POLICY_FLOW_BLOCKING" : "PHASE12_SECURITY_POLICY_FLOW_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase13ImplementationPlanning) {
+    for (const finding of designSnapshot.phase13ImplementationPlanning.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE13_IMPLEMENTATION_PLANNING_BLOCKING" : "PHASE13_IMPLEMENTATION_PLANNING_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase14ImplementationTemplates) {
+    for (const finding of designSnapshot.phase14ImplementationTemplates.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE14_VENDOR_NEUTRAL_TEMPLATE_BLOCKING" : "PHASE14_VENDOR_NEUTRAL_TEMPLATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase15ReportExportTruth) {
+    for (const finding of designSnapshot.phase15ReportExportTruth.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE15_REPORT_EXPORT_TRUTH_BLOCKING" : "PHASE15_REPORT_EXPORT_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase16DiagramTruth) {
+    for (const finding of designSnapshot.phase16DiagramTruth.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE16_DIAGRAM_TRUTH_BLOCKING" : "PHASE16_DIAGRAM_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase17PlatformBomFoundation) {
+    for (const finding of designSnapshot.phase17PlatformBomFoundation.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE17_PLATFORM_BOM_BLOCKING" : "PHASE17_PLATFORM_BOM_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  // PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT: discovery/current-state must stay manual/imported/validated/review-labelled.
+  if (designSnapshot?.phase18DiscoveryCurrentState) {
+    for (const finding of designSnapshot.phase18DiscoveryCurrentState.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE18_DISCOVERY_CURRENT_STATE_BLOCKING" : "PHASE18_DISCOVERY_CURRENT_STATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+
+  // PHASE19_AI_DRAFT_HELPER_CONTRACT: AI output is draft-only; applied AI objects stay review-required and not authoritative.
+  if (designSnapshot?.phase19AiDraftHelper) {
+    for (const finding of designSnapshot.phase19AiDraftHelper.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE19_AI_DRAFT_BLOCKING" : "PHASE19_AI_DRAFT_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  // PHASE20_FINAL_CROSS_ENGINE_PROOF_CONTRACT: final proof pass must expose blocked/review gates and scenario failures.
+  if (designSnapshot?.phase20FinalProofPass) {
+    for (const finding of designSnapshot.phase20FinalProofPass.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE20_FINAL_PROOF_BLOCKING" : "PHASE20_FINAL_PROOF_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 

@@ -75,13 +75,13 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             Describe the network in plain English. SubnetOps will generate a first draft with sites, VLANs, subnet sizes, and gateways.
           </p>
         </div>
-        <span className="badge badge-info">Trust-first AI</span>
+        <span className="badge badge-info">PHASE19_AI_DRAFT_HELPER_CONTRACT</span>
       </div>
 
       <div className="trust-note">
         <strong>How this draft works</strong>
         <p className="muted" style={{ margin: "6px 0 0 0" }}>
-          The AI proposes a draft. You review it, choose which parts to apply, and can still edit every field before the project is saved.
+          The AI proposes a draft only. It is marked AI_DRAFT / REVIEW_REQUIRED / NOT_AUTHORITATIVE and must pass the deterministic SubnetOps engines before it can become implementation evidence.
         </p>
       </div>
 
@@ -126,6 +126,8 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <h3 style={{ marginTop: 0, marginBottom: 8 }}>Project draft</h3>
               <span className="badge badge-info">{providerLabel(draft.provider)}</span>
+              <span className="badge badge-warning">{draft.authority?.proofStatus || "DRAFT_ONLY"}</span>
+              <span className="badge badge-warning">{draft.authority?.downstreamAuthority || "NOT_AUTHORITATIVE_UNTIL_REVIEWED"}</span>
             </div>
             <div className="summary-grid">
               <div className="summary-card"><div className="muted">Sites</div><div className="value">{draft.sites.length}</div></div>
@@ -159,6 +161,18 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             <h3 style={{ marginTop: 0 }}>Check before saving</h3>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {draft.reviewChecklist.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="panel" style={{ padding: 14 }}>
+            <h3 style={{ marginTop: 0 }}>Phase 19 authority gates</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Contract: {draft.authority?.contract || "PHASE19_AI_DRAFT_HELPER_CONTRACT"}. AI output is not authority until reviewed, saved as structured inputs, and proven by validation/addressing/IPAM/standards/traceability.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {(draft.authority?.conversionGates || []).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>

@@ -25,6 +25,8 @@ import {
 } from "../lib/requirementsProfile";
 
 const AI_DRAFT_STORAGE_KEY = "subnetops.aiDraftSelection";
+const PHASE19_AI_DRAFT_CONTRACT = "PHASE19_AI_DRAFT_HELPER_CONTRACT";
+const PHASE19_AI_APPLIED_MARKER = "PHASE19_AI_DRAFT_APPLIED_REVIEW_REQUIRED";
 
 const defaultUseOptions: AIUseDraftOptions = {
   applyProjectFields: true,
@@ -87,6 +89,43 @@ function selectedSummary(options: AIUseDraftOptions) {
   if (options.applySites) parts.push("sites");
   if (options.applyVlans) parts.push("VLANs");
   return parts.length > 0 ? parts.join(", ") : "nothing selected";
+}
+
+function appendPhase19AiReviewMarker(notes?: string) {
+  const marker = `${PHASE19_AI_APPLIED_MARKER}: AI-created suggestion imported from the AI workspace. Review required; not authoritative until requirements materialization, validation, Engine 1 addressing, Engine 2 IPAM where relevant, standards, and traceability checks pass.`;
+  if (!notes || notes.trim().length === 0) return marker;
+  if (notes.includes(PHASE19_AI_APPLIED_MARKER)) return notes;
+  return `${notes.trim()}\n${marker}`;
+}
+
+function buildRequirementsJsonForCreate(guided: RequirementsProfile, aiDraft: AIPlanDraft | null, options: AIUseDraftOptions) {
+  const raw = stringifyRequirementsProfile(guided);
+  let parsed: Record<string, unknown>;
+  try {
+    const value = JSON.parse(raw);
+    parsed = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  } catch {
+    parsed = {};
+  }
+
+  if (aiDraft) {
+    parsed.phase19AiDraft = {
+      contract: PHASE19_AI_DRAFT_CONTRACT,
+      state: "AI_DRAFT",
+      provider: aiDraft.provider,
+      selected: {
+        applyProjectFields: options.applyProjectFields,
+        applySites: options.applySites,
+        applyVlans: options.applyVlans,
+      },
+      reviewRequired: true,
+      notAuthoritative: true,
+      createdFrom: "AIWorkspacePage",
+      gate: aiDraft.authority?.conversionGates || [],
+    };
+  }
+
+  return JSON.stringify(parsed);
 }
 
 function trackStatusLabel(status: "READY" | "REVIEW" | "INACTIVE") {
@@ -1181,6 +1220,7 @@ export function NewProjectPage() {
               {aiDraft ? (
                 <div className="panel" style={{ padding: 14 }}>
                   <h3 style={{ marginTop: 0, marginBottom: 8 }}>Applied AI selections</h3>
+                  <p className="muted" style={{ marginTop: 0 }}>Phase 19 marker will be saved on AI-created objects: AI_DRAFT / REVIEW_REQUIRED / NOT_AUTHORITATIVE.</p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     <li>Project fields: {useOptions.applyProjectFields ? "Yes" : "No"}</li>
                     <li>Auto-create sites: {useOptions.applySites ? "Yes" : "No"}</li>
@@ -1201,7 +1241,7 @@ export function NewProjectPage() {
                   setSubmitError(null);
 
                   try {
-                    const project = await mutation.mutateAsync({ ...values, description: (values.description || guidedSummaryDescription).slice(0, 320), requirementsJson: stringifyRequirementsProfile(guided) });
+                    const project = await mutation.mutateAsync({ ...values, description: (values.description || guidedSummaryDescription).slice(0, 320), requirementsJson: buildRequirementsJsonForCreate(guided, aiDraft, useOptions) });
                     let importWarning = "";
 
                     if (aiDraft && (useOptions.applySites || useOptions.applyVlans)) {
@@ -1216,7 +1256,7 @@ export function NewProjectPage() {
                               location: siteDraft.location,
                               siteCode: siteDraft.siteCode,
                               defaultAddressBlock: siteDraft.defaultAddressBlock,
-                              notes: siteDraft.notes,
+                              notes: appendPhase19AiReviewMarker(siteDraft.notes),
                             });
                             createdSitesByName.set(siteDraft.name, site);
                           }
@@ -1236,7 +1276,7 @@ export function NewProjectPage() {
                               dhcpEnabled: vlanDraft.dhcpEnabled,
                               estimatedHosts: vlanDraft.estimatedHosts,
                               department: vlanDraft.department,
-                              notes: vlanDraft.notes,
+                              notes: appendPhase19AiReviewMarker(vlanDraft.notes),
                             });
                           }
                         }

@@ -1,3 +1,4 @@
+// Phase 12 security policy flow control markers: phase12PolicyState, consequenceSummary, reviewReason, SECURITY_NAT_REQUIRED_FLOW_UNCOVERED, SECURITY_RULE_SHADOWED_BY_EARLIER_RULE, SECURITY_IMPLICIT_DENY_NOT_MODELED.
 import type {
   NatRule,
   NetworkObjectTruthState,

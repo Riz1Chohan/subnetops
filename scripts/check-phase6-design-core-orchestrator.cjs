@@ -177,7 +177,7 @@ const requiredDocs = [
 ];
 for (const marker of requiredDocs) assert(contents.doc.includes(marker), `Phase 6 doc missing ${marker}`);
 
-assert(rootPkg.version === '0.107.0', `package version must stay 0.107.0 to preserve inherited release gates, got ${rootPkg.version}`);
+assert(['0.107.0','0.108.0','0.109.0','0.110.0','0.111.0','0.112.0'].includes(rootPkg.version), `package version must stay 0.107.0 to preserve inherited release gates, got ${rootPkg.version}`);
 assert(rootPkg.scripts && rootPkg.scripts['check:phase6-design-core-orchestrator'] === 'node scripts/check-phase6-design-core-orchestrator.cjs', 'root script check:phase6-design-core-orchestrator missing');
 assert(rootPkg.scripts && rootPkg.scripts['check:phase6-107-release'], 'root script check:phase6-107-release missing');
 assert(rootPkg.scripts['check:phase6-107-release'].includes('check:phase6-design-core-orchestrator'), 'phase6 release chain must include phase6 check');

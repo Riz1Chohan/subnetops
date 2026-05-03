@@ -82,6 +82,7 @@ export function ProjectDiscoveryPage() {
   const discoveryBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived");
   const backendUnconfirmedRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
   const backendUnconfirmedBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
+  const phase18DiscoveryCurrentState = designCore?.phase18DiscoveryCurrentState;
 
   const updateState = (patch: Partial<DiscoveryWorkspaceState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -143,15 +144,17 @@ export function ProjectDiscoveryPage() {
 
   const focusedSectionTitle = selectedSection === "summary"
     ? "Current state summary"
-    : selectedSection === "extraction"
-      ? "Extraction preview"
-      : selectedSection === "authority"
-        ? "Authority lift"
-        : selectedSection === "inputs"
-          ? "Paste inputs"
-          : selectedSection === "coverage"
-            ? "Coverage and gaps"
-            : "Discovery";
+    : selectedSection === "contract"
+      ? "Backend discovery contract"
+      : selectedSection === "extraction"
+        ? "Extraction preview"
+        : selectedSection === "authority"
+          ? "Authority lift"
+          : selectedSection === "inputs"
+            ? "Paste inputs"
+            : selectedSection === "coverage"
+              ? "Coverage and gaps"
+              : "Discovery";
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -190,6 +193,7 @@ export function ProjectDiscoveryPage() {
           <span className="badge-soft">Filled sections {summary.filledSections}/9</span>
           <span className="badge-soft">Migration complexity {summary.migrationComplexity}</span>
           <span className="badge-soft">Shared project persistence</span>
+          {phase18DiscoveryCurrentState ? <span className="badge-soft">Phase 18 {phase18DiscoveryCurrentState.overallReadiness}</span> : null}
         </div>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{project.name}</h2>
@@ -206,6 +210,89 @@ export function ProjectDiscoveryPage() {
         <p className="muted" style={{ margin: 0 }}>
           {saveNotice || (state.lastSavedAt ? `Last saved to project data: ${new Date(state.lastSavedAt).toLocaleString()}` : "No shared discovery save yet for this project.")}
         </p>
+      </div>
+
+      <div data-discovery-section="contract" className="panel" style={{ display: selectedSection && selectedSection !== "contract" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Phase 18 backend discovery/current-state contract</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            PHASE18_DISCOVERY_CURRENT_STATE_CONTRACT keeps discovery honest: manual notes, imported artifacts, validated evidence, conflicts, and review-required gaps are displayed from the backend snapshot instead of being invented by the frontend.
+          </p>
+        </div>
+        {phase18DiscoveryCurrentState ? (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className={phase18DiscoveryCurrentState.overallReadiness === "BLOCKED" ? "badge badge-danger" : phase18DiscoveryCurrentState.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>Readiness {phase18DiscoveryCurrentState.overallReadiness}</span>
+              <span className="badge-soft">Authority {phase18DiscoveryCurrentState.currentStateAuthority}</span>
+              <span className="badge-soft">Areas {phase18DiscoveryCurrentState.areaRowCount}</span>
+              <span className="badge-soft">Import targets {phase18DiscoveryCurrentState.importTargetCount}</span>
+              <span className="badge-soft">Open tasks {phase18DiscoveryCurrentState.openTaskCount}</span>
+              <span className="badge-soft">Conflicts {phase18DiscoveryCurrentState.conflictingEvidenceCount}</span>
+            </div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Discovery areas</strong>
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead><tr><th align="left">Area</th><th align="left">State</th><th align="left">Readiness</th><th align="left">Required for</th></tr></thead>
+                    <tbody>
+                      {phase18DiscoveryCurrentState.areaRows.slice(0, 9).map((row) => (
+                        <tr key={row.areaKey}>
+                          <td>{row.area}</td>
+                          <td>{row.state}</td>
+                          <td>{row.readinessImpact}</td>
+                          <td>{row.requiredFor.join(", ") || "none"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Structured import targets</strong>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {phase18DiscoveryCurrentState.importTargets.slice(0, 8).map((target) => (
+                    <div key={target.targetKey} className="trust-note">
+                      <p style={{ margin: 0 }}><strong>{target.target}</strong> — {target.state} / {target.readinessImpact}</p>
+                      <p className="muted" style={{ margin: "4px 0 0" }}>{target.reconciliationNeed}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Requirement-created discovery tasks</strong>
+                {phase18DiscoveryCurrentState.tasks.length ? (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {phase18DiscoveryCurrentState.tasks.slice(0, 8).map((task) => <li key={task.taskId} style={{ marginBottom: 8 }}><strong>{task.requirementId}</strong>: {task.title} — {task.state} / {task.readinessImpact}</li>)}
+                  </ul>
+                ) : <p className="muted" style={{ margin: 0 }}>No backend discovery tasks have been generated yet.</p>}
+              </div>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Proof boundary</strong>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {phase18DiscoveryCurrentState.proofBoundary.map((line) => <li key={line} style={{ marginBottom: 8 }}>{line}</li>)}
+                </ul>
+              </div>
+            </div>
+            {phase18DiscoveryCurrentState.findings.length ? (
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Backend findings</strong>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {phase18DiscoveryCurrentState.findings.slice(0, 8).map((finding) => (
+                    <div key={finding.code} className="validation-card">
+                      <p style={{ margin: 0 }}><strong>{finding.severity}</strong> — {finding.title}</p>
+                      <p className="muted" style={{ margin: "4px 0 0" }}>{finding.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>Backend Phase 18 discovery/current-state evidence is not available yet. That is a blocker, not a frontend excuse to fake current-state authority.</p>
+        )}
       </div>
 
       <div data-discovery-section="extraction" className="panel" style={{ display: selectedSection && selectedSection !== "extraction" ? "none" : "grid", gap: 14 }}>

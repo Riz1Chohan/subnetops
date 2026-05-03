@@ -189,6 +189,7 @@ export function ProjectReportPage() {
   const issueNotice = parseWorkspaceIssueNotice(location.search);
   const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const reportTruth = useMemo(() => buildReportTruthModel(designCore), [designCore]);
+  const phase15ReportExportTruth = designCore?.phase15ReportExportTruth;
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -880,9 +881,60 @@ export function ProjectReportPage() {
         </div>
       </div>
 
+      <div data-report-section="report-export-truth" className="panel report-section" style={{ display: selectedSection && selectedSection !== "report-export-truth" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h3 style={{ margin: "0 0 8px 0" }}>9. Report/export truth</h3>
+          <p className="muted" style={{ margin: 0 }}>
+            Phase 15 stops the report from becoming polished trash. PDF, DOCX, CSV, and the report page must show backend truth labels, requirement traceability, diagram impact, assumptions, review items, and blocked evidence instead of hiding them.
+          </p>
+        </div>
+        {!phase15ReportExportTruth ? <p className="muted" style={{ margin: 0 }}>Phase 15 report/export truth is not available in this snapshot yet.</p> : (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span className={truthBadgeClass(phase15ReportExportTruth.overallReadiness)}>Overall {phase15ReportExportTruth.overallReadiness}</span>
+              <span className="badge badge-soft">Sections {phase15ReportExportTruth.readySectionCount}/{phase15ReportExportTruth.requiredSectionCount} ready</span>
+              <span className="badge badge-soft">Traceability rows {phase15ReportExportTruth.traceabilityRowCount}</span>
+              <span className={truthBadgeClass(phase15ReportExportTruth.pdfDocxCsvCovered ? "ready" : "review")}>PDF/DOCX/CSV {phase15ReportExportTruth.pdfDocxCsvCovered ? "covered" : "review"}</span>
+            </div>
+
+            <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+              {summaryCard("Required sections", phase15ReportExportTruth.requiredSectionCount)}
+              {summaryCard("Blocked sections", phase15ReportExportTruth.blockedSectionCount)}
+              {summaryCard("Review sections", phase15ReportExportTruth.reviewSectionCount)}
+              {summaryCard("Missing consumers", phase15ReportExportTruth.missingTraceabilityConsumerCount)}
+            </div>
+
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Required report section gates</h3>
+              <div className="table-wrap"><table><thead><tr><th>Section</th><th>Report section</th><th>Frontend location</th><th>Readiness</th><th>Truth labels</th></tr></thead><tbody>
+                {phase15ReportExportTruth.sectionGates.slice(0, 14).map((row) => <tr key={row.sectionKey}><td><strong>{row.title}</strong><div className="muted">{row.evidence[0] ?? "Evidence not provided"}</div></td><td>{row.reportSection}</td><td>{row.frontendLocation}</td><td><span className={truthBadgeClass(row.readinessImpact)}>{row.readinessImpact}</span></td><td>{row.truthLabels.join(", ") || "—"}</td></tr>)}
+              </tbody></table></div>
+            </div>
+
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Requirement traceability matrix</h3>
+              <div className="table-wrap"><table><thead><tr><th>Requirement</th><th>Design consequence</th><th>Engines</th><th>Report</th><th>Diagram</th><th>Readiness</th></tr></thead><tbody>
+                {phase15ReportExportTruth.traceabilityMatrix.slice(0, 12).map((row) => <tr key={row.requirementKey}><td><strong>{row.requirementLabel}</strong><div className="muted">{row.requirementKey}</div></td><td>{row.designConsequence}</td><td>{row.enginesAffected.join(", ") || "—"}</td><td>{row.reportSection}</td><td>{row.diagramImpact}</td><td><span className={truthBadgeClass(row.readinessStatus)}>{row.readinessStatus}</span></td></tr>)}
+              </tbody></table></div>
+            </div>
+
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Truth labels</h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{phase15ReportExportTruth.truthLabelRows.map((row) => <li key={row.truthLabel} style={{ marginBottom: 8 }}><strong>{row.truthLabel}:</strong> {row.count} · {row.reportUsage}</li>)}</ul>
+              </div>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Findings</h3>
+                {phase15ReportExportTruth.findings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Phase 15 findings emitted.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{phase15ReportExportTruth.findings.map((finding) => <li key={finding.code} style={{ marginBottom: 8 }}><strong>{finding.severity} — {finding.title}:</strong> {finding.detail}</li>)}</ul>}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h3 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h3>
+          <h3 style={{ margin: "0 0 8px 0" }}>10. Open issues and review items</h3>
           <p className="muted" style={{ margin: 0 }}>
             The package should stay honest about unresolved assumptions, risks, and next actions. This is where the handoff should clearly say what still needs confirmation.
           </p>

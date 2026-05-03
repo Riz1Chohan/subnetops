@@ -36,6 +36,8 @@ export function ProjectImplementationPage() {
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const phase13ImplementationPlanning = designCore?.phase13ImplementationPlanning;
+  const phase14ImplementationTemplates = designCore?.phase14ImplementationTemplates;
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading implementation plan" message="Preparing rollout phases, rollback triggers, validation tests, and cutover guidance." />;
@@ -99,6 +101,50 @@ export function ProjectImplementationPage() {
         {summaryCard("Cutover checks", synthesized.cutoverChecklist.length, "Pre-check, cutover, and post-check controls.")}
         {summaryCard("Rollback triggers", synthesized.rollbackPlan.length, "When to stop and revert before deeper damage occurs.")}
         {summaryCard("Validation tests", synthesized.validationPlan.length, "Evidence-backed tests for acceptance and handoff.")}
+      </div>
+
+
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Phase 13 implementation planning control</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Backend-gated implementation steps with source objects, requirement lineage, verification evidence, rollback, dependencies, risk, and readiness. This is not vendor command generation.</p>
+          </div>
+          {phase13ImplementationPlanning ? <span className="badge badge-info">{phase13ImplementationPlanning.overallReadiness}</span> : <span className="badge badge-warning">Phase 13 unavailable</span>}
+        </div>
+        {phase13ImplementationPlanning ? (<>
+          <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+            {summaryCard("Step gates", phase13ImplementationPlanning.stepGateCount, `${phase13ImplementationPlanning.blockedStepGateCount} blocked / ${phase13ImplementationPlanning.reviewStepGateCount} review`)}
+            {summaryCard("Stage gates", phase13ImplementationPlanning.stageGateCount, "Readiness derived from backend step gates.")}
+            {summaryCard("Requirement gaps", phase13ImplementationPlanning.requirementLineageGapCount, "No fake execution when lineage is missing.")}
+            {summaryCard("Rollback gates", phase13ImplementationPlanning.rollbackGateCount, "Rollback evidence required per step.")}
+          </div>
+        </>) : (<p className="muted" style={{ margin: 0 }}>Phase 13 backend control is unavailable; treat synthesized implementation text as advisory only.</p>)}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Phase 14 vendor-neutral templates control</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Backend-authored implementation templates with variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command generation disabled. This is not vendor CLI generation.</p>
+          </div>
+          {phase14ImplementationTemplates ? <span className="badge badge-info">{phase14ImplementationTemplates.overallReadiness}</span> : <span className="badge badge-warning">Phase 14 unavailable</span>}
+        </div>
+        {phase14ImplementationTemplates ? (<>
+          <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+            {summaryCard("Template gates", phase14ImplementationTemplates.templateCount, `${phase14ImplementationTemplates.blockedTemplateCount} blocked / ${phase14ImplementationTemplates.reviewTemplateCount} review`)}
+            {summaryCard("Domains", phase14ImplementationTemplates.domainCount, "Addressing, VLANs, DHCP, routing, security, NAT, WAN, validation, rollback.")}
+            {summaryCard("Lineage gaps", phase14ImplementationTemplates.requirementLineageGapCount + phase14ImplementationTemplates.sourceObjectGapCount, "Templates without source proof stay gated.")}
+            {summaryCard("Vendor commands", phase14ImplementationTemplates.vendorSpecificCommandCount, phase14ImplementationTemplates.commandGenerationAllowed ? "Danger: command generation enabled" : "Command generation disabled by backend contract.")}
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead><tr><th align="left">Template</th><th align="left">Domain</th><th align="left">Readiness</th><th align="left">Sources</th><th align="left">Requirements</th><th align="left">Rollback</th></tr></thead>
+              <tbody>{phase14ImplementationTemplates.templateGates.slice(0, 24).map((template) => (<tr key={template.templateId}><td>{template.title}<br /><span className="muted">{template.templateId}</span></td><td>{template.domain}</td><td>{template.readinessImpact}</td><td>{template.sourceObjectIds.slice(0, 3).join(", ") || "none"}</td><td>{template.sourceRequirementIds.slice(0, 3).join(", ") || "none"}</td><td>{template.rollbackRequirement || "missing rollback"}</td></tr>))}</tbody>
+            </table>
+          </div>
+        </>) : (<p className="muted" style={{ margin: 0 }}>Phase 14 backend control is not available. Do not treat template text as vendor command output.</p>)}
       </div>
 
       <div className="grid-2" style={{ alignItems: "start" }}>

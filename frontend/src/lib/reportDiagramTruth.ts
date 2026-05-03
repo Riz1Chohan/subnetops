@@ -324,8 +324,9 @@ export function buildDiagramTruthModel(designCore: DesignCoreSnapshot | undefine
 }
 
 export function truthBadgeClass(readiness: TruthReadiness | "deferred" | string) {
-  if (readiness === "blocked") return "badge badge-error";
-  if (readiness === "review") return "badge badge-warning";
-  if (readiness === "ready") return "badge badge-info";
+  const normalized = String(readiness ?? "").toLowerCase();
+  if (normalized === "blocked") return "badge badge-error";
+  if (normalized === "review" || normalized === "review_required") return "badge badge-warning";
+  if (normalized === "ready") return "badge badge-info";
   return "badge badge-soft";
 }

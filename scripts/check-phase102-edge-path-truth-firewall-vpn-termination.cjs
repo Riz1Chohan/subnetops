@@ -16,7 +16,7 @@ const runtime = read('backend/src/services/requirementsRuntimeProof.service.ts')
 const canvas = read('frontend/src/features/diagram/components/BackendDiagramCanvas.tsx');
 const doc = read('docs/doc/PHASE102-EDGE-PATH-TRUTH-FIREWALL-VPN-TERMINATION.md');
 
-assert(/^0\.(102|103|104|105|106|107)\.0$/.test(pkg.version), 'root package version must preserve Phase 102 or newer release version');
+assert(/^0\.(102|103|104|105|106|107|108|109|110|111|112)\.0$/.test(pkg.version), 'root package version must preserve Phase 102 or newer release version');
 assert(pkg.scripts['check:phase102-edge-path-truth-firewall-vpn-termination'], 'Phase 102 script missing');
 assert(pkg.scripts['check:phase84-102-release'], 'Phase 84-102 release chain missing');
 assert(runtime.includes('edgePathTruthFirewallVpnTermination: "PHASE_102_EDGE_PATH_TRUTH_FIREWALL_VPN_TERMINATION"'), 'runtime must preserve Phase 102 marker after later releases');
