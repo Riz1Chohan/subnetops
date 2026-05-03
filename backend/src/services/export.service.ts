@@ -1201,6 +1201,30 @@ export async function getCsvRows(projectId: string) {
         });
       }
     }
+    if (designCore.phase9NetworkObjectModel) {
+      const phase9 = designCore.phase9NetworkObjectModel;
+      rows.push({ Section: "Phase 9 Network Object Model Truth", Scope: phase9.overallReadiness, Name: designCore.projectName, Key: phase9.contract, Value: `${phase9.objectCount} objects / ${phase9.metadataGapObjectCount} metadata gaps / ${phase9.requirementLineageGapCount} lineage gaps`, Notes: `Ready ${phase9.implementationReadyObjectCount}; review ${phase9.implementationReviewObjectCount}; blocked ${phase9.implementationBlockedObjectCount}` });
+      for (const object of phase9.objectLineage.slice(0, 180)) rows.push({ Section: "Phase 9 Object Lineage Rows", Scope: object.implementationReadiness, Name: object.displayName, Key: `${object.objectType} | ${object.objectRole} | ${object.truthState}`, Value: `Source ${object.sourceType}; confidence ${object.confidence}; proof ${object.proofStatus}`, Notes: `Requirements ${joinCsvList(object.sourceRequirementIds, "none")}; source objects ${joinCsvList(object.sourceObjectIds, "none")}; missing metadata ${joinCsvList(object.missingMetadataFields, "none")}` });
+      for (const row of phase9.requirementObjectLineage.slice(0, 180)) rows.push({ Section: "Phase 9 Requirement Object Lineage", Scope: row.readinessImpact, Name: row.sourceKey, Key: row.lifecycleStatus, Value: `Actual ${joinCsvList(row.actualObjectTypes, "none")}; missing ${joinCsvList(row.missingObjectTypes, "none")}`, Notes: `Requirement ${row.requirementId}; objects ${joinCsvList(row.actualObjectIds, "none")}` });
+      for (const finding of phase9.findings.slice(0, 120)) rows.push({ Section: "Phase 9 Network Object Findings", Scope: finding.severity, Name: finding.code, Key: finding.readinessImpact, Value: finding.title, Notes: `${finding.detail}; remediation ${finding.remediation}` });
+    }
+
+    if (designCore.phase10DesignGraph) {
+      const phase10 = designCore.phase10DesignGraph;
+      rows.push({ Section: "Phase 10 Design Graph Dependency Integrity", Scope: phase10.overallReadiness, Name: designCore.projectName, Key: phase10.contract, Value: `${phase10.graphNodeCount} nodes / ${phase10.graphEdgeCount} edges / ${phase10.objectCoverageGapCount} object graph gaps`, Notes: `Requirement paths ready ${phase10.requirementPathReadyCount}; review ${phase10.requirementPathReviewCount}; blocked ${phase10.requirementPathBlockedCount}` });
+      for (const path of phase10.requirementDependencyPaths.slice(0, 180)) rows.push({ Section: "Phase 10 Requirement Dependency Paths", Scope: path.readinessImpact, Name: path.sourceKey, Key: path.lifecycleStatus, Value: `Objects ${joinCsvList(path.actualObjectIds, "none")}; graph nodes ${joinCsvList(path.actualGraphNodeIds, "none")}`, Notes: `Relationships ${joinCsvList(path.actualRelationshipTypes, "none")}; missing graph ${joinCsvList(path.missingGraphNodeIds, "none")}; missing consumers ${joinCsvList(path.missingConsumerSurfaces, "none")}` });
+      for (const object of phase10.objectCoverage.slice(0, 180)) rows.push({ Section: "Phase 10 Object Graph Coverage", Scope: object.dependencyState, Name: object.displayName, Key: `${object.objectType} | ${object.truthState}`, Value: `Nodes ${joinCsvList(object.graphNodeIds, "none")}; relationships ${joinCsvList(object.relationshipTypes, "none")}`, Notes: `Requirements ${joinCsvList(object.sourceRequirementIds, "none")}; consumers ${joinCsvList(object.consumerSurfaces, "none")}; missing ${joinCsvList(object.missingConsumerSurfaces, "none")}` });
+      for (const finding of phase10.findings.slice(0, 120)) rows.push({ Section: "Phase 10 Design Graph Findings", Scope: finding.severity, Name: finding.code, Key: finding.readinessImpact, Value: finding.title, Notes: `${finding.detail}; remediation ${finding.remediation}` });
+    }
+
+    if (designCore.phase11RoutingSegmentation) {
+      const phase11 = designCore.phase11RoutingSegmentation;
+      rows.push({ Section: "Phase 11 Routing Segmentation Protocol-Aware Planning", Scope: phase11.overallReadiness, Name: designCore.projectName, Key: phase11.contract, Value: `${phase11.protocolIntentCount} protocol rows / ${phase11.simulationUnavailableCount} simulation-unavailable / ${phase11.activeRequirementRoutingGapCount} requirement gaps`, Notes: `Role ${phase11.role}; routing ${phase11.routingReadiness}; segmentation ${phase11.segmentationReadiness}` });
+      for (const row of phase11.protocolIntents.slice(0, 180)) rows.push({ Section: "Phase 11 Protocol Intent Rows", Scope: row.readinessImpact, Name: row.name, Key: `${row.category} | ${row.controlState}`, Value: `Routes ${joinCsvList(row.sourceRouteIntentIds, "none")}; objects ${joinCsvList(row.sourceObjectIds, "none")}`, Notes: `Requirements ${joinCsvList(row.requirementKeys, "none")}; evidence ${joinCsvList(row.evidence, "none")}; review ${row.reviewReason ?? "none"}` });
+      for (const row of phase11.requirementRoutingMatrix.slice(0, 120)) rows.push({ Section: "Phase 11 Requirement Routing Matrix", Scope: row.readinessImpact, Name: row.requirementLabel, Key: `${row.requirementKey} | active=${row.active}`, Value: `Actual ${joinCsvList(row.actualProtocolIntentIds, "none")}; missing ${joinCsvList(row.missingProtocolCategories, "none")}`, Notes: `Expected ${joinCsvList(row.expectedProtocolCategories, "none")}; evidence ${joinCsvList(row.evidence, "none")}` });
+      for (const finding of phase11.findings.slice(0, 120)) rows.push({ Section: "Phase 11 Routing Findings", Scope: finding.severity, Name: finding.code, Key: finding.readinessImpact, Value: finding.title, Notes: `${finding.detail}; remediation ${finding.remediation}` });
+    }
+
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;
       rows.push({

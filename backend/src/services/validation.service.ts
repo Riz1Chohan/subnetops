@@ -239,6 +239,14 @@ const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>>
     impact: "The design may contain mathematically valid or visible output, but at least one upstream truth chain is still review-gated.",
     recommendation: "Clear the review-required source or keep the output labelled review-required in UI, report, and diagram consumers.",
   },
+  PHASE9_NETWORK_OBJECT_MODEL_BLOCKING: {
+    impact: "The network object model is missing truth metadata or has fake-authority risk, so generated topology cannot be trusted as implementation evidence.",
+    recommendation: "Fix Phase 9 object lineage/readiness metadata before frontend, reports, exports, or diagrams consume those objects as engineering truth.",
+  },
+  PHASE9_NETWORK_OBJECT_MODEL_REVIEW_REQUIRED: {
+    impact: "The network object model is visible but contains review-only, draft-only, or incomplete requirement-to-object lineage.",
+    recommendation: "Keep affected objects labelled review-required and either materialize missing consequences or document an explicit no-op/review reason.",
+  },
   PHASE8_STRICT_READINESS_WARNING: {
     impact: "A non-blocking validation warning remains and must be preserved in engineering deliverables.",
     recommendation: "Review the warning and either resolve it or document the accepted limitation before final handoff.",
@@ -1101,6 +1109,24 @@ export async function runValidation(projectId: string) {
         entityType: "PROJECT",
         entityId: projectId,
       }));
+    }
+  }
+
+  if (designSnapshot?.phase9NetworkObjectModel) {
+    for (const finding of designSnapshot.phase9NetworkObjectModel.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE9_NETWORK_OBJECT_MODEL_BLOCKING" : "PHASE9_NETWORK_OBJECT_MODEL_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase10DesignGraph) {
+    for (const finding of designSnapshot.phase10DesignGraph.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE10_DESIGN_GRAPH_BLOCKING" : "PHASE10_DESIGN_GRAPH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+    }
+  }
+
+  if (designSnapshot?.phase11RoutingSegmentation) {
+    for (const finding of designSnapshot.phase11RoutingSegmentation.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
+      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "PHASE11_ROUTING_SEGMENTATION_BLOCKING" : "PHASE11_ROUTING_SEGMENTATION_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 

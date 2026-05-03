@@ -13,6 +13,11 @@ import type {
   NetworkLink,
   NetworkObjectModel,
   NetworkObjectTruthState,
+  Phase9NetworkObjectImplementationReadiness,
+  Phase9NetworkObjectType,
+  DesignTruthSourceType,
+  DesignTraceConfidence,
+  DesignProofStatus,
   PolicyRule,
   RouteDomain,
   SecurityZone,
@@ -641,6 +646,65 @@ function ensureRequirementDrivenZones(
   }
 }
 
+
+function activeRequirementIds(requirements: RequirementInputMap) {
+  return Object.entries(requirements)
+    .filter(([, value]) => value === true || (typeof value === "number" && value > 0) || (typeof value === "string" && value.trim().length > 0))
+    .map(([key]) => `requirements:${key}`);
+}
+function requirementIdsForKeys(requirements: RequirementInputMap, keys: string[]) {
+  const ids = keys.filter((key) => {
+    const value = requirements[key];
+    return value === true || (typeof value === "number" && value > 0) || (typeof value === "string" && value.trim().length > 0);
+  }).map((key) => `requirements:${key}`);
+  return ids.length ? ids : activeRequirementIds(requirements).slice(0, 8);
+}
+function requirementIdsForZoneRole(requirements: RequirementInputMap, zoneRole: SecurityZoneRole) {
+  switch (zoneRole) {
+    case "guest": return requirementIdsForKeys(requirements, ["guestWifi", "guestPolicy", "wirelessModel", "trustBoundaryModel", "securityPosture"]);
+    case "management": return requirementIdsForKeys(requirements, ["management", "managementAccess", "managementIpPolicy", "adminBoundary", "identityModel"]);
+    case "dmz": return requirementIdsForKeys(requirements, ["remoteAccess", "remoteAccessMethod", "identityModel", "securityPosture"]);
+    case "voice": return requirementIdsForKeys(requirements, ["voice", "phoneCount", "voiceQos", "qosModel", "latencySensitivity"]);
+    case "iot": return requirementIdsForKeys(requirements, ["iot", "iotDeviceCount", "cameras", "cameraCount", "printers", "printerCount"]);
+    case "transit": return requirementIdsForKeys(requirements, ["cloudConnected", "cloudProvider", "cloudConnectivity", "cloudNetworkModel", "cloudRoutingModel", "interSiteTrafficModel", "dualIsp", "resilienceTarget"]);
+    case "wan": return requirementIdsForKeys(requirements, ["internetModel", "dualIsp", "resilienceTarget", "remoteAccess"]);
+    default: return requirementIdsForKeys(requirements, ["usersPerSite", "primaryGoal", "securityPosture", "planningFor"]);
+  }
+}
+function requirementIdsForSegmentRole(requirements: RequirementInputMap, role?: SegmentRole) {
+  if (role === "GUEST") return requirementIdsForZoneRole(requirements, "guest");
+  if (role === "MANAGEMENT") return requirementIdsForZoneRole(requirements, "management");
+  if (role === "VOICE") return requirementIdsForZoneRole(requirements, "voice");
+  if (role === "IOT" || role === "CAMERA" || role === "PRINTER") return requirementIdsForZoneRole(requirements, "iot");
+  if (role === "WAN_TRANSIT" || role === "LOOPBACK") return requirementIdsForZoneRole(requirements, "transit");
+  return requirementIdsForZoneRole(requirements, "internal");
+}
+function uniqueStrings(values: Array<string | undefined | null>) { return Array.from(new Set(values.filter((v): v is string => Boolean(v && v.trim())))); }
+function sourceTypeFromTruthState(truthState: NetworkObjectTruthState): DesignTruthSourceType { if (truthState === "configured") return "USER_PROVIDED"; if (["planned","materialized","proposed"].includes(truthState)) return "REQUIREMENT_MATERIALIZED"; if (["durable","approved"].includes(truthState)) return "ENGINE2_DURABLE"; if (["imported","discovered"].includes(truthState)) return "IMPORTED"; if (["review-required","blocked"].includes(truthState)) return "REVIEW_REQUIRED"; return "INFERRED"; }
+function confidenceFromTruthState(truthState: NetworkObjectTruthState): DesignTraceConfidence { if (["configured","durable","approved"].includes(truthState)) return "high"; if (["planned","materialized","proposed"].includes(truthState)) return "medium"; if (["review-required","blocked"].includes(truthState)) return "low"; return "advisory"; }
+function proofStatusFromTruthState(truthState: NetworkObjectTruthState): DesignProofStatus { if (["configured","durable","approved"].includes(truthState)) return "PROVEN"; if (["planned","materialized","proposed"].includes(truthState)) return "PARTIAL"; if (["review-required","blocked"].includes(truthState)) return "REVIEW_REQUIRED"; return "DRAFT_ONLY"; }
+function implementationReadinessFromTruthState(truthState: NetworkObjectTruthState): Phase9NetworkObjectImplementationReadiness { if (["configured","durable","approved"].includes(truthState)) return "READY"; if (truthState === "blocked") return "BLOCKED"; if (["review-required","inferred","discovered","imported"].includes(truthState)) return "REVIEW_REQUIRED"; return "DRAFT_ONLY"; }
+function validationImpactFromTruthState(truthState: NetworkObjectTruthState) { return truthState === "blocked" ? "BLOCKING: object cannot support implementation until reviewed." : ["configured","durable","approved"].includes(truthState) ? "PASSED: object has sufficient authority for planning-level consumption." : "REVIEW_REQUIRED: object must not be treated as as-built implementation authority."; }
+type Phase9AnnotatableObject = { id: string; name?: string; truthState: NetworkObjectTruthState; notes: string[]; sourceRequirementIds?: string[]; sourceObjectIds?: string[]; objectType?: Phase9NetworkObjectType; objectRole?: string; sourceType?: DesignTruthSourceType; sourceEngine?: string; confidence?: DesignTraceConfidence; proofStatus?: DesignProofStatus; implementationReadiness?: Phase9NetworkObjectImplementationReadiness; validationImpact?: string; frontendDisplayImpact?: string[]; reportExportImpact?: string[]; diagramImpact?: string[]; reviewReason?: string; };
+function annotateObject(params: { object: Phase9AnnotatableObject; objectType: Phase9NetworkObjectType; objectRole: string; requirements: RequirementInputMap; sourceRequirementIds?: string[]; sourceObjectIds?: string[]; reviewReason?: string; }) {
+  const { object, objectType, objectRole, requirements } = params;
+  const sourceRequirementIds = uniqueStrings(params.sourceRequirementIds ?? []);
+  object.objectType = objectType; object.objectRole = objectRole;
+  object.sourceRequirementIds = sourceRequirementIds.length ? sourceRequirementIds : activeRequirementIds(requirements).slice(0, 8);
+  object.sourceObjectIds = uniqueStrings([...(params.sourceObjectIds ?? []), object.id]);
+  object.sourceEngine = "designCore.networkObjectModel.phase9";
+  object.sourceType = sourceTypeFromTruthState(object.truthState);
+  object.confidence = confidenceFromTruthState(object.truthState);
+  object.proofStatus = proofStatusFromTruthState(object.truthState);
+  object.implementationReadiness = implementationReadinessFromTruthState(object.truthState);
+  object.validationImpact = validationImpactFromTruthState(object.truthState);
+  object.frontendDisplayImpact = ["ProjectOverviewPage.phase9NetworkObjectModel", "networkObjectModel tables"];
+  object.reportExportImpact = ["Phase 9 Network Object Model Truth", "network object lineage export rows"];
+  object.diagramImpact = ["diagram truth may render only object-backed nodes/edges and must display inferred/review truth state labels"];
+  object.reviewReason = params.reviewReason ?? (["configured","durable","approved"].includes(object.truthState) ? undefined : "Object is planning/model evidence only until backed by explicit inventory, IPAM approval, or implementation confirmation.");
+  addUnique(object.notes, `Phase 9 object truth label: ${objectType}/${objectRole}; source=${object.sourceType}; readiness=${object.implementationReadiness}; requirements=${object.sourceRequirementIds.join(", ") || "none"}.`);
+}
+
 function buildObjectModelSummary(model: Omit<NetworkObjectModel, "summary">): NetworkObjectModel["summary"] {
   const allTruthStateObjects = [
     ...model.devices,
@@ -670,6 +734,18 @@ function buildObjectModelSummary(model: Omit<NetworkObjectModel, "summary">): Ne
     inferredObjectCount: countObjectsByTruthState(allTruthStateObjects, "inferred"),
     proposedObjectCount: countObjectsByTruthState(allTruthStateObjects, "proposed"),
     discoveredObjectCount: countObjectsByTruthState(allTruthStateObjects, "discovered"),
+    plannedObjectCount: countObjectsByTruthState(allTruthStateObjects, "planned"),
+    materializedObjectCount: countObjectsByTruthState(allTruthStateObjects, "materialized"),
+    durableObjectCount: countObjectsByTruthState(allTruthStateObjects, "durable"),
+    importedObjectCount: countObjectsByTruthState(allTruthStateObjects, "imported"),
+    approvedObjectCount: countObjectsByTruthState(allTruthStateObjects, "approved"),
+    reviewRequiredObjectCount: countObjectsByTruthState(allTruthStateObjects, "review-required"),
+    blockedObjectCount: countObjectsByTruthState(allTruthStateObjects, "blocked"),
+    phase9MetadataCompleteCount: allTruthStateObjects.filter((object) => Boolean(object.objectType && object.objectRole && object.sourceType && object.sourceEngine && object.confidence && object.proofStatus && object.implementationReadiness && object.validationImpact)).length,
+    phase9MetadataGapCount: allTruthStateObjects.filter((object) => !Boolean(object.objectType && object.objectRole && object.sourceType && object.sourceEngine && object.confidence && object.proofStatus && object.implementationReadiness && object.validationImpact)).length,
+    implementationReadyObjectCount: allTruthStateObjects.filter((object) => object.implementationReadiness === "READY").length,
+    implementationReviewObjectCount: allTruthStateObjects.filter((object) => object.implementationReadiness === "REVIEW_REQUIRED" || object.implementationReadiness === "DRAFT_ONLY").length,
+    implementationBlockedObjectCount: allTruthStateObjects.filter((object) => object.implementationReadiness === "BLOCKED").length,
     orphanedAddressRowCount,
     designGraphNodeCount: model.designGraph.summary.nodeCount,
     designGraphEdgeCount: model.designGraph.summary.edgeCount,
@@ -691,7 +767,8 @@ function buildObjectModelSummary(model: Omit<NetworkObjectModel, "summary">): Ne
     implementationPlanBlockingFindingCount: model.implementationPlan.summary.blockingFindingCount,
     notes: [
       "Phase 30 object model makes devices, interfaces, links, route domains, zones, policies, NAT intent, DHCP pools, IP reservations, security flow requirements, and implementation-neutral steps explicit backend design objects.",
-      "Configured, inferred, proposed, and discovered truth states are counted separately to prevent proposals from being mistaken for as-built network truth.",
+      "Configured, inferred, proposed, discovered, planned, materialized, durable, imported, approved, review-required, and blocked truth states are counted separately to prevent proposals from being mistaken for as-built network truth.",
+      "Phase 9 adds object-level provenance/readiness metadata so every network object can be traced to requirements or an explicit review reason.",
     ],
   };
 }
@@ -945,6 +1022,17 @@ export function buildNetworkObjectModel(params: {
   const devices = Array.from(devicesById.values()).sort((left, right) => left.name.localeCompare(right.name));
   const policyRules = buildPolicyRules(securityZones, requirements);
   const natRules = buildNatRules(securityZones);
+
+
+  annotateObject({ object: routeDomain, objectType: "route-domain", objectRole: routeDomain.scope, requirements, sourceRequirementIds: requirementIdsForKeys(requirements, ["siteCount", "interSiteTrafficModel", "cloudRoutingModel", "dualIsp", "resilienceTarget"]), sourceObjectIds: routeDomain.siteIds });
+  for (const zone of securityZones) annotateObject({ object: zone, objectType: "security-zone", objectRole: zone.zoneRole, requirements, sourceRequirementIds: requirementIdsForZoneRole(requirements, zone.zoneRole), sourceObjectIds: [...zone.subnetCidrs, ...zone.siteIds] });
+  for (const device of devices) annotateObject({ object: device, objectType: "network-device", objectRole: device.deviceRole, requirements, sourceRequirementIds: requirementIdsForKeys(requirements, ["siteCount", "usersPerSite", "internetModel", "dualIsp", "securityPosture"]), sourceObjectIds: [device.siteId, ...device.interfaceIds, ...device.securityZoneIds] });
+  for (const networkInterface of interfaces) { const row = addressingRows.find((item) => networkInterface.id.includes(item.id)); annotateObject({ object: networkInterface, objectType: "network-interface", objectRole: networkInterface.interfaceRole, requirements, sourceRequirementIds: requirementIdsForSegmentRole(requirements, row?.role), sourceObjectIds: uniqueStrings([row?.id, networkInterface.deviceId, networkInterface.routeDomainId, networkInterface.securityZoneId, networkInterface.linkId, networkInterface.subnetCidr]) }); }
+  for (const link of links) { const row = addressingRows.find((item) => link.id.includes(item.id)); annotateObject({ object: link, objectType: "network-link", objectRole: link.linkRole, requirements, sourceRequirementIds: requirementIdsForSegmentRole(requirements, row?.role), sourceObjectIds: uniqueStrings([row?.id, link.endpointA?.deviceId, link.endpointA?.interfaceId, link.endpointB?.deviceId, link.endpointB?.interfaceId, link.subnetCidr]) }); }
+  for (const pool of dhcpPools) { const row = addressingRows.find((item) => pool.id.includes(item.id)); annotateObject({ object: pool, objectType: "dhcp-pool", objectRole: pool.allocationState, requirements, sourceRequirementIds: requirementIdsForSegmentRole(requirements, row?.role), sourceObjectIds: uniqueStrings([row?.id, pool.siteId, String(pool.vlanId), pool.subnetCidr]) }); }
+  for (const reservation of ipReservations) annotateObject({ object: reservation, objectType: "ip-reservation", objectRole: reservation.reservationRole, requirements, sourceRequirementIds: requirementIdsForKeys(requirements, ["management", "managementAccess", "siteCount", "cloudRoutingModel", "interSiteTrafficModel"]), sourceObjectIds: uniqueStrings([reservation.ownerId, reservation.subnetCidr, reservation.ipAddress]) });
+  for (const rule of policyRules) { const sourceZone = securityZones.find((zone) => zone.id === rule.sourceZoneId); const destinationZone = securityZones.find((zone) => zone.id === rule.destinationZoneId); annotateObject({ object: rule, objectType: "policy-rule", objectRole: rule.action, requirements, sourceRequirementIds: uniqueStrings([...(sourceZone?.sourceRequirementIds ?? []), ...(destinationZone?.sourceRequirementIds ?? [])]), sourceObjectIds: uniqueStrings([rule.sourceZoneId, rule.destinationZoneId]) }); }
+  for (const rule of natRules) { const sourceZone = securityZones.find((zone) => zone.id === rule.sourceZoneId); annotateObject({ object: rule, objectType: "nat-rule", objectRole: rule.translatedAddressMode, requirements, sourceRequirementIds: uniqueStrings([...(sourceZone?.sourceRequirementIds ?? []), ...requirementIdsForKeys(requirements, ["internetModel", "guestWifi", "dualIsp"])]), sourceObjectIds: uniqueStrings([rule.sourceZoneId, rule.destinationZoneId, ...rule.sourceSubnetCidrs]) }); }
 
   const modelWithoutSummaryOrGraph: Omit<NetworkObjectModel, "summary" | "designGraph" | "routingSegmentation" | "securityPolicyFlow" | "implementationPlan"> = {
     routeDomains: [routeDomain],

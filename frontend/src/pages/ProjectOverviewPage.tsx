@@ -1438,6 +1438,43 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 9 network object model truth</h2>
+          {designCore?.phase9NetworkObjectModel ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.phase9NetworkObjectModel.overallReadiness)}
+                {summaryCard("Objects", designCore.phase9NetworkObjectModel.objectCount)}
+                {summaryCard("Metadata gaps", designCore.phase9NetworkObjectModel.metadataGapObjectCount)}
+                {summaryCard("Lineage gaps", designCore.phase9NetworkObjectModel.requirementLineageGapCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>Phase 9 makes every generated device, interface, link, zone, policy, NAT intent, DHCP pool, and IP reservation carry source, confidence, proof, readiness, validation impact, report/export impact, and diagram-impact labels.</p>
+              <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Object</th><th align="left">Type / role</th><th align="left">Truth</th><th align="left">Readiness</th><th align="left">Requirements</th></tr></thead><tbody>{designCore.phase9NetworkObjectModel.objectLineage.slice(0, 18).map((row) => (<tr key={row.objectId}><td>{row.displayName}<br /><span className="muted">{row.objectId}</span></td><td>{row.objectType}<br /><span className="muted">{row.objectRole}</span></td><td>{row.truthState}<br /><span className="muted">{row.sourceType} / {row.confidence}</span></td><td>{row.implementationReadiness}<br /><span className="muted">{row.proofStatus}</span></td><td>{row.sourceRequirementIds.slice(0, 4).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+              <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Lifecycle</th><th align="left">Readiness</th><th align="left">Actual objects</th><th align="left">Missing objects</th></tr></thead><tbody>{designCore.phase9NetworkObjectModel.requirementObjectLineage.slice(0, 14).map((row) => (<tr key={row.requirementId}><td>{row.sourceKey}</td><td>{row.lifecycleStatus}</td><td>{row.readinessImpact}</td><td>{row.actualObjectTypes.join(", ") || "—"}</td><td>{row.missingObjectTypes.join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            </>
+          ) : (<p className="muted" style={{ margin: 0 }}>Phase 9 network object model truth is not available in this backend snapshot yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 10 design graph dependency integrity</h2>
+          {designCore?.phase10DesignGraph ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.phase10DesignGraph.overallReadiness)}{summaryCard("Graph nodes", designCore.phase10DesignGraph.graphNodeCount)}{summaryCard("Graph edges", designCore.phase10DesignGraph.graphEdgeCount)}{summaryCard("Object gaps", designCore.phase10DesignGraph.objectCoverageGapCount)}</div>
+            <p className="muted" style={{ margin: 0 }}>Phase 10 proves dependency paths from requirements to backend objects, object relationships, validation impact, frontend display, report/export sections, and diagram impact. Diagram-only topology or orphaned graph objects are treated as readiness gaps.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Lifecycle</th><th align="left">Readiness</th><th align="left">Graph nodes</th><th align="left">Missing</th></tr></thead><tbody>{designCore.phase10DesignGraph.requirementDependencyPaths.slice(0, 14).map((row) => (<tr key={row.requirementId}><td>{row.sourceKey}<br /><span className="muted">{row.requirementId}</span></td><td>{row.lifecycleStatus}</td><td>{row.readinessImpact}</td><td>{row.actualGraphNodeIds.slice(0, 4).join(", ") || "—"}</td><td>{[...row.missingGraphNodeIds, ...row.missingRelationshipTypes, ...row.missingConsumerSurfaces].slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Object</th><th align="left">Type</th><th align="left">Dependency</th><th align="left">Relationships</th><th align="left">Consumers</th></tr></thead><tbody>{designCore.phase10DesignGraph.objectCoverage.slice(0, 18).map((row) => (<tr key={row.objectId}><td>{row.displayName}<br /><span className="muted">{row.objectId}</span></td><td>{row.objectType}<br /><span className="muted">{row.truthState}</span></td><td>{row.dependencyState}</td><td>{row.relationshipTypes.slice(0, 4).join(", ") || "—"}</td><td>{row.consumerSurfaces.slice(0, 4).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Phase 10 design graph dependency integrity is not available in this backend snapshot yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 11 routing segmentation protocol-aware planning</h2>
+          {designCore?.phase11RoutingSegmentation ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.phase11RoutingSegmentation.overallReadiness)}{summaryCard("Protocol rows", designCore.phase11RoutingSegmentation.protocolIntentCount)}{summaryCard("Simulation unavailable", designCore.phase11RoutingSegmentation.simulationUnavailableCount)}{summaryCard("Requirement gaps", designCore.phase11RoutingSegmentation.activeRequirementRoutingGapCount)}</div>
+            <p className="muted" style={{ margin: 0 }}>Phase 11 separates routing intent, routing review, routing blockers, and simulation-unavailable behavior. Connected/default/static/summary routes are planning evidence; OSPF, BGP, ECMP, redistribution, route leaking, cloud route tables, and asymmetric routing stay review-gated unless backend evidence exists.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual protocol rows</th><th align="left">Missing</th></tr></thead><tbody>{designCore.phase11RoutingSegmentation.requirementRoutingMatrix.slice(0, 14).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualProtocolIntentIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingProtocolCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Protocol/review row</th><th align="left">Category</th><th align="left">State</th><th align="left">Readiness</th><th align="left">Review reason</th></tr></thead><tbody>{designCore.phase11RoutingSegmentation.protocolIntents.slice(0, 18).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.id}</span></td><td>{row.category}</td><td>{row.controlState}</td><td>{row.readinessImpact}</td><td>{row.reviewReason || "—"}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Phase 11 routing segmentation protocol-aware planning is not available in this backend snapshot yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>

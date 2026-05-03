@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json --pretty false --listEmittedFiles",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -23,7 +23,7 @@
     "engine:selftest:matrix": "tsx src/lib/proofMatrix.selftest.ts",
     "engine:selftest:boundary": "tsx src/lib/cidrBoundary.selftest.ts",
     "engine:selftest:behavioral-matrix": "tsx src/lib/behavioralMatrix.selftest.ts",
-    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates && npm run engine:selftest:phase75-golden-requirements && npm run engine:selftest:phase4-addressing && npm run engine:selftest:phase5-enterprise-ipam && npm run engine:selftest:phase8-validation-readiness",
+    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates && npm run engine:selftest:phase75-golden-requirements && npm run engine:selftest:phase4-addressing && npm run engine:selftest:phase5-enterprise-ipam && npm run engine:selftest:phase8-validation-readiness && npm run engine:selftest:phase9-network-object-model && npm run engine:selftest:phase10-design-graph && npm run engine:selftest:phase11-routing-segmentation",
     "prisma:db:push": "prisma db push",
     "prisma:baseline:existing": "sh -c 'for d in prisma/migrations/*; do [ -d \"$d\" ] && npx prisma migrate resolve --applied \"$(basename \"$d\")\"; done'",
     "security:selftest:rate-limit": "tsx src/middleware/rateLimit.selftest.ts",
@@ -39,7 +39,10 @@
     "engine:selftest:phase5-enterprise-ipam": "tsx src/lib/phase5EnterpriseIpam.selftest.ts",
     "engine:selftest:phase6-design-core-orchestrator": "tsx src/lib/phase6DesignCoreOrchestrator.selftest.ts",
     "engine:selftest:phase7-standards-rulebook": "tsx src/lib/phase7StandardsRulebook.selftest.ts",
-    "engine:selftest:phase8-validation-readiness": "tsx src/lib/phase8ValidationReadiness.selftest.ts"
+    "engine:selftest:phase8-validation-readiness": "tsx src/lib/phase8ValidationReadiness.selftest.ts",
+    "engine:selftest:phase9-network-object-model": "tsx src/lib/phase9NetworkObjectModel.selftest.ts",
+    "engine:selftest:phase10-design-graph": "tsx src/lib/phase10DesignGraph.selftest.ts",
+    "engine:selftest:phase11-routing-segmentation": "tsx src/lib/phase11RoutingSegmentation.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

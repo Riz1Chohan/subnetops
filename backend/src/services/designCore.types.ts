@@ -1071,7 +1071,110 @@ export interface PlanningInputDisciplineSummary {
 }
 
 
-export type NetworkObjectTruthState = "configured" | "inferred" | "proposed" | "discovered";
+export type NetworkObjectTruthState =
+  | "configured"
+  | "inferred"
+  | "proposed"
+  | "discovered"
+  | "planned"
+  | "materialized"
+  | "durable"
+  | "imported"
+  | "approved"
+  | "review-required"
+  | "blocked";
+
+export type Phase9NetworkObjectType =
+  | "network-device"
+  | "network-interface"
+  | "network-link"
+  | "route-domain"
+  | "security-zone"
+  | "policy-rule"
+  | "nat-rule"
+  | "dhcp-pool"
+  | "ip-reservation";
+
+export type Phase9NetworkObjectImplementationReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "DRAFT_ONLY" | "UNSUPPORTED";
+
+export interface Phase9NetworkObjectProvenanceFields {
+  objectType?: Phase9NetworkObjectType;
+  objectRole?: string;
+  sourceType?: DesignTruthSourceType;
+  sourceRequirementIds?: string[];
+  sourceObjectIds?: string[];
+  sourceEngine?: string;
+  confidence?: DesignTraceConfidence;
+  proofStatus?: DesignProofStatus;
+  implementationReadiness?: Phase9NetworkObjectImplementationReadiness;
+  validationImpact?: string;
+  frontendDisplayImpact?: string[];
+  reportExportImpact?: string[];
+  diagramImpact?: string[];
+  reviewReason?: string;
+}
+
+export interface NetworkObjectProvenanceLabel extends DesignSourceTraceLabel {
+  objectId: string;
+  objectType: Phase9NetworkObjectType;
+  objectRole: string;
+  truthState: NetworkObjectTruthState;
+  implementationReadiness: Phase9NetworkObjectImplementationReadiness;
+  validationImpact: string;
+  frontendDisplayImpact: string[];
+  reportExportImpact: string[];
+  diagramImpact: string[];
+}
+
+export type Phase9NetworkObjectReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+
+export interface Phase9NetworkObjectLineageRow extends NetworkObjectProvenanceLabel {
+  displayName: string;
+  relatedObjectIds: string[];
+  hasCompleteMetadata: boolean;
+  missingMetadataFields: string[];
+}
+
+export interface Phase9RequirementObjectLineageRow {
+  requirementId: string;
+  sourceKey: string;
+  lifecycleStatus: RequirementPropagationLifecycleStatus;
+  expectedObjectTypes: Phase9NetworkObjectType[];
+  actualObjectIds: string[];
+  actualObjectTypes: Phase9NetworkObjectType[];
+  missingObjectTypes: Phase9NetworkObjectType[];
+  readinessImpact: Phase9NetworkObjectReadiness;
+  notes: string[];
+}
+
+export interface Phase9NetworkObjectFinding {
+  severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED";
+  code: string;
+  title: string;
+  detail: string;
+  affectedObjectIds: string[];
+  readinessImpact: Phase9NetworkObjectReadiness;
+  remediation: string;
+}
+
+export interface Phase9NetworkObjectModelControlSummary {
+  contract: "PHASE9_NETWORK_OBJECT_MODEL_TRUTH_CONTRACT";
+  role: "TRUTH_LABELLED_NETWORK_OBJECT_MODEL_NOT_FAKE_TOPOLOGY";
+  overallReadiness: Phase9NetworkObjectReadiness;
+  objectCount: number;
+  metadataCompleteObjectCount: number;
+  metadataGapObjectCount: number;
+  fakeAuthorityRiskCount: number;
+  requirementLineageRowCount: number;
+  requirementLineageGapCount: number;
+  implementationReadyObjectCount: number;
+  implementationReviewObjectCount: number;
+  implementationBlockedObjectCount: number;
+  objectLineage: Phase9NetworkObjectLineageRow[];
+  requirementObjectLineage: Phase9RequirementObjectLineageRow[];
+  findings: Phase9NetworkObjectFinding[];
+  notes: string[];
+}
 
 
 export type DesignGraphNodeObjectType =
@@ -1173,6 +1276,14 @@ export interface DesignGraph {
   integrityFindings: DesignGraphIntegrityFinding[];
 }
 
+export type Phase10DesignGraphReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase10DesignGraphDependencyState = "CONNECTED" | "ORPHANED" | "MISSING_GRAPH_NODE" | "MISSING_REQUIRED_EDGE" | "MISSING_CONSUMER" | "REVIEW_REQUIRED";
+
+export interface Phase10DesignGraphObjectCoverageRow { objectId: string; displayName: string; objectType: Phase9NetworkObjectType; truthState: NetworkObjectTruthState; sourceRequirementIds: string[]; graphNodeIds: string[]; relationshipIds: string[]; relationshipTypes: string[]; dependencyState: Phase10DesignGraphDependencyState; consumerSurfaces: string[]; missingConsumerSurfaces: string[]; notes: string[]; }
+export interface Phase10RequirementDependencyPath { requirementId: string; sourceKey: string; lifecycleStatus: RequirementPropagationLifecycleStatus; expectedObjectTypes: Phase9NetworkObjectType[]; actualObjectIds: string[]; actualGraphNodeIds: string[]; actualRelationshipIds: string[]; actualRelationshipTypes: string[]; expectedRelationshipTypes: string[]; missingGraphNodeIds: string[]; missingRelationshipTypes: string[]; frontendConsumers: string[]; reportExportConsumers: string[]; diagramConsumers: string[]; validationConsumers: string[]; missingConsumerSurfaces: string[]; readinessImpact: Phase10DesignGraphReadiness; notes: string[]; }
+export interface Phase10DesignGraphFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: Phase10DesignGraphReadiness; remediation: string; }
+export interface Phase10DesignGraphControlSummary { contract: "PHASE10_DESIGN_GRAPH_DEPENDENCY_INTEGRITY_CONTRACT"; role: "REQUIREMENT_TO_OBJECT_TO_CONSUMER_DEPENDENCY_GRAPH"; overallReadiness: Phase10DesignGraphReadiness; graphNodeCount: number; graphEdgeCount: number; requiredEdgeCount: number; connectedObjectCount: number; orphanObjectCount: number; integrityFindingCount: number; blockingFindingCount: number; requirementPathCount: number; requirementPathReadyCount: number; requirementPathReviewCount: number; requirementPathBlockedCount: number; objectCoverageCount: number; objectCoverageReadyCount: number; objectCoverageGapCount: number; diagramOnlyObjectCount: number; unreferencedPolicyCount: number; routeWithoutNextHopCount: number; implementationStepWithoutSourceCount: number; requirementDependencyPaths: Phase10RequirementDependencyPath[]; objectCoverage: Phase10DesignGraphObjectCoverageRow[]; findings: Phase10DesignGraphFinding[]; notes: string[]; }
+
 export interface NetworkObjectModelSummary {
   deviceCount: number;
   interfaceCount: number;
@@ -1187,6 +1298,18 @@ export interface NetworkObjectModelSummary {
   inferredObjectCount: number;
   proposedObjectCount: number;
   discoveredObjectCount: number;
+  plannedObjectCount: number;
+  materializedObjectCount: number;
+  durableObjectCount: number;
+  importedObjectCount: number;
+  approvedObjectCount: number;
+  reviewRequiredObjectCount: number;
+  blockedObjectCount: number;
+  phase9MetadataCompleteCount: number;
+  phase9MetadataGapCount: number;
+  implementationReadyObjectCount: number;
+  implementationReviewObjectCount: number;
+  implementationBlockedObjectCount: number;
   orphanedAddressRowCount: number;
   designGraphNodeCount: number;
   designGraphEdgeCount: number;
@@ -1209,7 +1332,7 @@ export interface NetworkObjectModelSummary {
   notes: string[];
 }
 
-export interface NetworkDevice {
+export interface NetworkDevice extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   siteId: string;
@@ -1224,7 +1347,7 @@ export interface NetworkDevice {
   notes: string[];
 }
 
-export interface NetworkInterface {
+export interface NetworkInterface extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   deviceId: string;
@@ -1249,7 +1372,7 @@ export interface NetworkLinkEndpoint {
   label: string;
 }
 
-export interface NetworkLink {
+export interface NetworkLink extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   linkRole: "site-wan-transit" | "vlan-gateway-binding" | "firewall-boundary" | "route-domain-membership" | "planned";
@@ -1264,7 +1387,7 @@ export interface NetworkLink {
   notes: string[];
 }
 
-export interface RouteDomain {
+export interface RouteDomain extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   scope: "project" | "site";
@@ -1278,7 +1401,7 @@ export interface RouteDomain {
   notes: string[];
 }
 
-export interface SecurityZone {
+export interface SecurityZone extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   zoneRole: "internal" | "guest" | "management" | "dmz" | "voice" | "iot" | "wan" | "transit" | "unknown";
@@ -1291,7 +1414,7 @@ export interface SecurityZone {
   notes: string[];
 }
 
-export interface PolicyRule {
+export interface PolicyRule extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   sourceZoneId: string;
@@ -1303,7 +1426,7 @@ export interface PolicyRule {
   notes: string[];
 }
 
-export interface NatRule {
+export interface NatRule extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   sourceZoneId: string;
@@ -1315,7 +1438,7 @@ export interface NatRule {
   notes: string[];
 }
 
-export interface DhcpPool {
+export interface DhcpPool extends Phase9NetworkObjectProvenanceFields {
   id: string;
   name: string;
   siteId: string;
@@ -1327,7 +1450,7 @@ export interface DhcpPool {
   notes: string[];
 }
 
-export interface IpReservation {
+export interface IpReservation extends Phase9NetworkObjectProvenanceFields {
   id: string;
   ipAddress: string;
   subnetCidr: string;
@@ -1337,6 +1460,16 @@ export interface IpReservation {
   truthState: NetworkObjectTruthState;
   notes: string[];
 }
+
+
+export type Phase11RoutingSegmentationReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type Phase11RoutingControlState = "ROUTING_INTENT" | "ROUTING_REVIEW" | "ROUTING_BLOCKER" | "ROUTING_SIMULATION_UNAVAILABLE";
+export type Phase11ProtocolIntentCategory = "connected" | "static" | "summary" | "default" | "ospf" | "bgp" | "route-leaking" | "ecmp" | "redistribution" | "cloud-route-table" | "wan-posture" | "wan-failover" | "asymmetric-routing" | "segmentation-reachability";
+export interface Phase11ProtocolIntentRow { id: string; category: Phase11ProtocolIntentCategory; name: string; routeDomainId?: string; routeDomainName?: string; siteId?: string; sourceRouteIntentIds: string[]; sourceObjectIds: string[]; requirementKeys: string[]; controlState: Phase11RoutingControlState; readinessImpact: Phase11RoutingSegmentationReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase11RequirementRoutingMatrixRow { requirementKey: string; requirementLabel: string; active: boolean; expectedProtocolCategories: Phase11ProtocolIntentCategory[]; actualProtocolIntentIds: string[]; missingProtocolCategories: Phase11ProtocolIntentCategory[]; readinessImpact: Phase11RoutingSegmentationReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface Phase11RouteDomainReviewRow { routeDomainId: string; routeDomainName: string; vrfName?: string; subnetCount: number; connectedRouteCount: number; staticRouteCount: number; summaryRouteCount: number; defaultRouteCount: number; routeConflictCount: number; segmentationExpectationCount: number; readinessImpact: Phase11RoutingSegmentationReadiness; notes: string[]; }
+export interface Phase11RoutingFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: Phase11RoutingSegmentationReadiness; remediation: string; }
+export interface Phase11RoutingSegmentationControlSummary { contract: "PHASE11_ROUTING_SEGMENTATION_PROTOCOL_AWARE_PLANNING_CONTRACT"; role: "ROUTING_INTENT_REVIEW_NOT_PACKET_SIMULATION"; overallReadiness: Phase11RoutingSegmentationReadiness; routeDomainCount: number; routeIntentCount: number; protocolIntentCount: number; connectedRouteIntentCount: number; staticRouteIntentCount: number; summaryRouteIntentCount: number; defaultRouteIntentCount: number; ospfReviewCount: number; bgpReviewCount: number; routeLeakingReviewCount: number; ecmpReviewCount: number; redistributionReviewCount: number; cloudRouteTableReviewCount: number; wanPostureReviewCount: number; segmentationReachabilityReviewCount: number; asymmetricRoutingReviewCount: number; requirementRoutingMatrixCount: number; activeRequirementRoutingGapCount: number; blockedProtocolIntentCount: number; reviewProtocolIntentCount: number; simulationUnavailableCount: number; findingCount: number; blockingFindingCount: number; reviewFindingCount: number; routingReadiness: "ready" | "review" | "blocked"; segmentationReadiness: "ready" | "review" | "blocked"; routeDomainReviews: Phase11RouteDomainReviewRow[]; protocolIntents: Phase11ProtocolIntentRow[]; requirementRoutingMatrix: Phase11RequirementRoutingMatrixRow[]; siteReachabilityChecks: SiteToSiteReachabilityCheck[]; findings: Phase11RoutingFinding[]; notes: string[]; }
 
 export interface RouteIntent {
   id: string;
@@ -2144,6 +2277,9 @@ export interface DesignCoreSnapshot {
   phase6DesignCoreOrchestrator: Phase6DesignCoreOrchestratorControlSummary;
   phase7StandardsRulebookControl: Phase7StandardsAlignmentRulebookControlSummary;
   phase8ValidationReadiness: Phase8ValidationReadinessControlSummary;
+  phase9NetworkObjectModel: Phase9NetworkObjectModelControlSummary;
+  phase10DesignGraph: Phase10DesignGraphControlSummary;
+  phase11RoutingSegmentation: Phase11RoutingSegmentationControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;
   requirementsScenarioProof: RequirementsScenarioProofSummary;
