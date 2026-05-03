@@ -1670,7 +1670,7 @@ export interface RequirementsScenarioProofSummary {
 
 
 
-export type V1ReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "UNSUPPORTED";
+export type V1ReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "UNSUPPORTED" | "NOT_APPLICABLE";
 export type V1ScenarioClosureStatus = "passed" | "review-required" | "blocked" | "not-applicable";
 
 export interface V1RequirementConsumerCoverage {
@@ -1742,7 +1742,6 @@ export interface V1RequirementsClosureControlSummary {
 
 
 
-export type V1ReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "NOT_APPLICABLE";
 export type V1CidrProofStatus = "passed" | "warning" | "blocked";
 
 export interface V1CidrEdgeCaseProof {

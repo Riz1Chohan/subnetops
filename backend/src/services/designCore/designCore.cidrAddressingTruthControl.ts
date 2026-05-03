@@ -110,14 +110,14 @@ function buildRequirementAddressingMatrix(args: {
   addressingRows: DesignCoreAddressRow[];
   siteBlocks: DesignCoreSiteBlock[];
 }): V1RequirementAddressingMatrixRow[] {
-  const V1ByKey = new Map(args.V1RequirementsMaterialization.fieldOutcomes.map((item) => [item.key, item]));
-  const V1ByKey = new Map((args.V1RequirementsClosure?.closureMatrix ?? []).map((item) => [item.key, item]));
+  const materializationByKey = new Map(args.V1RequirementsMaterialization.fieldOutcomes.map((item) => [item.key, item]));
+  const closureByKey = new Map((args.V1RequirementsClosure?.closureMatrix ?? []).map((item) => [item.key, item]));
 
   return ADDRESSING_REQUIREMENT_POLICIES.map((policy) => {
-    const V1 = V1ByKey.get(policy.key);
-    const V1 = V1ByKey.get(policy.key);
-    const sourceValue = V1?.sourceValue ?? V1?.sourceValue ?? "not captured";
-    const active = Boolean(V1?.active || V1?.active || isActiveSourceValue(sourceValue));
+    const materialization = materializationByKey.get(policy.key);
+    const closure = closureByKey.get(policy.key);
+    const sourceValue = materialization?.sourceValue ?? closure?.sourceValue ?? "not captured";
+    const active = Boolean(materialization?.active || closure?.active || isActiveSourceValue(sourceValue));
     const roleRows = args.addressingRows.filter((row) => policy.affectedRoles.includes(row.role));
     const materializedAddressingEvidence: string[] = [];
 
@@ -148,8 +148,8 @@ function buildRequirementAddressingMatrix(args: {
       missingAddressingEvidence,
       readinessImpact,
       notes: [
-        V1 ? `V1 disposition: ${V1.expectedDisposition} / ${V1.materializationStatus}.` : "V1 policy row not captured for this key.",
-        V1 ? `V1 lifecycle: ${V1.lifecycleStatus}.` : "V1 closure row not available for this key.",
+        materialization ? `V1 disposition: ${materialization.expectedDisposition} / ${materialization.materializationStatus}.` : "V1 policy row not captured for this key.",
+        closure ? `V1 lifecycle: ${closure.lifecycleStatus}.` : "V1 closure row not available for this key.",
         "V1 does not create addressing objects from this matrix; it proves whether Engine 1 rows already reflect the requirement or exposes a review gap.",
       ],
     };

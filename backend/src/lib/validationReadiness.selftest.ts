@@ -14,7 +14,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[V1] ${message}`);
 }
 
-const V1 = {
+const V1RequirementsClosure = {
   activeRequirementCount: 2,
   fullPropagatedCount: 1,
   missingConsumerCount: 1,
@@ -61,7 +61,7 @@ const V1 = {
   ],
 } as unknown as V1RequirementsClosureControlSummary;
 
-const V1 = {
+const V1CidrAddressingTruth = {
   totalAddressRowCount: 1,
   validSubnetCount: 1,
   requirementAddressingGapCount: 0,
@@ -80,7 +80,7 @@ const V1 = {
   ],
 } as unknown as V1CidrAddressingTruthControlSummary;
 
-const V1 = {
+const V1EnterpriseIpamTruth = {
   approvedAllocationCount: 0,
   conflictBlockerCount: 1,
   overallReadiness: "BLOCKING",
@@ -101,13 +101,13 @@ const V1 = {
   conflictRows: [],
 } as unknown as V1EnterpriseIpamTruthControlSummary;
 
-const V1 = {
+const V1DesignCoreOrchestrator = {
   presentSnapshotSectionCount: 13,
   requiredSnapshotSectionCount: 13,
   boundaryFindings: [],
 } as unknown as V1DesignCoreOrchestratorControlSummary;
 
-const V1 = {
+const V1StandardsRulebookControl = {
   passRuleCount: 1,
   blockingRuleCount: 1,
   reviewRuleCount: 0,
@@ -149,11 +149,11 @@ const diagramTruth = {
 
 const summary = buildV1ValidationReadinessControl({
   projectId: "project-1",
-  V1RequirementsClosure: V1,
-  V1CidrAddressingTruth: V1,
-  V1EnterpriseIpamTruth: V1,
-  V1DesignCoreOrchestrator: V1,
-  V1StandardsRulebookControl: V1,
+  V1RequirementsClosure,
+  V1CidrAddressingTruth,
+  V1EnterpriseIpamTruth,
+  V1DesignCoreOrchestrator,
+  V1StandardsRulebookControl,
   networkObjectModel,
   reportTruth,
   diagramTruth,

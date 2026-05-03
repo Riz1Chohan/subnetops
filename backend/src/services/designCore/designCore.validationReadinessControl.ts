@@ -113,7 +113,7 @@ function buildRequirementGateRows(input: V1Input, findings: V1ValidationFinding[
     });
 }
 
-function addV1Findings(input: V1Input, findings: V1ValidationFinding[]) {
+function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationFinding[]) {
   for (const row of input.V1RequirementsClosure.closureMatrix) {
     if (!row.active) continue;
     const category = toCategory(row.readinessImpact);
@@ -157,7 +157,7 @@ function addV1Findings(input: V1Input, findings: V1ValidationFinding[]) {
   }
 }
 
-function addV1Findings(input: V1Input, findings: V1ValidationFinding[]) {
+function addV1CidrAddressingFindings(input: V1Input, findings: V1ValidationFinding[]) {
   for (const proof of input.V1CidrAddressingTruth.edgeCaseProofs) {
     if (proof.status === "passed") continue;
     pushFinding(findings, {
@@ -221,7 +221,7 @@ function addV1Findings(input: V1Input, findings: V1ValidationFinding[]) {
   }
 }
 
-function addV1Findings(input: V1Input, findings: V1ValidationFinding[]) {
+function addV1EnterpriseIpamFindings(input: V1Input, findings: V1ValidationFinding[]) {
   for (const row of input.V1EnterpriseIpamTruth.reconciliationRows) {
     const category = toCategory(row.readinessImpact);
     if (category === "PASSED" || category === "INFO") continue;
@@ -432,9 +432,9 @@ function addDesignCoreIssueFindings(input: V1Input, findings: V1ValidationFindin
 export function buildV1ValidationReadinessControl(input: V1Input): V1ValidationReadinessControlSummary {
   const findings: V1ValidationFinding[] = [];
 
-  addV1Findings(input, findings);
-  addV1Findings(input, findings);
-  addV1Findings(input, findings);
+  addV1RequirementClosureFindings(input, findings);
+  addV1CidrAddressingFindings(input, findings);
+  addV1EnterpriseIpamFindings(input, findings);
   addV1And7Findings(input, findings);
   addDesignReadinessFindings(input, findings);
   addDesignCoreIssueFindings(input, findings);

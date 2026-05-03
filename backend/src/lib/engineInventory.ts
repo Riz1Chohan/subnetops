@@ -526,7 +526,7 @@ export const V1_ENGINE_INVENTORY: V1EngineInventoryRow[] = [
     inputs: ["requirements", "platformProfileJson", "networkObjectModel", "V1 diagram truth", "topology assumptions", "physical/device counts", "growth/redundancy signals"],
     outputs: ["V1PlatformBomFoundation", "switch/AP/firewall/WAN estimates", "PoE/port assumptions", "licensing placeholders", "confidence notes", "requirement-driven BOM rows", "manual review gates"],
     consumers: ["ProjectPlatformBomPage", "validation", "PDF/DOCX report", "CSV export", "future procurement workflow"],
-    sourceOfTruthLevel: "backend-computed-advisory-estimate",
+    sourceOfTruthLevel: "backend-computed-review-gated",
     requirementFieldsConsumed: ["wireless", "guestWifi", "voice", "printers", "iot", "cameras", "usersPerSite", "siteCount", "dualIsp", "remoteAccess", "cloudHybrid", "cloudConnected", "securityPosture", "complianceProfile", "printerCount", "phoneCount", "apCount", "cameraCount", "serverCount", "iotDeviceCount", "buildingCount", "floorCount", "growthMarginPercent"],
     frontendPagesUsingIt: ["ProjectPlatformBomPage", "ProjectOverviewPage", "ProjectReportPage"],
     reportExportSectionsUsingIt: ["V1 Platform/BOM Foundation", "Platform Profile and Bill of Materials Foundation", "Assumptions and limitations", "CSV Platform/BOM rows"],

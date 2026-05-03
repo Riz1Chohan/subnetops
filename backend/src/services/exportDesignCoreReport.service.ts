@@ -1463,7 +1463,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     }
   }
 
-  const V1Section: any = {
+  const V1ExportTruthSection: any = {
     title: "13. V1 Export Truth / DOCX-PDF Substance Hardening",
     paragraphs: [
       "This export section is backend-authored. It preserves the same reportTruth, diagramTruth, implementationPlan, verificationChecks, rollbackActions, blocking findings, review findings, and limitations that exist inside the backend design-core snapshot.",
@@ -1625,7 +1625,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   };
 
 
-  const V1Section: any = {
+  const V1VendorNeutralTemplatesSection: any = {
     title: "14. V1 Vendor-Neutral Implementation Templates",
     paragraphs: [
       "This export section is backend-authored from vendorNeutralImplementationTemplates. It converts the implementationPlan into human execution templates without generating vendor-specific commands.",
@@ -1721,7 +1721,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       },
     ],
   };
-  if (reportMode === "full-proof") report.sections.push(V1Section, V1Section);
+  if (reportMode === "full-proof") report.sections.push(V1ExportTruthSection, V1VendorNeutralTemplatesSection);
 
   return reportMode === "professional" ? professionalizeReportForAudience(report) : report;
 }

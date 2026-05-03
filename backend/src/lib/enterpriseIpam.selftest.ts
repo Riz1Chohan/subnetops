@@ -31,7 +31,7 @@ const baseRow: DesignCoreAddressRow = {
   notes: [],
 };
 
-const V1: V1CidrAddressingTruthControlSummary = {
+const V1CidrAddressingTruth: V1CidrAddressingTruthControlSummary = {
   contractVersion: "V1_ENGINE1_CIDR_ADDRESSING_TRUTH",
   totalAddressRowCount: 1,
   validSubnetCount: 1,
@@ -50,7 +50,7 @@ const V1: V1CidrAddressingTruthControlSummary = {
   notes: [],
 };
 
-const V1 = undefined as unknown as V1RequirementsClosureControlSummary;
+const V1RequirementsClosure = undefined as unknown as V1RequirementsClosureControlSummary;
 
 const basePosture: EnterpriseAllocatorPosture = {
   sourceOfTruthReadiness: "ready",
@@ -100,8 +100,8 @@ const approved = buildV1EnterpriseIpamTruthControl({
   addressingRows: [baseRow],
   enterpriseAllocatorPosture: basePosture,
   enterpriseAllocatorSource: approvedSource,
-  V1CidrAddressingTruth: V1,
-  V1RequirementsClosure: V1,
+  V1CidrAddressingTruth,
+  V1RequirementsClosure,
 });
 assert(approved.contractVersion === "V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW", "V1 contract marker missing");
 assert(approved.reconciliationRows[0].reconciliationState === "ENGINE2_APPROVED_ALLOCATION", "Approved Engine 2 allocation should be authoritative");
@@ -112,8 +112,8 @@ const proposalOnly = buildV1EnterpriseIpamTruthControl({
   addressingRows: [baseRow],
   enterpriseAllocatorPosture: { ...basePosture, durableAllocationCount: 0, allocationApprovalCount: 0, dhcpScopeCount: 0, reservationPolicyCount: 0 },
   enterpriseAllocatorSource: { ...approvedSource, ipAllocations: [], dhcpScopes: [], ipReservations: [], allocationApprovals: [], allocationLedger: [] },
-  V1CidrAddressingTruth: V1,
-  V1RequirementsClosure: V1,
+  V1CidrAddressingTruth,
+  V1RequirementsClosure,
 });
 assert(proposalOnly.reconciliationRows[0].reconciliationState === "ENGINE1_PROPOSAL_ONLY", "Engine 1 plan without Engine 2 durable allocation must stay proposal-only");
 assert(proposalOnly.overallReadiness === "REVIEW_REQUIRED", "Proposal-only rows must require review");
@@ -122,8 +122,8 @@ const stale = buildV1EnterpriseIpamTruthControl({
   addressingRows: [baseRow],
   enterpriseAllocatorPosture: basePosture,
   enterpriseAllocatorSource: { ...approvedSource, ipAllocations: [{ ...approvedSource.ipAllocations![0], inputHash: "hash-old" }] },
-  V1CidrAddressingTruth: V1,
-  V1RequirementsClosure: V1,
+  V1CidrAddressingTruth,
+  V1RequirementsClosure,
 });
 assert(stale.reconciliationRows[0].reconciliationState === "ENGINE2_STALE_ALLOCATION_REVIEW", "Stale approved allocation hash must block V1");
 assert(stale.overallReadiness === "BLOCKING", "Stale approved allocation should be blocking");

@@ -341,16 +341,6 @@ function siteRank(node: BackendDiagramRenderNode) {
 
 
 function V1EnterpriseColumns(branchCount: number) {
-  if (branchCount >= 8) return 5;
-  if (branchCount >= 5) return 4;
-  return Math.max(1, branchCount);
-}
-
-function V1EnterpriseRows(branchCount: number) {
-  return Math.max(1, Math.ceil(Math.max(0, branchCount) / V1EnterpriseColumns(branchCount)));
-}
-
-function V1EnterpriseColumns(branchCount: number) {
   if (branchCount >= 9) return 5;
   if (branchCount >= 7) return 4;
   if (branchCount >= 5) return 3;
