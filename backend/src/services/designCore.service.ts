@@ -45,6 +45,7 @@ import { buildPhase4CidrAddressingTruthControl } from "./designCore/designCore.p
 import { buildPhase5EnterpriseIpamTruthControl } from "./designCore/designCore.phase5EnterpriseIpamTruthControl.js";
 import { buildPhase6DesignCoreOrchestratorControl } from "./designCore/designCore.phase6DesignCoreOrchestratorControl.js";
 import { buildPhase7StandardsRulebookControl } from "./designCore/designCore.phase7StandardsRulebookControl.js";
+import { buildPhase8ValidationReadinessControl } from "./designCore/designCore.phase8ValidationReadinessControl.js";
 import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
@@ -83,7 +84,7 @@ import {
   type PlanningInputAuditSummary,
 } from "../lib/planningInputAudit.js";
 
-import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, Phase5EnterpriseIpamTruthControlSummary, Phase6DesignCoreOrchestratorControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
+import type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, Phase5EnterpriseIpamTruthControlSummary, Phase6DesignCoreOrchestratorControlSummary, Phase7StandardsAlignmentRulebookControlSummary, Phase8ValidationReadinessControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
 
 type ProjectWithDesignData = NonNullable<Awaited<ReturnType<typeof getProjectDesignData>>>;
 type SiteBlockRecord = DesignCoreSiteBlock & { parsed?: ParsedCidr };
@@ -1503,6 +1504,20 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     issues,
   });
 
+  // PHASE8_VALIDATION_READINESS_AUTHORITY_CONTRACT: strict validation/readiness authority aggregation surface.
+  const phase8ValidationReadiness = buildPhase8ValidationReadinessControl({
+    projectId: project.id,
+    phase3RequirementsClosure,
+    phase4CidrAddressingTruth,
+    phase5EnterpriseIpamTruth,
+    phase6DesignCoreOrchestrator,
+    phase7StandardsRulebookControl,
+    networkObjectModel,
+    reportTruth,
+    diagramTruth,
+    issues,
+  });
+
   return {
     projectId: project.id,
     projectName: project.name,
@@ -1547,6 +1562,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     phase5EnterpriseIpamTruth,
     phase6DesignCoreOrchestrator,
     phase7StandardsRulebookControl,
+    phase8ValidationReadiness,
     requirementsCoverage,
     requirementsImpactClosure,
     requirementsScenarioProof,
@@ -1578,4 +1594,4 @@ export async function getDesignCoreSnapshotForExport(projectId: string) {
   const project = await getProjectDesignData(projectId);
   return buildDesignCoreSnapshot(project);
 }
-export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignTruthSourceType, DesignProofStatus, DesignTraceConfidence, DesignSourceTraceLabel, DesignOutputTruthLabel, RequirementPropagationTraceItem, Phase1PlanningTraceabilityControlSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, Phase5EnterpriseIpamTruthControlSummary, Phase6DesignCoreOrchestratorControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";
+export type { DesignCoreIssue, DesignCoreSiteBlock, DesignCoreAddressRow, DesignCoreProposalRow, DesignTraceabilityItem, CurrentStateBoundarySummary, SiteSummarizationReview, TransitPlanRow, LoopbackPlanRow, TruthStateLedger, AllocationPolicySummary, RoutingIntentSummary, SecurityIntentSummary, TraceabilityCoverageSummary, WanPlanSummary, BrownfieldReadinessSummary, AllocatorConfidenceSummary, RouteDomainSummary, PolicyConsequenceSummary, DiscoveredStateImportPlanSummary, ImplementationReadinessSummary, EngineConfidenceSummary, AllocatorDeterminismSummary, StandardsRuleEvaluation, StandardsAlignmentSummary, ActivePlanningInputSummary, PlanningInputCoverageSummary, RequirementsCoverageArea, RequirementsCoverageSummary, RequirementsImpactClosureItem, RequirementsImpactClosureSummary, RequirementsScenarioProofSignal, RequirementsScenarioProofSummary, PlanningInputDisciplineItem, PlanningInputDisciplineSummary, DesignTruthSourceType, DesignProofStatus, DesignTraceConfidence, DesignSourceTraceLabel, DesignOutputTruthLabel, RequirementPropagationTraceItem, Phase1PlanningTraceabilityControlSummary, NetworkObjectModel, NetworkObjectModelSummary, NetworkDevice, NetworkInterface, NetworkLink, RouteDomain, SecurityZone, PolicyRule, NatRule, DhcpPool, IpReservation, DesignGraph, DesignGraphNode, DesignGraphEdge, DesignGraphIntegrityFinding, DesignGraphSummary, RoutingSegmentationModel, RoutingSegmentationSummary, RouteDomainRoutingTable, RouteIntent, SegmentationFlowExpectation, RoutingSegmentationReachabilityFinding, SecurityPolicyFlowModel, ImplementationPlanModel, BackendReportTruthModel, BackendDiagramTruthModel, BackendTruthFinding, BackendDiagramTruthHotspot, BackendDiagramTruthOverlaySummary, VendorNeutralImplementationTemplateModel, Phase4CidrEdgeCaseProof, Phase4RequirementAddressingMatrixRow, Phase4AddressingTruthRow, Phase4CidrAddressingTruthControlSummary, Phase5EnterpriseIpamTruthControlSummary, Phase6DesignCoreOrchestratorControlSummary, Phase7StandardsAlignmentRulebookControlSummary, Phase8ValidationReadinessControlSummary, DesignCoreSnapshot, DesignTruthReadiness } from "./designCore.types.js";

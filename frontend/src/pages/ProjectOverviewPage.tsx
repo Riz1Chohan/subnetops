@@ -1334,6 +1334,110 @@ export function ProjectOverviewPage() {
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Phase 8 validation readiness authority</h2>
+          {designCore?.phase8ValidationReadiness ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.phase8ValidationReadiness.overallReadiness)}
+                {summaryCard("Blockers", designCore.phase8ValidationReadiness.blockingFindingCount)}
+                {summaryCard("Review required", designCore.phase8ValidationReadiness.reviewRequiredFindingCount)}
+                {summaryCard("Impl gate", designCore.phase8ValidationReadiness.validationGateAllowsImplementation ? "allowed" : "blocked/review")}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Phase 8 is the strict validation gate across requirements, addressing, durable IPAM, standards, routing, security, implementation, report truth, and diagram truth. It does not create new design facts; it exposes whether upstream truth is clean enough to claim readiness.
+              </p>
+              {designCore.phase8ValidationReadiness.overallReadiness === "BLOCKING" ? (
+                <div className="trust-note danger">
+                  <strong>Implementation readiness is blocked.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>At least one Phase 8 blocking finding exists. Do not ship the design as implementation-ready.</p>
+                </div>
+              ) : designCore.phase8ValidationReadiness.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Implementation readiness is review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>The design may have visible outputs, but at least one requirement or engine truth chain still needs review.</p>
+                </div>
+              ) : designCore.phase8ValidationReadiness.overallReadiness === "WARNING" ? (
+                <div className="trust-note warning"><strong>Non-blocking validation warnings remain.</strong></div>
+              ) : (
+                <div className="trust-note success"><strong>Phase 8 found no blockers or review-required readiness gaps.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Domain</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Counts</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase8ValidationReadiness.coverageRows.slice(0, 14).map((row) => (
+                      <tr key={row.domain}>
+                        <td>{row.domain}<br /><span className="muted">{row.sourceSnapshotPath}</span></td>
+                        <td>{row.readiness}</td>
+                        <td>{row.blockerCount} block / {row.reviewRequiredCount} review / {row.warningCount} warning</td>
+                        <td>{row.evidence.slice(0, 2).join(" ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Missing consumers</th>
+                      <th align="left">Validation rules</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.phase8ValidationReadiness.requirementGateRows.slice(0, 14).map((row) => (
+                      <tr key={row.requirementId}>
+                        <td>{row.requirementKey}</td>
+                        <td>{row.lifecycleStatus}</td>
+                        <td>{row.readinessImpact}</td>
+                        <td>{row.missingConsumers.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{row.validationRuleCodes.slice(0, 4).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.phase8ValidationReadiness.findings.filter((finding) => finding.category !== "PASSED").length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Category</th>
+                        <th align="left">Source</th>
+                        <th align="left">Remediation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.phase8ValidationReadiness.findings.filter((finding) => finding.category !== "PASSED").slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.ruleCode}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.category}</td>
+                          <td>{finding.sourceEngine}<br /><span className="muted">{finding.sourceSnapshotPath}</span></td>
+                          <td>{finding.remediation}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Phase 8 validation readiness authority is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
           {designCore?.requirementsImpactClosure ? (
             <>

@@ -159,6 +159,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const phase5EnterpriseIpamTruth = designCore.phase5EnterpriseIpamTruth && typeof designCore.phase5EnterpriseIpamTruth === "object" ? designCore.phase5EnterpriseIpamTruth : null;
   const phase6DesignCoreOrchestrator = designCore.phase6DesignCoreOrchestrator && typeof designCore.phase6DesignCoreOrchestrator === "object" ? designCore.phase6DesignCoreOrchestrator : null;
   const phase7StandardsRulebookControl = designCore.phase7StandardsRulebookControl && typeof designCore.phase7StandardsRulebookControl === "object" ? designCore.phase7StandardsRulebookControl : null;
+  const phase8ValidationReadiness = designCore.phase8ValidationReadiness && typeof designCore.phase8ValidationReadiness === "object" ? designCore.phase8ValidationReadiness : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -463,7 +464,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
 
       report.sections.push({
         title: "Phase 6 Design-Core Orchestrator Contract",
-        summary: "Design-core is the backend coordinator: it exposes named snapshot sections and dependency edges so frontend, report, and diagram consumers do not invent engineering truth.",
+        paragraphs: ["Design-core is the backend coordinator: it exposes named snapshot sections and dependency edges so frontend, report, and diagram consumers do not invent engineering truth."],
         tables: [
           {
             title: "Phase 6 Orchestrator Summary",
@@ -528,7 +529,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
 
       report.sections.push({
         title: "Phase 7 Standards Alignment / Rulebook Contract",
-        summary: "Standards are evaluated as active rules with applicability, severity, affected engines/objects, requirement relationships, remediation guidance, and exception policy. They are not decorative credibility text.",
+        paragraphs: ["Standards are evaluated as active rules with applicability, severity, affected engines/objects, requirement relationships, remediation guidance, and exception policy. They are not decorative credibility text."],
         tables: [
           {
             title: "Phase 7 Rulebook Summary",
@@ -553,6 +554,71 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
             title: "Phase 7 Standards Findings",
             headers: ["Rule", "Severity", "Affected engine", "Finding", "Remediation"],
             rows: compactRows(phase7FindingRows, [["No Phase 7 standards findings", "INFO", "—", "—", "—"]]),
+          },
+        ],
+      });
+    }
+
+
+    if (includeTechnicalEvidence && phase8ValidationReadiness) {
+      const phase8CoverageRows = asArray(phase8ValidationReadiness?.coverageRows)
+        .slice(0, 24)
+        .map((row: any) => [
+          asString(row.domain, "domain"),
+          asString(row.readiness, "review"),
+          `${row.blockerCount ?? 0} block / ${row.reviewRequiredCount ?? 0} review / ${row.warningCount ?? 0} warning`,
+          asString(row.sourceSnapshotPath, "snapshot"),
+          joinText(asArray(row.evidence).slice(0, 3), "—"),
+        ]);
+
+      const phase8RequirementRows = asArray(phase8ValidationReadiness?.requirementGateRows)
+        .slice(0, 30)
+        .map((row: any) => [
+          asString(row.requirementKey, "requirement"),
+          asString(row.lifecycleStatus, "captured"),
+          asString(row.readinessImpact, "review"),
+          joinText(asArray(row.missingConsumers).slice(0, 5), "none"),
+          joinText(asArray(row.validationRuleCodes).slice(0, 5), "none"),
+        ]);
+
+      const phase8FindingRows = asArray(phase8ValidationReadiness?.findings)
+        .filter((finding: any) => asString(finding.category, "INFO") !== "PASSED")
+        .slice(0, 30)
+        .map((finding: any) => [
+          asString(finding.category, "INFO"),
+          asString(finding.ruleCode, "rule"),
+          asString(finding.sourceEngine, "engine"),
+          asString(finding.title, "finding"),
+          asString(finding.remediation, "—"),
+        ]);
+
+      report.sections.push({
+        title: "Phase 8 Validation / Readiness Authority",
+        paragraphs: ["Validation is the strict readiness authority across requirements, addressing, durable IPAM, standards, routing, security, implementation, report truth, and diagram truth. It must block or review-gate unresolved upstream truth instead of letting UI, reports, or diagrams overclaim readiness."],
+        tables: [
+          {
+            title: "Phase 8 Validation Summary",
+            headers: ["Gate", "Status", "Evidence"],
+            rows: [
+              ["Contract", asString(phase8ValidationReadiness.contractVersion, "missing"), asString(phase8ValidationReadiness.validationRole, "strict validation authority")],
+              ["Overall readiness", asString(phase8ValidationReadiness.overallReadiness, "review"), `${phase8ValidationReadiness.blockingFindingCount ?? 0} block; ${phase8ValidationReadiness.reviewRequiredFindingCount ?? 0} review; ${phase8ValidationReadiness.warningFindingCount ?? 0} warning.`],
+              ["Implementation gate", phase8ValidationReadiness.validationGateAllowsImplementation ? "allowed" : "blocked/review-gated", `${phase8ValidationReadiness.requirementGateCount ?? 0} requirement gate row(s); ${phase8ValidationReadiness.findingCount ?? 0} validation finding(s).`],
+            ],
+          },
+          {
+            title: "Phase 8 Coverage Domains",
+            headers: ["Domain", "Readiness", "Counts", "Snapshot Path", "Evidence"],
+            rows: compactRows(phase8CoverageRows, [["No Phase 8 coverage rows", "—", "—", "—", "—"]]),
+          },
+          {
+            title: "Phase 8 Requirement Readiness Gates",
+            headers: ["Requirement", "Lifecycle", "Readiness", "Missing consumers", "Validation rules"],
+            rows: compactRows(phase8RequirementRows, [["No Phase 8 requirement gates", "—", "—", "—", "—"]]),
+          },
+          {
+            title: "Phase 8 Validation Findings",
+            headers: ["Category", "Rule", "Source engine", "Finding", "Remediation"],
+            rows: compactRows(phase8FindingRows, [["PASSED", "VALIDATION_PASSED_STRICT_READINESS_GATE", "Validation/readiness", "No Phase 8 findings", "Continue engineer review."]]),
           },
         ],
       });

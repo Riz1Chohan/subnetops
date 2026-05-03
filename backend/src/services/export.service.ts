@@ -1155,6 +1155,52 @@ export async function getCsvRows(projectId: string) {
         });
       }
     }
+
+
+    if (designCore.phase8ValidationReadiness) {
+      const phase8 = designCore.phase8ValidationReadiness;
+      rows.push({
+        Section: "Phase 8 Validation Readiness Authority",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: phase8.contractVersion,
+        Value: `${phase8.overallReadiness} | ${phase8.blockingFindingCount} block / ${phase8.reviewRequiredFindingCount} review / ${phase8.warningFindingCount} warning`,
+        Notes: `Implementation gate ${phase8.validationGateAllowsImplementation ? "allowed" : "blocked/review-gated"}; role ${phase8.validationRole}; findings ${phase8.findingCount}`,
+      });
+
+      for (const row of phase8.coverageRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 8 Validation Coverage Domains",
+          Scope: row.readiness,
+          Name: row.domain,
+          Key: row.sourceSnapshotPath,
+          Value: `${row.blockerCount} block / ${row.reviewRequiredCount} review / ${row.warningCount} warning / ${row.passedCount} passed`,
+          Notes: joinCsvList(row.evidence, "No evidence recorded"),
+        });
+      }
+
+      for (const gate of phase8.requirementGateRows.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 8 Requirement Readiness Gates",
+          Scope: gate.readinessImpact,
+          Name: gate.requirementKey,
+          Key: gate.lifecycleStatus,
+          Value: `Rules ${joinCsvList(gate.validationRuleCodes, "none")}`,
+          Notes: `Missing consumers ${joinCsvList(gate.missingConsumers, "none")}; expected engines ${joinCsvList(gate.expectedAffectedEngines, "none")}; evidence ${joinCsvList(gate.evidence, "none")}`,
+        });
+      }
+
+      for (const finding of phase8.findings.slice(0, 120)) {
+        rows.push({
+          Section: "Phase 8 Validation Findings",
+          Scope: finding.category,
+          Name: finding.ruleCode,
+          Key: finding.sourceEngine,
+          Value: finding.title,
+          Notes: `${finding.detail}; remediation ${finding.remediation}; frontend ${finding.frontendImpact}; report ${finding.reportImpact}; diagram ${finding.diagramImpact}`,
+        });
+      }
+    }
     if (designCore.vendorNeutralImplementationTemplates) {
       const templateModel = designCore.vendorNeutralImplementationTemplates;
       rows.push({

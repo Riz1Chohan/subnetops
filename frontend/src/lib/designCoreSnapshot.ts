@@ -1741,6 +1741,90 @@ export interface Phase7StandardsAlignmentRulebookControlSummary {
   notes: string[];
 }
 
+export type Phase8ValidationReadinessCategory = "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED";
+
+export type Phase8ValidationRuleCode =
+  | "VALIDATION_REQUIREMENT_PROPAGATION_GAP"
+  | "VALIDATION_GOLDEN_SCENARIO_CLOSURE_GAP"
+  | "VALIDATION_CIDR_EDGE_CASE_BLOCKER"
+  | "VALIDATION_CIDR_EDGE_CASE_WARNING"
+  | "VALIDATION_CIDR_ADDRESSING_READINESS_GAP"
+  | "VALIDATION_REQUIREMENT_ADDRESSING_GAP"
+  | "VALIDATION_IPAM_DURABLE_AUTHORITY_GAP"
+  | "VALIDATION_REQUIREMENT_IPAM_GAP"
+  | "VALIDATION_ORCHESTRATOR_BOUNDARY_GAP"
+  | "VALIDATION_STANDARDS_RULE_GAP"
+  | "VALIDATION_ROUTING_SEGMENTATION_READINESS_GAP"
+  | "VALIDATION_SECURITY_POLICY_READINESS_GAP"
+  | "VALIDATION_IMPLEMENTATION_READINESS_GAP"
+  | "VALIDATION_REPORT_TRUTH_WARNING"
+  | "VALIDATION_DIAGRAM_TRUTH_WARNING"
+  | "VALIDATION_DESIGN_CORE_ISSUE"
+  | "VALIDATION_PASSED_STRICT_READINESS_GATE"
+  | string;
+
+export interface Phase8ValidationFinding {
+  id: string;
+  category: Phase8ValidationReadinessCategory;
+  ruleCode: Phase8ValidationRuleCode;
+  title: string;
+  detail: string;
+  sourceEngine: string;
+  sourceSnapshotPath: string;
+  affectedRequirementIds: string[];
+  affectedRequirementKeys: string[];
+  affectedObjectIds: string[];
+  frontendImpact: string;
+  reportImpact: string;
+  diagramImpact: string;
+  remediation: string;
+  evidence: string[];
+}
+
+export interface Phase8ValidationCoverageRow {
+  domain: string;
+  sourceSnapshotPath: string;
+  blockerCount: number;
+  reviewRequiredCount: number;
+  warningCount: number;
+  infoCount: number;
+  passedCount: number;
+  readiness: Phase8ValidationReadinessCategory;
+  evidence: string[];
+}
+
+export interface Phase8ValidationRequirementGateRow {
+  requirementId: string;
+  requirementKey: string;
+  lifecycleStatus: RequirementPropagationLifecycleStatus;
+  expectedAffectedEngines: string[];
+  missingConsumers: string[];
+  validationRuleCodes: string[];
+  readinessImpact: Phase8ValidationReadinessCategory;
+  evidence: string[];
+}
+
+export interface Phase8ValidationReadinessControlSummary {
+  contractVersion: "PHASE8_VALIDATION_READINESS_AUTHORITY_CONTRACT";
+  validationRole: "STRICT_READINESS_AUTHORITY_NOT_ADVISORY_SUMMARY";
+  validationCategories: Phase8ValidationReadinessCategory[];
+  overallReadiness: Phase8ValidationReadinessCategory;
+  validationGateAllowsImplementation: boolean;
+  findingCount: number;
+  blockingFindingCount: number;
+  reviewRequiredFindingCount: number;
+  warningFindingCount: number;
+  infoFindingCount: number;
+  passedFindingCount: number;
+  requirementGateCount: number;
+  blockedRequirementGateCount: number;
+  reviewRequirementGateCount: number;
+  coverageRows: Phase8ValidationCoverageRow[];
+  requirementGateRows: Phase8ValidationRequirementGateRow[];
+  findings: Phase8ValidationFinding[];
+  notes: string[];
+}
+
 export interface DesignCoreSnapshot {
   projectId: string;
   projectName: string;
@@ -1845,6 +1929,7 @@ export interface DesignCoreSnapshot {
   phase5EnterpriseIpamTruth?: Phase5EnterpriseIpamTruthControlSummary;
   phase6DesignCoreOrchestrator?: Phase6DesignCoreOrchestratorControlSummary;
   phase7StandardsRulebookControl?: Phase7StandardsAlignmentRulebookControlSummary;
+  phase8ValidationReadiness?: Phase8ValidationReadinessControlSummary;
   requirementsCoverage?: RequirementsCoverageSummary;
   requirementsImpactClosure?: RequirementsImpactClosureSummary;
   requirementsScenarioProof?: RequirementsScenarioProofSummary;

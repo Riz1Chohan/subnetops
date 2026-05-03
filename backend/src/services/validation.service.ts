@@ -231,6 +231,18 @@ const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>>
     impact: "The design-core section is present but review-gated; downstream consumers must preserve the review label.",
     recommendation: "Review the affected snapshot section and clear or explicitly accept the upstream review condition.",
   },
+  PHASE8_STRICT_READINESS_BLOCKING: {
+    impact: "The Phase 8 validation authority found a blocking readiness issue across requirements, addressing, IPAM, standards, routing, security, implementation, report, or diagram truth.",
+    recommendation: "Open the Phase 8 validation readiness ledger, resolve the upstream blocker, and rerun validation before claiming implementation readiness.",
+  },
+  PHASE8_STRICT_READINESS_REVIEW_REQUIRED: {
+    impact: "The design may contain mathematically valid or visible output, but at least one upstream truth chain is still review-gated.",
+    recommendation: "Clear the review-required source or keep the output labelled review-required in UI, report, and diagram consumers.",
+  },
+  PHASE8_STRICT_READINESS_WARNING: {
+    impact: "A non-blocking validation warning remains and must be preserved in engineering deliverables.",
+    recommendation: "Review the warning and either resolve it or document the accepted limitation before final handoff.",
+  },
   VALIDATION_PASSED: {
     impact: "No current blocker was detected by the saved validation checks, but this is not a live-network discovery result.",
     recommendation: "Continue engineer review against live inventory, business policy, and vendor implementation requirements.",
@@ -1070,6 +1082,22 @@ export async function runValidation(projectId: string) {
         ruleCode: finding.code,
         title: finding.title,
         message: `${finding.detail} Affected engine: ${finding.affectedEngine}.`,
+        entityType: "PROJECT",
+        entityId: projectId,
+      }));
+    }
+  }
+
+
+  if (designSnapshot?.phase8ValidationReadiness) {
+    const phase8 = designSnapshot.phase8ValidationReadiness;
+    for (const finding of phase8.findings.filter((item) => item.category !== "PASSED" && item.category !== "INFO")) {
+      results.push(makeItem({
+        projectId,
+        severity: finding.category === "BLOCKING" ? "ERROR" : "WARNING",
+        ruleCode: finding.category === "BLOCKING" ? "PHASE8_STRICT_READINESS_BLOCKING" : finding.category === "REVIEW_REQUIRED" ? "PHASE8_STRICT_READINESS_REVIEW_REQUIRED" : "PHASE8_STRICT_READINESS_WARNING",
+        title: finding.title,
+        message: `${finding.detail} Source: ${finding.sourceEngine}. Remediation: ${finding.remediation}`,
         entityType: "PROJECT",
         entityId: projectId,
       }));

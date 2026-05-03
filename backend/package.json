@@ -23,7 +23,7 @@
     "engine:selftest:matrix": "tsx src/lib/proofMatrix.selftest.ts",
     "engine:selftest:boundary": "tsx src/lib/cidrBoundary.selftest.ts",
     "engine:selftest:behavioral-matrix": "tsx src/lib/behavioralMatrix.selftest.ts",
-    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates && npm run engine:selftest:phase75-golden-requirements && npm run engine:selftest:phase4-addressing && npm run engine:selftest:phase5-enterprise-ipam",
+    "engine:selftest:all": "npm run engine:selftest && npm run engine:selftest:proof && npm run engine:selftest:allocator && npm run engine:selftest:matrix && npm run engine:selftest:boundary && npm run engine:selftest:design-core && npm run engine:selftest:behavioral-matrix && npm run engine:selftest:phase33-matrix && npm run engine:selftest:phase34-routing && npm run engine:selftest:phase35-security && npm run engine:selftest:phase36-implementation && npm run engine:selftest:phase41-scenarios && npm run engine:selftest:phase42-templates && npm run engine:selftest:phase75-golden-requirements && npm run engine:selftest:phase4-addressing && npm run engine:selftest:phase5-enterprise-ipam && npm run engine:selftest:phase8-validation-readiness",
     "prisma:db:push": "prisma db push",
     "prisma:baseline:existing": "sh -c 'for d in prisma/migrations/*; do [ -d \"$d\" ] && npx prisma migrate resolve --applied \"$(basename \"$d\")\"; done'",
     "security:selftest:rate-limit": "tsx src/middleware/rateLimit.selftest.ts",
@@ -38,7 +38,8 @@
     "engine:selftest:phase4-addressing": "tsx src/lib/phase4CidrAddressing.selftest.ts",
     "engine:selftest:phase5-enterprise-ipam": "tsx src/lib/phase5EnterpriseIpam.selftest.ts",
     "engine:selftest:phase6-design-core-orchestrator": "tsx src/lib/phase6DesignCoreOrchestrator.selftest.ts",
-    "engine:selftest:phase7-standards-rulebook": "tsx src/lib/phase7StandardsRulebook.selftest.ts"
+    "engine:selftest:phase7-standards-rulebook": "tsx src/lib/phase7StandardsRulebook.selftest.ts",
+    "engine:selftest:phase8-validation-readiness": "tsx src/lib/phase8ValidationReadiness.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
