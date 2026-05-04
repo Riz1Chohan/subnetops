@@ -24,7 +24,7 @@ export const V1_TRUTH_SOURCE_TYPE_POLICIES: Array<{ sourceType: DesignTruthSourc
   { sourceType: "USER_PROVIDED", rule: "Saved by the user as an explicit input; still needs downstream evidence before it becomes engineering authority." },
   { sourceType: "REQUIREMENT_MATERIALIZED", rule: "Created or strengthened by the backend requirement materializer from a captured requirement signal." },
   { sourceType: "BACKEND_COMPUTED", rule: "Computed inside backend design-core or engine code from source objects and validated inputs." },
-  { sourceType: "ENGINE2_DURABLE", rule: "Owned by the durable enterprise IPAM workflow, approvals, conflicts, and ledger." },
+  { sourceType: "DURABLE_IPAM", rule: "Owned by the durable enterprise IPAM workflow, approvals, conflicts, and ledger." },
   { sourceType: "INFERRED", rule: "Inferred by backend logic and must be visibly labelled; never implementation authority by itself." },
   { sourceType: "ESTIMATED", rule: "Estimate or sizing assumption; must expose calculation basis and review reason." },
   { sourceType: "IMPORTED", rule: "Imported/manual current-state evidence; must not be treated as validated discovery until reconciled." },
@@ -200,7 +200,7 @@ export function buildV1PlanningTraceabilityControl(input: {
     label("standardsAlignment", "Standards alignment summary", "BACKEND_COMPUTED", "designCore.standardsAlignment", "PARTIAL", "medium", ["Validation", "Report", "Readiness"], sourceRequirementIds),
     label("reportTruth", "Backend report truth model", "BACKEND_COMPUTED", "designCore.reportDiagramTruth", "PARTIAL", "medium", ["ProjectReportPage", "PDF/DOCX/CSV export"], sourceRequirementIds),
     label("diagramTruth", "Backend diagram truth model", "BACKEND_COMPUTED", "designCore.reportDiagramTruth", "PARTIAL", "medium", ["ProjectDiagramPage", "Report diagram truth section"], sourceRequirementIds, networkObjectIds),
-    label("enterpriseAllocatorPosture", "Enterprise IPAM posture", "ENGINE2_DURABLE", "enterpriseAddressAllocator", "PARTIAL", "medium", ["Enterprise IPAM", "Addressing reconciliation", "Validation", "Report"], sourceRequirementIds),
+    label("enterpriseAllocatorPosture", "Enterprise IPAM posture", "DURABLE_IPAM", "enterpriseAddressAllocator", "PARTIAL", "medium", ["Enterprise IPAM", "Addressing reconciliation", "Validation", "Report"], sourceRequirementIds),
   ];
 
   const missingLabels = REQUIRED_OUTPUTS.filter((key) => !outputLabels.some((item) => item.outputKey === key));

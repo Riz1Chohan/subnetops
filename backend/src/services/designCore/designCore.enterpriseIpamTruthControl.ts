@@ -273,7 +273,7 @@ function buildReconciliationRows(input: BuilderInput): V1EnterpriseIpamReconcili
       engine2PoolId: allocation?.poolId ?? undefined,
       engine2PoolName: pool?.name,
       routeDomainKey,
-      sourceTruth: allocation ? "ENGINE2_DURABLE" : "ENGINE1_PLANNED",
+      sourceTruth: allocation ? "DURABLE_IPAM" : "ENGINE1_PLANNED",
       reconciliationState: state.state,
       readinessImpact: state.readinessImpact,
       approvedHashMatches,

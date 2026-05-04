@@ -175,7 +175,7 @@ export interface DesignGraphIntegrityFinding {
 }
 
 export interface DesignGraph {
-  summary?: Record<string, unknown>;
+  summary?: object;
   nodes: DesignGraphNode[];
   edges: DesignGraphEdge[];
   integrityFindings: DesignGraphIntegrityFinding[];
@@ -209,10 +209,9 @@ export interface RoutingSegmentationReachabilityFinding {
 }
 
 export interface RoutingSegmentationModel {
-  summary?: Record<string, unknown>;
+  summary?: object;
   routeIntents: RouteIntent[];
   reachabilityFindings: RoutingSegmentationReachabilityFinding[];
-  [key: string]: unknown;
 }
 
 export type V1SecurityPolicyState = "REQUIRED" | "RECOMMENDED" | "BLOCKED" | "MISSING" | "OVERBROAD" | "SHADOWED" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
@@ -274,11 +273,10 @@ export interface SecurityPolicyFinding {
 }
 
 export interface SecurityPolicyFlowModel {
-  summary?: Record<string, unknown>;
+  summary?: object;
   natReviews: SecurityNatReview[];
   flowRequirements: SecurityFlowRequirement[];
   findings: SecurityPolicyFinding[];
-  [key: string]: unknown;
 }
 
 export interface ImplementationNetworkObjectModel {

@@ -13,7 +13,8 @@ export function errorHandler(
   }
 
   if (err instanceof ZodError) {
-    const first = err.issues[0];
+    const zodError = err as ZodError;
+    const first = zodError.issues[0];
     const message = first ? `${first.path.length ? `${first.path.join(".")}: ` : ""}${first.message}` : "Validation failed";
     return res.status(400).json({ message });
   }
