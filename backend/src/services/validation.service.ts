@@ -15,7 +15,7 @@ import {
   usableHostCount,
   validateGatewayForSubnet,
   type SegmentRole,
-} from "../lib/cidr.js";
+} from "../domain/addressing/cidr.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
 import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
 

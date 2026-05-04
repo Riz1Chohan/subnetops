@@ -4,7 +4,7 @@ import { SectionHeader } from "../components/app/SectionHeader";
 const helpSections = [
   {
     title: "Start with requirements",
-    body: "Use Start Plan to capture the business context, design goals, addressing strategy, operations model, physical site assumptions, WAN behavior, and handoff needs before you move into the detailed design stages.",
+    body: "Use Start Plan to capture the business context, design goals, addressing strategy, operations model, physical site assumptions, WAN behavior, and handoff needs before you move into detailed design work.",
   },
   {
     title: "Use AI separately",
@@ -12,7 +12,7 @@ const helpSections = [
   },
   {
     title: "Review before handoff",
-    body: "Work through Requirements, Logical Design, Validation, Diagram, and Report / Export in order. The later stages are easier to trust when the earlier planning inputs are complete.",
+    body: "Work through Requirements, Logical Design, Validation, Diagram, and Report / Export in order. The later sections are easier to trust when the earlier planning inputs are complete.",
   },
 ];
 

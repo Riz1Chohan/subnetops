@@ -778,7 +778,7 @@ export function TopologyPostureLedgerPanel({ synthesized, sites }: { synthesized
     <div className="diagram-note-card" style={{ marginBottom: 12 }}>
       <strong style={{ display: "block", marginBottom: 6 }}>Topology-specific posture ledger</strong>
       <p style={{ margin: "0 0 12px 0", color: "#61758f" }}>
-        This keeps Stage J tied to real design objects by showing how each in-scope site should behave in the current topology, not just what overlay is selected.
+        This keeps the view tied to real design objects by showing how each in-scope site should behave in the current topology, not just what overlay is selected.
       </p>
       <div className="diagram-overlay-evidence-grid">
         {sites.map((site) => (
@@ -895,7 +895,7 @@ export function diagramLegend(mode: OverlayMode) {
           ? ["Shows explicit local, centralized, DMZ, and cloud-hosted service anchors.", "Use this to verify which services are local versus remote and which boundary owns them."]
           : mode === "redundancy"
             ? ["Shows routed uplinks, edge posture, and route-domain anchors that affect failover meaning.", "Use this to verify whether the topology reads like single-edge, paired-edge, or broader resilient transport."]
-            : ["Shows actual device roles that the engine placed at each site.", "Use this to verify edge, switching, and service placement."];
+            : ["Shows actual device roles placed at each site.", "Use this to verify edge, switching, and service placement."];
   return { title, details };
 }
 

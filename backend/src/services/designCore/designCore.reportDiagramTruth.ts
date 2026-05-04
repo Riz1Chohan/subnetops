@@ -1,3 +1,4 @@
+import { buildDiagramRenderModel as buildDomainDiagramRenderModel } from '../../domain/diagram/index.js';
 import type {
   BackendDiagramRenderEdge,
   BackendDiagramRenderGroup,
@@ -756,7 +757,7 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
 }
 
 function buildBackendDiagramRenderModel(networkObjectModel: NetworkObjectModel, overlaySummaries: BackendDiagramTruthOverlaySummary[], hotspots: BackendDiagramTruthHotspot[]): BackendDiagramRenderModel {
-  return buildProfessionalTopologyRenderModel(networkObjectModel, overlaySummaries, hotspots);
+  return buildDomainDiagramRenderModel({ networkObjectModel, overlaySummaries, hotspots });
 }
 
 export function buildBackendReportTruthModel(params: { summary: SnapshotSummaryForTruth; networkObjectModel: NetworkObjectModel; issues: DesignCoreIssue[] }): BackendReportTruthModel {

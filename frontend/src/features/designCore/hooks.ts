@@ -6,6 +6,7 @@ import type { RequirementsProfile } from "../../lib/requirementsProfile";
 import { buildBackendOnlyDisplayDesign } from "../../lib/backendDesignDisplayModel";
 import { applyDesignCoreSnapshotToDisplayDesign } from "../../lib/designCoreAdapter";
 import { resolveDesignAuthorityState } from "../../lib/designAuthority";
+import { frontendTruthContract } from "../../lib/frontendTruthContract";
 
 export function buildDesignCoreInputFingerprint(
   project: Project | undefined,
@@ -80,6 +81,11 @@ export function useAuthoritativeDesign(
     [designCoreQuery.data, designCoreQuery.error, designCoreQuery.isLoading],
   );
 
+  const truthContract = useMemo(
+    () => frontendTruthContract(Boolean(designCoreQuery.data)),
+    [designCoreQuery.data],
+  );
+
   return {
     synthesized,
     backendOnlyDisplayShell,
@@ -87,6 +93,7 @@ export function useAuthoritativeDesign(
     designCore: designCoreQuery.data,
     designCoreQuery,
     authority,
+    truthContract,
     isUsingBackendDesignCore: authority.isBackendAuthority,
     isUsingFrontendFallback: false,
   };

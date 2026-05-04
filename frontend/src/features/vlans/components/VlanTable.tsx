@@ -23,7 +23,7 @@ export function VlanTable({
   onDelete,
   deletingVlanId,
   emptyTitle = "No VLANs added yet",
-  emptyMessage = "Add VLAN inputs, then review backend design-core validation and addressing facts in the design views.",
+  emptyMessage = "Add VLAN inputs, then review validation and addressing facts in the design views.",
 }: VlanTableProps) {
   if (vlans.length === 0) {
     return <EmptyState title={emptyTitle} message={emptyMessage} />;

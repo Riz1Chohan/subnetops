@@ -1,4 +1,21 @@
-import type { SegmentRole } from "../../lib/cidr.js";
+import type { SegmentRole } from "../../domain/addressing/cidr.js";
+import {
+  DEFAULT_ROUTE_DOMAIN_ID as CORPORATE_ROUTE_DOMAIN_ID,
+  WIDE_AREA_NETWORK_ZONE_ID,
+  buildTopologyModel,
+  chooseHubSite,
+  gatewayInterfaceId,
+  interfaceRoleFromSegmentRole,
+  isolationExpectationForRole,
+  normalizeIdentifierSegment,
+  securityBoundaryDeviceId,
+  securityZoneIdForRole,
+  securityZoneNameForRole,
+  siteDisplayCode,
+  siteGatewayDeviceId,
+  vlanGatewayLinkId,
+  zoneRoleFromSegmentContext,
+} from "../../domain/topology/index.js";
 import { buildBackendDesignGraph } from "./designCore.graph.js";
 import { buildRoutingSegmentationModel } from "./designCore.routingSegmentation.js";
 import { buildSecurityPolicyFlowModel } from "./designCore.securityPolicyFlow.js";
@@ -39,9 +56,6 @@ type NetworkObjectProject = {
 };
 
 type SecurityZoneRole = SecurityZone["zoneRole"];
-
-const CORPORATE_ROUTE_DOMAIN_ID = "route-domain-corporate";
-const WIDE_AREA_NETWORK_ZONE_ID = "security-zone-wide-area-network";
 
 type RequirementInputMap = Record<string, unknown>;
 
@@ -128,118 +142,12 @@ function multiSiteOrWanRequired(project: NetworkObjectProject, requirements: Req
     || requirementMentions(requirements, "internetModel", ["wan", "central", "hub", "site"]);
 }
 
-function normalizeIdentifierSegment(value: string) {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return normalized || "unnamed";
-}
-
-function siteDisplayCode(site: NetworkObjectProject["sites"][number]) {
-  return site.siteCode?.trim() || normalizeIdentifierSegment(site.name).toUpperCase();
-}
-
-function siteGatewayDeviceId(siteId: string) {
-  return `device-${siteId}-layer3-gateway`;
-}
-
-function securityBoundaryDeviceId(projectId: string) {
-  return `device-${projectId}-security-boundary-firewall`;
-}
-
-function gatewayInterfaceId(addressRowId: string, vlanId: number) {
-  return `interface-${addressRowId}-vlan-${vlanId}-gateway`;
-}
-
-function vlanGatewayLinkId(addressRowId: string, vlanId: number) {
-  return `link-${addressRowId}-vlan-${vlanId}-gateway-binding`;
-}
-
-function securityZoneIdForRole(zoneRole: SecurityZoneRole) {
-  return `security-zone-${zoneRole}`;
-}
-
-function securityZoneNameForRole(zoneRole: SecurityZoneRole) {
-  switch (zoneRole) {
-    case "guest":
-      return "Guest Access";
-    case "management":
-      return "Management Plane";
-    case "dmz":
-      return "DMZ Services";
-    case "voice":
-      return "Voice Services";
-    case "iot":
-      return "IoT and Operational Technology";
-    case "transit":
-      return "WAN Transit";
-    case "wan":
-      return "Wide Area Network";
-    case "internal":
-      return "Corporate Internal";
-    case "unknown":
-    default:
-      return "Unclassified Network";
-  }
-}
-
-function isolationExpectationForRole(zoneRole: SecurityZoneRole): SecurityZone["isolationExpectation"] {
-  switch (zoneRole) {
-    case "guest":
-    case "management":
-    case "dmz":
-    case "iot":
-      return "isolated";
-    case "voice":
-    case "transit":
-      return "restricted";
-    case "wan":
-      return "review";
-    case "internal":
-      return "restricted";
-    case "unknown":
-    default:
-      return "review";
-  }
-}
-
-function zoneRoleFromAddressRow(addressRow: DesignCoreAddressRow): SecurityZoneRole {
-  const descriptiveText = `${addressRow.vlanName} ${addressRow.notes.join(" ")}`.toLowerCase();
-
-  if (addressRow.role === "GUEST") return "guest";
-  if (addressRow.role === "MANAGEMENT") return "management";
-  if (addressRow.role === "VOICE") return "voice";
-  if (addressRow.role === "IOT" || addressRow.role === "CAMERA" || addressRow.role === "PRINTER") return "iot";
-  if (addressRow.role === "WAN_TRANSIT") return "transit";
-  if (addressRow.role === "SERVER" && descriptiveText.includes("dmz")) return "dmz";
-  if (addressRow.role === "LOOPBACK") return "transit";
-  if (addressRow.role === "OTHER") return "unknown";
-  return "internal";
-}
-
-function interfaceRoleFromSegmentRole(segmentRole: SegmentRole): NetworkInterface["interfaceRole"] {
-  if (segmentRole === "WAN_TRANSIT") return "wan-transit";
-  if (segmentRole === "LOOPBACK") return "loopback";
-  return "vlan-gateway";
-}
-
 function addUnique<T>(values: T[], value: T) {
   if (!values.includes(value)) values.push(value);
 }
 
 function countObjectsByTruthState(objects: Array<{ truthState: NetworkObjectTruthState }>, truthState: NetworkObjectTruthState) {
   return objects.filter((object) => object.truthState === truthState).length;
-}
-
-function chooseHubSite(project: NetworkObjectProject) {
-  const siteWithHeadquartersName = project.sites.find((site) => {
-    const text = `${site.name} ${site.siteCode ?? ""}`.toLowerCase();
-    return text.includes("hq") || text.includes("headquarter") || text.includes("head office");
-  });
-
-  return siteWithHeadquartersName ?? project.sites[0] ?? null;
 }
 
 function createInitialRouteDomain(project: NetworkObjectProject, siteSummaries: SiteSummarizationReview[]): RouteDomain {
@@ -807,7 +715,7 @@ export function buildNetworkObjectModel(params: {
     const siteGateway = devicesById.get(siteGatewayDeviceId(addressRow.siteId));
     const subnetCidr = addressRow.canonicalSubnetCidr ?? addressRow.proposedSubnetCidr;
     const gatewayIp = addressRow.effectiveGatewayIp ?? addressRow.proposedGatewayIp;
-    const zoneRole = zoneRoleFromAddressRow(addressRow);
+    const zoneRole = zoneRoleFromSegmentContext(addressRow);
     const securityZone = ensureSecurityZone(securityZonesById, zoneRole);
     const interfaceId = gatewayInterfaceId(addressRow.id, addressRow.vlanId);
     const linkId = vlanGatewayLinkId(addressRow.id, addressRow.vlanId);
@@ -1022,6 +930,13 @@ export function buildNetworkObjectModel(params: {
   const devices = Array.from(devicesById.values()).sort((left, right) => left.name.localeCompare(right.name));
   const policyRules = buildPolicyRules(securityZones, requirements);
   const natRules = buildNatRules(securityZones);
+  const topology = buildTopologyModel({
+    project,
+    addressingRows,
+    transitPlan,
+    loopbackPlan,
+    routeDomainId: CORPORATE_ROUTE_DOMAIN_ID,
+  });
 
 
   annotateObject({ object: routeDomain, objectType: "route-domain", objectRole: routeDomain.scope, requirements, sourceRequirementIds: requirementIdsForKeys(requirements, ["siteCount", "interSiteTrafficModel", "cloudRoutingModel", "dualIsp", "resilienceTarget"]), sourceObjectIds: routeDomain.siteIds });
@@ -1091,6 +1006,7 @@ export function buildNetworkObjectModel(params: {
 
   const modelWithGraph: Omit<NetworkObjectModel, "summary"> = {
     ...modelWithoutSummaryOrGraph,
+    topology,
     designGraph,
     routingSegmentation,
     securityPolicyFlow,

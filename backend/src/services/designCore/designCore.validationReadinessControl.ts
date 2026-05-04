@@ -15,10 +15,18 @@ import type {
   V1ValidationRequirementGateRow,
 } from "../designCore.types.js";
 
+import {
+  LEGACY_VALIDATION_CATEGORIES,
+  buildValidationFindingId,
+  countLegacyFindingCategories,
+  legacyReadinessFromCounts,
+  normalizeLegacyReadinessCategory,
+} from "../../domain/validation/index.js";
+
 export const V1_VALIDATION_READINESS_AUTHORITY_CONTRACT = "V1_VALIDATION_READINESS_AUTHORITY_CONTRACT" as const;
 // V1ValidationReadiness snapshot field is the strict validation/readiness gate surface.
 
-const VALIDATION_CATEGORIES: V1ValidationReadinessCategory[] = ["BLOCKING", "REVIEW_REQUIRED", "WARNING", "INFO", "PASSED"];
+const VALIDATION_CATEGORIES = [...LEGACY_VALIDATION_CATEGORIES] as V1ValidationReadinessCategory[];
 
 type V1Input = {
   projectId: string;
@@ -34,44 +42,36 @@ type V1Input = {
 };
 
 function toCategory(value: unknown): V1ValidationReadinessCategory {
-  const normalized = String(value ?? "").trim().toUpperCase();
-  if (["BLOCKING", "BLOCKED", "ERROR", "BLOCKER"].includes(normalized)) return "BLOCKING";
-  if (["REVIEW_REQUIRED", "REVIEW", "PARTIAL", "PARTIALLY_PROPAGATED", "MATERIALIZED", "CAPTURED_ONLY"].includes(normalized)) return "REVIEW_REQUIRED";
-  if (["WARNING", "WARN"].includes(normalized)) return "WARNING";
-  if (["INFO", "INFORMATIONAL", "NOT_APPLICABLE", "UNSUPPORTED"].includes(normalized)) return "INFO";
-  if (["PASSED", "PASS", "READY", "FULLY_PROPAGATED"].includes(normalized)) return "PASSED";
-  return "INFO";
+  return normalizeLegacyReadinessCategory(value) as V1ValidationReadinessCategory;
 }
 
 function readinessFromCounts(blockingCount: number, reviewRequiredCount: number, warningCount: number): V1ValidationReadinessCategory {
-  if (blockingCount > 0) return "BLOCKING";
-  if (reviewRequiredCount > 0) return "REVIEW_REQUIRED";
-  if (warningCount > 0) return "WARNING";
-  return "PASSED";
+  return legacyReadinessFromCounts(blockingCount, reviewRequiredCount, warningCount) as V1ValidationReadinessCategory;
 }
 
 function countByCategory(findings: V1ValidationFinding[]) {
-  return {
-    blockingCount: findings.filter((item) => item.category === "BLOCKING").length,
-    reviewRequiredCount: findings.filter((item) => item.category === "REVIEW_REQUIRED").length,
-    warningCount: findings.filter((item) => item.category === "WARNING").length,
-    infoCount: findings.filter((item) => item.category === "INFO").length,
-    passedCount: findings.filter((item) => item.category === "PASSED").length,
-  };
+  return countLegacyFindingCategories(findings);
 }
 
 function makeFinding(input: Omit<V1ValidationFinding, "id">): V1ValidationFinding {
-  const safeCode = input.ruleCode.replace(/[^A-Z0-9_]+/gi, "_").toUpperCase();
-  const scope = input.sourceSnapshotPath.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "snapshot";
   return {
-    id: `V1-${safeCode.toLowerCase()}-${scope}-${input.category.toLowerCase()}`,
+    id: buildValidationFindingId({
+      ruleCode: input.ruleCode,
+      severity: input.category,
+      status: input.category === "PASSED" ? "resolved" : "open",
+      category: "Validation",
+      title: input.title,
+      detail: input.detail,
+      sourcePath: input.sourceSnapshotPath,
+      affectedObjects: [...input.affectedRequirementIds, ...input.affectedRequirementKeys, ...input.affectedObjectIds],
+      evidence: input.evidence.map((detail) => ({ source: input.sourceEngine, path: input.sourceSnapshotPath, detail })),
+    }),
     ...input,
   };
 }
 
 function pushFinding(findings: V1ValidationFinding[], input: Omit<V1ValidationFinding, "id">) {
-  const finding = makeFinding(input);
-  findings.push({ ...finding, id: `${finding.id}-${findings.length + 1}` });
+  findings.push(makeFinding(input));
 }
 
 function summarizeCoverage(domain: string, sourceSnapshotPath: string, findingFilter: (finding: V1ValidationFinding) => boolean, findings: V1ValidationFinding[], evidence: string[]): V1ValidationCoverageRow {

@@ -1,10 +1,19 @@
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
-import { containsIp, isValidIpv4, parseCidr } from "../lib/cidr.js";
-import { ipv6Contains, parseIpv6Cidr } from "../lib/ipv6Cidr.js";
+import { containsIp, isValidIpv4, parseCidr } from "../domain/addressing/cidr.js";
+import { ipv6Contains, parseIpv6Cidr } from "../domain/addressing/ipv6.js";
 import { ensureCanEditProject, ensureCanViewProject } from "./access.service.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
+import {
+  applyBrownfieldConflictResolutions,
+  buildBrownfieldConflictReviewFromData,
+  normalizeRouteDomainKey,
+  rowAddressFamily,
+  sameConflictDomain,
+  tryCidrToRange,
+  type BrownfieldConflictResolutionInput,
+} from "../domain/ipam/brownfield-conflicts.js";
 import { getProjectDesignData } from "./designCore/designCore.repository.js";
 
 const ALLOCATION_REVIEW_STATUSES = new Set(["PROPOSED", "REVIEW_REQUIRED", "APPROVED", "REJECTED", "SUPERSEDED", "IMPLEMENTED"]);
@@ -33,49 +42,6 @@ function asConflictReviewRows(rows: unknown): Record<string, unknown>[] {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => (row && typeof row === "object" ? row as Record<string, unknown> : {}));
 }
-
-type BrownfieldConflictSeverity = "info" | "review" | "blocked";
-
-type BrownfieldConflict = {
-  code: string;
-  severity: BrownfieldConflictSeverity;
-  routeDomainKey: string;
-  addressFamily: "IPV4" | "IPV6";
-  importedCidr: string;
-  proposedCidr?: string | null;
-  existingObjectType: string;
-  existingObjectId?: string | null;
-  existingObjectLabel?: string | null;
-  detail: string;
-  recommendedAction: string;
-};
-
-type BrownfieldConflictResolutionInput = {
-  conflictKey: string;
-  code: string;
-  routeDomainKey?: string | null;
-  addressFamily: "IPV4" | "IPV6";
-  importedCidr: string;
-  proposedCidr?: string | null;
-  existingObjectType: string;
-  existingObjectId?: string | null;
-  decision: string;
-  reviewerLabel?: string | null;
-  reason?: string | null;
-  designInputHash?: string | null;
-  applySupersede?: boolean | null;
-};
-
-type BrownfieldResolvedConflict = BrownfieldConflict & {
-  conflictKey: string;
-  resolutionStatus: "open" | "resolved";
-  resolution?: Record<string, unknown> | null;
-};
-
-type BrownfieldConflictReview = {
-  conflicts: BrownfieldResolvedConflict[];
-  summary: { blocked: number; review: number; info: number; total: number; resolved: number; unresolved: number };
-};
 
 type BrownfieldDryRunRow = {
   rowNumber: number;
@@ -585,187 +551,6 @@ async function validateIpReservationInput(projectId: string, data: Record<string
   }
 
   await ensureReservationWriteIntegrity(projectId, data, tx, excludeId);
-}
-
-function normalizeRouteDomainKey(value: unknown) {
-  return String(value ?? "default").trim() || "default";
-}
-
-function rowAddressFamily(network: Record<string, unknown>): "IPV4" | "IPV6" {
-  const cidr = String(network.cidr ?? "").trim();
-  if (network.addressFamily) return toFamily(network.addressFamily as AddressFamilyInput);
-  return cidr.includes(":") ? "IPV6" : "IPV4";
-}
-
-function tryCidrToRange(cidr: string, family: AddressFamilyInput) {
-  try {
-    validateCidr("Brownfield network", cidr, family);
-    return { ok: true as const, range: cidrToRange(cidr, family) };
-  } catch (error) {
-    return { ok: false as const, error: error instanceof Error ? error.message : "Invalid CIDR." };
-  }
-}
-
-function sameConflictDomain(importedDomain: string, candidateDomain?: string | null) {
-  const normalizedCandidate = normalizeRouteDomainKey(candidateDomain);
-  return importedDomain === normalizedCandidate || importedDomain === "default" || normalizedCandidate === "default";
-}
-
-function conflictSeverityForOverlap(importedCidr: string, candidateCidr: string, objectType: string): BrownfieldConflictSeverity {
-  if (importedCidr === candidateCidr) return "blocked";
-  if (objectType === "durable allocation" || objectType === "DHCP scope") return "blocked";
-  return "review";
-}
-
-function brownfieldConflictKey(conflict: Pick<BrownfieldConflict, "code" | "routeDomainKey" | "addressFamily" | "importedCidr" | "proposedCidr" | "existingObjectType" | "existingObjectId">) {
-  return [
-    conflict.code,
-    normalizeRouteDomainKey(conflict.routeDomainKey),
-    conflict.addressFamily,
-    conflict.importedCidr,
-    conflict.proposedCidr ?? "",
-    conflict.existingObjectType,
-    conflict.existingObjectId ?? "",
-  ].join("|");
-}
-
-function attachConflictKeys(conflicts: BrownfieldConflict[]): BrownfieldResolvedConflict[] {
-  return conflicts.map((conflict) => ({
-    ...conflict,
-    conflictKey: brownfieldConflictKey(conflict),
-    resolutionStatus: "open",
-    resolution: null,
-  }));
-}
-
-function applyBrownfieldConflictResolutions(conflicts: BrownfieldConflict[], resolutions: Record<string, unknown>[] = []): BrownfieldConflictReview {
-  const latestByKey = new Map<string, Record<string, unknown>>();
-  for (const resolution of resolutions) {
-    const key = String(resolution.conflictKey ?? "");
-    if (key) latestByKey.set(key, resolution);
-  }
-
-  const resolvedConflicts = attachConflictKeys(conflicts).map((conflict) => {
-    const resolution = latestByKey.get(conflict.conflictKey) ?? null;
-    return resolution ? { ...conflict, resolutionStatus: "resolved" as const, resolution } : conflict;
-  });
-
-  const summaryBase = resolvedConflicts.reduce((acc, conflict) => {
-    if (conflict.severity === "blocked") acc.blocked += 1;
-    if (conflict.severity === "review") acc.review += 1;
-    if (conflict.severity === "info") acc.info += 1;
-    acc.total += 1;
-    if (conflict.resolutionStatus === "resolved") acc.resolved += 1;
-    return acc;
-  }, { blocked: 0, review: 0, info: 0, total: 0, resolved: 0, unresolved: 0 });
-  summaryBase.unresolved = summaryBase.total - summaryBase.resolved;
-  return { conflicts: resolvedConflicts, summary: summaryBase };
-}
-
-function buildBrownfieldConflictReviewFromData(input: {
-  brownfieldNetworks: Record<string, unknown>[];
-  ipAllocations: Record<string, unknown>[];
-  dhcpScopes: Record<string, unknown>[];
-  ipPools: Record<string, unknown>[];
-  planRows?: Record<string, unknown>[];
-}): BrownfieldConflictReview {
-  const conflicts: BrownfieldConflict[] = [];
-
-  for (const imported of input.brownfieldNetworks) {
-    const importedCidr = String(imported.cidr ?? "").trim();
-    const family = rowAddressFamily(imported);
-    const importedRange = tryCidrToRange(importedCidr, family);
-    if (!importedRange.ok) continue;
-    const importedDomain = normalizeRouteDomainKey(imported.routeDomainKey);
-
-    for (const allocation of input.ipAllocations) {
-      if (toFamily(allocation.addressFamily as AddressFamilyInput) !== family) continue;
-      const candidateCidr = String(allocation.cidr ?? "").trim();
-      const routeDomainKey = normalizeRouteDomainKey((allocation.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? ((allocation.pool as Record<string, unknown> | undefined)?.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? allocation.routeDomainKey);
-      if (!sameConflictDomain(importedDomain, routeDomainKey)) continue;
-      if (!cidrsOverlap(importedCidr, candidateCidr, family)) continue;
-      const severity = conflictSeverityForOverlap(importedCidr, candidateCidr, "durable allocation");
-      conflicts.push({
-        code: importedCidr === candidateCidr ? "BROWNFIELD_DUPLICATES_DURABLE_ALLOCATION" : "BROWNFIELD_OVERLAPS_DURABLE_ALLOCATION",
-        severity,
-        routeDomainKey: importedDomain,
-        addressFamily: family,
-        importedCidr,
-        proposedCidr: candidateCidr,
-        existingObjectType: "durable allocation",
-        existingObjectId: String(allocation.id ?? ""),
-        existingObjectLabel: String(allocation.purpose ?? allocation.cidr ?? "allocation"),
-        detail: `Imported ${importedCidr} overlaps durable allocation ${candidateCidr}.`,
-        recommendedAction: severity === "blocked" ? "Reconcile ownership before approving or implementing this allocation." : "Review whether the imported current-state block should supersede or constrain the proposed allocation.",
-      });
-    }
-
-    for (const scope of input.dhcpScopes) {
-      if (toFamily(scope.addressFamily as AddressFamilyInput) !== family) continue;
-      const scopeCidr = String(scope.scopeCidr ?? "").trim();
-      const routeDomainKey = normalizeRouteDomainKey((scope.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? scope.routeDomainKey);
-      if (!sameConflictDomain(importedDomain, routeDomainKey)) continue;
-      if (!cidrsOverlap(importedCidr, scopeCidr, family)) continue;
-      conflicts.push({
-        code: importedCidr === scopeCidr ? "BROWNFIELD_DUPLICATES_DHCP_SCOPE" : "BROWNFIELD_OVERLAPS_DHCP_SCOPE",
-        severity: "blocked",
-        routeDomainKey: importedDomain,
-        addressFamily: family,
-        importedCidr,
-        proposedCidr: scopeCidr,
-        existingObjectType: "DHCP scope",
-        existingObjectId: String(scope.id ?? ""),
-        existingObjectLabel: String(scope.serverLocation ?? scope.scopeCidr ?? "DHCP scope"),
-        detail: `Imported ${importedCidr} overlaps DHCP scope ${scopeCidr}.`,
-        recommendedAction: "Confirm whether this imported network is the authoritative scope or whether the proposed DHCP scope needs renumbering.",
-      });
-    }
-
-    for (const pool of input.ipPools) {
-      if (toFamily(pool.addressFamily as AddressFamilyInput) !== family) continue;
-      const poolCidr = String(pool.cidr ?? "").trim();
-      const routeDomainKey = normalizeRouteDomainKey((pool.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? pool.routeDomainKey);
-      if (!sameConflictDomain(importedDomain, routeDomainKey)) continue;
-      if (!cidrsOverlap(importedCidr, poolCidr, family)) continue;
-      conflicts.push({
-        code: "BROWNFIELD_INTERSECTS_POOL",
-        severity: Boolean(pool.noAllocate) ? "review" : "info",
-        routeDomainKey: importedDomain,
-        addressFamily: family,
-        importedCidr,
-        proposedCidr: poolCidr,
-        existingObjectType: "IP pool",
-        existingObjectId: String(pool.id ?? ""),
-        existingObjectLabel: String(pool.name ?? pool.cidr ?? "pool"),
-        detail: `Imported ${importedCidr} intersects planned pool ${poolCidr}.`,
-        recommendedAction: "Use this as context. Pools may intentionally contain current-state blocks, but allocations must still be reconciled.",
-      });
-    }
-
-    for (const row of input.planRows ?? []) {
-      const rowFamily = toFamily(row.family as AddressFamilyInput);
-      if (rowFamily !== family || !row.proposedCidr) continue;
-      const proposedCidr = String(row.proposedCidr ?? "").trim();
-      const routeDomainKey = normalizeRouteDomainKey(row.routeDomainKey);
-      if (!sameConflictDomain(importedDomain, routeDomainKey)) continue;
-      if (!cidrsOverlap(importedCidr, proposedCidr, family)) continue;
-      conflicts.push({
-        code: "BROWNFIELD_OVERLAPS_ALLOCATOR_PLAN_ROW",
-        severity: "review",
-        routeDomainKey: importedDomain,
-        addressFamily: family,
-        importedCidr,
-        proposedCidr,
-        existingObjectType: "allocator plan row",
-        existingObjectId: String(row.poolId ?? ""),
-        existingObjectLabel: String(row.target ?? "allocator plan row"),
-        detail: `Imported ${importedCidr} overlaps proposed allocator row ${proposedCidr}.`,
-        recommendedAction: "Do not materialize this plan row until the brownfield overlap is reviewed or imported ownership is confirmed.",
-      });
-    }
-  }
-
-  return applyBrownfieldConflictResolutions(conflicts);
 }
 
 async function loadBrownfieldReviewData(projectId: string) {

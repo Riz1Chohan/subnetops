@@ -7,7 +7,7 @@ import {
   parseCidr,
   recommendedPrefixForHosts,
   usableHostCount,
-} from "./cidr.js";
+} from "../domain/addressing/cidr.js";
 import {
   allocateRequestedBlocks,
   clipUsedRangesToParent,
@@ -16,7 +16,7 @@ import {
   normalizeUsedRanges,
   type BlockAllocationRequest,
   type UsedRange,
-} from "./addressAllocator.js";
+} from "../domain/addressing/allocation-fit.js";
 
 function run(name: string, fn: () => void) {
   try {

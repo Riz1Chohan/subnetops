@@ -76,7 +76,7 @@ import {
   validateGatewayForSubnet,
   type ParsedCidr,
   type SegmentRole,
-} from "../lib/cidr.js";
+} from "../domain/addressing/cidr.js";
 import {
   allocateRequestedBlocks,
   canChildFitInsideParent,
@@ -85,8 +85,8 @@ import {
   nextBlockSize,
   sortAllocationCandidates,
   sortSiteAllocationCandidates,
-} from "../lib/addressAllocator.js";
-import { buildEnterpriseAllocatorPosture, extractEnterpriseAllocatorSource, overallEnterpriseAllocatorReadiness } from "../lib/enterpriseAddressAllocator.js";
+} from "../domain/addressing/allocation-fit.js";
+import { buildEnterpriseAllocatorPosture, extractEnterpriseAllocatorSource, overallEnterpriseAllocatorReadiness } from "../domain/ipam/enterprise-ipam.js";
 import {
   NETWORK_STANDARDS_RULEBOOK,
 } from "../lib/networkStandardsRulebook.js";

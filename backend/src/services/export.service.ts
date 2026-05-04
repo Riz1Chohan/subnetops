@@ -780,7 +780,7 @@ export async function getCsvRows(projectId: string) {
         Name: `VLAN ${row.vlanId} ${row.vlanName}`,
         Key: "Subnet review",
         Value: row.canonicalSubnetCidr ?? row.sourceSubnetCidr,
-        Notes: `Gateway state ${row.gatewayState} | Capacity ${row.capacityState} | Required ${row.requiredUsableHosts ?? "—"} usable | Recommended ${row.recommendedPrefix ? `/${row.recommendedPrefix}` : "—"} | Role ${row.role} (${row.roleSource ?? "unknown"}/${row.roleConfidence ?? "low"}) | In site block ${row.inSiteBlock === null ? "Unknown" : row.inSiteBlock ? "Yes" : "No"} | ${row.engine1Explanation ?? row.capacityExplanation ?? row.roleEvidence ?? "Backend Engine 1 reviewed"}` ,
+        Notes: `Gateway state ${row.gatewayState} | Capacity ${row.capacityState} | Required ${row.requiredUsableHosts ?? "—"} usable | Recommended ${row.recommendedPrefix ? `/${row.recommendedPrefix}` : "—"} | Role ${row.role} (${row.roleSource ?? "unknown"}/${row.roleConfidence ?? "low"}) | In site block ${row.inSiteBlock === null ? "Unknown" : row.inSiteBlock ? "Yes" : "No"} | ${row.engine1Explanation ?? row.capacityExplanation ?? row.roleEvidence ?? "Backend addressing reviewed"}` ,
       });
     }
 
@@ -1150,7 +1150,7 @@ export async function getCsvRows(projectId: string) {
 
       for (const row of V1.reconciliationRows.slice(0, 120)) {
         rows.push({
-          Section: "V1 Engine1-Engine2 Reconciliation",
+          Section: "V1 Addressing/IPAM Reconciliation",
           Scope: row.siteName,
           Name: `VLAN ${row.vlanId} ${row.vlanName}`,
           Key: row.reconciliationState,

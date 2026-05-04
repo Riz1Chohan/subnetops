@@ -5,6 +5,6 @@
   "type": "commonjs",
   "scripts": {
     "check": "npm run check:v1",
-    "check:v1": "node scripts/check-v1-release.cjs"
+    "check:v1": "node scripts/check-v1-release.cjs && node scripts/check-frontend-truth.cjs && node scripts/check-ci-hardening.cjs && node scripts/check-ux-simplification.cjs && node scripts/check-ai-containment.cjs && node scripts/check-final-proof-package.cjs"
   }
 }

@@ -24,6 +24,10 @@ model User {
   notificationPreference NotificationPreference?
   watches       ProjectWatch[]
   passwordResetTokens PasswordResetToken[]
+  authSessions AuthSession[]
+  securityAuditEvents SecurityAuditEvent[]
+  tokenVersion Int @default(1)
+  tokensInvalidBefore DateTime?
 }
 
 enum NotificationType {
@@ -37,6 +41,55 @@ enum NotificationType {
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+
+model AuthSession {
+  id          String   @id @default(uuid())
+  userId      String
+  tokenHash   String   @unique
+  issuedAt    DateTime @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  lastSeenAt  DateTime?
+  ipAddress   String?
+  userAgent   String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model SecurityAuditEvent {
+  id             String   @id @default(uuid())
+  actorUserId    String?
+  organizationId String?
+  projectId      String?
+  action         String
+  outcome        String
+  targetType     String?
+  targetId       String?
+  detailJson     String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+  actor          User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
 }
 
 model PasswordResetToken {

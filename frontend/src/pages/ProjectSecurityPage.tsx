@@ -11,6 +11,7 @@ import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -119,7 +120,7 @@ export function ProjectSecurityPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Security zones {synthesized.securityZones.length}</span>
           <span className="badge-soft">Controls {synthesized.securityControls.length}</span>
-          <span className="badge-soft">Backend policy rows {backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length}</span>
+          <span className="badge-soft">Policy rows {backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length}</span>
           <span className="badge-soft">Segmentation review {criticalFindings} critical / {warningFindings} warning</span>
         </div>
         <p className="muted" style={{ margin: 0 }}>
@@ -145,7 +146,7 @@ export function ProjectSecurityPage() {
               <div key={stage.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
                   <strong>{stage.label}</strong>
-                  <span className={stage.status === "ready" ? "badge badge-info" : stage.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{stage.status}</span>
+                  <span className={stage.status === "ready" ? "badge badge-info" : stage.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{userFacingStatusLabel(stage.status)}</span>
                 </div>
                 <p className="muted" style={{ margin: 0 }}>{stage.detail}</p>
               </div>
@@ -167,7 +168,7 @@ export function ProjectSecurityPage() {
       <div className="grid-2" style={{ display: selectedSection && selectedSection !== "boundaries" ? "none" : "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {summaryCard("Security zones", synthesized.securityZones.length, "Distinct trust boundaries carried in the logical design.")}
         {summaryCard("Required controls", synthesized.securityControls.filter((item) => item.status === "required").length, "Controls that should not be skipped for the saved scope.")}
-        {summaryCard("Backend policy rows", backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length, "Backend security matrix rows carried by the authoritative design-core snapshot.")}
+        {summaryCard("Policy rows", backendPolicyMatrix.length || synthesized.securityPolicyMatrix.length, "Security matrix rows carried by the verified design model.")}
         {summaryCard("Open security findings", synthesized.segmentationReview.filter((item) => item.severity !== "info").length, "Critical and warning findings that still need engineering review.")}
       </div>
 
@@ -293,9 +294,9 @@ export function ProjectSecurityPage() {
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "policy" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Backend security policy engine</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security policy model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            These rows come from the backend design-core security engine. The frontend is only rendering the matrix, rule-order review, and NAT review; it is not creating firewall policy.
+            These rows come from the backend security policy model. The frontend is only rendering the matrix, rule-order review, and NAT review; it is not creating firewall policy.
           </p>
         </div>
         {backendSecurityFlow ? (
@@ -306,16 +307,16 @@ export function ProjectSecurityPage() {
               <span className="badge-soft">implicit deny gaps {backendSecurityFlow.summary.implicitDenyGapCount}</span>
               <span className="badge-soft">shadowed rules {backendSecurityFlow.summary.shadowedRuleCount}</span>
               <span className="badge-soft">logging gaps {backendSecurityFlow.summary.loggingGapCount}</span>
-              {V1SecurityPolicy ? <span className={V1SecurityPolicy.overallReadiness === "BLOCKED" ? "badge badge-error" : V1SecurityPolicy.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge badge-info"}>V1 {V1SecurityPolicy.overallReadiness}</span> : null}
+              {V1SecurityPolicy ? <span className={V1SecurityPolicy.overallReadiness === "BLOCKED" ? "badge badge-error" : V1SecurityPolicy.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge badge-info"}>{userFacingStatusLabel(V1SecurityPolicy.overallReadiness)}</span> : null}
               {V1SecurityPolicy ? <span className="badge-soft">flow consequences {V1SecurityPolicy.flowConsequenceCount}</span> : null}
               {V1SecurityPolicy ? <span className="badge-soft">requirement gaps {V1SecurityPolicy.activeRequirementSecurityGapCount}</span> : null}
             </div>
 
             {V1SecurityPolicy ? (
               <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 12 }}>
-                <div><h3 style={{ marginTop: 0, marginBottom: 6 }}>V1 security policy flow control</h3><p className="muted" style={{ margin: 0 }}>This is the strict backend control layer for zone-to-zone matrix, service dependencies, NAT, logging, broad permits, shadowing, and explicit requirement-to-flow consequences. It is not firewall command generation.</p></div>
-                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing</th></tr></thead><tbody>{V1SecurityPolicy.requirementSecurityMatrix.slice(0, 10).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
-                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">V1 state</th><th align="left">Review reason</th></tr></thead><tbody>{V1SecurityPolicy.flowConsequences.slice(0, 12).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{row.V1PolicyState}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
+                <div><h3 style={{ marginTop: 0, marginBottom: 6 }}>Security policy flow checks</h3><p className="muted" style={{ margin: 0 }}>This checks the zone-to-zone matrix, service dependencies, NAT, logging, broad permits, shadowing, and explicit requirement-to-flow consequences. It is not firewall command generation.</p></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing</th></tr></thead><tbody>{V1SecurityPolicy.requirementSecurityMatrix.slice(0, 10).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{userFacingStatusLabel(row.readinessImpact)}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">State</th><th align="left">Review reason</th></tr></thead><tbody>{V1SecurityPolicy.flowConsequences.slice(0, 12).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{userFacingStatusLabel(row.V1PolicyState)}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
               </div>
             ) : null}
 
@@ -408,8 +409,8 @@ export function ProjectSecurityPage() {
           </>
         ) : (
           <EmptyState
-            title="No backend security engine output"
-            message="SubnetOps cannot render authoritative security policy rows until the backend design-core snapshot is available."
+            title="No security policy output"
+            message="SubnetOps cannot render verified security policy rows until the design model is available."
           />
         )}
       </div>

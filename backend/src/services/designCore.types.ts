@@ -1,4 +1,5 @@
-import type { SegmentRole } from "../lib/cidr.js";
+import type { SegmentRole } from "../domain/addressing/cidr.js";
+import type { TopologyModel } from "../domain/topology/index.js";
 import type { StandardsRule, StandardsRulebookSummary, StandardsRuleStatus } from "../lib/networkStandardsRulebook.js";
 import type { PlanningInputAuditItem, PlanningInputAuditSummary } from "../lib/planningInputAudit.js";
 
@@ -124,7 +125,7 @@ export type DesignTruthSourceType =
   | "USER_PROVIDED"
   | "REQUIREMENT_MATERIALIZED"
   | "BACKEND_COMPUTED"
-  | "ENGINE2_DURABLE"
+  | "DURABLE_IPAM"
   | "INFERRED"
   | "ESTIMATED"
   | "IMPORTED"
@@ -895,7 +896,7 @@ export interface V1EnterpriseIpamReconciliationRow {
   engine2PoolId?: string;
   engine2PoolName?: string;
   routeDomainKey: string;
-  sourceTruth: "ENGINE1_PLANNED" | "ENGINE2_DURABLE";
+  sourceTruth: "ENGINE1_PLANNED" | "DURABLE_IPAM";
   reconciliationState: V1IpamReconciliationState;
   readinessImpact: V1IpamReadinessImpact;
   approvedHashMatches: boolean;
@@ -2067,7 +2068,7 @@ export interface V1ImplementationTemplateControlSummary { contract: "V1_VENDOR_N
 
 
 export type V1ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
-export type V1ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "ENGINE2_DURABLE" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
+export type V1ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "DURABLE_IPAM" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
 export interface V1ReportSectionGateRow { sectionKey: string; title: string; required: boolean; readinessImpact: V1ReportExportTruthReadiness; reportSection: string; frontendLocation: string; truthLabels: V1ReportTruthLabel[]; evidence: string[]; blockers: string[]; }
 export interface V1ReportTraceabilityMatrixRow { requirementKey: string; requirementLabel: string; designConsequence: string; enginesAffected: string[]; frontendLocation: string; reportSection: string; diagramImpact: string; readinessStatus: V1ReportExportTruthReadiness; missingConsumers: string[]; sourceObjectIds: string[]; }
 export interface V1ReportTruthLabelRow { truthLabel: V1ReportTruthLabel; count: number; reportUsage: string; readinessImpact: V1ReportExportTruthReadiness; evidence: string[]; }
@@ -2337,6 +2338,7 @@ export interface V1FinalProofPassControlSummary {
 
 export interface NetworkObjectModel {
   summary: NetworkObjectModelSummary;
+  topology?: TopologyModel;
   routeDomains: RouteDomain[];
   securityZones: SecurityZone[];
   devices: NetworkDevice[];

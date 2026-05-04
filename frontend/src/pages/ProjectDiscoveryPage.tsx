@@ -18,6 +18,7 @@ import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -145,11 +146,11 @@ export function ProjectDiscoveryPage() {
   const focusedSectionTitle = selectedSection === "summary"
     ? "Current state summary"
     : selectedSection === "contract"
-      ? "Backend discovery contract"
+      ? "Current-state evidence"
       : selectedSection === "extraction"
         ? "Extraction preview"
         : selectedSection === "authority"
-          ? "Authority lift"
+          ? "Route and boundary anchors"
           : selectedSection === "inputs"
             ? "Paste inputs"
             : selectedSection === "coverage"
@@ -174,7 +175,7 @@ export function ProjectDiscoveryPage() {
       ) : (
       <SectionHeader
         title="Discovery & Current State"
-        description="This workspace is the v1 foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
+        description="This workspace is the foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
         actions={(
           <div className="overview-actions-shell">
             <div className="overview-primary-actions">
@@ -193,7 +194,7 @@ export function ProjectDiscoveryPage() {
           <span className="badge-soft">Filled sections {summary.filledSections}/9</span>
           <span className="badge-soft">Migration complexity {summary.migrationComplexity}</span>
           <span className="badge-soft">Shared project persistence</span>
-          {V1DiscoveryCurrentState ? <span className="badge-soft">V1 {V1DiscoveryCurrentState.overallReadiness}</span> : null}
+          {V1DiscoveryCurrentState ? <span className="badge-soft">{userFacingStatusLabel(V1DiscoveryCurrentState.overallReadiness)}</span> : null}
         </div>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{project.name}</h2>
@@ -214,16 +215,16 @@ export function ProjectDiscoveryPage() {
 
       <div data-discovery-section="contract" className="panel" style={{ display: selectedSection && selectedSection !== "contract" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: 0 }}>V1 backend discovery/current-state contract</h2>
+          <h2 style={{ margin: 0 }}>Current-state evidence contract</h2>
           <p className="muted" style={{ margin: 0 }}>
-            V1_DISCOVERY_CURRENT_STATE_CONTRACT keeps discovery honest: manual notes, imported artifacts, validated evidence, conflicts, and review-required gaps are displayed from the backend snapshot instead of being invented by the frontend.
+            Current-state evidence keeps discovery honest: manual notes, imported artifacts, validated evidence, conflicts, and review-required gaps are displayed from saved project data instead of being invented in the browser.
           </p>
         </div>
         {V1DiscoveryCurrentState ? (
           <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <span className={V1DiscoveryCurrentState.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1DiscoveryCurrentState.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>Readiness {V1DiscoveryCurrentState.overallReadiness}</span>
-              <span className="badge-soft">Authority {V1DiscoveryCurrentState.currentStateAuthority}</span>
+              <span className={V1DiscoveryCurrentState.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1DiscoveryCurrentState.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>Readiness {userFacingStatusLabel(V1DiscoveryCurrentState.overallReadiness)}</span>
+              <span className="badge-soft">Source {userFacingStatusLabel(V1DiscoveryCurrentState.currentStateAuthority)}</span>
               <span className="badge-soft">Areas {V1DiscoveryCurrentState.areaRowCount}</span>
               <span className="badge-soft">Import targets {V1DiscoveryCurrentState.importTargetCount}</span>
               <span className="badge-soft">Open tasks {V1DiscoveryCurrentState.openTaskCount}</span>
@@ -267,10 +268,10 @@ export function ProjectDiscoveryPage() {
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {V1DiscoveryCurrentState.tasks.slice(0, 8).map((task) => <li key={task.taskId} style={{ marginBottom: 8 }}><strong>{task.requirementId}</strong>: {task.title} — {task.state} / {task.readinessImpact}</li>)}
                   </ul>
-                ) : <p className="muted" style={{ margin: 0 }}>No backend discovery tasks have been generated yet.</p>}
+                ) : <p className="muted" style={{ margin: 0 }}>No discovery tasks have been generated yet.</p>}
               </div>
               <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
-                <strong>Proof boundary</strong>
+                <strong>Evidence boundary</strong>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {V1DiscoveryCurrentState.proofBoundary.map((line) => <li key={line} style={{ marginBottom: 8 }}>{line}</li>)}
                 </ul>
@@ -278,7 +279,7 @@ export function ProjectDiscoveryPage() {
             </div>
             {V1DiscoveryCurrentState.findings.length ? (
               <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
-                <strong>Backend findings</strong>
+                <strong>System findings</strong>
                 <div style={{ display: "grid", gap: 8 }}>
                   {V1DiscoveryCurrentState.findings.slice(0, 8).map((finding) => (
                     <div key={finding.code} className="validation-card">
@@ -291,7 +292,7 @@ export function ProjectDiscoveryPage() {
             ) : null}
           </>
         ) : (
-          <p className="muted" style={{ margin: 0 }}>Backend V1 discovery/current-state evidence is not available yet. That is a blocker, not a frontend excuse to fake current-state authority.</p>
+          <p className="muted" style={{ margin: 0 }}>Current-state evidence is not available yet. That is a blocker, not a browser excuse to fake current-state facts.</p>
         )}
       </div>
 
@@ -299,7 +300,7 @@ export function ProjectDiscoveryPage() {
         <div>
           <h2 style={{ margin: 0 }}>Discovery-to-design extraction preview</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Discovery should not stay as pasted notes only. This preview shows what the current-state capture is already doing to strengthen the design engine, route/boundary truth, and recovery handoff decision.
+            Discovery should not stay as pasted notes only. This preview shows what the current-state capture is already doing to strengthen the design checks, route/boundary evidence, and recovery handoff decision.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -335,7 +336,7 @@ export function ProjectDiscoveryPage() {
 
       <div data-discovery-section="authority" className="panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Discovery-backed authority lift</h2>
+          <h2 style={{ margin: 0 }}>Discovery-backed anchors</h2>
           <p className="muted" style={{ margin: 0 }}>
             Discovery is now allowed to strengthen the shared model instead of staying as passive notes only. These counts show where current-state evidence is already promoting route and boundary anchors ahead of later saved design detail.
           </p>
@@ -343,8 +344,8 @@ export function ProjectDiscoveryPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Discovery route anchors {discoveryRouteAnchors.length}</span>
           <span className="badge-soft">Discovery boundary anchors {discoveryBoundaryAnchors.length}</span>
-          <span className="badge-soft">Backend-unconfirmed route anchors {backendUnconfirmedRouteAnchors.length}</span>
-          <span className="badge-soft">Backend-unconfirmed boundary anchors {backendUnconfirmedBoundaryAnchors.length}</span>
+          <span className="badge-soft">System-draft route anchors {backendUnconfirmedRouteAnchors.length}</span>
+          <span className="badge-soft">System-draft boundary anchors {backendUnconfirmedBoundaryAnchors.length}</span>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -359,7 +360,7 @@ export function ProjectDiscoveryPage() {
             )}
           </div>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>Still held by backend-unconfirmed truth</strong>
+            <strong style={{ display: "block", marginBottom: 8 }}>Still held as system-draft anchors</strong>
             <p className="muted" style={{ margin: 0 }}>
               Planner-preview anchors are useful, but the stronger recovery direction is to replace as many of them as possible with discovery-backed or saved design records.
             </p>

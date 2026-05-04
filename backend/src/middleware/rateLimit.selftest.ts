@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { createRateLimiter } from "./rateLimit.js";
+import { createRateLimiter, MemoryRateLimitStore } from "./rateLimit.js";
 
 interface MockResponse {
   statusCode?: number;
@@ -36,15 +36,16 @@ function makeResponse(): MockResponse & Response {
   return response as MockResponse & Response;
 }
 
-function invoke(limiter: ReturnType<typeof createRateLimiter>, ip: string) {
+async function invoke(limiter: ReturnType<typeof createRateLimiter>, ip: string) {
   const req = makeRequest(ip);
   const res = makeResponse();
   let passed = false;
-  const next: NextFunction = () => {
+  const next: NextFunction = (error?: unknown) => {
+    if (error) throw error;
     passed = true;
   };
 
-  limiter(req, res, next);
+  await limiter(req, res, next);
   return { passed, statusCode: res.statusCode, headers: res.headers };
 }
 
@@ -54,21 +55,22 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function runRateLimitSelftest() {
-  const authLimiter = createRateLimiter({ keyPrefix: "auth-selftest", windowMs: 60_000, maxAttempts: 1 });
+async function runRateLimitSelftest() {
+  const store = new MemoryRateLimitStore();
+  const authLimiter = createRateLimiter({ keyPrefix: "auth-selftest", windowMs: 60_000, maxAttempts: 1, store });
 
-  const firstClientFirstAttempt = invoke(authLimiter, "198.51.100.10");
+  const firstClientFirstAttempt = await invoke(authLimiter, "198.51.100.10");
   assert(firstClientFirstAttempt.passed, "first request from client A should pass");
 
-  const firstClientSecondAttempt = invoke(authLimiter, "198.51.100.10");
+  const firstClientSecondAttempt = await invoke(authLimiter, "198.51.100.10");
   assert(!firstClientSecondAttempt.passed, "second request from client A should be blocked");
   assert(firstClientSecondAttempt.statusCode === 429, "blocked request should return 429");
 
-  const secondClientFirstAttempt = invoke(authLimiter, "198.51.100.11");
+  const secondClientFirstAttempt = await invoke(authLimiter, "198.51.100.11");
   assert(secondClientFirstAttempt.passed, "client B must not inherit client A's exhausted bucket");
 
-  const passwordResetLimiter = createRateLimiter({ keyPrefix: "password-reset-selftest", windowMs: 60_000, maxAttempts: 1 });
-  const sameIpDifferentPrefix = invoke(passwordResetLimiter, "198.51.100.10");
+  const passwordResetLimiter = createRateLimiter({ keyPrefix: "password-reset-selftest", windowMs: 60_000, maxAttempts: 1, store });
+  const sameIpDifferentPrefix = await invoke(passwordResetLimiter, "198.51.100.10");
   assert(sameIpDifferentPrefix.passed, "different limiter prefixes must use separate buckets for the same IP");
 
   console.log("Rate limiter selftest passed.");

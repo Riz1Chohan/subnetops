@@ -305,7 +305,7 @@ export function ProjectAddressingPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recommended segment model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This view shows what the design engine believes the logical segmentation should look like across the project.
+            This view shows the backend-calculated logical segmentation model for the project.
           </p>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -361,7 +361,7 @@ export function ProjectAddressingPage() {
           <h2 style={{ margin: 0 }}>Open issues and risks</h2>
           {synthesized.openIssues.length === 0 ? (
             <div className="trust-note">
-              <p className="muted" style={{ margin: 0 }}>No major addressing gaps are currently surfaced by the synthesis engine.</p>
+              <p className="muted" style={{ margin: 0 }}>No major addressing gaps are currently surfaced by design checks.</p>
             </div>
           ) : (
             <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -378,7 +378,7 @@ export function ProjectAddressingPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Enterprise allocator readiness</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This is the Engine 2 enterprise gate. It separates real computed allocator proof from missing enterprise evidence: IPv6, VRF domains, brownfield imports, DHCP options/reservations, reserve policy, and approvals.
+            This is the enterprise IPAM gate. It separates computed allocator evidence from missing enterprise evidence: IPv6, VRF domains, brownfield imports, DHCP options/reservations, reserve policy, and approvals.
           </p>
         </div>
         {designCore?.enterpriseAllocatorPosture ? (
@@ -395,7 +395,7 @@ export function ProjectAddressingPage() {
             <div className="trust-note">
               <p style={{ margin: 0 }}><strong>IPv4 subnets:</strong> {designCore.enterpriseAllocatorPosture.ipv4ConfiguredSubnetCount} • <strong>IPv6 prefixes:</strong> {designCore.enterpriseAllocatorPosture.ipv6ConfiguredPrefixCount} • <strong>DHCP scopes:</strong> {designCore.enterpriseAllocatorPosture.dhcpScopeCount} • <strong>Brownfield evidence:</strong> {designCore.enterpriseAllocatorPosture.brownfieldEvidenceState}</p>
               <p style={{ margin: "6px 0 0 0" }}><strong>Durable pools:</strong> {designCore.enterpriseAllocatorPosture.durablePoolCount ?? 0} • <strong>Durable allocations:</strong> {designCore.enterpriseAllocatorPosture.durableAllocationCount ?? 0} • <strong>Imported networks:</strong> {designCore.enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0} • <strong>Approvals:</strong> {designCore.enterpriseAllocatorPosture.allocationApprovalCount ?? 0} • <strong>Ledger:</strong> {designCore.enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0}</p>
-              <p style={{ margin: "6px 0 0 0" }}><strong>Conflict proof:</strong> VRF {designCore.enterpriseAllocatorPosture.vrfOverlapFindingCount ?? 0} • Brownfield {designCore.enterpriseAllocatorPosture.brownfieldConflictCount ?? 0} • DHCP {designCore.enterpriseAllocatorPosture.dhcpFindingCount ?? 0} • Reserve {designCore.enterpriseAllocatorPosture.reservePolicyFindingCount ?? 0} • Stale approvals {designCore.enterpriseAllocatorPosture.staleAllocationCount ?? 0}</p>
+              <p style={{ margin: "6px 0 0 0" }}><strong>Conflict evidence:</strong> VRF {designCore.enterpriseAllocatorPosture.vrfOverlapFindingCount ?? 0} • Brownfield {designCore.enterpriseAllocatorPosture.brownfieldConflictCount ?? 0} • DHCP {designCore.enterpriseAllocatorPosture.dhcpFindingCount ?? 0} • Reserve {designCore.enterpriseAllocatorPosture.reservePolicyFindingCount ?? 0} • Stale approvals {designCore.enterpriseAllocatorPosture.staleAllocationCount ?? 0}</p>
             </div>
             {designCore.enterpriseAllocatorPosture.allocationPlanRows?.length ? (
               <div style={{ overflowX: "auto" }}>
@@ -409,7 +409,7 @@ export function ProjectAddressingPage() {
                       <th align="left">Requested</th>
                       <th align="left">Proposed</th>
                       <th align="left">Status</th>
-                      <th align="left">Proof</th>
+                      <th align="left">Evidence</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -436,13 +436,13 @@ export function ProjectAddressingPage() {
             ) : <p className="muted" style={{ margin: 0 }}>No enterprise allocator review queue items are currently present.</p>}
           </div>
         ) : (
-          <div className="trust-note"><p className="muted" style={{ margin: 0 }}>Enterprise allocator posture is unavailable from the backend snapshot.</p></div>
+          <div className="trust-note"><p className="muted" style={{ margin: 0 }}>Enterprise allocator posture is unavailable from the design model.</p></div>
         )}
       </div>
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "table" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Engine 2 allocator proposal review{/* Engine 1 proposal review: compatibility label for the V1 static release gate. */}</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>IPAM allocator proposal review{/* addressing proposal review: compatibility label for the V1 static release gate. */}</h2>
           <p className="muted" style={{ margin: 0 }}>
             Structured backend proposal rows are shown here so allocator decisions are not trapped in raw JSON. This table surfaces the proposed subnet, gateway,
             role evidence, capacity requirement, proposed mask/range/headroom, and allocator explanation before any engineer accepts the correction.
@@ -462,7 +462,7 @@ export function ProjectAddressingPage() {
                   <th align="left">Gateway</th>
                   <th align="left">Headroom</th>
                   <th align="left">Allocator Explanation</th>
-                  <th align="left">Allocator Proof</th>
+                  <th align="left">Allocator Evidence</th>
                   <th align="left">Notes</th>
                 </tr>
               </thead>
@@ -523,7 +523,7 @@ export function ProjectAddressingPage() {
                 <th align="left">Recommended</th>
                 <th align="left">Headroom</th>
                 <th align="left">Capacity</th>
-                <th align="left">Engine 1 Explanation</th>
+                <th align="left">Addressing Explanation</th>
                 <th align="left">Placement</th>
                 <th align="left">Notes</th>
               </tr>

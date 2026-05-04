@@ -1,5 +1,5 @@
 import { isPrivateIpv4Cidr, parseJsonMap, valueAsBoolean, valueAsString } from "./designCore.helpers.js";
-import { parseCidr } from "../../lib/cidr.js";
+import { parseCidr } from "../../domain/addressing/cidr.js";
 import { NETWORK_STANDARDS_RULEBOOK, summarizeStandardsRulebook, type StandardsRuleStatus } from "../../lib/networkStandardsRulebook.js";
 import type { AllocationPolicySummary, DesignCoreIssue, SecurityIntentSummary, SiteSummarizationReview, StandardsAlignmentSummary, StandardsRuleEvaluation, TransitPlanRow } from "../designCore.types.js";
 

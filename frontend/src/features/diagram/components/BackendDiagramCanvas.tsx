@@ -460,7 +460,7 @@ function V1WithSiteSummary(site: BackendDiagramRenderNode, allNodes: BackendDiag
       `Site block: ${siteBlock}`,
       `VLANs: ${vlans.length}`,
       `Subnets: ${subnets.length}`,
-      `Segments: ${uniqueSegments.length ? uniqueSegments.join(", ") : "No VLANs materialized"}`,
+      `Segments: ${uniqueSegments.length ? uniqueSegments.join(", ") : "No VLANs applied"}`,
       `Readiness: ${V1ReadinessSummary(site, allNodes)}`,
       "Collapsed summary. Open Logical / Per-site for full VLAN, subnet, gateway, and DHCP detail.",
       ...site.notes.slice(0, 2),
@@ -781,18 +781,15 @@ function buildVisibleDiagram(renderModel: BackendDiagramRenderModel, mode: Diagr
     return layoutNodesForView({ nodes: summaryNodes, edges: [], mode, scope, focusedSiteId, activeOverlays });
   }
 
-  // V1: physical/WAN drawings should not use one global WAN cloud as a fake parent.
-  // Replace raw WAN anchors with per-site local Internet breakouts, then draw VPN overlay separately.
-  if (scope !== "boundaries" && (mode === "physical" || scope === "wan-cloud")) {
-    nodes = addLocalInternetBreakouts(nodes, mode, scope, focusedSiteId);
-    nodes = addV1VpnFabric(nodes, mode, scope);
-  }
+  // V1 diagram truth rebuild: the frontend may filter, lay out, and label backend renderModel objects,
+  // but it must not add local-Internet/VPN-fabric nodes or other topology facts.
+  void focusedSiteId;
 
   const limit = scope === "boundaries" ? 80 : mode === "logical" ? 120 : isV1EnterpriseScale(nodes) ? 140 : 80;
   const limitedNodes = nodes.slice(0, limit);
   const nodeIds = new Set(limitedNodes.map((node) => node.id));
   const filteredEdges = candidateEdges.filter((edge) => nodeIds.has(edge.sourceNodeId) && nodeIds.has(edge.targetNodeId));
-  const edges = supplementPresentationEdges(limitedNodes, dedupeEdgesForReadableView(filteredEdges, nodeById, mode, scope), mode, scope, focusedSiteId);
+  const edges = dedupeEdgesForReadableView(filteredEdges, nodeById, mode, scope);
   return layoutNodesForView({ nodes: limitedNodes, edges, mode, scope, focusedSiteId, activeOverlays });
 }
 
@@ -1084,7 +1081,7 @@ function V1SiteSummaryCard({ node, selected }: { node: BackendDiagramRenderNode;
   const siteBlock = V1SummaryValue(node, "Site block") || "Address block pending";
   const vlans = V1SummaryValue(node, "VLANs") || "0";
   const subnets = V1SummaryValue(node, "Subnets") || "0";
-  const segments = V1SummaryValue(node, "Segments") || "No VLANs materialized";
+  const segments = V1SummaryValue(node, "Segments") || "No VLANs applied";
   const readiness = V1SummaryValue(node, "Readiness") || executionReadinessText(node.readiness);
   const width = 315;
   const height = 172;

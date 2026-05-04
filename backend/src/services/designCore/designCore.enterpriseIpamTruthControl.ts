@@ -16,7 +16,7 @@ import type {
   EnterprisePoolRecord,
   EnterpriseDhcpScopeRecord,
   EnterpriseReservationRecord,
-} from "../../lib/enterpriseAddressAllocator.js";
+} from "../../domain/ipam/enterprise-ipam.js";
 
 // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 // Snapshot surface: V1EnterpriseIpamTruth

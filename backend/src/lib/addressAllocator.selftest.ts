@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { intToIpv4, parseCidr } from "./cidr.js";
+import { intToIpv4, parseCidr } from "../domain/addressing/cidr.js";
 import {
   chooseGatewayForSubnet,
   calculateFreeRanges,
@@ -14,7 +14,7 @@ import {
   sortAllocationCandidates,
   sortSiteAllocationCandidates,
   type AllocationCandidate,
-} from "./addressAllocator.js";
+} from "../domain/addressing/allocation-fit.js";
 
 function run(name: string, fn: () => void) {
   try {
@@ -103,7 +103,7 @@ run("site block candidate sorting allocates larger demands first", () => {
 run("allocator skips fragmented ranges and lands on the next aligned block", () => {
   const proposed = findNextAvailableNetwork(parseCidr("10.0.0.0/22"), 24, [
     { start: parseCidr("10.0.0.0/24").network, end: parseCidr("10.0.0.0/24").broadcast },
-    { start: parseCidr("11.0.0.0/25").network, end: parseCidr("11.0.0.0/25").broadcast },
+    { start: parseCidr("10.0.1.0/25").network, end: parseCidr("10.0.1.0/25").broadcast },
   ]);
 
   assert.equal(proposed ? intToIpv4(proposed.network) : null, "10.0.2.0");

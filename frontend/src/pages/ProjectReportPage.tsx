@@ -118,6 +118,22 @@ function summaryCard(label: string, value: string | number) {
   );
 }
 
+
+function reportTruthLabel(label: string) {
+  const labels: Record<string, string> = {
+    USER_PROVIDED: "User provided",
+    REQUIREMENT_MATERIALIZED: "Applied requirement",
+    BACKEND_COMPUTED: "System calculated",
+    DURABLE_IPAM: "Durable IPAM",
+    INFERRED: "Inferred / needs review",
+    ESTIMATED: "Estimate",
+    REVIEW_REQUIRED: "Needs review",
+    BLOCKED: "Blocked",
+    UNSUPPORTED: "Not supported",
+  };
+  return labels[label] ?? label.replace(/_/g, " ").toLowerCase();
+}
+
 function sectionList(items: string[], empty: string) {
   if (items.length === 0) return <p className="muted" style={{ margin: 0 }}>{empty}</p>;
   return (
@@ -397,7 +413,7 @@ export function ProjectReportPage() {
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span className={status.className}>{status.label}</span>
-            <span className={truthBadgeClass(reportTruth.overallReadiness)}>Backend truth {reportTruth.overallReadinessLabel}</span>
+            <span className={truthBadgeClass(reportTruth.overallReadiness)}>System evidence {reportTruth.overallReadinessLabel}</span>
             <span className="badge-soft">Requirements {readinessSummary.completionLabel}</span>
             {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
             <span className="badge-soft">Topology {synthesized.topology.topologyLabel}</span>
@@ -876,7 +892,7 @@ export function ProjectReportPage() {
         </div>
 
         <div>
-          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Proof boundary and limitations</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence boundary and limitations</h3>
           {sectionList(reportTruth.limitations, "No additional limitations were recorded.")}
         </div>
       </div>
@@ -885,10 +901,10 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>9. Report/export truth</h3>
           <p className="muted" style={{ margin: 0 }}>
-            V1 stops the report from becoming polished trash. PDF, DOCX, CSV, and the report page must show backend truth labels, requirement traceability, diagram impact, assumptions, review items, and blocked evidence instead of hiding them.
+            Reports and exports must show system evidence, requirement traceability, diagram impact, assumptions, review items, and blocked evidence instead of hiding missing data behind polished wording.
           </p>
         </div>
-        {!V1ReportExportTruth ? <p className="muted" style={{ margin: 0 }}>V1 report/export truth is not available in this snapshot yet.</p> : (
+        {!V1ReportExportTruth ? <p className="muted" style={{ margin: 0 }}>Report/export readiness evidence is not available in this snapshot yet.</p> : (
           <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <span className={truthBadgeClass(V1ReportExportTruth.overallReadiness)}>Overall {V1ReportExportTruth.overallReadiness}</span>
@@ -905,27 +921,27 @@ export function ProjectReportPage() {
             </div>
 
             <div>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Required report section gates</h3>
-              <div className="table-wrap"><table><thead><tr><th>Section</th><th>Report section</th><th>Frontend location</th><th>Readiness</th><th>Truth labels</th></tr></thead><tbody>
-                {V1ReportExportTruth.sectionGates.slice(0, 14).map((row) => <tr key={row.sectionKey}><td><strong>{row.title}</strong><div className="muted">{row.evidence[0] ?? "Evidence not provided"}</div></td><td>{row.reportSection}</td><td>{row.frontendLocation}</td><td><span className={truthBadgeClass(row.readinessImpact)}>{row.readinessImpact}</span></td><td>{row.truthLabels.join(", ") || "—"}</td></tr>)}
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Required report sections</h3>
+              <div className="table-wrap"><table><thead><tr><th>Section</th><th>Report section</th><th>Frontend location</th><th>Readiness</th><th>Evidence labels</th></tr></thead><tbody>
+                {V1ReportExportTruth.sectionGates.slice(0, 14).map((row) => <tr key={row.sectionKey}><td><strong>{row.title}</strong><div className="muted">{row.evidence[0] ?? "Evidence not provided"}</div></td><td>{row.reportSection}</td><td>{row.frontendLocation}</td><td><span className={truthBadgeClass(row.readinessImpact)}>{row.readinessImpact}</span></td><td>{row.truthLabels.map(reportTruthLabel).join(", ") || "—"}</td></tr>)}
               </tbody></table></div>
             </div>
 
             <div>
               <h3 style={{ marginTop: 0, marginBottom: 8 }}>Requirement traceability matrix</h3>
-              <div className="table-wrap"><table><thead><tr><th>Requirement</th><th>Design consequence</th><th>Engines</th><th>Report</th><th>Diagram</th><th>Readiness</th></tr></thead><tbody>
+              <div className="table-wrap"><table><thead><tr><th>Requirement</th><th>Design consequence</th><th>Design areas</th><th>Report</th><th>Diagram</th><th>Readiness</th></tr></thead><tbody>
                 {V1ReportExportTruth.traceabilityMatrix.slice(0, 12).map((row) => <tr key={row.requirementKey}><td><strong>{row.requirementLabel}</strong><div className="muted">{row.requirementKey}</div></td><td>{row.designConsequence}</td><td>{row.enginesAffected.join(", ") || "—"}</td><td>{row.reportSection}</td><td>{row.diagramImpact}</td><td><span className={truthBadgeClass(row.readinessStatus)}>{row.readinessStatus}</span></td></tr>)}
               </tbody></table></div>
             </div>
 
             <div className="grid-2" style={{ alignItems: "start" }}>
               <div>
-                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Truth labels</h3>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.truthLabelRows.map((row) => <li key={row.truthLabel} style={{ marginBottom: 8 }}><strong>{row.truthLabel}:</strong> {row.count} · {row.reportUsage}</li>)}</ul>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence labels</h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.truthLabelRows.map((row) => <li key={row.truthLabel} style={{ marginBottom: 8 }}><strong>{reportTruthLabel(row.truthLabel)}:</strong> {row.count} · {row.reportUsage}</li>)}</ul>
               </div>
               <div>
                 <h3 style={{ marginTop: 0, marginBottom: 8 }}>Findings</h3>
-                {V1ReportExportTruth.findings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No V1 findings emitted.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.findings.map((finding) => <li key={finding.code} style={{ marginBottom: 8 }}><strong>{finding.severity} — {finding.title}:</strong> {finding.detail}</li>)}</ul>}
+                {V1ReportExportTruth.findings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No report/export findings are currently emitted.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.findings.map((finding) => <li key={finding.code} style={{ marginBottom: 8 }}><strong>{finding.severity} — {finding.title}:</strong> {finding.detail}</li>)}</ul>}
               </div>
             </div>
           </>

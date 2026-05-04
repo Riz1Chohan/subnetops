@@ -6,6 +6,7 @@ import { ensureRequirementsMaterializedForRead, materializeRequirementsForProjec
 import { assertRequirementsRuntimeProofPass, buildRequirementsRuntimeProof, REQUIREMENTS_RUNTIME_RELEASE } from "./requirementsRuntimeProof.service.js";
 import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
+import { recordSecurityAuditEvent } from "./securityAudit.service.js";
 
 type TemplateKey = "small-office" | "branch-office" | "clinic-starter";
 
@@ -186,6 +187,7 @@ export async function createProject(
       assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
     }
     await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
+    await recordSecurityAuditEvent({ action: "project.create", outcome: "created", actorUserId: userId, organizationId: project.organizationId, projectId: project.id, targetType: "project", targetId: project.id }, tx);
     return { ...project, requirementsMaterialization, requirementsRuntimeProof };
   });
 }
@@ -358,6 +360,7 @@ export async function updateProject(projectId: string, userId: string, data: Rec
       assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
     }
     await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
+    await recordSecurityAuditEvent({ action: "project.update", outcome: "updated", actorUserId: userId, organizationId: result.organizationId, projectId, targetType: "project", targetId: projectId }, tx);
     return { ...result, requirementsMaterialization, requirementsRuntimeProof };
   });
 }
@@ -417,6 +420,8 @@ export async function saveProjectRequirements(
 }
 
 export async function deleteProject(projectId: string, userId: string) {
-  await ensureCanEditProject(userId, projectId);
-  return prisma.project.deleteMany({ where: { id: projectId } });
+  const project = await ensureCanEditProject(userId, projectId);
+  const deleted = await prisma.project.deleteMany({ where: { id: projectId } });
+  await recordSecurityAuditEvent({ action: "project.delete", outcome: "updated", actorUserId: userId, organizationId: project.organizationId, projectId, targetType: "project", targetId: projectId });
+  return deleted;
 }

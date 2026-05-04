@@ -16,7 +16,7 @@ import {
   recommendedCapacityPlanForHosts,
   usableHostCount,
   wildcardMaskFromPrefix,
-} from "./cidr.js";
+} from "../domain/addressing/cidr.js";
 
 function run(name: string, fn: () => void) {
   try {

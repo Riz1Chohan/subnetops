@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { canonicalCidr, isUsableHostIp, parseCidr, recommendedCapacityPlanForHosts, validateGatewayForSubnet } from "./cidr.js";
-import { allocateRequestedBlocks } from "./addressAllocator.js";
+import { canonicalCidr, isUsableHostIp, parseCidr, recommendedCapacityPlanForHosts, validateGatewayForSubnet } from "../domain/addressing/cidr.js";
+import { allocateRequestedBlocks } from "../domain/addressing/allocation-fit.js";
 import { buildV1CidrAddressingTruthControl } from "../services/designCore/designCore.cidrAddressingTruthControl.js";
 import type { DesignCoreAddressRow, V1RequirementsMaterializationControlSummary } from "../services/designCore.types.js";
 

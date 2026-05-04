@@ -4,8 +4,8 @@ import {
   parseCidr,
   type ParsedCidr,
   type SegmentRole,
-} from "../../lib/cidr.js";
-import { chooseGatewayForSubnet } from "../../lib/addressAllocator.js";
+} from "../../domain/addressing/cidr.js";
+import { chooseGatewayForSubnet } from "../../domain/addressing/allocation-fit.js";
 import type { DesignCoreAddressRow, DesignCoreIssue } from "../designCore.types.js";
 
 type JsonMap = Record<string, unknown>;

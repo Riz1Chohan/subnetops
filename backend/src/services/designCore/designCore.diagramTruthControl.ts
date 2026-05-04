@@ -1,3 +1,4 @@
+import { coverageForDiagramEdge, coverageForDiagramNode, layersForDiagramMode as domainLayersForDiagramMode } from '../../domain/diagram/index.js';
 import type {
   BackendDiagramRenderEdge,
   BackendDiagramRenderLayer,
@@ -35,12 +36,7 @@ function addFinding(findings: V1DiagramTruthFinding[], finding: V1DiagramTruthFi
 }
 
 function layersForMode(mode: V1DiagramModeKey): BackendDiagramRenderLayer[] {
-  if (mode === "physical") return ["site", "device", "interface"];
-  if (mode === "logical") return ["site", "interface", "routing", "security"];
-  if (mode === "wan-cloud") return ["site", "device", "routing", "security"];
-  if (mode === "security") return ["site", "device", "security"];
-  if (mode === "per-site") return ["site", "device", "interface", "security"];
-  return ["implementation", "verification", "device"];
+  return domainLayersForDiagramMode(mode);
 }
 
 function modeImpactsForNode(node: BackendDiagramRenderNode): V1DiagramModeKey[] {
@@ -58,36 +54,11 @@ function modeImpactsForEdge(edge: BackendDiagramRenderEdge): V1DiagramModeKey[] 
 }
 
 function coverageForNode(node: BackendDiagramRenderNode): V1DiagramRenderCoverageRow {
-  return {
-    rowType: "node",
-    renderId: node.id,
-    backendObjectId: node.objectId,
-    objectType: node.objectType,
-    truthState: node.truthState,
-    readiness: node.readiness,
-    hasBackendIdentity: Boolean(node.objectId),
-    hasTruthState: Boolean(node.truthState),
-    hasReadiness: Boolean(node.readiness),
-    sourceEngine: node.sourceEngine,
-    relatedFindingIds: node.relatedFindingIds,
-    modeImpacts: modeImpactsForNode(node),
-  };
+  return coverageForDiagramNode(node);
 }
 
 function coverageForEdge(edge: BackendDiagramRenderEdge): V1DiagramRenderCoverageRow {
-  return {
-    rowType: "edge",
-    renderId: edge.id,
-    backendObjectId: edge.relatedObjectIds[0] ?? edge.relationship,
-    relationship: edge.relationship,
-    readiness: edge.readiness,
-    hasBackendIdentity: edge.relatedObjectIds.length > 0 || Boolean(edge.relationship),
-    hasTruthState: true,
-    hasReadiness: Boolean(edge.readiness),
-    sourceEngine: "design-graph",
-    relatedFindingIds: [],
-    modeImpacts: modeImpactsForEdge(edge),
-  };
+  return coverageForDiagramEdge(edge);
 }
 
 function buildModeContracts(params: { diagramTruth: BackendDiagramTruthModel; networkObjectModel: NetworkObjectModel }): V1DiagramModeContractRow[] {

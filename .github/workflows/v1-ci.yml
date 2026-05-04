@@ -1,0 +1,86 @@
+name: SubnetOps V1 CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: subnetops_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d subnetops_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/subnetops_ci?schema=public
+      JWT_SECRET: ci-subnetops-secret-with-more-than-32-characters
+      CORS_ORIGIN: http://localhost:4173,http://localhost:5173
+      FRONTEND_APP_URL: http://localhost:4173
+      SEND_REAL_EMAILS: "false"
+      PRISMA_SYNC_ON_BOOT: "false"
+      ALLOW_UNSAFE_DB_PUSH: "false"
+      DB_PUSH_ON_BOOT: "false"
+      SEED_DEMO_ON_BOOT: "false"
+      VITE_API_BASE_URL: /api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.12.2
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Run root V1 release checks
+        run: npm run check:v1
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        working-directory: backend
+        run: npm run prisma:migrate:deploy
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Run backend selftests
+        working-directory: backend
+        run: npm run selftest:all
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build backend container
+        run: docker build -t subnetops-backend-ci ./backend
+
+      - name: Build frontend container
+        run: docker build -t subnetops-frontend-ci ./frontend

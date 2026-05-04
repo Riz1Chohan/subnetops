@@ -112,7 +112,7 @@ export function ProjectLayout() {
       key: "design",
       label: "Design Package",
       path: `/projects/${projectId}/logical-design`,
-      summary: "Logical design views and engineering truth.",
+      summary: "Logical design views and verified project facts.",
       matchers: ["/logical-design", "/overview", "/core-model", "/addressing", "/enterprise-ipam", "/security", "/routing", "/implementation", "/standards", "/platform", "/sites", "/vlans"],
     },
     {
@@ -133,12 +133,12 @@ export function ProjectLayout() {
 
   const activeStage = isDiagramWorkspace ? undefined : stageGroups.find((group) => activeForPath(location.pathname, group.matchers))?.key ?? "discovery";
 
-  // V1_DISCOVERY_CURRENT_STATE_CONTRACT: discovery card exposes backend manual/imported current-state proof.
+  // Discovery card exposes manual/imported current-state evidence from the saved project model.
   const discoveryLinks: WorkspaceLink[] = [
     { key: "summary", label: "Current state summary", path: `/projects/${projectId}/discovery?section=summary`, description: "Project baseline and saved discovery state." },
-    { key: "contract", label: "Backend contract", path: `/projects/${projectId}/discovery?section=contract`, description: "V1 manual/imported current-state proof." },
+    { key: "contract", label: "Current-state evidence", path: `/projects/${projectId}/discovery?section=contract`, description: "Manual and imported evidence used by the design model." },
     { key: "extraction", label: "Extraction preview", path: `/projects/${projectId}/discovery?section=extraction`, description: "What discovery is already feeding into design." },
-    { key: "authority", label: "Authority lift", path: `/projects/${projectId}/discovery?section=authority`, description: "Discovery-backed route and boundary anchors." },
+    { key: "authority", label: "Route and boundary anchors", path: `/projects/${projectId}/discovery?section=authority`, description: "Discovery-backed route and boundary references." },
     { key: "inputs", label: "Paste inputs", path: `/projects/${projectId}/discovery?section=inputs`, description: "Current-state notes, inventory, risks, and constraints." },
     { key: "coverage", label: "Coverage and gaps", path: `/projects/${projectId}/discovery?section=coverage`, description: "Coverage, highlights, parsed signals, and next inputs." },
   ];
@@ -157,16 +157,16 @@ export function ProjectLayout() {
   ];
 
   const designLinks: WorkspaceLink[] = [
-    { key: "design-summary", label: "Design summary", path: `/projects/${projectId}/logical-design?section=summary`, description: "Recovery gate, project basics, and current design posture." },
+    { key: "design-summary", label: "Design summary", path: `/projects/${projectId}/logical-design?section=summary`, description: "Project basics, blockers, and current design posture." },
     { key: "design-topology", label: "Topology blueprint", path: `/projects/${projectId}/logical-design?section=topology`, description: "Topology behavior, placement highlights, and major paths." },
-    { key: "design-truth", label: "Unified truth", path: `/projects/${projectId}/logical-design?section=truth`, description: "Shared model status and discovery-backed design foundation." },
+    { key: "design-truth", label: "Verified model", path: `/projects/${projectId}/logical-design?section=truth`, description: "Shared design status and discovery-backed foundation." },
     { key: "design-lld", label: "Site LLD", path: `/projects/${projectId}/logical-design?section=lld`, description: "Per-site low-level design and implementation posture." },
     { key: "design-traceability", label: "Traceability", path: `/projects/${projectId}/logical-design?section=traceability`, description: "Requirement-to-design traceability, risks, and next steps." },
-    { key: "core-authority", label: "Core authority", path: `/projects/${projectId}/core-model?section=authority`, description: "Authority-source ledger and cleanup priorities." },
-    { key: "core-sites", label: "Site truth", path: `/projects/${projectId}/core-model?section=sites`, description: "Per-site unification, unresolved refs, and linkage." },
+    { key: "core-authority", label: "Source ledger", path: `/projects/${projectId}/core-model?section=authority`, description: "Source records and cleanup priorities." },
+    { key: "core-sites", label: "Site model", path: `/projects/${projectId}/core-model?section=sites`, description: "Per-site records, unresolved refs, and linkage." },
     { key: "addressing-hierarchy", label: "Address hierarchy", path: `/projects/${projectId}/addressing?section=hierarchy`, description: "Organization/site blocks, route domains, and transit plan." },
     { key: "addressing-table", label: "Address table", path: `/projects/${projectId}/addressing?section=table`, description: "Implementation-ready logical addressing rows only." },
-    { key: "engine2-ipam", label: "Engine 2 IPAM", path: `/projects/${projectId}/enterprise-ipam`, description: "VRFs, pools, allocations, DHCP, brownfield imports, approvals, and ledger." },
+    { key: "ipam", label: "IPAM", path: `/projects/${projectId}/enterprise-ipam`, description: "VRFs, pools, allocations, DHCP, brownfield imports, approvals, and ledger." },
     { key: "security-boundaries", label: "Security boundaries", path: `/projects/${projectId}/security?section=boundaries`, description: "Boundary truth, zones, and trust model." },
     { key: "security-policy", label: "Policy matrix", path: `/projects/${projectId}/security?section=policy`, description: "Controls, segmentation review, and policy-intent flows." },
     { key: "routing-intent", label: "Routing intent", path: `/projects/${projectId}/routing?section=intent`, description: "Protocols, transport, summarization, switching, and QoS." },
@@ -177,7 +177,7 @@ export function ProjectLayout() {
 
   const validationLinks: WorkspaceLink[] = [
     { key: "focus", label: "Current priorities", path: `/projects/${projectId}/validation?section=focus`, description: "Main issues and the order to address them." },
-    { key: "health", label: "Health summary", path: `/projects/${projectId}/validation?section=health`, description: "Readiness, authority debt, and strongest signals." },
+    { key: "health", label: "Health summary", path: `/projects/${projectId}/validation?section=health`, description: "Readiness, source gaps, and strongest signals." },
     { key: "findings", label: "Findings", path: `/projects/${projectId}/validation?section=findings`, description: "Errors, warnings, and issue list." },
     { key: "guidance", label: "Review guidance", path: `/projects/${projectId}/validation?section=guidance`, description: "Correction advice and AI fix helper." },
   ];
@@ -245,7 +245,7 @@ export function ProjectLayout() {
             <div>
               <h1 style={{ margin: "0 0 8px 0" }}>{project.name}</h1>
               <p className="muted" style={{ margin: 0 }}>{project.organizationName || "No organization label set"}</p>
-              <p className="muted" style={{ marginTop: 8 }}>{project.description || "Use the workflow stages below to move through discovery, requirements, design, validation, and delivery one focused card at a time."}</p>
+              <p className="muted" style={{ marginTop: 8 }}>{project.description || "Use the workflow sections below to move through discovery, requirements, design, validation, and delivery one focused card at a time."}</p>
             </div>
           </div>
           <div className="project-header-side">
@@ -273,7 +273,7 @@ export function ProjectLayout() {
                 to={group.path}
                 className={() => `project-stage-chip ${isActive ? "active" : ""}`.trim()}
               >
-                <span className="project-stage-chip-step">Stage {index + 1}</span>
+                <span className="project-stage-chip-step">Step {index + 1}</span>
                 <strong>{group.label}</strong>
                 <small>{group.summary}</small>
               </NavLink>

@@ -1,61 +1,15 @@
 import { env } from "../config/env.js";
-
-export interface AIDraftSite {
-  name: string;
-  location?: string;
-  siteCode?: string;
-  defaultAddressBlock?: string;
-  notes?: string;
-}
-
-export interface AIDraftVlan {
-  siteName: string;
-  vlanId: number;
-  vlanName: string;
-  purpose?: string;
-  subnetCidr: string;
-  gatewayIp: string;
-  dhcpEnabled: boolean;
-  estimatedHosts?: number;
-  department?: string;
-  notes?: string;
-}
-
-export interface V1AIDraftAuthority {
-  contract: "V1_AI_DRAFT_HELPER_CONTRACT";
-  state: "AI_DRAFT";
-  sourceType: "AI_DRAFT";
-  proofStatus: "DRAFT_ONLY";
-  reviewRequired: true;
-  notAuthoritative: true;
-  materializationRequired: true;
-  downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED";
-  conversionGates: string[];
-}
-
-export interface AIPlanDraft {
-  project: {
-    name: string;
-    description: string;
-    organizationName?: string;
-    environmentType?: string;
-    basePrivateRange?: string;
-  };
-  sites: AIDraftSite[];
-  vlans: AIDraftVlan[];
-  rationale: string[];
-  assumptions: string[];
-  reviewChecklist: string[];
-  provider: "local" | "openai";
-  authority: V1AIDraftAuthority;
-}
-
-export interface AIValidationExplanation {
-  explanation: string;
-  whyItMatters: string;
-  suggestedFixes: string[];
-  provider: "local" | "openai";
-}
+import { ApiError } from "../utils/apiError.js";
+import {
+  buildV1DraftAuthority,
+  containPrompt,
+  containValidationExplanation,
+  sanitizePlanDraft,
+  type AIDraftSite,
+  type AIDraftVlan,
+  type AIPlanDraft,
+  type AIValidationExplanation,
+} from "../domain/ai/index.js";
 
 function inferEnvironment(prompt: string) {
   const text = prompt.toLowerCase();
@@ -87,28 +41,6 @@ function extractCount(prompt: string, pattern: RegExp, fallback: number) {
   if (!match) return fallback;
   const value = Number(match[1]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-function V1DraftAuthority(): V1AIDraftAuthority {
-  return {
-    contract: "V1_AI_DRAFT_HELPER_CONTRACT",
-    state: "AI_DRAFT",
-    sourceType: "AI_DRAFT",
-    proofStatus: "DRAFT_ONLY",
-    reviewRequired: true,
-    notAuthoritative: true,
-    materializationRequired: true,
-    downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED",
-    conversionGates: [
-      "User selective review/apply action",
-      "Structured requirement/source object conversion",
-      "Requirements materialization",
-      "Validation/readiness review",
-      "Engine 1 addressing proof",
-      "Engine 2 IPAM reconciliation when relevant",
-      "Standards and traceability checks",
-    ],
-  };
 }
 
 function nextSiteOctet(index: number) {
@@ -275,7 +207,7 @@ function localPlanDraft(prompt: string): AIPlanDraft {
     assumptions,
     reviewChecklist,
     provider: "local",
-    authority: V1DraftAuthority(),
+    authority: buildV1DraftAuthority(),
   };
 }
 
@@ -295,7 +227,7 @@ async function tryOpenAIPlanDraft(prompt: string): Promise<AIPlanDraft | null> {
         {
           role: "system",
           content:
-            "You are a network planning assistant. Return strict JSON with keys project, sites, vlans, rationale, assumptions, reviewChecklist. Project includes name, description, organizationName, environmentType, basePrivateRange. Sites is an array of objects with name, location, siteCode, defaultAddressBlock, notes. Vlans is an array of objects with siteName, vlanId, vlanName, purpose, subnetCidr, gatewayIp, dhcpEnabled, estimatedHosts, department, notes. Rationale is an array of short strings. Assumptions is an array of short strings about what the draft assumed. ReviewChecklist is an array of short strings telling the user what to verify before saving.",
+            "You are a network planning assistant. Return strict JSON with keys project, sites, vlans, rationale, assumptions, reviewChecklist. This is a draft-only helper. Do not claim approval, readiness, final authority, vendor command accuracy, or implementation safety. Project includes name, description, organizationName, environmentType, basePrivateRange. Sites is an array of objects with name, location, siteCode, defaultAddressBlock, notes. Vlans is an array of objects with siteName, vlanId, vlanName, purpose, subnetCidr, gatewayIp, dhcpEnabled, estimatedHosts, department, notes. Rationale is an array of short strings. Assumptions is an array of short strings about what the draft assumed. ReviewChecklist is an array of short strings telling the user what to verify before saving.",
         },
         { role: "user", content: prompt },
       ],
@@ -308,26 +240,23 @@ async function tryOpenAIPlanDraft(prompt: string): Promise<AIPlanDraft | null> {
   if (!content) return null;
 
   try {
-    const parsed = JSON.parse(content) as Partial<Omit<AIPlanDraft, "provider">>;
-    return {
-      project: parsed.project || localPlanDraft(prompt).project,
-      sites: parsed.sites || [],
-      vlans: parsed.vlans || [],
-      rationale: parsed.rationale || ["AI generated a first draft based on the provided prompt."],
-      assumptions: parsed.assumptions || ["Review the generated draft carefully before saving."],
-      reviewChecklist: parsed.reviewChecklist || ["Confirm the project details, sites, VLANs, and gateways before applying the draft."],
-      provider: "openai",
-      authority: V1DraftAuthority(),
-    };
+    const parsed = JSON.parse(content) as Partial<AIPlanDraft>;
+    return sanitizePlanDraft(parsed, "openai", localPlanDraft(prompt));
   } catch {
     return null;
   }
 }
 
 export async function generatePlanDraft(prompt: string): Promise<AIPlanDraft> {
-  const openAiDraft = await tryOpenAIPlanDraft(prompt);
+  const contained = containPrompt(prompt);
+  if (!contained.allowed) {
+    const message = contained.blockedReasons.join(" ") || "AI can only create review-required draft suggestions.";
+    throw new ApiError(400, message);
+  }
+  const openAiDraft = await tryOpenAIPlanDraft(contained.normalizedPrompt);
   if (openAiDraft) return openAiDraft;
-  return localPlanDraft(prompt);
+  const fallback = localPlanDraft(contained.normalizedPrompt);
+  return sanitizePlanDraft(fallback, "local", fallback);
 }
 
 function localValidationExplanation(input: { title: string; message: string; severity: "ERROR" | "WARNING" | "INFO"; entityType: "PROJECT" | "SITE" | "VLAN"; }): AIValidationExplanation {
@@ -363,6 +292,7 @@ function localValidationExplanation(input: { title: string; message: string; sev
     whyItMatters,
     suggestedFixes,
     provider: "local",
+    authority: buildV1DraftAuthority(),
   };
 }
 
@@ -382,7 +312,7 @@ async function tryOpenAIValidationExplanation(input: { title: string; message: s
         {
           role: "system",
           content:
-            "You explain network validation findings. Return strict JSON with keys explanation, whyItMatters, suggestedFixes. suggestedFixes must be an array of short strings.",
+            "You explain network validation findings. Return strict JSON with keys explanation, whyItMatters, suggestedFixes. suggestedFixes must be an array of short strings. Do not change readiness, approve implementation, create final subnets/routes/firewall rules, or claim the finding is resolved.",
         },
         { role: "user", content: JSON.stringify(input) },
       ],
@@ -395,8 +325,8 @@ async function tryOpenAIValidationExplanation(input: { title: string; message: s
   if (!content) return null;
 
   try {
-    const parsed = JSON.parse(content) as Omit<AIValidationExplanation, "provider">;
-    return { ...parsed, provider: "openai" };
+    const parsed = JSON.parse(content) as Partial<AIValidationExplanation>;
+    return containValidationExplanation(parsed, "openai", localValidationExplanation(input));
   } catch {
     return null;
   }

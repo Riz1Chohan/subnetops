@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const readJson = (relativePath) => JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
+const readText = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const readJson = (relativePath) => JSON.parse(readText(relativePath));
 const fail = (message) => {
   console.error(`V1 release check failed: ${message}`);
   process.exit(1);
@@ -36,7 +37,11 @@ assert(frontendPkg.version === '1.0.0', 'frontend package must be version 1.0.0'
 
 const allFiles = walk(root);
 const markdownFiles = allFiles.filter((file) => /\.md$/i.test(file));
-assert(markdownFiles.length === 1 && path.basename(markdownFiles[0]) === 'README.md', 'README.md must be the only Markdown file');
+const extraMarkdown = markdownFiles.filter((file) => path.relative(root, file).replace(/\\/g, '/') !== 'README.md');
+assert(
+  extraMarkdown.length === 0,
+  'README.md must be the only Markdown documentation file'
+);
 
 const ignoredContentFiles = new Set([
   path.join(root, 'package-lock.json'),
@@ -57,8 +62,30 @@ for (const file of allFiles) {
   assert(!oldProductReleasePattern.test(text), `${relative} leaks old 0.x product release label`);
 }
 
-const render = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
+const render = readText('render.yaml');
 assert(!/prisma\s+db\s+push/.test(render), 'render.yaml must not run unsafe Prisma schema push in production');
-assert(/prisma\s+migrate\s+deploy/.test(render), 'render.yaml must run Prisma migrations in production');
+
+function extractBackendStartCommand(renderYaml) {
+  const backendService = renderYaml.match(/name:\s*subnetops-backend[\s\S]*?(?=\n\s*-\s*type:\s*web|\ndatabases:|$)/);
+  if (!backendService) return null;
+  const startCommand = backendService[0].match(/^\s*startCommand:\s*(.+)$/m);
+  return startCommand ? startCommand[1].trim().replace(/^['"]|['"]$/g, '') : null;
+}
+
+function commandScriptPath(command) {
+  if (!command) return null;
+  const match = command.match(/(?:^|\s)(?:sh\s+)?\.\/(entrypoint\.sh)\b/);
+  return match ? path.join('backend', match[1]) : null;
+}
+
+const backendStartCommand = extractBackendStartCommand(render);
+const delegatedScript = commandScriptPath(backendStartCommand);
+const productionStartupText = delegatedScript ? readText(delegatedScript) : render;
+const productionStartupTarget = delegatedScript || 'render.yaml';
+
+assert(
+  /prisma\s+migrate\s+deploy/.test(productionStartupText),
+  `${productionStartupTarget} must run Prisma migrations in production`
+);
 
 console.log('V1 release check passed.');

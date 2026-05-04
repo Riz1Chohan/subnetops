@@ -10,7 +10,7 @@ import type {
   V1CidrEdgeCaseProof,
   V1RequirementAddressingMatrixRow,
 } from "../designCore.types.js";
-import type { SegmentRole } from "../../lib/cidr.js";
+import type { SegmentRole } from "../../domain/addressing/cidr.js";
 
 export const V1_CIDR_ADDRESSING_TRUTH_CONTRACT_VERSION = "V1_ENGINE1_CIDR_ADDRESSING_TRUTH" as const;
 

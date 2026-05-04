@@ -8,6 +8,7 @@ import { useProject, useProjectSites, useProjectVlans } from "../features/projec
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -40,7 +41,7 @@ export function ProjectImplementationPage() {
   const V1ImplementationTemplates = designCore?.V1ImplementationTemplates;
 
   if (projectQuery.isLoading) {
-    return <LoadingState title="Loading implementation plan" message="Preparing rollout stages, rollback triggers, validation tests, and cutover guidance." />;
+    return <LoadingState title="Loading implementation plan" message="Preparing rollout steps, rollback triggers, validation tests, and cutover guidance." />;
   }
 
   if (projectQuery.isError) {
@@ -69,7 +70,7 @@ export function ProjectImplementationPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Implementation & Migration"
-        description="This workspace turns the logical design into an execution package: rollout approach, staged implementation, cutover checks, rollback triggers, validation evidence, and implementation risks."
+        description="This workspace turns the logical design into an execution package: rollout approach, ordered implementation, cutover checks, rollback triggers, validation evidence, and implementation risks."
         actions={
           <>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
@@ -84,20 +85,20 @@ export function ProjectImplementationPage() {
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Stages {synthesized.implementationStages.length}</span>
+          <span className="badge-soft">Steps {synthesized.implementationStages.length}</span>
           <span className="badge-soft">Checklist items {synthesized.cutoverChecklist.length}</span>
           <span className="badge-soft">Rollback triggers {synthesized.rollbackPlan.length}</span>
           <span className="badge-soft">Validation tests {synthesized.validationPlan.length}</span>
           <span className="badge-soft">Risks {criticalRisks} critical / {warningRisks} warning</span>
-          {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Backend V1C operational-safety implementation plan displayed</span> : <span className="badge badge-warning">Backend plan unavailable</span>}
+          {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Verified implementation plan displayed</span> : <span className="badge badge-warning">Implementation plan unavailable</span>}
         </div>
         <p className="muted" style={{ margin: 0 }}>
-          A real design package should not stop at topology and addressing. This page renders the backend design-core implementation model when available, including dependencies, blockers, evidence, blast radius, and rollback posture.
+          A real design package should not stop at topology and addressing. This page renders the verified implementation model when available, including dependencies, blockers, evidence, blast radius, and rollback posture.
         </p>
       </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        {summaryCard("Implementation stages", synthesized.implementationStages.length, "Wave-by-wave execution structure for this scope.")}
+        {summaryCard("Implementation steps", synthesized.implementationStages.length, "Wave-by-wave execution structure for this scope.")}
         {summaryCard("Cutover checks", synthesized.cutoverChecklist.length, "Pre-check, cutover, and post-check controls.")}
         {summaryCard("Rollback triggers", synthesized.rollbackPlan.length, "When to stop and revert before deeper damage occurs.")}
         {summaryCard("Validation tests", synthesized.validationPlan.length, "Evidence-backed tests for acceptance and handoff.")}
@@ -108,35 +109,35 @@ export function ProjectImplementationPage() {
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <h2 style={{ margin: 0 }}>V1 implementation planning control</h2>
-            <p className="muted" style={{ margin: "6px 0 0" }}>Backend-gated implementation steps with source objects, requirement lineage, verification evidence, rollback, dependencies, risk, and readiness. This is not vendor command generation.</p>
+            <h2 style={{ margin: 0 }}>Implementation planning checks</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Implementation steps with source objects, requirement lineage, verification evidence, rollback, dependencies, risk, and readiness. This is not vendor command generation.</p>
           </div>
-          {V1ImplementationPlanning ? <span className="badge badge-info">{V1ImplementationPlanning.overallReadiness}</span> : <span className="badge badge-warning">V1 unavailable</span>}
+          {V1ImplementationPlanning ? <span className="badge badge-info">{userFacingStatusLabel(V1ImplementationPlanning.overallReadiness)}</span> : <span className="badge badge-warning">Unavailable</span>}
         </div>
         {V1ImplementationPlanning ? (<>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
             {summaryCard("Step gates", V1ImplementationPlanning.stepGateCount, `${V1ImplementationPlanning.blockedStepGateCount} blocked / ${V1ImplementationPlanning.reviewStepGateCount} review`)}
-            {summaryCard("Stage gates", V1ImplementationPlanning.stageGateCount, "Readiness derived from backend step gates.")}
+            {summaryCard("Step readiness", V1ImplementationPlanning.stageGateCount, "Readiness derived from implementation checks.")}
             {summaryCard("Requirement gaps", V1ImplementationPlanning.requirementLineageGapCount, "No fake execution when lineage is missing.")}
             {summaryCard("Rollback gates", V1ImplementationPlanning.rollbackGateCount, "Rollback evidence required per step.")}
           </div>
-        </>) : (<p className="muted" style={{ margin: 0 }}>V1 backend control is unavailable; treat synthesized implementation text as advisory only.</p>)}
+        </>) : (<p className="muted" style={{ margin: 0 }}>Implementation checks are unavailable; treat generated implementation text as advisory only.</p>)}
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <h2 style={{ margin: 0 }}>V1 vendor-neutral templates control</h2>
-            <p className="muted" style={{ margin: "6px 0 0" }}>Backend-authored implementation templates with variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command generation disabled. This is not vendor CLI generation.</p>
+            <h2 style={{ margin: 0 }}>Vendor-neutral templates</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Implementation templates with variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command generation disabled. This is not vendor CLI generation.</p>
           </div>
-          {V1ImplementationTemplates ? <span className="badge badge-info">{V1ImplementationTemplates.overallReadiness}</span> : <span className="badge badge-warning">V1 unavailable</span>}
+          {V1ImplementationTemplates ? <span className="badge badge-info">{userFacingStatusLabel(V1ImplementationTemplates.overallReadiness)}</span> : <span className="badge badge-warning">Unavailable</span>}
         </div>
         {V1ImplementationTemplates ? (<>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
             {summaryCard("Template gates", V1ImplementationTemplates.templateCount, `${V1ImplementationTemplates.blockedTemplateCount} blocked / ${V1ImplementationTemplates.reviewTemplateCount} review`)}
             {summaryCard("Domains", V1ImplementationTemplates.domainCount, "Addressing, VLANs, DHCP, routing, security, NAT, WAN, validation, rollback.")}
-            {summaryCard("Lineage gaps", V1ImplementationTemplates.requirementLineageGapCount + V1ImplementationTemplates.sourceObjectGapCount, "Templates without source proof stay gated.")}
-            {summaryCard("Vendor commands", V1ImplementationTemplates.vendorSpecificCommandCount, V1ImplementationTemplates.commandGenerationAllowed ? "Danger: command generation enabled" : "Command generation disabled by backend contract.")}
+            {summaryCard("Lineage gaps", V1ImplementationTemplates.requirementLineageGapCount + V1ImplementationTemplates.sourceObjectGapCount, "Templates without source evidence stay gated.")}
+            {summaryCard("Vendor commands", V1ImplementationTemplates.vendorSpecificCommandCount, V1ImplementationTemplates.commandGenerationAllowed ? "Danger: command generation enabled" : "Command generation disabled by design policy.")}
           </div>
           <div style={{ overflowX: "auto" }}>
             <table>
@@ -144,7 +145,7 @@ export function ProjectImplementationPage() {
               <tbody>{V1ImplementationTemplates.templateGates.slice(0, 24).map((template) => (<tr key={template.templateId}><td>{template.title}<br /><span className="muted">{template.templateId}</span></td><td>{template.domain}</td><td>{template.readinessImpact}</td><td>{template.sourceObjectIds.slice(0, 3).join(", ") || "none"}</td><td>{template.sourceRequirementIds.slice(0, 3).join(", ") || "none"}</td><td>{template.rollbackRequirement || "missing rollback"}</td></tr>))}</tbody>
             </table>
           </div>
-        </>) : (<p className="muted" style={{ margin: 0 }}>V1 backend control is not available. Do not treat template text as vendor command output.</p>)}
+        </>) : (<p className="muted" style={{ margin: 0 }}>Template checks are not available. Do not treat template text as vendor command output.</p>)}
       </div>
 
       <div className="grid-2" style={{ alignItems: "start" }}>
@@ -179,9 +180,9 @@ export function ProjectImplementationPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Staged execution plan</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Execution plan</h2>
           <p className="muted" style={{ margin: 0 }}>
-            These stages are meant to guide the change sequence, not just describe it after the fact.
+            These steps are meant to guide the change sequence, not just describe it after the fact.
           </p>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -221,7 +222,7 @@ export function ProjectImplementationPage() {
             <table>
               <thead>
                 <tr>
-                  <th align="left">Stage</th>
+                  <th align="left">Step</th>
                   <th align="left">Item</th>
                   <th align="left">Owner</th>
                   <th align="left">Why it matters</th>
@@ -282,7 +283,7 @@ export function ProjectImplementationPage() {
           <table>
             <thead>
               <tr>
-                <th align="left">Stage</th>
+                <th align="left">Step</th>
                 <th align="left">Test</th>
                 <th align="left">Expected outcome</th>
                 <th align="left">Evidence</th>

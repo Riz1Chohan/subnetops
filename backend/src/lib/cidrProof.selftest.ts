@@ -12,7 +12,7 @@ import {
   recommendedCapacityPlanForHosts,
   suggestedGatewayPattern,
   usableHostCount,
-} from "./cidr.js";
+} from "../domain/addressing/cidr.js";
 
 function run(name: string, fn: () => void) {
   try {
@@ -49,7 +49,7 @@ run("network and broadcast address checks work for standard subnets", () => {
 });
 
 run("containsIp respects subnet boundaries", () => {
-  const subnet = parseCidr("11.0.0.0/24");
+  const subnet = parseCidr("10.0.1.0/24");
   assert.equal(containsIp(subnet, "10.0.1.20"), true);
   assert.equal(containsIp(subnet, "10.0.2.20"), false);
 });

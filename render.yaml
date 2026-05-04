@@ -4,14 +4,26 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci --include=dev --no-audit --no-fund && npx prisma generate && npm run build
+    buildCommand: npm ci --include=dev --no-audit --no-fund && npm run prisma:generate && npm run build
     startCommand: sh ./entrypoint.sh
-    healthCheckPath: /api/health/live
+    healthCheckPath: /api/health/ready
     envVars:
       - key: NODE_VERSION
         value: 20.12.2
       - key: NODE_ENV
         value: production
+      - key: PRISMA_SYNC_ON_BOOT
+        value: "true"
+      - key: PRISMA_SYNC_STRATEGY
+        value: migrate
+      - key: PRISMA_BASELINE_EXISTING_DB
+        value: "false"
+      - key: ALLOW_UNSAFE_DB_PUSH
+        value: "false"
+      - key: DB_PUSH_ON_BOOT
+        value: "false"
+      - key: SEED_DEMO_ON_BOOT
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: subnetops-db

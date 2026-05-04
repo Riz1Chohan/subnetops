@@ -163,17 +163,17 @@ export function ProjectPlatformBomPage() {
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
           <div>
-            <h2 style={{ margin: 0 }}>V1 Platform/BOM foundation contract</h2>
+            <h2 style={{ margin: 0 }}>Platform/BOM foundation</h2>
             <p className="muted" style={{ margin: "8px 0 0" }}>
               V1_PLATFORM_BOM_FOUNDATION_CONTRACT backend-controlled advisory BOM evidence. This panel is the hard stop against fake SKUs, fake pricing, fake PoE precision, and frontend-only procurement truth.
             </p>
           </div>
-          {V1PlatformBomFoundation ? <span className="badge-soft">{V1PlatformBomFoundation.overallReadiness}</span> : <span className="badge-soft">Backend evidence loading</span>}
+          {V1PlatformBomFoundation ? <span className="badge-soft">{V1PlatformBomFoundation.overallReadiness}</span> : <span className="badge-soft">Evidence loading</span>}
         </div>
         {V1PlatformBomFoundation ? (
           <>
             <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-              {summaryCard("Backend BOM rows", V1PlatformBomFoundation.rowCount, V1PlatformBomFoundation.procurementAuthority)}
+              {summaryCard("BOM rows", V1PlatformBomFoundation.rowCount, V1PlatformBomFoundation.procurementAuthority)}
               {summaryCard("Requirement drivers", V1PlatformBomFoundation.requirementDriverCount, "Every BOM effect keeps source requirement evidence.")}
               {summaryCard("Local ports/site", V1PlatformBomFoundation.localPortDemandPerSite, `${V1PlatformBomFoundation.growthMarginPercent}% growth margin included.`)}
               {summaryCard("PoE endpoints/site", V1PlatformBomFoundation.poeDemandPerSite, "Endpoint count only; watt budget requires device classes.")}
@@ -189,11 +189,11 @@ export function ProjectPlatformBomPage() {
               </table>
             </div>
             <div className="grid-2" style={{ alignItems: "start" }}>
-              <div className="trust-note"><strong>Proof boundary</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{V1PlatformBomFoundation.proofBoundary.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="trust-note"><strong>Evidence boundary</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{V1PlatformBomFoundation.proofBoundary.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
               <div className="trust-note"><strong>Review-required items</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{V1PlatformBomFoundation.reviewItems.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
             </div>
           </>
-        ) : <p className="muted" style={{ margin: 0 }}>Backend V1 evidence is not available yet. Keep the local table advisory and do not use it as procurement authority.</p>}
+        ) : <p className="muted" style={{ margin: 0 }}>Platform/BOM evidence is not available yet. Keep the local table advisory and do not use it for procurement approval.</p>}
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>

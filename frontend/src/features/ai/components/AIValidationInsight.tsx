@@ -18,7 +18,7 @@ export function AIValidationInsight({ item, explanation }: { item: ValidationRes
       <div className="trust-note">
         <strong>How to use this</strong>
         <p className="muted" style={{ margin: "6px 0 0 0" }}>
-          Treat this as guidance to speed up review. Confirm the actual subnet, gateway, or segmentation intent before making changes.
+          Treat this as a draft explanation only. It cannot resolve the finding, approve readiness, or create final subnet, route, firewall, diagram, report, or implementation facts.
         </p>
       </div>
 

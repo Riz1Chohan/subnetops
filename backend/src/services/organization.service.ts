@@ -3,6 +3,8 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { listEmailOutbox as listQueuedEmails, queueEmail } from "./email.service.js";
 import { createNotification } from "./notification.service.js";
+import { canManageOrganization, canTransferOrganizationOwnership } from "../domain/security/authorization.js";
+import { recordSecurityAuditEvent } from "./securityAudit.service.js";
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -25,13 +27,13 @@ async function requireMembership(userId: string, organizationId: string, db: any
 
 async function ensureOrgAdmin(userId: string, organizationId: string, db: any = prisma) {
   const membership = await requireMembership(userId, organizationId, db);
-  if (membership.role !== "OWNER" && membership.role !== "ADMIN") throw new ApiError(403, "You do not have permission to manage this organization.");
+  if (!canManageOrganization(membership.role)) throw new ApiError(403, "You do not have permission to manage this organization.");
   return membership;
 }
 
 async function ensureOrgOwner(userId: string, organizationId: string, db: any = prisma) {
   const membership = await requireMembership(userId, organizationId, db);
-  if (membership.role !== "OWNER") throw new ApiError(403, "Only an owner can perform that action.");
+  if (!canTransferOrganizationOwnership(membership.role)) throw new ApiError(403, "Only an owner can perform that action.");
   return membership;
 }
 
@@ -43,7 +45,9 @@ export async function listOrganizations(userId: string) {
 export async function createOrganization(userId: string, name: string) {
   const slug = slugify(name);
   if (!slug) throw new ApiError(400, "Invalid organization name");
-  return prisma.organization.create({ data: { name, slug, memberships: { create: { userId, role: "OWNER" } } } });
+  const organization = await prisma.organization.create({ data: { name, slug, memberships: { create: { userId, role: "OWNER" } } } });
+  await recordSecurityAuditEvent({ action: "org.create", outcome: "created", actorUserId: userId, organizationId: organization.id, targetType: "organization", targetId: organization.id });
+  return organization;
 }
 
 export async function listMembers(userId: string, organizationId: string) {
@@ -67,6 +71,7 @@ export async function createInvitation(userId: string, organizationId: string, e
   await queueEmail({ toEmail: normalizedEmail, subject: `You were invited to ${organization?.name || "an organization"} on SubnetOps`, templateKey: "org-invite", payload: { organizationId, organizationName: organization?.name, token, role } });
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } }).catch(() => null);
   if (existingUser) await createNotification({ userId: existingUser.id, type: "INVITE", title: "Organization invitation", message: `You were invited to join ${organization?.name || "an organization"} as ${role}.`, link: "/dashboard" });
+  await recordSecurityAuditEvent({ action: "org.invite", outcome: "created", actorUserId: userId, organizationId, targetType: "organization", targetId: organizationId, detail: { invitedEmail: normalizedEmail, role } });
   return sanitizeInvitation(invite);
 }
 
@@ -97,7 +102,9 @@ export async function updateMemberRole(userId: string, organizationId: string, m
   const target = await prisma.membership.findFirst({ where: { id: membershipId, organizationId } });
   if (!target) throw new ApiError(404, "Member not found");
   if (role === "OWNER" && actingMembership.role !== "OWNER") throw new ApiError(403, "Only an owner can promote another owner.");
-  return prisma.membership.update({ where: { id: membershipId }, data: { role } });
+  const updated = await prisma.membership.update({ where: { id: membershipId }, data: { role } });
+  await recordSecurityAuditEvent({ action: "org.member_role_update", outcome: "updated", actorUserId: userId, organizationId, targetType: "user", targetId: updated.userId, detail: { role } });
+  return updated;
 }
 
 export async function removeMember(userId: string, organizationId: string, membershipId: string) {
@@ -106,7 +113,9 @@ export async function removeMember(userId: string, organizationId: string, membe
   if (!target) throw new ApiError(404, "Member not found");
   if (actingMembership.role !== "OWNER" && target.role === "OWNER") throw new ApiError(403, "Only an owner can remove another owner.");
   if (actingMembership.id === target.id) throw new ApiError(400, "Use ownership transfer before removing yourself.");
-  return prisma.membership.delete({ where: { id: membershipId } });
+  const removed = await prisma.membership.delete({ where: { id: membershipId } });
+  await recordSecurityAuditEvent({ action: "org.member_remove", outcome: "updated", actorUserId: userId, organizationId, targetType: "user", targetId: removed.userId });
+  return removed;
 }
 
 export async function revokeInvitation(userId: string, organizationId: string, invitationId: string) {
@@ -125,7 +134,9 @@ export async function transferOwnership(userId: string, organizationId: string, 
     if (target.id === currentOwner.id) throw new ApiError(400, "Target member is already the owner.");
     await tx.membership.update({ where: { id: membershipId }, data: { role: "OWNER" } });
     await tx.membership.update({ where: { id: currentOwner.id }, data: { role: "ADMIN" } });
-    return tx.membership.findUnique({ where: { id: membershipId } });
+    const transferred = await tx.membership.findUnique({ where: { id: membershipId } });
+    await recordSecurityAuditEvent({ action: "org.ownership_transfer", outcome: "updated", actorUserId: userId, organizationId, targetType: "user", targetId: target.userId }, tx);
+    return transferred;
   });
 }
 

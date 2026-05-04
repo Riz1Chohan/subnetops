@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { canonicalCidr, cidrsOverlap, containsIp, parseCidr, recommendedPrefixForHosts } from "./cidr.js";
+import { canonicalCidr, cidrsOverlap, containsIp, parseCidr, recommendedPrefixForHosts } from "../domain/addressing/cidr.js";
 
 function run(name: string, fn: () => void) {
   try {

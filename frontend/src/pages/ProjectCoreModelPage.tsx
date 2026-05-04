@@ -12,6 +12,7 @@ import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildDesignAuthorityLedger } from "../lib/designAuthorityLedger";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -79,10 +80,10 @@ export function ProjectCoreModelPage() {
   const inferredBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.sourceModel === "inferred").length;
   const savedRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "saved-design").length;
   const discoveryRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "discovery-derived").length;
-  const backendUnconfirmedRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "backend-unconfirmed").length;
+  const systemDraftRouteDomains = truth.routeDomains.filter((route) => route.authoritySource === "backend-unconfirmed").length;
   const savedBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "saved-design").length;
   const discoveryBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "discovery-derived").length;
-  const backendUnconfirmedBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "backend-unconfirmed").length;
+  const systemDraftBoundaryDomains = truth.boundaryDomains.filter((boundary) => boundary.authoritySource === "backend-unconfirmed").length;
   const recovery = buildRecoveryRoadmapStatus(synthesized);
   const focusPlan = buildRecoveryFocusPlan(projectId, synthesized);
   const authorityLedger = buildDesignAuthorityLedger(projectId, synthesized);
@@ -91,13 +92,13 @@ export function ProjectCoreModelPage() {
   const issueNotice = parseWorkspaceIssueNotice(location.search);
   const focusKey = issueNotice?.focus;
   const focusClass = (key: string) => `panel workspace-focus-target ${focusKey === key ? "active" : ""}`.trim();
-  const focusedSectionTitle = selectedSection === "sites" ? "Per-site truth" : selectedSection === "recovery" ? "Recovery and repair" : selectedSection === "linkage" ? "Route and boundary linkage" : selectedSection === "coverage" ? "Model coverage" : "Authority ledger";
+  const focusedSectionTitle = selectedSection === "sites" ? "Per-site model" : selectedSection === "recovery" ? "Recovery and repair" : selectedSection === "linkage" ? "Route and boundary linkage" : selectedSection === "coverage" ? "Model coverage" : "Source ledger";
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Unified Design Model"
-        description="This workspace shows the shared engineering truth layer behind the design package so topology, routing, service placement, boundaries, and flows can be reviewed as one connected model instead of isolated helper views."
+        description="This workspace shows the shared engineering model behind the design package so topology, routing, service placement, boundaries, and flows can be reviewed as one connected model instead of isolated helper views."
         actions={
           <div className="overview-actions-shell">
             <div className="overview-primary-actions">
@@ -115,7 +116,7 @@ export function ProjectCoreModelPage() {
           <div>
             <p className="workspace-detail-kicker">Design Package</p>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>{focusedSectionTitle}</h2>
-            <p className="muted" style={{ margin: 0 }}>Focused core-model view so the right pane stays on one truth-layer slice at a time.</p>
+            <p className="muted" style={{ margin: 0 }}>Focused design-model view so the right pane stays on one review slice at a time.</p>
           </div>
         </div>
       ) : null}
@@ -124,7 +125,7 @@ export function ProjectCoreModelPage() {
 
       <div className="panel recovery-focus-panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority cleanup focus</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Source cleanup focus</h2>
           <p className="muted" style={{ margin: 0 }}>{focusPlan.summary}</p>
         </div>
         <div className="recovery-focus-grid">
@@ -163,14 +164,14 @@ export function ProjectCoreModelPage() {
       <div className="grid-2" style={{ display: selectedSection && !["authority", "sites"].includes(selectedSection) ? "none" : "grid", alignItems: "start" }}>
         <div className={focusClass("authority-ledger")} style={{ display: "grid", gap: 14 }}>
           <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority-source ledger</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Source ledger</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This ledger keeps the shared model honest about where its trust is coming from. It separates stronger saved design truth from discovery-backed, backend-unconfirmed, and still inferred anchors instead of treating every object as equally real.
+              This ledger keeps the shared model honest about where each fact comes from. It separates stronger saved design records from discovery-backed, system-draft, and still-inferred anchors instead of treating every object as equally real.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className={authorityBadge(authorityLedger.status)}>{authorityLedger.confidenceLabel}</span>
-            <span className="badge-soft">Confidence {authorityLedger.confidenceScore}%</span>
+            <span className="badge-soft">Evidence strength {authorityLedger.confidenceScore}%</span>
             <span className="badge-soft">Explicit core {authorityLedger.masterEvidence.explicitCoreObjects}</span>
             <span className="badge-soft">Inferred core {authorityLedger.masterEvidence.inferredCoreObjects}</span>
           </div>
@@ -188,9 +189,9 @@ export function ProjectCoreModelPage() {
             ))}
           </div>
           <div>
-            <strong style={{ display: "block", marginBottom: 8 }}>Top authority debt</strong>
+            <strong style={{ display: "block", marginBottom: 8 }}>Top source gaps</strong>
             {authorityLedger.debtItems.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>No major authority debt is being flagged from the shared model right now.</p>
+              <p className="muted" style={{ margin: 0 }}>No major source gaps are being flagged from the shared model right now.</p>
             ) : (
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {authorityLedger.debtItems.slice(0, 4).map((item) => (
@@ -205,9 +206,9 @@ export function ProjectCoreModelPage() {
 
         <div className={focusClass("site-authority")} style={{ display: "grid", gap: 14 }}>
           <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Per-site truth pressure</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Per-site model pressure</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Site-level authority should become visible before the design is treated as truly unified. This keeps the core model from looking strong overall while one or two sites are still thin.
+              Site-level source evidence should become visible before the design is treated as truly unified. This keeps the core model from looking strong overall while one or two sites are still thin.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -220,9 +221,9 @@ export function ProjectCoreModelPage() {
               <div key={site.siteId} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
                   <strong>{site.siteName}</strong>
-                  <span className={coverageBadge(site.status)}>{site.status}</span>
+                  <span className={coverageBadge(site.status)}>{userFacingStatusLabel(site.status)}</span>
                   <span className="badge-soft">{site.strongestSourceLabel}</span>
-                  <span className="badge-soft">Debt {site.debtCount}</span>
+                  <span className="badge-soft">Gaps {site.debtCount}</span>
                 </div>
                 <p className="muted" style={{ margin: 0 }}>{site.detail}</p>
                 {site.blockers.length ? (
@@ -241,13 +242,13 @@ export function ProjectCoreModelPage() {
       <div className="grid-2" style={{ display: selectedSection && selectedSection !== "recovery" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recovery roadmap status</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Design cleanup status</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This scorecard turns the recovery roadmap into a live engineering check. It shows which recovery stages now look stronger inside the current build and which ones still need deeper work before the master roadmap fully takes over.
+              This scorecard turns the cleanup plan into a live engineering check. It shows which design areas are stronger and which ones still need deeper work before the handoff can be trusted.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className={coverageBadge(recovery.overallStatus)}>{recovery.overallStatus}</span>
+            <span className={coverageBadge(recovery.overallStatus)}>{userFacingStatusLabel(recovery.overallStatus)}</span>
             <span className="badge-soft">ready {recovery.completedCount}</span>
             <span className="badge-soft">partial {recovery.partialCount}</span>
             <span className="badge-soft">pending {recovery.pendingCount}</span>
@@ -257,7 +258,7 @@ export function ProjectCoreModelPage() {
               <div key={stage.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
                   <strong>{stage.label}</strong>
-                  <span className={coverageBadge(stage.status)}>{stage.status}</span>
+                  <span className={coverageBadge(stage.status)}>{userFacingStatusLabel(stage.status)}</span>
                 </div>
                 <p className="muted" style={{ margin: 0 }}>{stage.detail}</p>
                 {stage.blockers.length ? (
@@ -314,7 +315,7 @@ export function ProjectCoreModelPage() {
       <div className="grid-2" style={{ display: selectedSection && selectedSection !== "coverage" ? "none" : "grid", alignItems: "start" }}>
         <div className="panel" style={{ display: "grid", gap: 14 }}>
           <div>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Authority split</h2>
+            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Source split</h2>
             <p className="muted" style={{ margin: 0 }}>
               The recovery goal is not just to have more model objects. It is to make the model evidence-driven and reviewable. These counts show both the raw explicit-vs-inferred split and where the explicit pressure is now coming from.
             </p>
@@ -328,12 +329,12 @@ export function ProjectCoreModelPage() {
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {summaryCard("Saved route anchors", savedRouteDomains, "Backed by saved routing objects.")}
             {summaryCard("Discovery route anchors", discoveryRouteDomains, "Promoted from current-state evidence.")}
-            {summaryCard("Backend-unconfirmed route anchors", backendUnconfirmedRouteDomains, "Held by planner/addressing truth until saved routing records catch up.")}
+            {summaryCard("System-draft route anchors", systemDraftRouteDomains, "Held by planning/addressing model until saved routing records catch up.")}
           </div>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
             {summaryCard("Saved boundaries", savedBoundaryDomains, "Backed by saved boundary objects.")}
             {summaryCard("Discovery boundaries", discoveryBoundaryDomains, "Promoted from security or addressing discovery evidence.")}
-            {summaryCard("Backend-unconfirmed boundaries", backendUnconfirmedBoundaryDomains, "Held by planner/addressing truth until saved boundary records catch up.")}
+            {summaryCard("System-draft boundaries", systemDraftBoundaryDomains, "Held by planning/addressing model until saved boundary records catch up.")}
           </div>
         </div>
 
@@ -375,7 +376,7 @@ export function ProjectCoreModelPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Required flow coverage</h2>
           <p className="muted" style={{ margin: 0 }}>
-            The recovery roadmap expects certain traffic patterns to exist explicitly, not just as general narrative. This view shows whether the current flow engine is covering the scenario paths that matter for the saved design scope.
+            The recovery roadmap expects certain traffic patterns to exist explicitly, not just as general narrative. This view shows whether the current flow checks is covering the scenario paths that matter for the saved design scope.
           </p>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -398,7 +399,7 @@ export function ProjectCoreModelPage() {
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>Site unification table</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This table shows whether each site is carrying the objects expected from a real design engine: placements, segments, services, boundaries, flows, WAN, and route ownership.
+              This table shows whether each site is carrying the objects expected from a real design checks: placements, segments, services, boundaries, flows, WAN, and route ownership.
             </p>
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -414,7 +415,7 @@ export function ProjectCoreModelPage() {
                   <th align="left">Boundaries</th>
                   <th align="left">Flows</th>
                   <th align="left">WAN</th>
-                  <th align="left">Authority</th>
+                  <th align="left">Source status</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,7 +425,7 @@ export function ProjectCoreModelPage() {
                     <tr key={site.id}>
                       <td><strong>{site.siteName}</strong>{site.siteCode ? <><br /><span className="muted">{site.siteCode}</span></> : null}</td>
                       <td>{site.topologyRole}</td>
-                      <td>{route ? `${route.siteName} (${route.authoritySource})` : "Missing"}</td>
+                      <td>{route ? `${route.siteName} (${userFacingStatusLabel(route.authoritySource)})` : "Missing"}</td>
                       <td>{site.placementIds.length}</td>
                       <td>{site.segmentIds.length}</td>
                       <td>{site.serviceIds.length}</td>
@@ -432,7 +433,7 @@ export function ProjectCoreModelPage() {
                       <td>{site.flowIds.length}</td>
                       <td>{site.wanAdjacencyIds.length}</td>
                       <td>
-                        <span className={coverageBadge(site.authorityStatus)}>{site.authorityStatus}</span>
+                        <span className={coverageBadge(site.authorityStatus)}>{userFacingStatusLabel(site.authorityStatus)}</span>
                         {site.authorityNotes.length > 0 ? <><br /><span className="muted">{site.authorityNotes[0]}</span></> : null}
                       </td>
                     </tr>

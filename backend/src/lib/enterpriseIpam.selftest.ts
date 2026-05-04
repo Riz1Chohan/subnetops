@@ -1,6 +1,6 @@
 import { buildV1EnterpriseIpamTruthControl } from "../services/designCore/designCore.enterpriseIpamTruthControl.js";
 import type { DesignCoreAddressRow, V1RequirementsClosureControlSummary, V1CidrAddressingTruthControlSummary } from "../services/designCore.types.js";
-import type { EnterpriseAllocatorPosture, EnterpriseAllocatorSource } from "./enterpriseAddressAllocator.js";
+import type { EnterpriseAllocatorPosture, EnterpriseAllocatorSource } from "../domain/ipam/enterprise-ipam.js";
 
 // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 

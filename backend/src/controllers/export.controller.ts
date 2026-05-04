@@ -20,6 +20,7 @@ import {
   TableLayoutType,
 } from "docx";
 import { composeProfessionalReportForProject, getCsvRows, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
+import { recordSecurityAuditEvent } from "../services/securityAudit.service.js";
 
 function parseReportMode(value: unknown): "professional" | "technical" | "full-proof" {
   const mode = Array.isArray(value) ? value[0] : value;
@@ -505,6 +506,7 @@ export async function exportCsv(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
   await ensureCanExportProject(req, projectId);
 
+  await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "csv" } });
   const rows = await getCsvRows(projectId);
   const csv = toCsv(rows);
 
@@ -517,6 +519,7 @@ export async function exportPdf(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
   await ensureCanExportProject(req, projectId);
 
+  await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "pdf", reportMode: parseReportMode(req.query.reportMode) } });
   const pdfBytes = await buildPdf(projectId, parseReportMode(req.query.reportMode));
   if (!pdfBytes) {
     return res.status(404).json({ message: "Project not found" });
@@ -531,6 +534,7 @@ export async function exportDocx(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
   await ensureCanExportProject(req, projectId);
 
+  await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "docx", reportMode: parseReportMode(req.query.reportMode) } });
   const docxBytes = await buildDocx(projectId, parseReportMode(req.query.reportMode));
   if (!docxBytes) {
     return res.status(404).json({ message: "Project not found" });

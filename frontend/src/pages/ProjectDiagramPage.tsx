@@ -262,7 +262,7 @@ export function ProjectDiagramPage() {
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
-  if (isWorkspaceLoading) return <LoadingState title="Loading diagram" message="Preparing project, site, VLAN, and backend Engine 1 inputs before rendering the canvas." />;
+  if (isWorkspaceLoading) return <LoadingState title="Loading diagram" message="Preparing project, site, VLAN, and addressing inputs before rendering the canvas." />;
   if (workspaceError) {
     return (
       <ErrorState
@@ -413,7 +413,7 @@ export function ProjectDiagramPage() {
               </div>
 
               <div className="diagram-stage-viewport-pro" ref={canvasViewportRef} style={{ minHeight: `${canvasViewportMinHeight}px` }} aria-label="Auto-growing diagram canvas">
-                {diagramTruth.hasModeledTopology ? null : <div className="panel" style={{ marginBottom: 12, padding: 14 }}><strong>Topology proof is incomplete.</strong><p className="muted" style={{ margin: "8px 0 0 0" }}>{diagramTruth.emptyStateReason}</p></div>}
+                {diagramTruth.hasModeledTopology ? null : <div className="panel" style={{ marginBottom: 12, padding: 14 }}><strong>Topology evidence is incomplete.</strong><p className="muted" style={{ margin: "8px 0 0 0" }}>{diagramTruth.emptyStateReason}</p></div>}
                 {diagramTruth.renderModel ? (
                   <BackendDiagramCanvas
                     renderModel={diagramTruth.renderModel}
@@ -450,15 +450,15 @@ export function ProjectDiagramPage() {
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <div>
                   <strong>V1 diagram truth contract</strong>
-                  <p className="muted" style={{ margin: "4px 0 0 0" }}>Backend-only renderer authority: every visual node needs backend object identity, every edge needs relationship evidence, and each mode has its own purpose.</p>
+                  <p className="muted" style={{ margin: "4px 0 0 0" }}>Verified renderer rule: every visual node needs source object identity, every edge needs relationship evidence, and each mode has its own purpose.</p>
                 </div>
                 <span className={truthBadgeClass(V1DiagramTruth.overallReadiness)}>{V1DiagramTruth.overallReadiness}</span>
               </div>
               <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
-                <div className="summary-card"><div className="muted">Backend authored</div><div className="value">{V1DiagramTruth.backendAuthored ? "Yes" : "No"}</div><div className="muted">Frontend cannot invent topology.</div></div>
+                <div className="summary-card"><div className="muted">Source-authored</div><div className="value">{V1DiagramTruth.backendAuthored ? "Yes" : "No"}</div><div className="muted">Browser cannot invent topology.</div></div>
                 <div className="summary-card"><div className="muted">Render coverage</div><div className="value">{V1DiagramTruth.renderNodeCount}/{V1DiagramTruth.renderEdgeCount}</div><div className="muted">Nodes / edges with lineage checks.</div></div>
                 <div className="summary-card"><div className="muted">Mode contracts</div><div className="value">{V1DiagramTruth.modeContractCount}</div><div className="muted">Physical, logical, WAN/cloud, security, per-site, implementation.</div></div>
-                <div className="summary-card"><div className="muted">Truth visibility</div><div className="value">{V1DiagramTruth.inferredOrReviewVisibleCount}</div><div className="muted">Inferred/review evidence remains visible.</div></div>
+                <div className="summary-card"><div className="muted">Evidence visibility</div><div className="value">{V1DiagramTruth.inferredOrReviewVisibleCount}</div><div className="muted">Inferred/review evidence remains visible.</div></div>
               </div>
               <div className="grid-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "start" }}>
                 {V1DiagramTruth.modeContracts.slice(0, 6).map((item) => (

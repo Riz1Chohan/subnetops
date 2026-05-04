@@ -18,17 +18,17 @@ export function resolveDesignAuthorityState(snapshot?: DesignCoreSnapshot | null
     const blockerCount = snapshot.issues.filter((issue) => issue.severity === "ERROR").length;
     const reviewCount = snapshot.issues.filter((issue) => issue.severity === "WARNING").length;
     const mode: DesignAuthorityMode = snapshot.summary.readyForBackendAuthority ? "backend-authoritative" : "backend-review";
-    const label = snapshot.summary.readyForBackendAuthority ? "Backend design-core authority" : "Backend design-core authority — review required";
+    const label = snapshot.summary.readyForBackendAuthority ? "Verified design model" : "Design model needs review";
     const warnings = [
       snapshot.authority?.requiresEngineerReview ? "Engineer review is still required before production implementation." : null,
-      blockerCount > 0 ? `${blockerCount} backend blocker${blockerCount === 1 ? "" : "s"} must be resolved before implementation.` : null,
-      reviewCount > 0 ? `${reviewCount} backend warning${reviewCount === 1 ? "" : "s"} need review.` : null,
+      blockerCount > 0 ? `${blockerCount} system blocker${blockerCount === 1 ? "" : "s"} must be resolved before implementation.` : null,
+      reviewCount > 0 ? `${reviewCount} system warning${reviewCount === 1 ? "" : "s"} need review.` : null,
     ].filter(Boolean) as string[];
 
     return {
       mode,
       label,
-      detail: `${snapshot.summary.networkObjectCount || snapshot.summary.vlanCount} backend-modeled object${(snapshot.summary.networkObjectCount || snapshot.summary.vlanCount) === 1 ? "" : "s"}; ${snapshot.summary.implementationPlanStepCount || 0} implementation step${snapshot.summary.implementationPlanStepCount === 1 ? "" : "s"}; ${blockerCount} blocker${blockerCount === 1 ? "" : "s"}.`,
+      detail: `${snapshot.summary.networkObjectCount || snapshot.summary.vlanCount} verified object${(snapshot.summary.networkObjectCount || snapshot.summary.vlanCount) === 1 ? "" : "s"}; ${snapshot.summary.implementationPlanStepCount || 0} implementation step${snapshot.summary.implementationPlanStepCount === 1 ? "" : "s"}; ${blockerCount} blocker${blockerCount === 1 ? "" : "s"}.`,
       isBackendAuthority: true,
       isFallback: false,
       backendRequired: false,
@@ -38,24 +38,24 @@ export function resolveDesignAuthorityState(snapshot?: DesignCoreSnapshot | null
   }
 
   const fallbackReason = error instanceof Error
-    ? `Backend design-core request failed: ${error.message}`
+    ? `Design model request failed: ${error.message}`
     : isLoading
-      ? "Backend design-core snapshot is still loading."
-      : "Backend design-core snapshot is unavailable.";
+      ? "Design model is still loading."
+      : "Design model is unavailable.";
 
   return {
     mode: "backend-unavailable",
-    label: "Backend design-core unavailable",
-    detail: `${fallbackReason} The frontend is intentionally not generating a substitute network plan.`,
+    label: "Design model unavailable",
+    detail: `${fallbackReason} The browser is intentionally not generating a substitute network plan.`,
     isBackendAuthority: false,
     isFallback: false,
     backendRequired: true,
     requiresEngineerReview: true,
     warnings: [
       fallbackReason,
-      "No authoritative backend design snapshot is available.",
-      "Frontend planning fallback is disabled: this UI may display, explain, filter, and visualize backend facts only.",
-      "Resolve backend design-core availability before using implementation, routing, security, diagram, or export views for sign-off.",
+      "No verified design model is available.",
+      "Browser-side planning fallback is disabled: this UI may display, explain, filter, and visualize verified facts only.",
+      "Resolve design model availability before using implementation, routing, security, diagram, or export views for sign-off.",
     ],
   };
 }

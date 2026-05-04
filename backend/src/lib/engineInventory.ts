@@ -276,7 +276,7 @@ export const V1_ENGINE_INVENTORY: V1EngineInventoryRow[] = [
     engineName: "Engine 2 enterprise IPAM",
     primarySourceFiles: [
       "backend/src/services/enterpriseIpam.service.ts",
-      "backend/src/lib/enterpriseAddressAllocator.ts",
+      "backend/src/domain/ipam/enterprise-ipam.ts",
       "backend/src/services/designCore/designCore.enterpriseIpamTruthControl.ts",
       "backend/src/controllers/enterpriseIpam.controller.ts",
       "backend/prisma/schema.prisma",

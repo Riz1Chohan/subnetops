@@ -44,7 +44,7 @@ const wizardSteps: WizardStep[] = [
   {
     key: "core",
     title: "Core requirements",
-    description: "Define the network type, project stage, environment, and basic scope before shaping the design.",
+    description: "Define the network type, project lifecycle, environment, and basic scope before shaping the design.",
   },
   {
     key: "priorities",
@@ -92,7 +92,7 @@ function selectedSummary(options: AIUseDraftOptions) {
 }
 
 function appendV1AiReviewMarker(notes?: string) {
-  const marker = `${V1_AI_APPLIED_MARKER}: AI-created suggestion imported from the AI workspace. Review required; not authoritative until requirements materialization, validation, Engine 1 addressing, Engine 2 IPAM where relevant, standards, and traceability checks pass.`;
+  const marker = `${V1_AI_APPLIED_MARKER}: AI-created suggestion imported from the AI workspace. Review required; not authoritative until requirements application, validation, addressing, IPAM where relevant, standards, and traceability checks pass.`;
   if (!notes || notes.trim().length === 0) return marker;
   if (notes.includes(V1_AI_APPLIED_MARKER)) return notes;
   return `${notes.trim()}\n${marker}`;
@@ -1219,12 +1219,12 @@ export function NewProjectPage() {
 
               {aiDraft ? (
                 <div className="panel" style={{ padding: 14 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>Applied AI selections</h3>
-                  <p className="muted" style={{ marginTop: 0 }}>V1 marker will be saved on AI-created objects: AI_DRAFT / REVIEW_REQUIRED / NOT_AUTHORITATIVE.</p>
+                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>AI selections sent to review</h3>
+                  <p className="muted" style={{ marginTop: 0 }}>AI-created objects are saved as draft suggestions only. They are not approved design facts until deterministic checks accept them.</p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     <li>Project fields: {useOptions.applyProjectFields ? "Yes" : "No"}</li>
-                    <li>Auto-create sites: {useOptions.applySites ? "Yes" : "No"}</li>
-                    <li>Auto-create VLANs: {useOptions.applyVlans ? "Yes" : "No"}</li>
+                    <li>Sites sent to review: {useOptions.applySites ? "Yes" : "No"}</li>
+                    <li>VLANs sent to review: {useOptions.applyVlans ? "Yes" : "No"}</li>
                   </ul>
                 </div>
               ) : null}

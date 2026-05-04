@@ -22,6 +22,7 @@ import {
 } from "../lib/requirementsProfile";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingEvidenceLabel, userFacingStatusLabel } from "../lib/userFacingCopy";
 
 export function ProjectRequirementsPage() {
   const { projectId = "" } = useParams();
@@ -101,12 +102,12 @@ export function ProjectRequirementsPage() {
       setLastRuntimeProof(proof);
 
       if (!proof || proof.release?.stage !== "V1_REQUIREMENTS_READ_REPAIR_MATERIALIZATION") {
-        setSaveConfidenceNote("Save response did not include V1 runtime proof. Backend may still be stale; do not trust design/report output yet.");
+        setSaveConfidenceNote("Save response did not include the system check. Saved design/report output still needs review.");
         return;
       }
 
       if (proof.status !== "pass") {
-        setSaveConfidenceNote(`Requirements runtime proof BLOCKED: ${proof.failureReasons.join(" ")}`);
+        setSaveConfidenceNote(`Requirements save check blocked: ${proof.failureReasons.join(" ")}`);
         return;
       }
 
@@ -121,12 +122,12 @@ export function ProjectRequirementsPage() {
       const coverage = result.requirementsFieldCoverage;
       const coverageLabel = coverage
         ? ` Captured ${coverage.capturedFields}/${coverage.expectedFields} requirement field(s) (${coverage.status}).`
-        : " Requirement field coverage was not returned by the backend.";
+        : " Requirement field coverage was not returned by the system.";
       const missingLabel = coverage?.missingFields?.length
         ? ` Missing: ${coverage.missingFields.slice(0, 8).join(", ")}${coverage.missingFields.length > 8 ? ", ..." : ""}.`
         : "";
       setSaveConfidenceNote(
-        `V1 runtime proof PASSED at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
+        `Save check passed at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
       );
     },
     onError: (error) => {
@@ -212,7 +213,7 @@ export function ProjectRequirementsPage() {
             <div className="trust-note">
               <strong>Methodology note</strong>
               <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                SubnetOps is meant to behave like a planning workspace, not a generic form. The first answers should control what later stages even need to be reviewed.
+                SubnetOps is meant to behave like a planning workspace, not a generic form. The first answers should control what later steps even need to be reviewed.
               </p>
             </div>
 
@@ -1507,7 +1508,7 @@ export function ProjectRequirementsPage() {
 
       <div className="panel save-confidence-panel">
         <div>
-          <strong style={{ display: "block", marginBottom: 6 }}>Save confidence</strong>
+          <strong style={{ display: "block", marginBottom: 6 }}>Save status</strong>
           <p className="muted" style={{ margin: 0 }}>This workspace now keeps a browser draft while you edit, warns before accidental refresh or close, and makes it clearer whether the current plan is only local or already saved to project data.</p>
         </div>
         <div className="save-confidence-grid">
@@ -1521,14 +1522,14 @@ export function ProjectRequirementsPage() {
           </div>
           <div className="save-confidence-pill">
             <strong>Shared project data</strong>
-            <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later stages."}</span>
+            <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later steps."}</span>
           </div>
           <div className={`save-confidence-pill ${lastRuntimeProof?.status === "blocker" ? "warning" : lastRuntimeProof?.status === "pass" ? "ok" : ""}`.trim()}>
-            <strong>Backend runtime proof</strong>
+            <strong>System save check</strong>
             <span>
               {lastRuntimeProof
-                ? `${lastRuntimeProof.release?.stage ?? "unknown backend stage"}: ${lastRuntimeProof.status}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
-                : "No V1 runtime proof has been returned by the backend in this browser session."}
+                ? `${userFacingEvidenceLabel(lastRuntimeProof.release?.stage ?? "system check")}: ${userFacingStatusLabel(lastRuntimeProof.status)}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
+                : "No system save check has been returned in this browser session."}
             </span>
           </div>
         </div>
@@ -1542,15 +1543,15 @@ export function ProjectRequirementsPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Backend design-core required</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Verified design model required</h2>
           <p className="muted" style={{ margin: 0 }}>
             This page collects and saves requirements only. It no longer generates an early browser-side design preview from unsaved planner answers.
           </p>
         </div>
         <div className="validation-card warning">
-          <strong>Frontend planning authority disabled</strong>
+          <strong>Browser planning fallback disabled</strong>
           <p className="muted" style={{ margin: "8px 0 0" }}>
-            Save requirements, then review addressing, routing, security, implementation, reports, and diagrams from the backend design-core snapshot. If the backend has not returned a snapshot, those views should show an honest unavailable state instead of a fabricated frontend plan.
+            Save requirements, then review addressing, routing, security, implementation, reports, and diagrams from the verified design model. If the system has not returned a model, those views should show an honest unavailable state instead of a fabricated browser plan.
           </p>
         </div>
       </div>

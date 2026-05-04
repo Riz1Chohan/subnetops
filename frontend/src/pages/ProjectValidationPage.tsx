@@ -116,7 +116,7 @@ export function ProjectValidationPage() {
   const backendSummary = designCore?.networkObjectModel?.summary;
 
   if (projectQuery.isLoading || validationQuery.isLoading) {
-    return <LoadingState title="Loading validation" message="Loading backend validation results and design-core authority state." />;
+    return <LoadingState title="Loading validation" message="Loading validation results and design model status." />;
   }
 
   if (projectQuery.isError || validationQuery.isError) {
@@ -188,7 +188,7 @@ export function ProjectValidationPage() {
       ) : (
         <SectionHeader
           title="Validation"
-          description="Review backend validation findings, authority state, and the design-core signals that affect release readiness."
+          description="Review validation findings, source status, and design signals that affect readiness."
           actions={
             <button type="button" onClick={() => validationMutation.mutate()} disabled={validationMutation.isPending}>
               {validationMutation.isPending ? "Running..." : "Run Validation"}
@@ -210,7 +210,7 @@ export function ProjectValidationPage() {
       <div data-validation-section="health" className="panel validation-trust-panel" style={{ display: selectedSection !== "health" ? "none" : "grid" }}>
         <div className="validation-trust-header">
           <div>
-            <p className="eyebrow" style={{ margin: 0 }}>Backend validation health</p>
+            <p className="eyebrow" style={{ margin: 0 }}>Validation health</p>
             <h2 style={{ margin: "4px 0 8px 0" }}>{healthLabel(errorCount, warningCount)}</h2>
             <p className="muted" style={{ margin: 0 }}>{readinessSummary.summary}</p>
           </div>
@@ -306,13 +306,13 @@ export function ProjectValidationPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Review guidance</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Use this only as review support. Backend validation and design-core outputs remain the source of truth.
+            Use this only as review support. Validation results and the design model remain the source of truth.
           </p>
         </div>
         <div className="trust-note">
           <strong>Release rule</strong>
           <p className="muted" style={{ margin: "6px 0 0" }}>
-            Do not ship a project while ERROR findings, backend authority gaps, or implementation blockers remain unresolved.
+            Do not ship a project while ERROR findings, backend evidence gaps, or implementation blockers remain unresolved.
           </p>
         </div>
         <div ref={insightRef}>

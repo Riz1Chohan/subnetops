@@ -3,16 +3,20 @@ set -e
 
 PRISMA_SYNC_ON_BOOT="${PRISMA_SYNC_ON_BOOT:-true}"
 PRISMA_SYNC_STRATEGY="${PRISMA_SYNC_STRATEGY:-migrate}"
+PRISMA_GENERATE_ON_BOOT="${PRISMA_GENERATE_ON_BOOT:-false}"
 ALLOW_UNSAFE_DB_PUSH="${ALLOW_UNSAFE_DB_PUSH:-false}"
 DB_PUSH_ON_BOOT="${DB_PUSH_ON_BOOT:-false}"
 SEED_DEMO_ON_BOOT="${SEED_DEMO_ON_BOOT:-false}"
 
-# Controlled recovery for Render databases that were previously created with
+# Controlled recovery for databases that were previously created with
 # `prisma db push` and therefore have tables but no Prisma migration history.
 # This is intentionally opt-in. Do not leave it enabled long-term.
 PRISMA_BASELINE_EXISTING_DB="${PRISMA_BASELINE_EXISTING_DB:-false}"
 
-npx prisma generate
+if [ "$PRISMA_GENERATE_ON_BOOT" = "true" ]; then
+  echo "PRISMA_GENERATE_ON_BOOT=true: generating Prisma client at startup."
+  npx prisma generate
+fi
 
 run_migrate_deploy() {
   npx prisma migrate deploy
@@ -57,7 +61,7 @@ if [ "$PRISMA_SYNC_ON_BOOT" = "true" ]; then
         done
         run_migrate_deploy
       else
-        echo "Migration failed. If this is an existing Render DB previously created with prisma db push, either:"
+        echo "Migration failed. If this is an existing Render database previously created with prisma db push, either:"
         echo "  1) create a fresh empty database, or"
         echo "  2) temporarily set PRISMA_BASELINE_EXISTING_DB=true for one deploy, then set it back to false."
         echo "This deploy also checks for the known V1 brownfield relation-exists drift automatically."
@@ -88,7 +92,8 @@ fi
 
 if [ "$NODE_ENV" = "production" ]; then
   if [ ! -f dist/server.js ]; then
-    npm run build
+    echo "Refusing production startup because dist/server.js is missing. Build the backend during the image or platform build step before starting production."
+    exit 1
   fi
   npm run start
 else

@@ -1,6 +1,7 @@
 // V1_DISCOVERY_CURRENT_STATE_CONTRACT report wiring
 // V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: professional report exposes diagram mode contracts.
 import type { ProfessionalReport } from "./export.types.js";
+import { buildReportEvidenceDocument, findOverclaimRisks, reportCanClaimReady } from "../domain/reporting/index.js";
 // V1_ENGINE1_CIDR_ADDRESSING_TRUTH
 // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 // V1_DESIGN_CORE_ORCHESTRATOR_CONTRACT
@@ -196,22 +197,49 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       Boolean(diagramEmptyReason)
       || scenarioProofMissingAllEvidence
     );
+  const reportEvidenceDocument = V1ReportExportTruth ? buildReportEvidenceDocument(V1ReportExportTruth as any) : null;
+  const reportOverclaimRisks = reportEvidenceDocument ? findOverclaimRisks(reportEvidenceDocument) : ["Report/export readiness evidence is not available."];
+  const reportExportNotReady = !reportEvidenceDocument || !reportCanClaimReady(reportEvidenceDocument);
 
-  if (V1TruthBlocked) {
+  if (V1TruthBlocked || reportExportNotReady) {
     report.metadata = report.metadata ?? {
       organizationName: "To be confirmed",
       environment: "To be confirmed",
-      reportVersion: "Version 0.98 truth-locked",
+      reportVersion: "Version 1 truth-locked",
       revisionStatus: "Blocked - design evidence gaps present",
       documentOwner: "SubnetOps project owner",
       approvalStatus: "Not ready for approval",
       generatedFrom: "Backend design evidence truth lock",
     };
-    report.metadata.reportVersion = "Version 0.98 truth-locked";
-    report.metadata.revisionStatus = "Blocked - design evidence gaps present";
+    report.metadata.reportVersion = "Version 1 truth-locked";
+    report.metadata.revisionStatus = reportExportNotReady ? "Blocked - report/export evidence review required" : "Blocked - design evidence gaps present";
     report.metadata.approvalStatus = "Not ready for approval";
-    report.executiveSummary.unshift("Requirement-output evidence is still incomplete. Do not treat the package as design-review ready until materialized sites, addressing rows, and diagram topology evidence agree.");
+    report.executiveSummary.unshift(reportExportNotReady
+      ? "Report/export readiness evidence is not ready. Do not treat the package as final until blocked or review-required sections are resolved."
+      : "Requirement-output evidence is still incomplete. Do not treat the package as design-review ready until materialized sites, addressing rows, and diagram topology evidence agree.");
   }
+
+  report.sections.push({
+    title: "Report Export Readiness Gate",
+    paragraphs: [
+      reportExportNotReady
+        ? "The export is not final-ready. Blocked or review-required sections must remain visible in PDF, DOCX, CSV, and the report page."
+        : "The export readiness gate is clear based on current report/export evidence.",
+      "This gate prevents the report from claiming readiness when routing, security, implementation, validation, diagram, or traceability evidence is missing or review-required.",
+    ],
+    tables: [
+      {
+        title: "Report Export Evidence",
+        headers: ["Metric", "Status", "Evidence"],
+        rows: [
+          ["Overall readiness", asString(V1ReportExportTruth?.overallReadiness, "review"), `${V1ReportExportTruth?.readySectionCount ?? 0}/${V1ReportExportTruth?.requiredSectionCount ?? 0} required sections ready`],
+          ["Blocked sections", String(V1ReportExportTruth?.blockedSectionCount ?? 0), joinText(asArray(V1ReportExportTruth?.sectionGates).filter((row: any) => row.readinessImpact === "BLOCKED").map((row: any) => row.title).slice(0, 6), "none")],
+          ["Review sections", String(V1ReportExportTruth?.reviewSectionCount ?? 0), joinText(asArray(V1ReportExportTruth?.sectionGates).filter((row: any) => row.readinessImpact === "REVIEW_REQUIRED").map((row: any) => row.title).slice(0, 6), "none")],
+          ["Overclaim risks", reportOverclaimRisks.length ? "review" : "ready", joinText(reportOverclaimRisks.slice(0, 6), "No overclaim risks recorded")],
+        ],
+      },
+    ],
+  });
 
   report.sections.push({
     title: "Requirement Output Verification",
@@ -425,7 +453,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         rows: [
           ["CIDR edge cases", `${V1CidrAddressingTruth?.edgeCaseProofs?.length ?? 0} proof rows`, "Canonicalization, invalid CIDR rejection, /0-/32 behavior, overlap detection, and role-aware gateway safety."],
           ["Address rows", `${V1CidrAddressingTruth?.validSubnetCount ?? 0} valid / ${V1CidrAddressingTruth?.invalidSubnetCount ?? 0} invalid`, `${V1CidrAddressingTruth?.undersizedSubnetCount ?? 0} undersized; ${V1CidrAddressingTruth?.gatewayIssueCount ?? 0} gateway issue(s).`],
-          ["Requirement addressing", `${V1CidrAddressingTruth?.requirementDrivenAddressingCount ?? 0} driven / ${V1CidrAddressingTruth?.requirementAddressingGapCount ?? 0} gap(s)`, "Requirement-driven addressing evidence is proven from Engine 1 rows, not frontend-only calculations."],
+          ["Requirement addressing", `${V1CidrAddressingTruth?.requirementDrivenAddressingCount ?? 0} driven / ${V1CidrAddressingTruth?.requirementAddressingGapCount ?? 0} gap(s)`, "Requirement-driven addressing evidence is proven from backend addressing rows, not frontend-only calculations."],
         ],
       });
       addressingSection.tables.push({
@@ -465,14 +493,14 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         title: "V1 Enterprise IPAM Durable Authority",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
-          ["Engine relationship", asString(V1EnterpriseIpamTruth.overallReadiness, "review"), "Engine 1 is planner; Engine 2 is durable IPAM authority; design-core reconciles split-brain states."],
+          ["Addressing/IPAM relationship", asString(V1EnterpriseIpamTruth.overallReadiness, "review"), "Addressing plans are reconciled against durable IPAM authority so proposal-only, conflict, and approval states stay visible."],
           ["Durable objects", `${V1EnterpriseIpamTruth.durablePoolCount ?? 0} pools / ${V1EnterpriseIpamTruth.durableAllocationCount ?? 0} allocations`, `${V1EnterpriseIpamTruth.dhcpScopeCount ?? 0} DHCP scopes; ${V1EnterpriseIpamTruth.reservationCount ?? 0} reservations; ${V1EnterpriseIpamTruth.brownfieldNetworkCount ?? 0} brownfield networks.`],
-          ["Review gates", `${V1EnterpriseIpamTruth.conflictBlockerCount ?? 0} blockers / ${V1EnterpriseIpamTruth.reviewRequiredCount ?? 0} review`, `${V1EnterpriseIpamTruth.engine1ProposalOnlyCount ?? 0} Engine 1 proposal-only row(s); ${V1EnterpriseIpamTruth.staleAllocationCount ?? 0} stale allocation(s).`],
+          ["Review gates", `${V1EnterpriseIpamTruth.conflictBlockerCount ?? 0} blockers / ${V1EnterpriseIpamTruth.reviewRequiredCount ?? 0} review`, `${V1EnterpriseIpamTruth.engine1ProposalOnlyCount ?? 0} proposal-only addressing row(s); ${V1EnterpriseIpamTruth.staleAllocationCount ?? 0} stale allocation(s).`],
         ],
       });
       addressingSection.tables.push({
-        title: "V1 Engine 1 / Engine 2 Reconciliation",
-        headers: ["VLAN", "Engine 1 Planned CIDR", "Engine 2 Durable CIDR", "State", "Proof / Review"],
+        title: "V1 Addressing / IPAM Reconciliation",
+        headers: ["VLAN", "Planned CIDR", "Durable IPAM CIDR", "State", "Proof / Review"],
         rows: compactRows(V1ReconciliationRows, [["No V1 reconciliation rows", "—", "—", "—", "—"]]),
       });
       addressingSection.tables.push({

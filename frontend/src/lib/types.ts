@@ -218,6 +218,8 @@ export interface V1AIDraftAuthority {
   materializationRequired: true;
   downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED";
   conversionGates: string[];
+  allowedUses?: string[];
+  prohibitedUses?: string[];
 }
 
 export interface AIPlanDraft {
@@ -259,4 +261,5 @@ export interface AIValidationExplanation {
   whyItMatters: string;
   suggestedFixes: string[];
   provider: "local" | "openai";
+  authority?: V1AIDraftAuthority;
 }

@@ -81,9 +81,9 @@ export function ProjectEnterpriseIpamPage() {
     }
   }
 
-  if (query.isLoading) return <LoadingState title="Loading Engine 2 management" message="Loading VRFs, pools, allocations, DHCP scopes, brownfield evidence, approvals, and ledger entries." />;
-  if (query.isError) return <ErrorState title="Unable to load Engine 2 management" message={query.error instanceof Error ? query.error.message : "SubnetOps could not load enterprise IPAM data."} />;
-  if (!data) return <ErrorState title="Engine 2 data missing" message="The enterprise IPAM snapshot did not return usable data." />;
+  if (query.isLoading) return <LoadingState title="Loading IPAM management" message="Loading VRFs, pools, allocations, DHCP scopes, brownfield evidence, approvals, and ledger entries." />;
+  if (query.isError) return <ErrorState title="Unable to load IPAM management" message={query.error instanceof Error ? query.error.message : "SubnetOps could not load enterprise IPAM data."} />;
+  if (!data) return <ErrorState title="IPAM data missing" message="The enterprise IPAM snapshot did not return usable data." />;
 
   const routeDomains = data.routeDomains;
   const ipPools = data.ipPools;
@@ -124,7 +124,7 @@ export function ProjectEnterpriseIpamPage() {
   async function resolveBrownfieldConflict(conflict: any, formData: FormData) {
     setMessage(null);
     try {
-      if (!conflict.conflictKey) throw new Error("Conflict key missing. Refresh Engine 2 IPAM and try again.");
+      if (!conflict.conflictKey) throw new Error("Conflict key missing. Refresh IPAM and try again.");
       await mutations.createBrownfieldConflictResolution.mutateAsync({
         conflictKey: conflict.conflictKey,
         code: conflict.code,
@@ -156,19 +156,19 @@ export function ProjectEnterpriseIpamPage() {
         siteId: row.siteId,
         vlanNumber: row.vlanId,
         routeDomainKey: row.routeDomainKey,
-        purpose: `Materialized allocator proposal for ${row.target}`,
+        purpose: `Applied allocator proposal for ${row.target}`,
         notes: row.explanation,
       });
-      setMessage(`Plan row ${row.proposedCidr} materialized as a durable allocation.`);
+      setMessage(`Plan row ${row.proposedCidr} was saved as a durable allocation.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Plan row materialization failed.");
+      setMessage(error instanceof Error ? error.message : "Plan row application failed.");
     }
   }
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
-        title="Engine 2 Enterprise IPAM Management"
+        title="Enterprise IPAM Management"
         description="Manage the durable source-of-truth objects that the address allocator now uses: route domains, pools, allocations, DHCP scopes, reservations, brownfield evidence, approvals, and audit ledger."
         actions={<><Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Output</Link><Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link></>}
       />
@@ -190,7 +190,7 @@ export function ProjectEnterpriseIpamPage() {
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <h2 style={{ margin: 0 }}>0. Safe edit console</h2>
         <p className="muted" style={{ margin: 0 }}>
-          V1 exposes the backend PATCH routes directly in the UI. Edits still go through Engine 2 write-time guards, so overlapping pools, bad CIDRs, unsafe reservations, stale approvals, and brownfield conflicts are not silently accepted.
+          Edits go through IPAM write-time guards, so overlapping pools, bad CIDRs, unsafe reservations, stale approvals, and brownfield conflicts are not silently accepted.
         </p>
 
         <details>
@@ -296,7 +296,7 @@ export function ProjectEnterpriseIpamPage() {
                 <input name="gatewayIp" defaultValue={allocation.gatewayIp ?? ""} placeholder="Gateway IP" />
                 <select name="status" defaultValue={allocation.status}><option>PROPOSED</option><option>REVIEW_REQUIRED</option><option>APPROVED</option><option>REJECTED</option><option>SUPERSEDED</option><option>IMPLEMENTED</option></select>
                 <input name="purpose" defaultValue={allocation.purpose ?? ""} placeholder="Purpose" />
-                <input name="inputHash" defaultValue={allocation.inputHash ?? currentInputHash ?? ""} placeholder="Engine 2 input hash" />
+                <input name="inputHash" defaultValue={allocation.inputHash ?? currentInputHash ?? ""} placeholder="IPAM input hash" />
                 <input name="notes" defaultValue={allocation.notes ?? ""} placeholder="Notes / override tokens" />
                 <button type="submit">Update {allocation.cidr}</button>
               </form>
@@ -401,7 +401,7 @@ export function ProjectEnterpriseIpamPage() {
                 <input name="siteName" defaultValue={network.siteName ?? ""} placeholder="Site name" />
                 <input name="vlanNumber" type="number" min="1" max="4094" defaultValue={network.vlanNumber ?? ""} placeholder="VLAN" />
                 <input name="ownerLabel" defaultValue={network.ownerLabel ?? ""} placeholder="Owner" />
-                <input name="confidence" defaultValue={network.confidence ?? "imported"} placeholder="Confidence" />
+                <input name="confidence" defaultValue={network.confidence ?? "imported"} placeholder="Evidence quality" />
                 <input name="notes" defaultValue={network.notes ?? ""} placeholder="Notes" />
                 <button type="submit">Update {network.cidr}</button>
               </form>
@@ -471,9 +471,9 @@ export function ProjectEnterpriseIpamPage() {
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>3. Allocator plan materialization</h2>
-        <p className="muted" style={{ margin: 0 }}>These are backend-generated Engine 2 allocator proposals. Creating one here persists it as a durable allocation with the current input hash; it is still proposed/review-required, not approved.</p>
-        <p className="muted" style={{ margin: 0 }}><strong>Current Engine 2 input hash:</strong> {emptyCell(currentInputHash)}</p>
+        <h2 style={{ margin: 0 }}>3. Allocator plan application</h2>
+        <p className="muted" style={{ margin: 0 }}>These are backend-generated IPAM allocator proposals. Creating one here persists it as a durable allocation with the current input hash; it is still proposed/review-required, not approved.</p>
+        <p className="muted" style={{ margin: 0 }}><strong>Current IPAM input hash:</strong> {emptyCell(currentInputHash)}</p>
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead><tr><th align="left">Family</th><th align="left">Pool</th><th align="left">Target</th><th align="left">Prefix</th><th align="left">Proposed CIDR</th><th align="left">Status</th><th align="left">Action</th></tr></thead>
@@ -520,7 +520,7 @@ export function ProjectEnterpriseIpamPage() {
           <button type="submit">Create allocation</button>
         </form>
         <div style={{ overflowX: "auto" }}>
-          <table><thead><tr><th align="left">CIDR</th><th align="left">Family</th><th align="left">Status</th><th align="left">Pool</th><th align="left">Site/VLAN</th><th align="left">Gateway</th><th align="left">Actions</th></tr></thead><tbody>{allocations.map((allocation: any) => <tr key={allocation.id}><td>{allocation.cidr}</td><td>{allocation.addressFamily}</td><td>{allocation.status}</td><td>{allocation.pool?.name ?? "—"}</td><td>{allocation.site?.name ?? "—"}{allocation.vlan ? ` / VLAN ${allocation.vlan.vlanId}` : ""}</td><td>{emptyCell(allocation.gatewayIp)}</td><td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button type="button" onClick={() => mutations.updateIpAllocationStatus.mutate({ id: allocation.id, input: { status: "APPROVED", summary: "Approved from Engine 2 management interface.", designInputHash: currentInputHash } })}>Approve</button><button type="button" onClick={() => mutations.updateIpAllocationStatus.mutate({ id: allocation.id, input: { status: "IMPLEMENTED", summary: "Marked implemented from Engine 2 management interface.", designInputHash: currentInputHash } })}>Implemented</button><button type="button" onClick={() => mutations.deleteIpAllocation.mutate(allocation.id)}>Delete</button></td></tr>)}</tbody></table>
+          <table><thead><tr><th align="left">CIDR</th><th align="left">Family</th><th align="left">Status</th><th align="left">Pool</th><th align="left">Site/VLAN</th><th align="left">Gateway</th><th align="left">Actions</th></tr></thead><tbody>{allocations.map((allocation: any) => <tr key={allocation.id}><td>{allocation.cidr}</td><td>{allocation.addressFamily}</td><td>{allocation.status}</td><td>{allocation.pool?.name ?? "—"}</td><td>{allocation.site?.name ?? "—"}{allocation.vlan ? ` / VLAN ${allocation.vlan.vlanId}` : ""}</td><td>{emptyCell(allocation.gatewayIp)}</td><td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button type="button" onClick={() => mutations.updateIpAllocationStatus.mutate({ id: allocation.id, input: { status: "APPROVED", summary: "Approved from the IPAM workspace.", designInputHash: currentInputHash } })}>Approve</button><button type="button" onClick={() => mutations.updateIpAllocationStatus.mutate({ id: allocation.id, input: { status: "IMPLEMENTED", summary: "Marked implemented from the IPAM workspace.", designInputHash: currentInputHash } })}>Implemented</button><button type="button" onClick={() => mutations.deleteIpAllocation.mutate(allocation.id)}>Delete</button></td></tr>)}</tbody></table>
         </div>
       </div>
 
@@ -624,7 +624,7 @@ export function ProjectEnterpriseIpamPage() {
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <h2 style={{ margin: 0 }}>8. Current vs proposed conflict review</h2>
-        <p className="muted" style={{ margin: 0 }}>This compares saved brownfield current-state networks against durable allocations, DHCP scopes, IP pools, and allocator plan rows. V1 adds durable conflict decisions, so review outcomes are no longer lost after refresh.</p>
+        <p className="muted" style={{ margin: 0 }}>This compares saved brownfield current-state networks against durable allocations, DHCP scopes, IP pools, and allocator plan rows. Durable conflict decisions keep review outcomes from being lost after refresh.</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <label className="muted">Filter conflicts</label>
           <select value={conflictFilter} onChange={(event) => setConflictFilter(event.target.value as typeof conflictFilter)}>
@@ -637,7 +637,7 @@ export function ProjectEnterpriseIpamPage() {
           <span className="muted">{visibleConflicts.length} shown / {conflicts.length} total</span>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table><thead><tr><th align="left">State</th><th align="left">Severity</th><th align="left">Route domain</th><th align="left">Imported current state</th><th align="left">Proposed/durable object</th><th align="left">Action required</th><th align="left">Decision</th></tr></thead><tbody>{visibleConflicts.length ? visibleConflicts.map((conflict: any, index: number) => <tr key={`${conflict.conflictKey ?? conflict.code}-${index}`}><td>{conflict.resolutionStatus === "resolved" ? `Resolved: ${conflict.resolution?.decision ?? "recorded"}` : "Open"}</td><td>{conflict.severity}</td><td>{conflict.routeDomainKey}</td><td>{conflict.importedCidr}</td><td>{conflict.existingObjectType} {emptyCell(conflict.proposedCidr)}</td><td>{conflict.recommendedAction}</td><td><form onSubmit={(event) => submit("Conflict resolution", event, async (formData) => resolveBrownfieldConflict(conflict, formData))} style={{ display: "grid", gap: 6, minWidth: 260 }}><select name="decision" defaultValue={conflict.existingObjectType === "durable allocation" ? "SUPERSEDE_PROPOSED" : "ACCEPT_BROWNFIELD"}><option>ACCEPT_BROWNFIELD</option><option>KEEP_PROPOSED</option><option>IGNORE_NOT_APPLICABLE</option><option>SUPERSEDE_PROPOSED</option><option>SPLIT_REQUIRED</option><option>CHANGE_WINDOW_REQUIRED</option></select><input name="reviewerLabel" placeholder="Reviewer" /><input name="designInputHash" defaultValue={currentInputHash} placeholder="Current Engine 2 input hash" /><textarea name="reason" rows={2} placeholder="Required decision reason / evidence" required /><label className="muted"><input name="applySupersede" type="checkbox" disabled={conflict.existingObjectType !== "durable allocation"} /> Apply supersede to durable allocation</label><button type="submit">Record decision</button></form></td></tr>) : <tr><td colSpan={7}>No saved brownfield conflicts match this filter.</td></tr>}</tbody></table>
+          <table><thead><tr><th align="left">State</th><th align="left">Severity</th><th align="left">Route domain</th><th align="left">Imported current state</th><th align="left">Proposed/durable object</th><th align="left">Action required</th><th align="left">Decision</th></tr></thead><tbody>{visibleConflicts.length ? visibleConflicts.map((conflict: any, index: number) => <tr key={`${conflict.conflictKey ?? conflict.code}-${index}`}><td>{conflict.resolutionStatus === "resolved" ? `Resolved: ${conflict.resolution?.decision ?? "recorded"}` : "Open"}</td><td>{conflict.severity}</td><td>{conflict.routeDomainKey}</td><td>{conflict.importedCidr}</td><td>{conflict.existingObjectType} {emptyCell(conflict.proposedCidr)}</td><td>{conflict.recommendedAction}</td><td><form onSubmit={(event) => submit("Conflict resolution", event, async (formData) => resolveBrownfieldConflict(conflict, formData))} style={{ display: "grid", gap: 6, minWidth: 260 }}><select name="decision" defaultValue={conflict.existingObjectType === "durable allocation" ? "SUPERSEDE_PROPOSED" : "ACCEPT_BROWNFIELD"}><option>ACCEPT_BROWNFIELD</option><option>KEEP_PROPOSED</option><option>IGNORE_NOT_APPLICABLE</option><option>SUPERSEDE_PROPOSED</option><option>SPLIT_REQUIRED</option><option>CHANGE_WINDOW_REQUIRED</option></select><input name="reviewerLabel" placeholder="Reviewer" /><input name="designInputHash" defaultValue={currentInputHash} placeholder="Current design input hash" /><textarea name="reason" rows={2} placeholder="Required decision reason / evidence" required /><label className="muted"><input name="applySupersede" type="checkbox" disabled={conflict.existingObjectType !== "durable allocation"} /> Apply supersede to durable allocation</label><button type="submit">Record decision</button></form></td></tr>) : <tr><td colSpan={7}>No saved brownfield conflicts match this filter.</td></tr>}</tbody></table>
         </div>
       </div>
 
@@ -656,7 +656,7 @@ export function ProjectEnterpriseIpamPage() {
             <select name="allocationId" required defaultValue=""><option value="">Select allocation</option>{allocations.map((allocation: any) => <option key={allocation.id} value={allocation.id}>{allocation.cidr} ({allocation.status})</option>)}</select>
             <select name="decision" defaultValue="APPROVED"><option>APPROVED</option><option>REJECTED</option><option>NEEDS_CHANGES</option></select>
             <input name="reviewerLabel" placeholder="Reviewer" />
-            <input name="designInputHash" defaultValue={currentInputHash} placeholder="Current Engine 2 input hash" />
+            <input name="designInputHash" defaultValue={currentInputHash} placeholder="Current design input hash" />
             <textarea name="reason" rows={3} placeholder="Reviewer reason / evidence" />
             <button type="submit">Record approval decision</button>
           </form>
