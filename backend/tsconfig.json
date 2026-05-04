@@ -10,6 +10,10 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.selftest.ts", "src/**/*.fixtures.ts"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.selftest.ts"
+  ]
 }

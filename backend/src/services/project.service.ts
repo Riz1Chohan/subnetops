@@ -211,7 +211,7 @@ export async function createProjectFromTemplate(
       { name: "HQ", location: "Core Site", siteCode: "HQ", defaultAddressBlock: "10.20.0.0/16", vlans: [
         { vlanId: 10, vlanName: "ADMIN", subnetCidr: "10.20.10.0/24", gatewayIp: "10.20.10.1", dhcpEnabled: true, estimatedHosts: 50, purpose: "Administrative users" },
         { vlanId: 60, vlanName: "VOICE", subnetCidr: "10.20.60.0/24", gatewayIp: "10.20.60.1", dhcpEnabled: true, estimatedHosts: 40, purpose: "IP phones" },
-        { vlanId: 90, vlanName: "MANAGEMENT", subnetCidr: "10.21.0.0/24", gatewayIp: "10.20.90.1", dhcpEnabled: false, estimatedHosts: 20, purpose: "Management devices" },
+        { vlanId: 90, vlanName: "MANAGEMENT", subnetCidr: "10.20.90.0/24", gatewayIp: "10.20.90.1", dhcpEnabled: false, estimatedHosts: 20, purpose: "Management devices" },
       ] },
       { name: "Branch 1", location: "Remote Branch", siteCode: "BR1", defaultAddressBlock: "10.21.0.0/16", vlans: [
         { vlanId: 10, vlanName: "ADMIN", subnetCidr: "10.21.10.0/24", gatewayIp: "10.21.10.1", dhcpEnabled: true, estimatedHosts: 30, purpose: "Administrative users" },
@@ -222,7 +222,7 @@ export async function createProjectFromTemplate(
       { vlanId: 10, vlanName: "ADMIN", subnetCidr: "10.30.10.0/24", gatewayIp: "10.30.10.1", dhcpEnabled: true, estimatedHosts: 30, purpose: "Administrative devices" },
       { vlanId: 20, vlanName: "CLINICAL", subnetCidr: "10.30.20.0/24", gatewayIp: "10.30.20.1", dhcpEnabled: true, estimatedHosts: 80, purpose: "Clinical devices" },
       { vlanId: 30, vlanName: "GUEST", subnetCidr: "10.30.30.0/24", gatewayIp: "10.30.30.1", dhcpEnabled: true, estimatedHosts: 40, purpose: "Guest access" },
-      { vlanId: 90, vlanName: "MANAGEMENT", subnetCidr: "10.31.0.0/24", gatewayIp: "10.30.90.1", dhcpEnabled: false, estimatedHosts: 20, purpose: "Managed systems" },
+      { vlanId: 90, vlanName: "MANAGEMENT", subnetCidr: "10.30.90.0/24", gatewayIp: "10.30.90.1", dhcpEnabled: false, estimatedHosts: 20, purpose: "Managed systems" },
     ] }] },
   };
 

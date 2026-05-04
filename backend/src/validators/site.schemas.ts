@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { addSiteAddressBlockValidation } from "./addressingTrust.schemas.js";
 
-export const createSiteSchema = z.object({
+const rawCreateSiteSchema = z.object({
   projectId: z.string().uuid(),
   name: z.string().min(1).max(100),
   location: z.string().max(100).optional(),
@@ -12,4 +13,10 @@ export const createSiteSchema = z.object({
   defaultAddressBlock: z.string().max(50).optional(),
 });
 
-export const updateSiteSchema = createSiteSchema.omit({ projectId: true }).partial();
+export const createSiteSchema = rawCreateSiteSchema.superRefine((value, ctx) => {
+  addSiteAddressBlockValidation(ctx, value.defaultAddressBlock);
+});
+
+export const updateSiteSchema = rawCreateSiteSchema.omit({ projectId: true }).partial().superRefine((value, ctx) => {
+  addSiteAddressBlockValidation(ctx, value.defaultAddressBlock);
+});

@@ -16,3 +16,15 @@ export function readinessFromFindingSeverity(severity: 'ERROR' | 'WARNING' | 'IN
   if (severity === 'WARNING') return 'review';
   return 'ready';
 }
+
+export function minimumReadinessForTruthState(truthState: string | undefined | null): DiagramReadiness {
+  const normalized = String(truthState ?? '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+  if (normalized === 'blocked') return 'blocked';
+  if (['review-required', 'inferred', 'proposed', 'planned', 'imported'].includes(normalized)) return 'review';
+  if (['configured', 'discovered', 'materialized', 'durable', 'approved'].includes(normalized)) return 'ready';
+  return 'unknown';
+}
+
+export function enforceTruthStateReadiness(readiness: DiagramReadiness, truthState: string | undefined | null): DiagramReadiness {
+  return rollupDiagramReadiness([readiness, minimumReadinessForTruthState(truthState)]);
+}

@@ -992,7 +992,7 @@ export function buildNetworkObjectModel(params: {
       designGraph: temporaryDesignGraph,
       routingSegmentation,
       securityPolicyFlow,
-    },
+    } as never,
   });
 
   const designGraph = buildBackendDesignGraph({

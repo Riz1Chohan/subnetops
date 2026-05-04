@@ -666,10 +666,20 @@ function parseStructuredValidationMessage(message: string, ruleCode: string, tit
   });
 }
 
+function readinessStateForValidationSeverity(severity: ValidationSeverity) {
+  if (severity === "ERROR") return "blocked" as const;
+  if (severity === "WARNING") return "needs_review" as const;
+  return "informational" as const;
+}
+
 function enrichValidationResult<T extends { message: string; ruleCode: string; title: string; severity: ValidationSeverity }>(item: T) {
   const narrative = parseStructuredValidationMessage(item.message, item.ruleCode, item.title, item.severity);
+  const readinessState = readinessStateForValidationSeverity(item.severity);
   return {
     ...item,
+    readinessState,
+    engineeringReviewState: readinessState,
+    canClaimReady: readinessState === "informational",
     issue: narrative.issue,
     impact: narrative.impact,
     recommendation: narrative.recommendation,

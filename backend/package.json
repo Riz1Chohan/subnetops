@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json --pretty false --listEmittedFiles",
+    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json --pretty false",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -45,7 +45,7 @@
     "selftest:discovery": "tsx src/lib/discoveryCurrentState.selftest.ts",
     "selftest:ai-draft": "tsx src/lib/aiDraftHelper.selftest.ts",
     "selftest:final-proof": "tsx src/lib/finalProofPass.selftest.ts",
-    "selftest:all": "npm run selftest:cidr && npm run selftest:cidr-proof && npm run selftest:allocator && npm run selftest:addressing-domain && npm run selftest:requirements-domain && npm run selftest:ipam-domain && npm run selftest:validation-domain && npm run selftest:topology-domain && npm run selftest:routing-domain && npm run selftest:security-policy-domain && npm run selftest:implementation-domain && npm run selftest:diagram-domain && npm run selftest:reporting-domain && npm run selftest:security-domain && npm run selftest:proof-domain && npm run selftest:ai-domain && npm run selftest:boundary && npm run selftest:design-core && npm run selftest:behavioral-matrix && npm run selftest:engine-matrix && npm run selftest:routing-engine && npm run selftest:security-policy-engine && npm run selftest:implementation-planning-engine && npm run selftest:scenario-matrix && npm run selftest:vendor-neutral-templates && npm run selftest:golden-requirements && npm run selftest:addressing && npm run selftest:enterprise-ipam && npm run selftest:orchestrator && npm run selftest:standards && npm run selftest:validation-readiness && npm run selftest:network-object-model && npm run selftest:design-graph && npm run selftest:routing-segmentation && npm run selftest:security-policy-flow && npm run selftest:implementation-planning && npm run selftest:implementation-templates && npm run selftest:report-export-truth && npm run selftest:diagram-truth && npm run selftest:platform-bom && npm run selftest:discovery && npm run selftest:ai-draft && npm run selftest:final-proof",
+    "selftest:all": "npm run selftest:cidr && npm run selftest:cidr-proof && npm run selftest:allocator && npm run selftest:addressing-domain && npm run selftest:requirements-domain && npm run selftest:ipam-domain && npm run selftest:validation-domain && npm run selftest:topology-domain && npm run selftest:routing-domain && npm run selftest:security-policy-domain && npm run selftest:implementation-domain && npm run selftest:diagram-domain && npm run selftest:reporting-domain && npm run selftest:security-domain && npm run selftest:proof-domain && npm run selftest:ai-domain && npm run selftest:boundary && npm run selftest:design-core && npm run selftest:behavioral-matrix && npm run selftest:engine-matrix && npm run selftest:routing-engine && npm run selftest:security-policy-engine && npm run selftest:implementation-planning-engine && npm run selftest:scenario-matrix && npm run selftest:vendor-neutral-templates && npm run selftest:golden-requirements && npm run selftest:addressing && npm run selftest:enterprise-ipam && npm run selftest:orchestrator && npm run selftest:standards && npm run selftest:validation-readiness && npm run selftest:network-object-model && npm run selftest:design-graph && npm run selftest:routing-segmentation && npm run selftest:security-policy-flow && npm run selftest:implementation-planning && npm run selftest:implementation-templates && npm run selftest:report-export-truth && npm run selftest:diagram-truth && npm run selftest:platform-bom && npm run selftest:discovery && npm run selftest:ai-draft && npm run selftest:final-proof && npm run selftest:network-engineer-trust",
     "security:selftest:rate-limit": "tsx src/middleware/rateLimit.selftest.ts",
     "selftest:addressing-domain": "tsx src/domain/addressing/addressing-domain.selftest.ts",
     "selftest:requirements-domain": "tsx src/domain/requirements/requirements-domain.selftest.ts",
@@ -59,7 +59,8 @@
     "selftest:reporting-domain": "tsx src/domain/reporting/reporting-domain.selftest.ts",
     "selftest:security-domain": "tsx src/domain/security/security-domain.selftest.ts",
     "selftest:ai-domain": "tsx src/domain/ai/ai-domain.selftest.ts",
-    "selftest:proof-domain": "tsx src/domain/proof/proof-domain.selftest.ts"
+    "selftest:proof-domain": "tsx src/domain/proof/proof-domain.selftest.ts",
+    "selftest:network-engineer-trust": "tsx src/lib/networkEngineerTrust.selftest.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -1079,8 +1079,3 @@ static check: package versions remain 1.0.0
 ```
 
 Important limitation: the full scenario matrix could not execute in this container because dependency installation is unavailable and `@prisma/client` is not installed. The scenario matrix must still be run locally or in CI with dependencies installed.
-
-
-## V1 Render build repair note
-
-This package keeps the V1 production backend build focused on runtime source by excluding `*.selftest.ts` and `*.fixtures.ts` from `backend/tsconfig.json`. Self-tests remain in `src` and can still be run through their `tsx` npm scripts, but they are no longer emitted into production `dist` during Render deploys. The patch also normalizes durable IPAM trace source labels to the existing `DURABLE_IPAM` truth-source enum and loosens implementation-domain nested summary typing so concrete design-core summary objects can pass through without fake index signatures.

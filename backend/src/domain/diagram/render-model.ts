@@ -1,4 +1,4 @@
-import { normalizeDiagramReadiness, readinessFromFindingSeverity, rollupDiagramReadiness } from './readiness.js';
+import { enforceTruthStateReadiness, normalizeDiagramReadiness, readinessFromFindingSeverity, rollupDiagramReadiness } from './readiness.js';
 import type {
   BuildDiagramRenderModelInput,
   DiagramFindingInput,
@@ -82,7 +82,11 @@ function collectFindingRefs(networkObjectModel: DiagramNetworkObjectModelInput):
   ];
 }
 
-function readinessForObject(objectId: string, networkObjectModel: DiagramNetworkObjectModelInput, findingRefs: FindingRef[]) {
+function renderReadiness(readiness: 'ready' | 'review' | 'blocked' | 'unknown', truthState?: DiagramTruthState) {
+  return enforceTruthStateReadiness(readiness, truthState);
+}
+
+function readinessForObject(objectId: string, networkObjectModel: DiagramNetworkObjectModelInput, findingRefs: FindingRef[], truthState?: DiagramTruthState) {
   const findingMatches = findingRefs.filter((finding) => finding.affectedObjectIds.includes(objectId));
   const implementationMatches = networkObjectModel.implementationPlan.steps.filter((step) => step.targetObjectId === objectId || step.dependencyObjectIds.includes(objectId));
   const verificationMatches = networkObjectModel.implementationPlan.verificationChecks.filter((check) => check.relatedObjectIds.includes(objectId));
@@ -92,7 +96,7 @@ function readinessForObject(objectId: string, networkObjectModel: DiagramNetwork
     ...verificationMatches.map((check) => normalizeDiagramReadiness(check.readiness)),
   ]);
   return {
-    readiness: readiness === 'unknown' ? 'ready' as const : readiness,
+    readiness: enforceTruthStateReadiness(readiness === 'unknown' ? 'ready' as const : readiness, truthState),
     relatedFindingIds: findingMatches.map((finding) => finding.id),
   };
 }
@@ -149,7 +153,7 @@ function wanZoneForDiagram(securityZones: DiagramSecurityZoneInput[]) {
 function addRouteDomainNode(params: { nodes: DiagramRenderNode[]; routeDomain?: DiagramNetworkObjectModelInput['routeDomains'][number]; networkObjectModel: DiagramNetworkObjectModelInput; findingRefs: FindingRef[] }) {
   const { nodes, routeDomain, networkObjectModel, findingRefs } = params;
   if (!routeDomain) return;
-  const readiness = readinessForObject(routeDomain.id, networkObjectModel, findingRefs);
+  const readiness = readinessForObject(routeDomain.id, networkObjectModel, findingRefs, routeDomain.truthState);
   addNode(nodes, {
     id: `render-route-domain-${routeDomain.id}`,
     objectId: routeDomain.id,
@@ -168,7 +172,7 @@ function addRouteDomainNode(params: { nodes: DiagramRenderNode[]; routeDomain?: 
 
 function addWanNode(params: { nodes: DiagramRenderNode[]; wanZone?: DiagramSecurityZoneInput; networkObjectModel: DiagramNetworkObjectModelInput; findingRefs: FindingRef[] }) {
   const { nodes, wanZone, networkObjectModel, findingRefs } = params;
-  const readiness = wanZone ? readinessForObject(wanZone.id, networkObjectModel, findingRefs) : { readiness: 'review' as const, relatedFindingIds: [] };
+  const readiness = wanZone ? readinessForObject(wanZone.id, networkObjectModel, findingRefs, wanZone.truthState) : { readiness: 'review' as const, relatedFindingIds: [] };
   addNode(nodes, {
     id: 'render-wan-internet-edge',
     objectId: wanZone?.id ?? 'wan-internet-edge-review-boundary',
@@ -198,7 +202,7 @@ function addSiteNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRender
       groupId: `site:${site.siteId}`,
       siteId: site.siteId,
       layer: 'site',
-      readiness: 'ready',
+      readiness: renderReadiness('ready', 'configured'),
       truthState: 'configured',
       x: point.x,
       y: point.y,
@@ -218,7 +222,7 @@ function addSiteNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRender
         groupId: `site:${site.siteId}`,
         siteId: site.siteId,
         layer: 'interface',
-        readiness: 'review',
+        readiness: renderReadiness('review', 'inferred'),
         truthState: 'inferred',
         x: point.x + 88,
         y: point.y + 95,
@@ -267,7 +271,7 @@ function addVlanSubnetNodes(params: { nodes: DiagramRenderNode[]; edges: Diagram
       groupId: `site:${site.siteId}`,
       siteId: site.siteId,
       layer: 'site',
-      readiness: 'ready',
+      readiness: renderReadiness('ready', graphNode.truthState),
       truthState: graphNode.truthState,
       x: point.x - 170 + (rowIndex % 2) * 340,
       y: point.y + 190 + Math.floor(rowIndex / 2) * 82,
@@ -281,7 +285,7 @@ function addVlanSubnetNodes(params: { nodes: DiagramRenderNode[]; edges: Diagram
       sourceNodeId: `render-site-${site.siteId}`,
       targetNodeId: vlanNodeId,
       label: 'VLAN membership',
-      readiness: 'ready',
+      readiness: renderReadiness('ready', graphNode.truthState),
       overlayKeys: ['addressing'],
       relatedObjectIds: [site.siteId, graphNode.objectId],
       notes: ['Site/VLAN membership from backend design graph.'],
@@ -298,7 +302,7 @@ function addVlanSubnetNodes(params: { nodes: DiagramRenderNode[]; edges: Diagram
         groupId: `site:${site.siteId}`,
         siteId: site.siteId,
         layer: 'interface',
-        readiness: 'ready',
+        readiness: renderReadiness('ready', subnet.truthState),
         truthState: subnet.truthState,
         x: point.x - 170 + (rowIndex % 2) * 340,
         y: point.y + 225 + Math.floor(rowIndex / 2) * 82,
@@ -312,7 +316,7 @@ function addVlanSubnetNodes(params: { nodes: DiagramRenderNode[]; edges: Diagram
         sourceNodeId: vlanNodeId,
         targetNodeId: subnetNodeId,
         label: 'subnet',
-        readiness: 'ready',
+        readiness: renderReadiness('ready', subnet.truthState),
         overlayKeys: ['addressing'],
         relatedObjectIds: [graphNode.objectId, subnet.objectId],
         notes: ['VLAN-to-subnet binding from backend addressing/design graph evidence.'],
@@ -345,7 +349,7 @@ function addDeviceNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRend
     });
 
     devices.forEach((device, index) => {
-      const readiness = readinessForObject(device.id, networkObjectModel, findingRefs);
+      const readiness = readinessForObject(device.id, networkObjectModel, findingRefs, device.truthState);
       const deviceNodeId = `render-device-${device.id}`;
       const xOffset = devices.length === 1 ? 0 : (index - (devices.length - 1) / 2) * 120;
       addNode(nodes, {
@@ -433,7 +437,7 @@ function addSecurityNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRe
     .slice(0, 8);
 
   visibleZones.forEach((zone, index) => {
-    const readiness = readinessForObject(zone.id, networkObjectModel, findingRefs);
+    const readiness = readinessForObject(zone.id, networkObjectModel, findingRefs, zone.truthState);
     const zoneNodeId = `render-zone-${zone.id}`;
     addNode(nodes, {
       id: zoneNodeId,
@@ -475,7 +479,7 @@ function addSecurityNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRe
         objectType: 'policy-rule',
         label: cleanDiagramLabel(policy.name.replace(/^Deny\s+/i, 'Deny ')),
         layer: 'security',
-        readiness: policy.action === 'review' ? 'review' : 'ready',
+        readiness: renderReadiness(policy.action === 'review' ? 'review' : 'ready', policy.truthState),
         truthState: policy.truthState,
         x: zoneBaseX + 280,
         y: zoneBaseY + index * 86,
@@ -493,7 +497,7 @@ function addSecurityNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRe
         sourceNodeId: sourceExists ? sourceZoneNodeId : 'render-wan-internet-edge',
         targetNodeId: policyNodeId,
         label: `${policy.action} policy`,
-        readiness: policy.action === 'review' ? 'review' : 'ready',
+        readiness: renderReadiness(policy.action === 'review' ? 'review' : 'ready', policy.truthState),
         overlayKeys: ['security'],
         relatedObjectIds: [policy.id, policy.sourceZoneId],
         notes: ['Policy source relationship from backend security-policy model.'],
@@ -505,7 +509,7 @@ function addSecurityNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRe
           sourceNodeId: policyNodeId,
           targetNodeId: targetZoneNodeId,
           label: 'protected destination',
-          readiness: policy.action === 'review' ? 'review' : 'ready',
+          readiness: renderReadiness(policy.action === 'review' ? 'review' : 'ready', policy.truthState),
           overlayKeys: ['security'],
           relatedObjectIds: [policy.id, policy.destinationZoneId],
           notes: ['Policy destination relationship from backend security-policy model.'],
@@ -521,7 +525,7 @@ function buildGroups(params: { nodes: DiagramRenderNode[]; sites: SiteSummary[];
       id: `site:${site.siteId}`,
       groupType: 'site' as const,
       label: `${siteDiagramCode(site)} — ${site.siteName}`,
-      readiness: 'ready' as const,
+      readiness: rollupDiagramReadiness(nodes.filter((node) => node.siteId === site.siteId).map((node) => node.readiness)),
       nodeIds: nodes.filter((node) => node.siteId === site.siteId).map((node) => node.id),
       notes: [`Backend diagram grouping for ${site.siteName}.`],
     })),
@@ -529,7 +533,7 @@ function buildGroups(params: { nodes: DiagramRenderNode[]; sites: SiteSummary[];
       id: `route-domain:${routeDomain.id}`,
       groupType: 'route-domain' as const,
       label: routeDomain.name,
-      readiness: readinessForObject(routeDomain.id, networkObjectModel, findingRefs).readiness,
+      readiness: readinessForObject(routeDomain.id, networkObjectModel, findingRefs, routeDomain.truthState).readiness,
       nodeIds: nodes.filter((node) => node.objectId === routeDomain.id || node.layer === 'routing').map((node) => node.id),
       notes: routeDomain.notes,
     }] : []),
@@ -537,7 +541,7 @@ function buildGroups(params: { nodes: DiagramRenderNode[]; sites: SiteSummary[];
       id: `security-zone:${zone.id}`,
       groupType: 'security-zone' as const,
       label: zone.name,
-      readiness: readinessForObject(zone.id, networkObjectModel, findingRefs).readiness,
+      readiness: readinessForObject(zone.id, networkObjectModel, findingRefs, zone.truthState).readiness,
       nodeIds: nodes.filter((node) => node.objectId === zone.id).map((node) => node.id),
       notes: zone.notes,
     })),

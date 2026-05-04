@@ -3,10 +3,19 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { ensureCanEditProject } from "./access.service.js";
+import { collectSiteAddressBlockValidationMessages } from "../validators/addressingTrust.schemas.js";
+
+function assertSiteAddressBlockWritable(defaultAddressBlock: unknown) {
+  const messages = collectSiteAddressBlockValidationMessages(defaultAddressBlock);
+  if (messages.length > 0) {
+    throw new ApiError(400, `Site addressing failed engineering validation: ${messages.join(" ")}`);
+  }
+}
 
 export async function createSite(userId: string, planTier: PlanTier, data: { projectId: string; name: string; location?: string; streetAddress?: string; buildingLabel?: string; floorLabel?: string; siteCode?: string; notes?: string; defaultAddressBlock?: string }, actorLabel?: string) {
   const project = await ensureCanEditProject(userId, data.projectId);
   if (!project) throw new ApiError(404, "Project not found");
+  assertSiteAddressBlockWritable(data.defaultAddressBlock);
 
   if (planTier === "FREE") {
     const siteCount = await prisma.site.count({ where: { projectId: data.projectId } });
@@ -24,6 +33,7 @@ export async function updateSite(siteId: string, userId: string, data: Record<st
   const site = await prisma.site.findFirst({ where: { id: siteId }, include: { project: true } });
   if (!site) throw new ApiError(404, "Site not found");
   await ensureCanEditProject(userId, site.projectId);
+  assertSiteAddressBlockWritable(Object.prototype.hasOwnProperty.call(data, "defaultAddressBlock") ? data.defaultAddressBlock : site.defaultAddressBlock);
 
   return prisma.$transaction(async (tx: any) => {
     const updated = await tx.site.update({ where: { id: siteId }, data });
