@@ -42,6 +42,10 @@ assert(!/const\s+SCENARIOS\s*:\s*V1ScenarioDefinition\[\]/.test(finalProof), 'fi
 assert(!finalProof.includes('expectedStageNumbers.map'), 'final proof must not derive scenario pass/fail from expected stage numbers');
 
 assert(scenarioExecution.includes('buildDesignCoreSnapshot'), 'scenario execution must run real backend design-core snapshots');
+
+assert(scenarioExecution.includes('if (!snapshot)'), 'scenario execution must explicitly handle null design-core snapshots');
+assert(scenarioExecution.includes('snapshotProduced=false'), 'null snapshot handling must surface proof evidence instead of crashing or using non-null assertions');
+assert(!scenarioExecution.includes('buildDesignCoreSnapshot(scenario.project as never)!'), 'scenario execution must not silence nullable snapshots with a non-null assertion');
 assert(scenarioExecution.includes('executeV1ScenarioMatrix'), 'scenario execution must expose executeV1ScenarioMatrix');
 assert(scenarioExecution.includes('snapshotResult'), 'scenario execution must return snapshotResult evidence');
 assert(scenarioExecution.includes('assertions'), 'scenario execution must emit executable assertions');

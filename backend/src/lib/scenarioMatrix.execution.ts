@@ -75,6 +75,49 @@ function scenarioCategoryFor(scenario: V1ScenarioFixture): string {
 export function executeV1Scenario(scenario: V1ScenarioFixture, executedAt = new Date().toISOString()): V1ScenarioExecutionResult {
   const snapshot = buildDesignCoreSnapshot(scenario.project as never);
   const expected = scenario.expected;
+
+  if (!snapshot) {
+    const assertions: V1ScenarioAssertion[] = [
+      assertion({
+        assertionId: `${scenario.id}:snapshot-built`,
+        description: "Scenario must produce a backend design-core snapshot before final proof can evaluate it.",
+        expected: "non-null backend design-core snapshot",
+        actual: null,
+        condition: false,
+      }),
+    ];
+
+    return {
+      scenarioId: scenario.id,
+      scenarioName: scenario.name,
+      scenarioCategory: scenarioCategoryFor(scenario),
+      inputFixture: {
+        id: scenario.id,
+        name: scenario.name,
+        riskClass: scenario.riskClass,
+        intent: scenario.intent,
+        knownGapCount: scenario.knownGaps.length,
+      },
+      executedAt,
+      snapshotResult: {
+        projectId: null,
+        overallReadiness: "BLOCKED",
+        error: "Design-core snapshot was not produced for this scenario.",
+      },
+      assertions,
+      affectedEngines: [
+        "design-core",
+        "validation-readiness",
+        "report-export-truth",
+        "diagram-truth",
+        `risk:${scenario.riskClass}`,
+      ],
+      reportEvidence: ["reportReadiness=BLOCKED", "snapshotProduced=false"],
+      diagramEvidence: ["backendAuthored=false", "snapshotProduced=false"],
+      validationEvidence: ["snapshotProduced=false"],
+    };
+  }
+
   const findingCodes = collectFindingCodes(snapshot);
   const zoneRoles = new Set<string>(snapshot.networkObjectModel.securityZones.map((zone) => zone.zoneRole));
   const overlayKeys = new Set(snapshot.diagramTruth.renderModel.overlays.map((overlay) => overlay.key));

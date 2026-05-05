@@ -5,6 +5,7 @@ import {
   validateSiteAddressBlock,
   validateVlanAddressing,
   formatAddressingValidationIssues,
+  type AddressingValidationIssue,
   type DhcpScopeAddressingCandidate,
   type VlanAddressingCandidate,
 } from "../domain/addressing/addressing-validation.js";
@@ -23,7 +24,7 @@ export type ProjectWriteFields = {
   basePrivateRange?: unknown;
 };
 
-function validationFailure(prefix: string, issues: { message: string }[]): ApiError {
+function validationFailure(prefix: string, issues: AddressingValidationIssue[]): ApiError {
   return new ApiError(400, `${prefix}: ${formatAddressingValidationIssues(issues)}`);
 }
 
