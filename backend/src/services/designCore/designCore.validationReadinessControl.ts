@@ -28,6 +28,111 @@ export const V1_VALIDATION_READINESS_AUTHORITY_CONTRACT = "V1_VALIDATION_READINE
 
 const VALIDATION_CATEGORIES = [...LEGACY_VALIDATION_CATEGORIES] as V1ValidationReadinessCategory[];
 
+const DOWNSTREAM_ECHO_RULES = new Set([
+  "VALIDATION_IMPLEMENTATION_READINESS_GAP",
+  "VALIDATION_REPORT_TRUTH_WARNING",
+  "VALIDATION_DIAGRAM_TRUTH_WARNING",
+]);
+
+const PROPAGATED_BOUNDARY_PATTERNS = [
+  /blocking upstream findings/i,
+  /upstream blocker/i,
+  /report truth is not fully clean/i,
+  /diagram truth is not fully clean/i,
+  /implementation plan is not execution-ready/i,
+  /final proof/i,
+];
+
+const REVIEW_ONLY_AUTHORITY_PATTERNS = [
+  /ENGINE1_PROPOSAL_ONLY/i,
+  /candidate allocation/i,
+  /candidate pool/i,
+  /candidate ledger/i,
+  /requires Engine 2 review/i,
+  /No durable Engine 2 pool exists/i,
+  /No matching Engine 2 durable allocation found/i,
+  /approval/i,
+  /review-gated/i,
+  /not imported/i,
+  /not saved yet/i,
+  /profile is not saved/i,
+  /missing live inventory/i,
+];
+
+const HARD_BLOCKER_PATTERNS = [
+  /invalid CIDR/i,
+  /noncanonical/i,
+  /overlap/i,
+  /outside subnet/i,
+  /broadcast/i,
+  /network address/i,
+  /conflict blocker/i,
+  /contradict/i,
+  /cannot be resolved to the DesignGraph/i,
+  /no dependency edge/i,
+  /no source dependency edge/i,
+  /missing graph nodes/i,
+  /Expected default deny is not explicitly modeled/i,
+];
+
+type TaxonomyInput = Omit<V1ValidationFinding, "id">;
+
+function combinedFindingText(input: Pick<TaxonomyInput, "ruleCode" | "title" | "detail" | "sourceEngine" | "evidence">): string {
+  return [input.ruleCode, input.title, input.detail, input.sourceEngine, ...(input.evidence ?? [])].join(" ");
+}
+
+function matchesAny(patterns: RegExp[], value: string): boolean {
+  return patterns.some((pattern) => pattern.test(value));
+}
+
+function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
+  const originalCategory = input.originalCategory ?? input.category;
+  const text = combinedFindingText(input);
+
+  if (input.category === "PASSED" || input.category === "INFO") {
+    return { ...input, originalCategory, findingClass: "REVIEW_ITEM", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+  }
+
+  if (input.category !== "BLOCKING") {
+    return { ...input, originalCategory, findingClass: "REVIEW_ITEM", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+  }
+
+  if (DOWNSTREAM_ECHO_RULES.has(input.ruleCode) || matchesAny(PROPAGATED_BOUNDARY_PATTERNS, text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "PROPAGATED_BLOCKER",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "Downstream readiness/report/diagram/implementation evidence is a propagated impact. It must stay visible, but it must not inflate the root ERROR count for wizard-generated planning output.",
+    };
+  }
+
+  if (matchesAny(REVIEW_ONLY_AUTHORITY_PATTERNS, text) && !matchesAny(HARD_BLOCKER_PATTERNS, text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "REVIEW_ITEM",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "Wizard-generated candidate/review authority is unresolved, but no invalid or contradictory engineering object was proven. This is review-required, not a root blocker.",
+    };
+  }
+
+  return { ...input, originalCategory, findingClass: "ROOT_BLOCKER", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+}
+
+function countFindingClasses(findings: V1ValidationFinding[]) {
+  return {
+    rootBlockerCount: findings.filter((finding) => finding.findingClass === "ROOT_BLOCKER").length,
+    propagatedBlockerCount: findings.filter((finding) => finding.findingClass === "PROPAGATED_BLOCKER").length,
+    derivedImpactCount: findings.filter((finding) => finding.findingClass === "DERIVED_IMPACT").length,
+    reviewItemCount: findings.filter((finding) => finding.findingClass === "REVIEW_ITEM").length,
+  };
+}
+
 type V1Input = {
   projectId: string;
   V1RequirementsClosure: V1RequirementsClosureControlSummary;
@@ -54,19 +159,20 @@ function countByCategory(findings: V1ValidationFinding[]) {
 }
 
 function makeFinding(input: Omit<V1ValidationFinding, "id">): V1ValidationFinding {
+  const classified = classifyValidationFinding(input);
   return {
     id: buildValidationFindingId({
-      ruleCode: input.ruleCode,
-      severity: input.category,
-      status: input.category === "PASSED" ? "resolved" : "open",
+      ruleCode: classified.ruleCode,
+      severity: classified.category,
+      status: classified.category === "PASSED" ? "resolved" : "open",
       category: "Validation",
-      title: input.title,
-      detail: input.detail,
-      sourcePath: input.sourceSnapshotPath,
-      affectedObjects: [...input.affectedRequirementIds, ...input.affectedRequirementKeys, ...input.affectedObjectIds],
-      evidence: input.evidence.map((detail) => ({ source: input.sourceEngine, path: input.sourceSnapshotPath, detail })),
+      title: classified.title,
+      detail: classified.detail,
+      sourcePath: classified.sourceSnapshotPath,
+      affectedObjects: [...classified.affectedRequirementIds, ...classified.affectedRequirementKeys, ...classified.affectedObjectIds],
+      evidence: classified.evidence.map((detail) => ({ source: classified.sourceEngine, path: classified.sourceSnapshotPath, detail })),
     }),
-    ...input,
+    ...classified,
   };
 }
 
@@ -459,20 +565,21 @@ export function buildV1ValidationReadinessControl(input: V1Input): V1ValidationR
   }
 
   const counts = countByCategory(findings);
+  const classCounts = countFindingClasses(findings);
   const overallReadiness = readinessFromCounts(counts.blockingCount, counts.reviewRequiredCount, counts.warningCount);
   const validationGateAllowsImplementation = counts.blockingCount === 0 && counts.reviewRequiredCount === 0;
   const requirementGateRows = buildRequirementGateRows(input, findings);
 
   const coverageRows: V1ValidationCoverageRow[] = [
-    summarizeCoverage("Requirements propagation", "V1RequirementsClosure", (finding) => finding.sourceSnapshotPath.startsWith("V1"), findings, [
+    summarizeCoverage("Requirements propagation", "V1RequirementsClosure", (finding) => finding.sourceSnapshotPath.startsWith("V1RequirementsClosure"), findings, [
       `${input.V1RequirementsClosure.fullPropagatedCount}/${input.V1RequirementsClosure.activeRequirementCount} active requirement(s) fully propagated.`,
       `${input.V1RequirementsClosure.missingConsumerCount} missing consumer gap(s).`,
     ]),
-    summarizeCoverage("CIDR/addressing", "V1CidrAddressingTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1"), findings, [
+    summarizeCoverage("CIDR/addressing", "V1CidrAddressingTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1CidrAddressingTruth"), findings, [
       `${input.V1CidrAddressingTruth.validSubnetCount}/${input.V1CidrAddressingTruth.totalAddressRowCount} valid subnet row(s).`,
       `${input.V1CidrAddressingTruth.requirementAddressingGapCount} requirement-to-addressing gap(s).`,
     ]),
-    summarizeCoverage("Enterprise IPAM", "V1EnterpriseIpamTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1"), findings, [
+    summarizeCoverage("Enterprise IPAM", "V1EnterpriseIpamTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1EnterpriseIpamTruth"), findings, [
       `${input.V1EnterpriseIpamTruth.approvedAllocationCount} approved allocation(s); ${input.V1EnterpriseIpamTruth.conflictBlockerCount} conflict blocker(s).`,
       `Overall Engine 2 readiness: ${input.V1EnterpriseIpamTruth.overallReadiness}.`,
     ]),
@@ -508,6 +615,10 @@ export function buildV1ValidationReadinessControl(input: V1Input): V1ValidationR
     validationGateAllowsImplementation,
     findingCount: findings.length,
     blockingFindingCount: counts.blockingCount,
+    rootBlockerCount: classCounts.rootBlockerCount,
+    propagatedBlockerCount: classCounts.propagatedBlockerCount,
+    derivedImpactCount: classCounts.derivedImpactCount,
+    reviewItemCount: classCounts.reviewItemCount,
     reviewRequiredFindingCount: counts.reviewRequiredCount,
     warningFindingCount: counts.warningCount,
     infoFindingCount: counts.infoCount,
@@ -518,6 +629,11 @@ export function buildV1ValidationReadinessControl(input: V1Input): V1ValidationR
     coverageRows,
     requirementGateRows,
     findings,
+    blockerTaxonomyNotes: [
+      `${classCounts.rootBlockerCount} root blocker(s), ${classCounts.propagatedBlockerCount} propagated blocker(s), ${classCounts.derivedImpactCount} derived impact(s), and ${classCounts.reviewItemCount} review item(s) are classified separately.`,
+      "Wizard-generated missing approvals/imports/candidate authority must be review-required unless an invalid, contradictory, or unlinked engineering object is proven.",
+      "Downstream report/diagram/implementation failures are visible impacts, not additional root blockers.",
+    ],
     notes: [
       "V1 is a readiness gate, not a feature engine.",
       "A design is not implementation-ready while blocking or review-required validation findings remain.",

@@ -10,6 +10,7 @@ import { ensureRequirementsMaterializedForRead } from "./requirementsMaterializa
 import { runValidation } from "./validation.service.js";
 import { applyBackendDesignCoreToReport, type ProfessionalReportMode } from "./exportDesignCoreReport.service.js";
 import type { ProfessionalReport, ReportMetadata, ReportSection, ReportTable, ReportVisualSnapshot } from "./export.types.js";
+import { resolveProjectBaseRangeForRequirements } from "../domain/requirements/apply.js";
 
 type JsonMap = Record<string, unknown>;
 type SiteWithVlans = { name: string; location?: string | null; siteCode?: string | null; defaultAddressBlock?: string | null; vlans: Array<{ vlanId: number; vlanName: string; purpose?: string | null; subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; estimatedHosts?: number | null }> };
@@ -186,6 +187,121 @@ function validationNarrative(item: ValidationItem) {
   return { issue, impact, recommendation };
 }
 
+function validationBucket(item: ValidationItem) {
+  const text = `${item.ruleCode ?? ""} ${item.title ?? ""} ${item.message ?? ""}`;
+  if (item.severity === "ERROR" || /ROOT_BLOCKER|invalid CIDR|noncanonical|overlap|cannot be resolved|no dependency edge|missing graph nodes/i.test(text)) {
+    return {
+      severity: "ERROR",
+      category: "Root blocker",
+      action: "Fix the generated source object or engine lineage before treating the plan as clean.",
+    };
+  }
+  if (/Engine 2|IPAM|ENGINE1_PROPOSAL_ONLY|durable allocation|candidate allocation|candidate pool/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Enterprise IPAM authority",
+      action: "Review or approve candidate pools, allocations, DHCP scope authority, and ledger evidence.",
+    };
+  }
+  if (/Requirement propagation|Requirement .* unresolved|missing consumer|closure/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Requirement propagation closure",
+      action: "Confirm each active requirement has engine evidence, consumer evidence, or explicit no-op/review disposition.",
+    };
+  }
+  if (/Golden scenario|scenario proof/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Scenario proof",
+      action: "Review scenario applicability and confirm any scenario-only gaps are intentional.",
+    };
+  }
+  if (/Security policy|default deny|NAT|policy flow|broad permit|shadow/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Security policy / NAT review",
+      action: "Confirm baseline deny, required allow, NAT, logging, and exception policy intent before implementation.",
+    };
+  }
+  if (/Routing|segmentation|route/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Routing and segmentation review",
+      action: "Confirm WAN, route-domain, route intent, summarization, and reachability assumptions.",
+    };
+  }
+  if (/Implementation|template|rollback|verification|operational safety/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Implementation/template readiness",
+      action: "Keep generated steps as planning candidates until source, verification, rollback, and approval evidence exists.",
+    };
+  }
+  if (/Report|diagram|omitted|export/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Report/diagram evidence boundary",
+      action: "Preserve omitted-evidence warnings and backend truth labels in exports and visuals.",
+    };
+  }
+  if (/Platform|BOM|discovery|inventory|import|current-state/i.test(text)) {
+    return {
+      severity: "REVIEW",
+      category: "Discovery/platform review",
+      action: "Capture or explicitly defer live inventory, platform profile, imports, and procurement evidence.",
+    };
+  }
+  return {
+    severity: item.severity === "WARNING" ? "WARNING" : "REVIEW",
+    category: "General engineering review",
+    action: "Review the finding, document the decision, and rerun validation after changes.",
+  };
+}
+
+function buildValidationRollupRows(validations: ValidationItem[]) {
+  const groups = new Map<string, { severity: string; category: string; count: number; examples: string[]; action: string }>();
+  for (const item of validations) {
+    const bucket = validationBucket(item);
+    const key = `${bucket.severity}::${bucket.category}`;
+    const existing = groups.get(key) ?? { ...bucket, count: 0, examples: [], action: bucket.action };
+    existing.count += 1;
+    if (existing.examples.length < 3) existing.examples.push(item.title);
+    groups.set(key, existing);
+  }
+  const order = { ERROR: 0, REVIEW: 1, WARNING: 2, INFO: 3 } as Record<string, number>;
+  const rows = Array.from(groups.values())
+    .sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9) || b.count - a.count || a.category.localeCompare(b.category))
+    .map((group) => [
+      group.severity,
+      group.category,
+      String(group.count),
+      joinCsvList(group.examples, "No examples recorded"),
+      group.action,
+    ]);
+  return rows.length > 0 ? rows : [["INFO", "No validation findings saved", "0", "No saved findings are available in the current export.", "Run validation after changes if a fresh technical review is required."]];
+}
+
+function buildOpenReviewBullets(exportContext: NonNullable<ReturnType<typeof buildExportContext>>) {
+  const bullets: string[] = [];
+  if (exportContext.outputTruthBlocked) bullets.push("Requirement-output evidence is incomplete and must be regenerated before design review.");
+  if (exportContext.errors.length > 0) bullets.push(`${exportContext.errors.length} root blocker${exportContext.errors.length === 1 ? "" : "s"} require correction before the plan can be considered clean planning output.`);
+  const rollupRows = buildValidationRollupRows(exportContext.validations);
+  for (const row of rollupRows) {
+    const [severity, category, count, examples, action] = row;
+    if (severity === "INFO") continue;
+    bullets.push(`${category}: ${count} item${count === "1" ? "" : "s"}. Examples: ${examples}. Action: ${action}`);
+    if (bullets.length >= 8) break;
+  }
+  return bullets.length > 0 ? bullets : ["No active validation findings are saved in the current export."];
+}
+
+function baseRangeDisplay(baseRange: ReturnType<typeof resolveProjectBaseRangeForRequirements>) {
+  return baseRange.reviewRequired
+    ? `${baseRange.canonicalCidr} (system-proposed; review required)`
+    : `${baseRange.canonicalCidr} (user-confirmed)`;
+}
+
 
 export async function getProjectExportData(projectId: string) {
   await ensureRequirementsMaterializedForRead(projectId, "SubnetOps export", "export-read", {
@@ -256,9 +372,12 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
     ].flat() as string[],
   );
 
+  const baseRangeResolution = resolveProjectBaseRangeForRequirements(project.basePrivateRange, requirements);
+  const baseRangeLabel = baseRangeDisplay(baseRangeResolution);
+
   const openItems = [
     !asString(project.organizationName) ? "Organization name should be confirmed for final title page and approval routing." : null,
-    !asString(project.basePrivateRange) ? "The parent private addressing block should be confirmed before final implementation sign-off." : null,
+    baseRangeResolution.reviewRequired ? `The parent private addressing block is system-proposed (${baseRangeResolution.canonicalCidr}) and must be confirmed or replaced before final implementation sign-off.` : null,
     !asString(requirements.primaryGoal) ? "The primary business or technical design objective should be saved explicitly in the requirements workspace." : null,
     !asString(requirements.complianceProfile) ? "Compliance and governance requirements should be confirmed if the package will be used for regulated environments." : null,
     discoveryHighlights.length === 0 ? "Current-state discovery notes are still thin and should be expanded before migration planning or procurement review." : null,
@@ -316,6 +435,8 @@ export function buildExportContext(project: Awaited<ReturnType<typeof getProject
     openItems,
     platformHighlights,
     usersPerSite,
+    baseRangeResolution,
+    baseRangeLabel,
     environment,
     planningFor,
     primaryGoal,
@@ -422,7 +543,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
 
   const hldBullets = [
     `Architecture direction: ${architecturePattern}`,
-    `Base private range: ${asString(exportContext.project.basePrivateRange) || "working range still needs explicit confirmation"}`,
+    `Base private range: ${exportContext.baseRangeLabel}`,
     `Materialized site rows: ${exportContext.siteCount}`,
     exportContext.requestedSiteCount != null ? `Requirement-selected site count: ${exportContext.requestedSiteCount}` : null,
     exportContext.outputTruthBlocked ? `Requirement-output truth gaps: ${exportContext.requirementOutputGaps.length}` : null,
@@ -540,31 +661,26 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     bullets: routingBullets,
   };
 
-  const validationRows = exportContext.validations.length > 0
-    ? exportContext.validations.slice(0, 15).map((item) => {
-        const narrative = validationNarrative(item);
-        return [item.severity, item.title, narrative.issue, narrative.impact, narrative.recommendation];
-      })
-    : [["INFO", "No validation findings saved", "No saved findings are available in the current export.", "A stale validation state can hide recent design changes.", "Run validation after changes if a fresh technical review is required."]];
+  const validationRows = buildValidationRollupRows(exportContext.validations);
 
   const implementationSection: ReportSection = {
     title: "9. Implementation, Testing, and Validation Strategy",
     paragraphs: [
       "Implementation should proceed in controlled stages so that addressing, gateway ownership, service reachability, security boundary enforcement, and rollback conditions can be verified without expanding the blast radius of each change window.",
       exportContext.errors.length > 0
-        ? "Because the current package still contains error-level blockers, implementation approval should pause until those blockers are reviewed and resolved."
-        : "Because the current validation posture does not contain active error-level blockers, the package can move into deeper technical sign-off and change preparation once the warning and assumption items are reviewed.",
+        ? "Because the current package still contains root blockers, implementation approval should pause until those generated-object or lineage defects are corrected."
+        : "Because the current validation posture does not contain active root blockers, the package can move into planning review once candidate IPAM, security, routing, discovery, and approval items are reviewed.",
     ],
     bullets: [
-      `Validation blockers: ${exportContext.errors.length}`,
-      `Validation warnings: ${exportContext.warnings.length}`,
-      `Validation information items: ${exportContext.infos.length}`,
-      exportContext.warnings.length > 0 ? "Warning-level findings should be cleared or accepted explicitly before final handoff." : null,
+      `Root blockers: ${exportContext.errors.length}`,
+      `Review / warning items: ${exportContext.warnings.length}`,
+      `Information items: ${exportContext.infos.length}`,
+      exportContext.warnings.length > 0 ? "Review-level findings should be cleared, approved, or explicitly accepted before final handoff." : null,
     ].filter(Boolean) as string[],
     tables: [
       {
         title: "Validation Review Summary",
-        headers: ["Severity", "Finding", "Issue", "Impact", "Recommendation"],
+        headers: ["Severity", "Category", "Count", "Examples", "Action"],
         rows: validationRows,
       },
     ],
@@ -604,7 +720,7 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     bullets: [
       ...exportContext.requirementOutputGaps.map((gap) => `Requirement-output blocker: ${gap}`),
       ...exportContext.openItems,
-      ...exportContext.warnings.slice(0, 6).map((item) => `Validation review item: ${item.title} — ${item.message}`),
+      ...buildOpenReviewBullets(exportContext),
     ],
   };
 
@@ -618,8 +734,8 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
       exportContext.outputTruthBlocked
         ? "The next priority should be to fix materialization/design-core propagation, rerun validation, and regenerate this export only after Sites, VLANs, addressing rows, topology, and scenario proof reflect the selected requirements."
         : exportContext.errors.length > 0
-          ? `The next priority should be to resolve the remaining ${exportContext.errors.length} blocker${exportContext.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the final handoff reflects a cleaner implementation posture.`
-          : "The next priority should be to tighten discovery detail, confirm platform and compliance assumptions, and carry the approved design into platform-specific implementation artifacts, diagrams, and change-control evidence.",
+          ? `The next priority should be to correct the remaining ${exportContext.errors.length} root blocker${exportContext.errors.length === 1 ? "" : "s"}, rerun validation, and then regenerate the report so the handoff reflects clean planning output.`
+          : "The next priority should be to review candidate IPAM authority, confirm discovery/platform/compliance assumptions, and only then carry approved evidence into platform-specific implementation artifacts and change-control packages.",
     ],
   };
 
@@ -683,10 +799,10 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
   const reportMetadata: ReportMetadata = {
     organizationName: asString(exportContext.project.organizationName, "To be confirmed"),
     environment: projectEnvironment,
-    reportVersion: "Version 0.94 V1 truth-locked",
-    revisionStatus: exportContext.outputTruthBlocked ? "Blocked - requirement outputs missing" : exportContext.errors.length > 0 ? "Draft - blockers present" : exportContext.warnings.length > 0 ? "Review draft" : "Review-ready draft",
+    reportVersion: "Version 1 truth-locked",
+    revisionStatus: exportContext.outputTruthBlocked ? "Blocked - requirement outputs missing" : exportContext.errors.length > 0 ? "Blocked - root blockers present" : exportContext.warnings.length > 0 ? "Planning review required" : "Planning-ready draft",
     documentOwner: asString(exportContext.project.ownerName, "SubnetOps project owner"),
-    approvalStatus: exportContext.outputTruthBlocked || exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for technical review",
+    approvalStatus: exportContext.outputTruthBlocked || exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for planning review",
     projectStage: asString(exportContext.requirements.projectStage, "To be confirmed"),
     planningFocus: asString(exportContext.planningFor, "To be confirmed"),
     primaryObjective: asString(exportContext.primaryGoal, "To be confirmed"),
@@ -700,9 +816,9 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
       ["Addressing rows", String(exportContext.vlanCount)],
       ["Requirement-output gaps", String(exportContext.requirementOutputGaps.length)],
       ["Security zones", String(exportContext.securityZones.length)],
-      ["Validation blockers", String(exportContext.errors.length)],
+      ["Root blockers", String(exportContext.errors.length)],
       ["Validation warnings", String(exportContext.warnings.length)],
-      ["Base range", asString(exportContext.project.basePrivateRange, "Working range pending confirmation")],
+      ["Base range", exportContext.baseRangeLabel],
     ],
     topologyRows: [
       ["Edge / Internet", exportContext.internetModel || "Internet/edge model pending refinement", exportContext.multiSiteRequired ? "Multi-site edge/WAN intent must produce site and transport evidence" : "Keep the routed edge intentionally simple"],
@@ -743,7 +859,7 @@ export async function getCsvRows(projectId: string) {
   rows.push(
     { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Organization", Value: exportContext.project.organizationName ?? "", Notes: "" },
     { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Environment", Value: exportContext.project.environmentType ?? "", Notes: "" },
-    { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Base Private Range", Value: exportContext.project.basePrivateRange ?? "", Notes: "" },
+    { Section: "Project", Scope: "Project", Name: exportContext.project.name, Key: "Base Private Range", Value: exportContext.baseRangeResolution.canonicalCidr, Notes: exportContext.baseRangeResolution.approvalState },
     { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Planning For", Value: exportContext.requirements.planningFor ?? "", Notes: "" },
     { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Project Stage", Value: exportContext.requirements.projectStage ?? "", Notes: "" },
     { Section: "Requirements", Scope: "Project", Name: exportContext.project.name, Key: "Primary Goal", Value: exportContext.requirements.primaryGoal ?? "", Notes: "" },
@@ -1329,7 +1445,7 @@ export async function getCsvRows(projectId: string) {
         Name: designCore.projectName,
         Key: V1.contractVersion,
         Value: `${V1.overallReadiness} | ${V1.blockingFindingCount} block / ${V1.reviewRequiredFindingCount} review / ${V1.warningFindingCount} warning`,
-        Notes: `Implementation gate ${V1.validationGateAllowsImplementation ? "allowed" : "blocked/review-gated"}; role ${V1.validationRole}; findings ${V1.findingCount}`,
+        Notes: `Implementation gate ${V1.validationGateAllowsImplementation ? "allowed" : "blocked/review-gated"}; root blockers ${V1.rootBlockerCount ?? 0}; propagated blockers ${V1.propagatedBlockerCount ?? 0}; derived impacts ${V1.derivedImpactCount ?? 0}; role ${V1.validationRole}; findings ${V1.findingCount}`,
       });
 
       for (const row of V1.coverageRows.slice(0, 120)) {
@@ -1361,7 +1477,7 @@ export async function getCsvRows(projectId: string) {
           Name: finding.ruleCode,
           Key: finding.sourceEngine,
           Value: finding.title,
-          Notes: `${finding.detail}; remediation ${finding.remediation}; frontend ${finding.frontendImpact}; report ${finding.reportImpact}; diagram ${finding.diagramImpact}`,
+          Notes: `${finding.detail}; class ${finding.findingClass ?? "UNCLASSIFIED"}; ${finding.deEscalationReason ? `classification ${finding.deEscalationReason}; ` : ""}remediation ${finding.remediation}; frontend ${finding.frontendImpact}; report ${finding.reportImpact}; diagram ${finding.diagramImpact}`,
         });
       }
     }

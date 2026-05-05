@@ -6,6 +6,7 @@ export type RequirementSourceType =
   | "USER_PROVIDED"
   | "DERIVED_FROM_USER_INPUT"
   | "SYSTEM_ASSUMPTION"
+  | "SYSTEM_PROPOSED"
   | "NOT_CAPTURED"
   | "REVIEW_REQUIRED";
 

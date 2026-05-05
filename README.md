@@ -1835,6 +1835,7 @@ Required guards:
 | `scripts/check-no-frontend-engineering-facts.cjs` | Browser-side CIDR math, VLAN generation, route/security policy generation, or frontend fallback authority. |
 | `scripts/check-service-validation-coverage.cjs` | Manual or generated service writes bypassing shared addressing validation. |
 | `scripts/check-requirement-materialization-source-truth.cjs` | Missing capacity becoming fake user intent or implementation-ready DHCP/addressing truth. |
+| `scripts/check-security-policy-matrix-completion.cjs` | Wizard/security-policy matrix output missing explicit default-deny policy evidence for high-risk zone pairs. |
 | `scripts/check-no-silent-read-repair.cjs` | Read paths mutating project state without authorization, audit evidence, and surfaced repair evidence. |
 | `scripts/check-final-proof-scenario-execution.cjs` | Final proof passing from static expected summaries instead of executed scenario results. |
 | `scripts/check-omitted-evidence-counters.cjs` | Sliced evidence hiding omitted blockers or review-required items. |
@@ -2058,6 +2059,63 @@ Diagram rules:
 - Omitted blockers must appear as warning badges or rollups.
 - Frontend diagram code may render truth evidence, but must not invent it.
 
+
+### Wizard-generated root blocker elimination
+
+Wizard-generated greenfield plans must not punish the user for backend propagation gaps. A requirements-wizard output is allowed to be planning/review-gated, but it must not create avoidable backend ERROR blockers because later engines failed to materialize evidence.
+
+Required wizard-generated chain:
+
+```text
+requirements wizard input
+→ Engine 1 mathematical addressing proposal
+→ Engine 2 candidate IPAM authority
+→ design graph lineage
+→ explicit security policy baseline
+→ implementation planning/review gates
+→ report/export truth
+→ final proof impact
+```
+
+Rules:
+
+- Engine 1 subnet math must be converted into Engine 2 candidate IPAM evidence when durable IPAM objects do not already exist.
+- Wizard-generated site/VLAN/subnet rows must create candidate pools, candidate allocations, DHCP scope evidence when DHCP is enabled, gateway reservation evidence, and candidate ledger entries.
+- Candidate IPAM evidence is not approval and is not implementation-ready. It is review-required authority evidence that prevents `ENGINE1_PROPOSAL_ONLY` spam in greenfield generated plans.
+- Explicit default-deny guardrails must be generated for high-risk zone pairs, including Guest → Voice, Voice → Management, and WAN → Voice.
+- Security service objects must connect to security flows in the backend design graph so service nodes do not become orphaned evidence.
+- Implementation steps with valid stage dependency evidence must not become false source-lineage blockers.
+- Requirement closure may count Engine 2 as consumed when wizard-generated candidate IPAM evidence exists; approval still remains review-required.
+
+Regression gate:
+
+```bash
+node scripts/check-wizard-root-blocker-elimination.cjs
+```
+
+### Security-policy matrix completion
+
+Wizard-generated zones must not be created without explicit baseline policy evidence. The security-policy engine now completes the high-risk zone matrix with deterministic default-deny guardrails when the wizard or network-object model has zones but the downstream policy matrix would otherwise report missing implicit-deny evidence.
+
+Required behavior:
+
+```text
+wizard/generated security zones
+→ explicit default-deny policy evidence for every high-risk zone pair
+→ matching flow requirements satisfied by policy evidence
+→ generated deny guardrails marked review-required planning evidence
+→ no implementation-ready firewall claim until real interfaces, rule order, logging, and approval are confirmed
+```
+
+Rules:
+
+- The implicit-deny detector remains active; missing deny evidence still fails if completion is removed.
+- Generated baseline deny rules are `review-required`, not approved implementation firewall rules.
+- The network object model still emits named wizard guardrails such as Guest → Voice, Voice → Management, WAN → Voice, Guest → Internal, and WAN → Internal.
+- Security-policy completion must reduce avoidable wizard root blockers without hiding contradictory allows, shadowed rules, missing NAT review, or missing logging evidence.
+
+Regression guard: `scripts/check-security-policy-matrix-completion.cjs`.
+
 ### CI proof commands
 
 Root commands:
@@ -2108,3 +2166,74 @@ Known limitations for this repaired archive:
 - SubnetOps remains V1 only. Do not add multiple public version labels or separate release note files.
 
 V1 is done only when `npm run check:v1` is meaningful in an installed environment and proves docs, quality, backend, frontend, trust, and proof together.
+
+### Wizard-generated blocker taxonomy
+
+Wizard-generated greenfield plans must not inflate one upstream issue into dozens of apparent root errors. Validation findings are now classified as `ROOT_BLOCKER`, `PROPAGATED_BLOCKER`, `DERIVED_IMPACT`, or `REVIEW_ITEM`. Candidate IPAM authority, missing approvals, missing imports, platform/BOM review, discovery review, report gates, diagram gates, implementation gates, and final-proof echoes stay visible, but they do not become root `ERROR` rows unless the backend proves an invalid, contradictory, or unlinked engineering object.
+
+Root blocker examples include invalid/noncanonical CIDR, gateway/subnet contradictions, real overlaps, missing mandatory DesignGraph lineage, and explicitly missing default-deny policy objects. Review-required examples include wizard-generated candidate IPAM allocations awaiting approval, platform profile not saved, discovery imports not performed, or generated implementation/report/diagram surfaces blocked only because an upstream authority is still review-gated. The gate `scripts/check-wizard-blocker-taxonomy.cjs` protects this behavior and is part of `npm run check:quality`.
+
+
+### V1_WIZARD_BASE_RANGE_SOURCE_TRUTH
+
+Wizard-generated greenfield projects must not say the organization/base range is missing while simultaneously generating concrete site blocks and VLAN subnets. When `basePrivateRange` is not saved, SubnetOps now resolves an explicit system-proposed planning parent such as `10.60.0.0/14` for a three-site greenfield plan. That range is source-classified as `SYSTEM_PROPOSED`, marked `SYSTEM_PROPOSED_REVIEW_REQUIRED`, and remains blocked from implementation authority until the engineer confirms or replaces it.
+
+This prevents the old contradiction:
+
+- report says “working range pending confirmation”
+- backend still generates `10.60.0.0/16`, `10.61.0.0/16`, and `10.62.0.0/16`
+
+The correct behavior is:
+
+- base range: system-proposed planning parent
+- site blocks: derived from the proposed parent
+- IPAM authority: candidate/review-required until confirmed
+- implementation readiness: not clean until approval exists
+
+Regression guard: `scripts/check-wizard-base-range-source-truth.cjs`.
+
+### Requirement-consumer closure registry
+
+Wizard-generated requirements now use a central V1 requirement-consumer closure registry instead of a universal hard-coded consumer checklist. The registry separates mandatory consumers, review-only consumers, and explicit no-op consumers so internal wizard keys do not create fake root blockers just because they are not golden-scenario drivers.
+
+Required behavior:
+
+```text
+active wizard requirement
+→ required consumers proven
+→ review-only consumers labelled review-required when approval/imports are missing
+→ explicit no-op consumers recorded when a consumer is not applicable
+→ no hidden requirement key can become active without evidence or no-op/review reason
+```
+
+The gate `scripts/check-requirement-consumer-closure-registry.cjs` protects this behavior and is part of `npm run check:quality`.
+
+### Wizard implementation stage gating
+
+Wizard-generated implementation output is not allowed to punish greenfield planning rows as hard execution failures just because IPAM approval, device inventory, live management access, policy/NAT confirmation, or change-window proof has not happened yet.
+
+The implementation planner now separates execution posture into four backend dispositions:
+
+- `EXECUTION_READY` — source authority, evidence, verification, rollback, and dependencies are ready for execution planning.
+- `PLANNING_CANDIDATE` — wizard-generated planning evidence exists, but authority/import/approval/discovery proof is still required.
+- `REVIEW_REQUIRED` — engineer review is required before execution, but no contradictory or invalid engineering object has been proven.
+- `STRUCTURAL_BLOCKER` — the generated object is invalid, contradictory, source-less, missing rollback/evidence, or otherwise unsafe as a planning artifact.
+
+Missing WAN/provider confirmation, missing allow/NAT confirmation, and missing live operational-safety evidence stay review-gated for wizard-generated planning output. They must not inflate root blocker counts unless the backend proves a structural defect. Vendor-neutral templates inherit this classification: planning candidates become review-required templates; only structural source/variable/evidence/rollback/command-safety defects remain blocked.
+
+Regression guard: `node scripts/check-wizard-implementation-stage-gating.cjs`.
+
+
+### Wizard design-graph lineage completion
+
+Wizard-generated planning output must not create loose backend objects that later appear as orphan graph nodes. The backend design graph now completes lineage for route-domain site ownership, security-zone route-domain scope, policy service usage, NAT translated source subnets, route-intent next-hop objects, and security-flow service references.
+
+This pass preserves the rule that the graph is evidence, not decoration: generated sites, VLANs, subnets, zones, policies, NAT rules, route intents, services, and implementation stages must be connected to a backend source/dependency path or remain review-gated. The guard is `node scripts/check-wizard-design-graph-lineage-completion.cjs`.
+
+## Report professional compression
+
+Wizard-generated greenfield plans must not dump repeated downstream review findings as if every row were a separate root failure. The report/export layer now groups validation findings into professional review categories such as root blockers, Enterprise IPAM authority, requirement propagation closure, security policy/NAT review, routing review, implementation/template readiness, report/diagram evidence boundaries, and discovery/platform review.
+
+The full row-level evidence remains in the appendix and machine-readable export, but the main report must lead with root-cause rollups and review actions. Forbidden readiness wording is also rewritten without creating double-negative phrases such as `not not implementation-ready`.
+
+Regression guard: `node scripts/check-report-professional-compression.cjs`.

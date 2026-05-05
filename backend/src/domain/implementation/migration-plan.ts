@@ -197,15 +197,19 @@ function riskLevelForRouteIntent(routeIntent: RouteIntent): StepRiskLevel {
 }
 
 function readinessForRouteIntent(routeIntent: RouteIntent): StepReadiness {
-  if (routeIntent.administrativeState === "missing") return "blocked";
-  if (routeIntent.administrativeState === "review") return "review";
+  // A wizard-generated greenfield route intent can be missing provider/live-WAN confirmation
+  // without proving an invalid route. Keep that as review-required planning evidence.
+  // Only contradictory/invalid dependency findings should become hard blockers later.
+  if (routeIntent.administrativeState === "missing" || routeIntent.administrativeState === "review") return "review";
   return "ready";
 }
 
 function readinessForSecurityFlow(flowRequirement: SecurityFlowRequirement): StepReadiness {
   if (flowRequirement.state === "conflict") return "blocked";
-  if (flowRequirement.state === "missing-policy" || flowRequirement.state === "missing-nat") return "blocked";
-  if (flowRequirement.state === "review") return "review";
+  // Missing policy/NAT coverage in a wizard-generated plan is an execution-readiness gap,
+  // not a claim that the design object is mathematically impossible. The policy matrix
+  // completion pass should materialize baseline denies; remaining allow/NAT gaps stay review-gated.
+  if (flowRequirement.state === "missing-policy" || flowRequirement.state === "missing-nat" || flowRequirement.state === "review") return "review";
   return "ready";
 }
 
@@ -383,21 +387,22 @@ function operationalSafetyContextForDevices(params: {
     source: "object-model",
   }));
 
-  const blockers = [
-    ...(params.blockWhenNoDevice && affectedDevices.length === 0 ? [`Operational safety blocked: no affected device could be resolved for ${params.changeLabel}.`] : []),
+  const blockers: string[] = [];
+
+  const reviewReasons = [
+    ...(params.blockWhenNoDevice && affectedDevices.length === 0 ? [`Operational safety review: no affected device could be resolved for ${params.changeLabel}; execution must wait for inventory/device authority.`] : []),
     ...affectedDevices
       .filter((device) => !deviceSafetyEvidence(device).hasManagementAccess)
-      .map((device) => `Operational safety blocked: ${device.name} has no modeled management IP, so risky changes cannot be treated as executable.`),
-  ];
-
-  const reviewReasons = affectedDevices.flatMap((device) => {
+      .map((device) => `Operational safety review: ${device.name} has no modeled management IP; device-facing execution must wait for live management access proof.`),
+    ...affectedDevices.flatMap((device) => {
     const evidence = deviceSafetyEvidence(device);
     return [
       ...(evidence.hasManagementAccess && !evidence.hasManagementAccessProof ? [`Operational safety review: management access to ${device.name} (${device.managementIp}) must be tested before change execution.`] : []),
       ...(!evidence.hasBackupEvidence ? [`Operational safety review: current configuration backup/baseline for ${device.name} is not modeled.`] : []),
       ...(!evidence.hasRollbackAccessEvidence ? [`Operational safety review: out-of-band, console, fallback, or rollback access path for ${device.name} is not modeled.`] : []),
     ];
-  });
+  }),
+  ];
 
   return {
     affectedDeviceIds: affectedDevices.map((device) => device.id),
@@ -725,10 +730,9 @@ function buildOperationalSafetySteps(params: {
   return params.devices.map((device, index) => {
     const evidence = deviceSafetyEvidence(device);
     const objectFindings = findingsForObject(params.upstreamFindings, [device.id, ...(device.interfaceIds ?? []), ...(device.routeDomainIds ?? []), ...(device.securityZoneIds ?? [])]);
-    const blockers = [
-      ...(!evidence.hasManagementAccess ? ["No management IP is modeled for this device; remote or high-impact changes cannot be treated as executable."] : []),
-    ];
+    const blockers: string[] = [];
     const reviewReasons = [
+      ...(!evidence.hasManagementAccess ? ["No management IP is modeled for this device; execution must wait for live management access proof."] : []),
       ...(device.truthState !== "configured" ? ["Device is not confirmed configured; engineer must validate the live device identity before change execution."] : []),
       ...(evidence.hasManagementAccess && !evidence.hasManagementAccessProof ? ["Management access is modeled but not proven/tested in the device notes."] : []),
       ...(!evidence.hasBackupEvidence ? ["Current configuration backup or baseline capture is not modeled for this device."] : []),
@@ -745,10 +749,10 @@ function buildOperationalSafetySteps(params: {
       targetObjectType: "network-device",
       targetObjectId: device.id,
       action: "review",
-      baseReadiness: blockers.length > 0 ? "blocked" : reviewReasons.length > 0 ? "review" : "ready",
+      baseReadiness: reviewReasons.length > 0 ? "review" : "ready",
       baseBlockers: blockers,
       reviewReasons,
-      riskLevel: blockers.length > 0 ? "high" : "medium",
+      riskLevel: "medium",
       engineerReviewRequired: true,
       dependencies: dependenciesWithGate(),
       dependencyObjectIds: [device.id, ...(device.interfaceIds ?? []), ...(device.routeDomainIds ?? []), ...(device.securityZoneIds ?? [])],
@@ -1752,7 +1756,7 @@ function buildSummary(params: {
       "V1D expands verification from broad category checks into object-level and flow-level route, policy, NAT, DHCP, safety, rollback, and documentation checks.",
       "V1C adds operational safety gates so device-facing changes require management access, backup, and rollback proof.",
       "Every risky task is tied to backend authority objects such as devices, interfaces, route intents, security flows, NAT rules, DHCP pools, design findings, and dependency graph edges.",
-      "Blocked implementation and operational-safety steps are stop conditions, not advisory warnings.",
+      "Wizard-generated planning candidates remain review-required until IPAM, live inventory, policy/NAT, verification, rollback, and approval evidence are confirmed; only contradictory or structurally invalid objects become hard blockers.",
     ],
   };
 }

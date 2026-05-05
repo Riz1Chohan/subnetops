@@ -60,6 +60,7 @@ import { buildV1AiDraftHelperControl } from "./designCore/designCore.aiDraftHelp
 import { buildV1ReadinessLadderControl } from "./designCore/designCore.readinessLadderControl.js";
 import { buildV1FinalProofPassControl } from "./designCore/designCore.finalProofPassControl.js";
 import { buildRequirementMaterializationPolicySummary, parseRequirementsForMaterializationPolicy } from "./requirementsMaterialization.policy.js";
+import { resolveProjectBaseRangeForRequirements } from "../domain/requirements/apply.js";
 import { buildBackendDiagramTruthModel, buildBackendReportTruthModel } from "./designCore/designCore.reportDiagramTruth.js";
 import { buildVendorNeutralImplementationTemplates } from "./designCore/designCore.implementationTemplates.js";
 import {
@@ -87,7 +88,7 @@ import {
   sortAllocationCandidates,
   sortSiteAllocationCandidates,
 } from "../domain/addressing/allocation-fit.js";
-import { buildEnterpriseAllocatorPosture, extractEnterpriseAllocatorSource, overallEnterpriseAllocatorReadiness } from "../domain/ipam/enterprise-ipam.js";
+import { buildEnterpriseAllocatorPosture, extractEnterpriseAllocatorSource, materializeWizardGeneratedIpamCandidates, overallEnterpriseAllocatorReadiness } from "../domain/ipam/enterprise-ipam.js";
 import {
   NETWORK_STANDARDS_RULEBOOK,
 } from "../lib/networkStandardsRulebook.js";
@@ -251,28 +252,33 @@ function buildEngine1Explanation(row: AddressRowRecord): string {
 
 function evaluateOrganizationBlock(project: ProjectWithDesignData, issues: DesignCoreIssue[]) {
   const notes: string[] = [];
-  const sourceValue = project.basePrivateRange ?? undefined;
+  const requirements = parseRequirementsForMaterializationPolicy(project.requirementsJson) ?? {};
+  const baseRange = resolveProjectBaseRangeForRequirements(project.basePrivateRange, requirements);
+  const sourceValue = baseRange.sourceValue ?? undefined;
+  const effectiveSourceValue = baseRange.effectiveBaseRange;
 
   if (!sourceValue) {
-    notes.push("No organization private range saved yet.");
-    return {
-      sourceValue,
-      validationState: "missing" as const,
-      notes,
-    };
+    notes.push(...baseRange.notes);
+    if (baseRange.approvalState === "SYSTEM_PROPOSED_REVIEW_REQUIRED") {
+      notes.push("Generated site blocks are tied to this system-proposed parent range and remain review-required until confirmed.");
+    }
   }
 
   try {
-    const parsed = parseCidr(sourceValue);
-    const canonical = canonicalCidr(sourceValue);
-    if (canonical !== sourceValue) {
-      notes.push(`Saved organization block canonicalized to ${canonical}.`);
+    const parsed = parseCidr(effectiveSourceValue);
+    const canonical = canonicalCidr(effectiveSourceValue);
+    if (canonical !== effectiveSourceValue) {
+      notes.push(`Effective organization block canonicalized to ${canonical}.`);
     }
     return {
-      sourceValue,
+      sourceValue: sourceValue ?? null,
+      effectiveSourceValue,
       canonicalCidr: canonical,
       parsed,
       validationState: "valid" as const,
+      sourceType: baseRange.sourceType,
+      approvalState: baseRange.approvalState,
+      reviewRequired: baseRange.reviewRequired,
       notes,
     };
   } catch {
@@ -280,13 +286,17 @@ function evaluateOrganizationBlock(project: ProjectWithDesignData, issues: Desig
       severity: "ERROR",
       code: "ORG_BLOCK_INVALID",
       title: "Invalid organization private range",
-      detail: `${sourceValue} is not valid CIDR notation. The top-level planning block should be corrected before site allocation becomes review-ready.`,
+      detail: `${effectiveSourceValue} is not valid CIDR notation. The top-level planning block should be corrected before site allocation becomes review-ready.`,
       entityType: "PROJECT",
       entityId: project.id,
     });
-    notes.push("Saved organization private range is not valid CIDR notation.");
+    notes.push("Effective organization private range is not valid CIDR notation.");
     return {
-      sourceValue,
+      sourceValue: sourceValue ?? null,
+      effectiveSourceValue,
+      sourceType: baseRange.sourceType,
+      approvalState: baseRange.approvalState,
+      reviewRequired: true,
       validationState: "invalid" as const,
       notes,
     };
@@ -1353,7 +1363,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   });
   const engineConfidence = buildEngineConfidenceSummary(traceabilityCoverage, allocatorConfidence, brownfieldReadiness, implementationReadiness, routeDomain, standardsAlignment, planningInputCoverage, requirementsCoverage);
   const allocatorDeterminism = buildAllocatorDeterminismSummary(issues, siteBlocks, proposals);
-  const enterpriseAllocatorPosture = buildEnterpriseAllocatorPosture(addressingRows.map((row) => ({
+  const enterpriseAllocatorRows = addressingRows.map((row) => ({
     id: row.id,
     siteId: row.siteId,
     siteName: row.siteName,
@@ -1362,9 +1372,13 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     role: row.role,
     subnetCidr: row.canonicalSubnetCidr ?? row.sourceSubnetCidr,
     proposedSubnetCidr: row.proposedSubnetCidr,
+    siteBlockCidr: row.siteBlockCidr,
+    gatewayIp: row.effectiveGatewayIp ?? row.proposedGatewayIp,
     dhcpEnabled: row.dhcpEnabled,
     estimatedHosts: row.estimatedHosts,
-  })), extractEnterpriseAllocatorSource(project));
+  }));
+  const enterpriseAllocatorSource = materializeWizardGeneratedIpamCandidates(enterpriseAllocatorRows, extractEnterpriseAllocatorSource(project));
+  const enterpriseAllocatorPosture = buildEnterpriseAllocatorPosture(enterpriseAllocatorRows, enterpriseAllocatorSource);
   const enterpriseAllocatorReadiness = overallEnterpriseAllocatorReadiness(enterpriseAllocatorPosture);
 
   const generatedAt = new Date().toISOString();
@@ -1454,6 +1468,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     traceability,
     addressingRows,
     networkObjectModel,
+    enterpriseIpamCandidateCount: enterpriseAllocatorPosture.durableAllocationCount,
     reportTruth,
     diagramTruth,
   });
@@ -1473,7 +1488,7 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
   const V1EnterpriseIpamTruth = buildV1EnterpriseIpamTruthControl({
     addressingRows,
     enterpriseAllocatorPosture,
-    enterpriseAllocatorSource: extractEnterpriseAllocatorSource(project),
+    enterpriseAllocatorSource,
     V1CidrAddressingTruth,
     V1RequirementsClosure,
   });
@@ -1653,8 +1668,12 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     },
     organizationBlock: {
       sourceValue: organizationBlock.sourceValue,
+      effectiveSourceValue: organizationBlock.effectiveSourceValue,
       canonicalCidr: organizationBlock.canonicalCidr,
       validationState: organizationBlock.validationState,
+      sourceType: organizationBlock.sourceType,
+      approvalState: organizationBlock.approvalState,
+      reviewRequired: organizationBlock.reviewRequired,
       ...(organizationBlock.parsed ? siteBlockFacts(organizationBlock.parsed) : {}),
       notes: organizationBlock.notes,
     },

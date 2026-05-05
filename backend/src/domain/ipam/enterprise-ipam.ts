@@ -33,6 +33,8 @@ export interface EnterpriseAllocatorInputRow {
   role: SegmentRole;
   subnetCidr?: string;
   proposedSubnetCidr?: string;
+  siteBlockCidr?: string | null;
+  gatewayIp?: string | null;
   dhcpEnabled?: boolean;
   estimatedHosts?: number | null;
 }
@@ -596,6 +598,183 @@ export function extractEnterpriseAllocatorSource(project: unknown): EnterpriseAl
     brownfieldNetworks: Array.isArray(record.brownfieldNetworks) ? record.brownfieldNetworks as EnterpriseBrownfieldNetworkRecord[] : [],
     allocationApprovals: Array.isArray(record.allocationApprovals) ? record.allocationApprovals as EnterpriseApprovalRecord[] : [],
     allocationLedger: Array.isArray(record.allocationLedger) ? record.allocationLedger as EnterpriseLedgerRecord[] : [],
+  };
+}
+
+
+function sanitizeIdPart(value: unknown): string {
+  const normalized = String(value ?? "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "unknown";
+}
+
+function candidateCidrForRow(row: EnterpriseAllocatorInputRow): string | undefined {
+  return row.subnetCidr ?? row.proposedSubnetCidr;
+}
+
+function syntheticSitePoolCidr(row: EnterpriseAllocatorInputRow): string | undefined {
+  if (row.siteBlockCidr) return row.siteBlockCidr;
+  const cidr = candidateCidrForRow(row);
+  if (!cidr || !cidr.includes(".")) return undefined;
+  const address = cidr.split("/")[0];
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return undefined;
+  return `${parts[0]}.${parts[1]}.0.0/16`;
+}
+
+function existingAllocationForRow(row: EnterpriseAllocatorInputRow, source: EnterpriseAllocatorSource): EnterpriseAllocationRecord | undefined {
+  const cidr = candidateCidrForRow(row);
+  return (source.ipAllocations ?? []).find((allocation) => {
+    if (allocation.vlanId === row.id) return true;
+    if (allocation.siteId === row.siteId && cidr && allocation.cidr === cidr) return true;
+    return Boolean(cidr && allocation.cidr === cidr);
+  });
+}
+
+function existingAllocationMatchesRow(row: EnterpriseAllocatorInputRow, source: EnterpriseAllocatorSource): boolean {
+  return Boolean(existingAllocationForRow(row, source));
+}
+
+function existingDhcpScopeMatchesRow(row: EnterpriseAllocatorInputRow, source: EnterpriseAllocatorSource): boolean {
+  const cidr = candidateCidrForRow(row);
+  return (source.dhcpScopes ?? []).some((scope) => {
+    if (scope.vlanId === row.id) return true;
+    if (scope.siteId === row.siteId && cidr && scope.scopeCidr === cidr) return true;
+    return Boolean(cidr && scope.scopeCidr === cidr);
+  });
+}
+
+/**
+ * V1_WIZARD_GENERATED_IPAM_CANDIDATE_AUTHORITY
+ *
+ * Requirements-wizard greenfield output must not stop at Engine 1 math rows.
+ * When no durable IPAM records exist yet, the backend now creates deterministic
+ * Engine 2 candidate evidence in the design-core source view: default route
+ * domain, per-site candidate pools, per-VLAN candidate allocations, DHCP scope
+ * candidates, gateway reservations, and ledger entries. These are not approvals
+ * and are not implementation-ready. They are review-required authority objects
+ * that prevent wizard-generated plans from looking internally broken.
+ */
+export function materializeWizardGeneratedIpamCandidates(
+  rows: EnterpriseAllocatorInputRow[],
+  source: EnterpriseAllocatorSource = {},
+): EnterpriseAllocatorSource {
+  if (rows.length === 0) return source;
+
+  const routeDomains = [...(source.routeDomains ?? [])];
+  if (routeDomains.length === 0) {
+    routeDomains.push({
+      id: "wizard-route-domain-default",
+      routeDomainKey: "default",
+      name: "Default Corporate Route Domain",
+      allowOverlappingCidrs: false,
+    });
+  }
+  const routeDomainId = routeDomains[0]?.id ?? "wizard-route-domain-default";
+
+  const ipPools = [...(source.ipPools ?? [])];
+  const ipAllocations = [...(source.ipAllocations ?? [])];
+  const dhcpScopes = [...(source.dhcpScopes ?? [])];
+  const ipReservations = [...(source.ipReservations ?? [])];
+  const allocationLedger = [...(source.allocationLedger ?? [])];
+
+  const poolIdBySite = new Map<string, string>();
+  for (const pool of ipPools) {
+    if (pool.siteId) poolIdBySite.set(pool.siteId, pool.id);
+  }
+
+  for (const row of rows) {
+    const cidr = candidateCidrForRow(row);
+    if (!cidr) continue;
+
+    let poolId = poolIdBySite.get(row.siteId);
+    if (!poolId) {
+      const poolCidr = syntheticSitePoolCidr(row);
+      poolId = `wizard-pool-${sanitizeIdPart(row.siteId)}`;
+      poolIdBySite.set(row.siteId, poolId);
+      if (poolCidr && !ipPools.some((pool) => pool.id === poolId || (pool.siteId === row.siteId && pool.cidr === poolCidr))) {
+        ipPools.push({
+          id: poolId,
+          name: `${row.siteName} candidate IPAM pool`,
+          addressFamily: "IPV4",
+          cidr: poolCidr,
+          scope: "site",
+          status: "ACTIVE",
+          reservePercent: 20,
+          routeDomainId,
+          siteId: row.siteId,
+          ownerLabel: "requirements-wizard-candidate",
+        });
+      }
+    }
+
+    const existingAllocation = existingAllocationForRow(row, { ...source, ipAllocations });
+    const allocationId = existingAllocation?.id ?? `wizard-allocation-${sanitizeIdPart(row.id)}`;
+    if (!existingAllocation) {
+      ipAllocations.push({
+        id: allocationId,
+        poolId,
+        routeDomainId,
+        siteId: row.siteId,
+        vlanId: row.id,
+        addressFamily: "IPV4",
+        cidr,
+        gatewayIp: row.gatewayIp ?? null,
+        status: "CANDIDATE_REVIEW",
+        purpose: `${row.siteName} VLAN ${row.vlanId} ${row.vlanName} wizard-generated candidate allocation`,
+      });
+      allocationLedger.push({
+        id: `wizard-ledger-${sanitizeIdPart(row.id)}`,
+        allocationId,
+        action: "WIZARD_CANDIDATE_MATERIALIZED",
+        summary: `Requirements wizard materialized Engine 2 candidate allocation ${cidr} for ${row.siteName} VLAN ${row.vlanId}; approval is still required before implementation.`,
+      });
+    }
+
+    const scopeId = `wizard-dhcp-${sanitizeIdPart(row.id)}`;
+    if (row.dhcpEnabled && !existingDhcpScopeMatchesRow(row, { ...source, dhcpScopes })) {
+      dhcpScopes.push({
+        id: scopeId,
+        siteId: row.siteId,
+        vlanId: row.id,
+        routeDomainId,
+        allocationId,
+        addressFamily: "IPV4",
+        scopeCidr: cidr,
+        defaultGateway: row.gatewayIp ?? null,
+        dnsServersJson: JSON.stringify(["review-required"]),
+        excludedRangesJson: row.gatewayIp ? JSON.stringify([{ start: row.gatewayIp, end: row.gatewayIp, reason: "gateway" }]) : "[]",
+        optionsJson: JSON.stringify([{ name: "implementation-review-required" }]),
+        relayTargetsJson: "[]",
+        serverLocation: "engineer-review",
+      });
+    }
+
+    if (row.gatewayIp && !ipReservations.some((reservation) => reservation.allocationId === allocationId && reservation.ipAddress === row.gatewayIp)) {
+      ipReservations.push({
+        id: `wizard-reservation-${sanitizeIdPart(row.id)}-gateway`,
+        siteId: row.siteId,
+        vlanId: row.id,
+        dhcpScopeId: row.dhcpEnabled ? scopeId : null,
+        allocationId,
+        addressFamily: "IPV4",
+        ipAddress: row.gatewayIp,
+        hostname: `${sanitizeIdPart(row.siteName)}-vlan${row.vlanId}-gateway`,
+        ownerLabel: "wizard-generated-gateway-reservation",
+      });
+    }
+  }
+
+  return {
+    ...source,
+    routeDomains,
+    ipPools,
+    ipAllocations,
+    dhcpScopes,
+    ipReservations,
+    allocationLedger,
   };
 }
 

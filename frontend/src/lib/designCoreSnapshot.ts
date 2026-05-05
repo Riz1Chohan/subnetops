@@ -250,6 +250,11 @@ export type DesignGraphNodeObjectType =
 export type DesignGraphRelationship =
   | "site-contains-device"
   | "site-contains-vlan"
+  | "site-owns-route-domain"
+  | "security-zone-belongs-to-route-domain"
+  | "policy-rule-uses-service"
+  | "nat-rule-translates-subnet"
+  | "route-intent-uses-next-hop-object"
   | "vlan-uses-subnet"
   | "device-owns-interface"
   | "interface-uses-subnet"
@@ -272,6 +277,7 @@ export type DesignGraphRelationship =
   | "security-zone-initiates-security-flow"
   | "security-flow-targets-security-zone"
   | "security-flow-covered-by-policy"
+  | "security-flow-uses-service"
   | "security-flow-uses-nat-rule"
   | "implementation-stage-contains-step"
   | "implementation-step-targets-object"
@@ -2006,6 +2012,7 @@ export interface V1StandardsAlignmentRulebookControlSummary {
 }
 
 export type V1ValidationReadinessCategory = "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED";
+export type V1ValidationFindingClass = "ROOT_BLOCKER" | "PROPAGATED_BLOCKER" | "DERIVED_IMPACT" | "REVIEW_ITEM";
 
 export type V1ValidationRuleCode =
   | "VALIDATION_REQUIREMENT_PROPAGATION_GAP"
@@ -2030,6 +2037,11 @@ export type V1ValidationRuleCode =
 export interface V1ValidationFinding {
   id: string;
   category: V1ValidationReadinessCategory;
+  originalCategory?: V1ValidationReadinessCategory;
+  findingClass?: V1ValidationFindingClass;
+  rootCauseKey?: string;
+  rootCauseTitle?: string;
+  deEscalationReason?: string;
   ruleCode: V1ValidationRuleCode;
   title: string;
   detail: string;
@@ -2076,6 +2088,10 @@ export interface V1ValidationReadinessControlSummary {
   validationGateAllowsImplementation: boolean;
   findingCount: number;
   blockingFindingCount: number;
+  rootBlockerCount?: number;
+  propagatedBlockerCount?: number;
+  derivedImpactCount?: number;
+  reviewItemCount?: number;
   reviewRequiredFindingCount: number;
   warningFindingCount: number;
   infoFindingCount: number;
@@ -2086,6 +2102,7 @@ export interface V1ValidationReadinessControlSummary {
   coverageRows: V1ValidationCoverageRow[];
   requirementGateRows: V1ValidationRequirementGateRow[];
   findings: V1ValidationFinding[];
+  blockerTaxonomyNotes?: string[];
   notes: string[];
 }
 
@@ -2110,8 +2127,12 @@ export interface DesignCoreSnapshot {
   };
   organizationBlock?: {
     sourceValue?: string | null;
+    effectiveSourceValue?: string | null;
     canonicalCidr?: string;
     validationState: "valid" | "invalid" | "missing";
+    sourceType?: "USER_PROVIDED" | "DERIVED_FROM_USER_INPUT" | "SYSTEM_ASSUMPTION" | "SYSTEM_PROPOSED" | "NOT_CAPTURED" | "REVIEW_REQUIRED";
+    approvalState?: "USER_CONFIRMED" | "SYSTEM_PROPOSED_REVIEW_REQUIRED";
+    reviewRequired?: boolean;
     prefix?: number;
     networkAddress?: string;
     broadcastAddress?: string;

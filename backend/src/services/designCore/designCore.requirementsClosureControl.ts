@@ -12,6 +12,7 @@ import type {
   RequirementsScenarioProofSignal,
   RequirementsScenarioProofSummary,
 } from "../designCore.types.js";
+import { requirementConsumerRegistryFor, V1_REQUIREMENT_CONSUMER_REGISTRY_VERSION } from "./designCore.requirementConsumerRegistry.js";
 
 export const V1_REQUIREMENTS_CLOSURE_CONTRACT_VERSION = "V1_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF" as const;
 
@@ -46,6 +47,8 @@ export interface V1RequirementClosureMatrixRow {
   expectedAffectedEngines: string[];
   actualAffectedEngines: string[];
   missingConsumers: string[];
+  reviewOnlyConsumers: string[];
+  explicitNoOpConsumers: string[];
   consumerCoverage: V1RequirementConsumerCoverage;
   evidence: string[];
   reviewReason?: string;
@@ -92,6 +95,7 @@ type V1Input = {
   traceability: DesignTraceabilityItem[];
   addressingRows: DesignCoreAddressRow[];
   networkObjectModel: NetworkObjectModel;
+  enterpriseIpamCandidateCount?: number;
   reportTruth?: BackendReportTruthModel;
   diagramTruth?: BackendDiagramTruthModel;
 };
@@ -137,28 +141,15 @@ function stringsForOutcome(outcome: RequirementMaterializationOutcome) {
 }
 
 function expectedConsumersFor(outcome: RequirementMaterializationOutcome) {
-  const policyText = stringsForOutcome(outcome);
-  const expected = new Set<string>([
-    "requirements.capture",
-    "requirements.normalization",
-    "requirementsMaterialization.policy",
-    "designCore.traceability",
-    "designCore.requirementsImpactClosure",
-    "designCore.requirementsScenarioProof",
-    "validation/readiness",
-    "ProjectOverviewPage.V1Closure",
-    "report/export.requirementEvidence",
-  ]);
+  return requirementConsumerRegistryFor(outcome).requiredConsumers;
+}
 
-  if (outcome.expectedDisposition === "MATERIALIZED_OBJECT") expected.add("materialized.sourceObject");
-  if (includesText(policyText, ["address", "subnet", "vlan", "segment", "host demand", "Engine1"])) expected.add("Engine1.addressing");
-  if (includesText(policyText, ["ipam", "pool", "allocation", "dhcp", "reservation", "Engine2"])) expected.add("Engine2.enterpriseIpamReview");
-  if (includesText(policyText, ["route", "wan", "cloud", "isp", "transit", "failover", "reachability"])) expected.add("designCore.routingSegmentation");
-  if (includesText(policyText, ["security", "zone", "policy", "guest", "management", "remote", "identity", "firewall", "trust boundary"])) expected.add("designCore.securityPolicyFlow");
-  if (includesText(policyText, ["implementation", "handoff", "rollout", "downtime", "team", "review item"]) || REVIEW_ONLY_MATERIALIZATION_STATUSES.has(outcome.materializationStatus)) expected.add("designCore.implementationPlan");
-  if (outcome.diagramImpact && !outcome.diagramImpact.toLowerCase().includes("not applicable")) expected.add("diagramTruth.requirementImpact");
+function reviewOnlyConsumersFor(outcome: RequirementMaterializationOutcome) {
+  return requirementConsumerRegistryFor(outcome).reviewOnlyConsumers;
+}
 
-  return Array.from(expected).sort();
+function explicitNoOpConsumersFor(outcome: RequirementMaterializationOutcome) {
+  return requirementConsumerRegistryFor(outcome).explicitNoOpConsumers;
 }
 
 function actualConsumersFor(args: {
@@ -167,6 +158,7 @@ function actualConsumersFor(args: {
   scenarioSignals: RequirementsScenarioProofSignal[];
   traceabilityItems: DesignTraceabilityItem[];
   coverage: V1RequirementConsumerCoverage;
+  enterpriseIpamCandidateCount?: number;
 }) {
   const { outcome, closure, scenarioSignals, traceabilityItems, coverage } = args;
   const actual = new Set<string>();
@@ -179,6 +171,7 @@ function actualConsumersFor(args: {
   if (scenarioSignals.length > 0) actual.add("designCore.requirementsScenarioProof");
   if (coverage.materialized) actual.add("materialized.sourceObject");
   if (coverage.addressingConsumed) actual.add("Engine1.addressing");
+  if ((args.enterpriseIpamCandidateCount ?? 0) > 0 && includesText(stringsForOutcome(outcome), ["ipam", "pool", "allocation", "dhcp", "reservation", "Engine2", "address", "subnet", "vlan", "segment", "host demand"])) actual.add("Engine2.enterpriseIpamReview");
   if (coverage.routingConsumed) actual.add("designCore.routingSegmentation");
   if (coverage.securityConsumed) actual.add("designCore.securityPolicyFlow");
   if (coverage.implementationConsumed) actual.add("designCore.implementationPlan");
@@ -261,6 +254,7 @@ function buildCoverage(args: {
   scenarioSignals: RequirementsScenarioProofSignal[];
   addressingRows: DesignCoreAddressRow[];
   networkObjectModel: NetworkObjectModel;
+  enterpriseIpamCandidateCount?: number;
   reportTruth?: BackendReportTruthModel;
   diagramTruth?: BackendDiagramTruthModel;
 }): V1RequirementConsumerCoverage {
@@ -333,11 +327,14 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
     scenarioSignals,
     addressingRows: input.addressingRows,
     networkObjectModel: input.networkObjectModel,
+    enterpriseIpamCandidateCount: input.enterpriseIpamCandidateCount,
     reportTruth: input.reportTruth,
     diagramTruth: input.diagramTruth,
   });
   const expectedAffectedEngines = expectedConsumersFor(outcome);
-  const actualAffectedEngines = actualConsumersFor({ outcome, closure, scenarioSignals, traceabilityItems, coverage });
+  const reviewOnlyConsumers = reviewOnlyConsumersFor(outcome);
+  const explicitNoOpConsumers = explicitNoOpConsumersFor(outcome);
+  const actualAffectedEngines = actualConsumersFor({ outcome, closure, scenarioSignals, traceabilityItems, coverage, enterpriseIpamCandidateCount: input.enterpriseIpamCandidateCount });
   const active = outcome.active || valueLooksActive(outcome.sourceValue);
   const missingConsumers = active
     ? expectedAffectedEngines.filter((expected) => !actualAffectedEngines.includes(expected))
@@ -360,6 +357,8 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
     expectedAffectedEngines,
     actualAffectedEngines,
     missingConsumers,
+    reviewOnlyConsumers,
+    explicitNoOpConsumers,
     consumerCoverage: coverage,
     evidence: evidenceFor({ outcome, closure, traceabilityItems, scenarioSignals, coverage }),
     reviewReason,
@@ -458,8 +457,9 @@ export function buildV1RequirementsClosureControl(input: V1Input): V1Requirement
     closureMatrix,
     goldenScenarioClosures,
     notes: [
-      "V1 is the nothing-got-lost checker: captured requirements must prove normalization, materialization/review state, backend consumption, readiness impact, frontend visibility, report/export evidence, diagram impact when relevant, and scenario proof.",
-      "The closure matrix does not invent missing downstream facts. If routing, security, implementation, report, or diagram consumers cannot be proven, the row remains partially propagated, review-required, or blocked.",
+      `Consumer registry: ${V1_REQUIREMENT_CONSUMER_REGISTRY_VERSION}.`,
+      "V1 is the nothing-got-lost checker: captured requirements must prove normalization, materialization/review state, backend consumption, readiness impact, frontend visibility, report/export evidence, diagram impact when relevant, and scenario proof only when the registry says the requirement is a scenario driver.",
+      "The closure matrix does not invent missing downstream facts. It separates mandatory consumers, review-only consumers, and explicit no-op consumers so wizard-generated internal keys do not create fake root blockers.",
       "Golden scenario closures are derived from the same backend evidence and keep small office, multi-site, guest Wi-Fi, voice, cloud/hybrid, remote access, dual ISP, security-sensitive, and brownfield cases visible.",
     ],
   };

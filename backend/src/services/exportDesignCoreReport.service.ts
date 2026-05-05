@@ -803,10 +803,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         .slice(0, 30)
         .map((finding: any) => [
           asString(finding.category, "INFO"),
+          asString(finding.findingClass, "REVIEW_ITEM"),
           asString(finding.ruleCode, "rule"),
           asString(finding.sourceEngine, "engine"),
           asString(finding.title, "finding"),
-          asString(finding.remediation, "—"),
+          asString(finding.deEscalationReason || finding.remediation, "—"),
         ]);
 
       report.sections.push({
@@ -819,6 +820,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
             rows: [
               ["Contract", asString(V1ValidationReadiness.contractVersion, "missing"), asString(V1ValidationReadiness.validationRole, "strict validation authority")],
               ["Overall readiness", asString(V1ValidationReadiness.overallReadiness, "review"), `${V1ValidationReadiness.blockingFindingCount ?? 0} block; ${V1ValidationReadiness.reviewRequiredFindingCount ?? 0} review; ${V1ValidationReadiness.warningFindingCount ?? 0} warning.`],
+              ["Root-cause taxonomy", `${V1ValidationReadiness.rootBlockerCount ?? 0} root blocker(s)`, `${V1ValidationReadiness.propagatedBlockerCount ?? 0} propagated blocker(s); ${V1ValidationReadiness.derivedImpactCount ?? 0} derived impact(s); ${V1ValidationReadiness.reviewItemCount ?? 0} review item(s).`],
               ["Implementation gate", V1ValidationReadiness.validationGateAllowsImplementation ? "allowed" : "blocked/review-gated", `${V1ValidationReadiness.requirementGateCount ?? 0} requirement gate row(s); ${V1ValidationReadiness.findingCount ?? 0} validation finding(s).`],
             ],
           },
@@ -834,8 +836,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           },
           {
             title: "V1 Validation Findings",
-            headers: ["Category", "Rule", "Source engine", "Finding", "Remediation"],
-            rows: compactRows(V1FindingRows, [["PASSED", "VALIDATION_PASSED_STRICT_READINESS_GATE", "Validation/readiness", "No V1 findings", "Continue engineer review."]]),
+            headers: ["Category", "Class", "Rule", "Source engine", "Finding", "Remediation / classification note"],
+            rows: compactRows(V1FindingRows, [["PASSED", "REVIEW_ITEM", "VALIDATION_PASSED_STRICT_READINESS_GATE", "Validation/readiness", "No V1 findings", "Continue engineer review."]]),
           },
         ],
       });

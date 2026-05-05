@@ -21,6 +21,7 @@ import {
   buildSegmentAddressingPlans,
   buildSiteBlock,
   buildVlanCidr,
+  resolveProjectBaseRangeForRequirements,
 } from "../domain/requirements/apply.js";
 import { consumedRequirementFields } from "../domain/requirements/traceability.js";
 import type {
@@ -213,6 +214,8 @@ export async function materializeRequirementsForProject(
 
   const siteCountCaptured = hasCapturedRequirement(requirements, "siteCount");
   const siteCount = asNumber(requirements.siteCount, 1, 1, 500);
+  const baseRangeResolution = resolveProjectBaseRangeForRequirements(project.basePrivateRange, requirements);
+  const effectiveBasePrivateRange = baseRangeResolution.effectiveBaseRange;
   const existingSites = await tx.site.findMany({
     where: { projectId },
     include: { vlans: true },
@@ -232,6 +235,8 @@ export async function materializeRequirementsForProject(
     "Requirement-derived objects are conservative starting points. They must be reviewed before implementation.",
     `Requirement impact inventory covers ${impactInventory.length} fields and exposes direct/indirect requirement-to-output traceability instead of hiding selections as dead survey text.`,
     `Captured direct-impact requirement fields: ${directImpactCount}.`,
+    `Base range source: ${baseRangeResolution.sourceType}; ${baseRangeResolution.canonicalCidr}; approval=${baseRangeResolution.approvalState}.`,
+    ...baseRangeResolution.notes,
   ];
   let createdSites = 0;
   let updatedSites = 0;
@@ -241,6 +246,7 @@ export async function materializeRequirementsForProject(
   let updatedDhcpScopes = 0;
   let reviewRequiredObjects = 0;
   let blockedImplementationObjects = 0;
+  if (baseRangeResolution.reviewRequired) reviewRequiredObjects += 1;
   const materializedSites: any[] = [...existingSites];
 
   for (let index = 0; index < siteCount; index += 1) {
@@ -253,13 +259,14 @@ export async function materializeRequirementsForProject(
     const defaultAddressBlock =
       existing && !isRequirementManagedSite(existing)
         ? existing.defaultAddressBlock ||
-          buildSiteBlock(project.basePrivateRange, index)
-        : buildSiteBlock(project.basePrivateRange, index);
+          buildSiteBlock(effectiveBasePrivateRange, index)
+        : buildSiteBlock(effectiveBasePrivateRange, index);
     const siteNotes = joinNotes([
       siteCountCaptured
         ? `Requirement materialization: ${siteName} exists because requirements requested ${siteCount} site(s).`
         : `Requirement materialization: ${siteName} is a baseline site placeholder because siteCount was not captured; site count requires review.`,
-      `Source classification: siteCount=${siteCountCaptured ? "USER_PROVIDED" : "REVIEW_REQUIRED"}; implementationBlocked=${siteCountCaptured ? "false" : "true"}.`,
+      `Source classification: siteCount=${siteCountCaptured ? "USER_PROVIDED" : "REVIEW_REQUIRED"}; baseRange=${baseRangeResolution.sourceType}; implementationBlocked=${!siteCountCaptured || baseRangeResolution.reviewRequired ? "true" : "false"}.`,
+      `Base range evidence: ${baseRangeResolution.canonicalCidr}; approval=${baseRangeResolution.approvalState}.`,
       `Site role model: ${asString(requirements.siteRoleModel, "unspecified")}`,
       `Site identity capture: ${asString(requirements.siteIdentityCapture, "unspecified")}`,
       `Layout: ${asString(requirements.siteLayoutModel, "unspecified")}`,
@@ -315,7 +322,7 @@ export async function materializeRequirementsForProject(
       orderBy: { vlanId: "asc" },
     });
     const segmentAddressingPlans = buildSegmentAddressingPlans(
-      project.basePrivateRange,
+      effectiveBasePrivateRange,
       index,
       segments,
       requirements,
@@ -329,7 +336,7 @@ export async function materializeRequirementsForProject(
       );
       const addressing =
         segmentAddressingPlans.get(segment.vlanId) ??
-        buildVlanCidr(project.basePrivateRange, index, segment.vlanId);
+        buildVlanCidr(effectiveBasePrivateRange, index, segment.vlanId);
       if (segment.readinessImpact === "REVIEW") reviewRequiredObjects += 1;
       if (segment.implementationBlocked) blockedImplementationObjects += 1;
       const capacityLine =

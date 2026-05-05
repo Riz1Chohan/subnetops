@@ -266,7 +266,7 @@ export interface RequirementMaterializationOutcome {
   materializationStatus: RequirementMaterializationStatus;
   evidenceObjectIds: string[];
   actualEvidence: string[];
-  sourceType: "USER_PROVIDED" | "DERIVED_FROM_USER_INPUT" | "SYSTEM_ASSUMPTION" | "NOT_CAPTURED" | "REVIEW_REQUIRED";
+  sourceType: "USER_PROVIDED" | "DERIVED_FROM_USER_INPUT" | "SYSTEM_ASSUMPTION" | "SYSTEM_PROPOSED" | "NOT_CAPTURED" | "REVIEW_REQUIRED";
   readinessImpact: "NONE" | "REVIEW" | "BLOCKING";
   implementationBlocked: boolean;
   reviewReason?: string;
@@ -532,6 +532,7 @@ export interface V1StandardsAlignmentRulebookControlSummary {
 
 
 export type V1ValidationReadinessCategory = "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED";
+export type V1ValidationFindingClass = "ROOT_BLOCKER" | "PROPAGATED_BLOCKER" | "DERIVED_IMPACT" | "REVIEW_ITEM";
 
 export type V1ValidationRuleCode =
   | "VALIDATION_REQUIREMENT_PROPAGATION_GAP"
@@ -556,6 +557,11 @@ export type V1ValidationRuleCode =
 export interface V1ValidationFinding {
   id: string;
   category: V1ValidationReadinessCategory;
+  originalCategory?: V1ValidationReadinessCategory;
+  findingClass?: V1ValidationFindingClass;
+  rootCauseKey?: string;
+  rootCauseTitle?: string;
+  deEscalationReason?: string;
   ruleCode: V1ValidationRuleCode;
   title: string;
   detail: string;
@@ -602,6 +608,10 @@ export interface V1ValidationReadinessControlSummary {
   validationGateAllowsImplementation: boolean;
   findingCount: number;
   blockingFindingCount: number;
+  rootBlockerCount?: number;
+  propagatedBlockerCount?: number;
+  derivedImpactCount?: number;
+  reviewItemCount?: number;
   reviewRequiredFindingCount: number;
   warningFindingCount: number;
   infoFindingCount: number;
@@ -612,6 +622,7 @@ export interface V1ValidationReadinessControlSummary {
   coverageRows: V1ValidationCoverageRow[];
   requirementGateRows: V1ValidationRequirementGateRow[];
   findings: V1ValidationFinding[];
+  blockerTaxonomyNotes?: string[];
   notes: string[];
 }
 
@@ -759,6 +770,8 @@ export interface V1RequirementClosureMatrixRow {
   expectedAffectedEngines: string[];
   actualAffectedEngines: string[];
   missingConsumers: string[];
+  reviewOnlyConsumers: string[];
+  explicitNoOpConsumers: string[];
   consumerCoverage: V1RequirementConsumerCoverage;
   evidence: string[];
   reviewReason?: string;
@@ -1203,6 +1216,11 @@ export type DesignGraphNodeObjectType =
 export type DesignGraphRelationship =
   | "site-contains-device"
   | "site-contains-vlan"
+  | "site-owns-route-domain"
+  | "security-zone-belongs-to-route-domain"
+  | "policy-rule-uses-service"
+  | "nat-rule-translates-subnet"
+  | "route-intent-uses-next-hop-object"
   | "vlan-uses-subnet"
   | "device-owns-interface"
   | "interface-uses-subnet"
@@ -1225,6 +1243,7 @@ export type DesignGraphRelationship =
   | "security-zone-initiates-security-flow"
   | "security-flow-targets-security-zone"
   | "security-flow-covered-by-policy"
+  | "security-flow-uses-service"
   | "security-flow-uses-nat-rule"
   | "implementation-stage-contains-step"
   | "implementation-step-targets-object"
@@ -1963,11 +1982,12 @@ export interface ImplementationPlanModel {
 
 export type V1ImplementationReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1ImplementationState = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "DRAFT_ONLY" | "UNSUPPORTED";
+export type V1ImplementationExecutionDisposition = "EXECUTION_READY" | "PLANNING_CANDIDATE" | "REVIEW_REQUIRED" | "STRUCTURAL_BLOCKER";
 export interface V1ImplementationStageGateRow { stageId: string; stageName: string; stageType: ImplementationPlanStageType; sequence: number; stepIds: string[]; readyStepIds: string[]; reviewStepIds: string[]; blockedStepIds: string[]; exitCriteria: string[]; readinessImpact: V1ImplementationReadiness; blockers: string[]; evidence: string[]; notes: string[]; }
-export interface V1ImplementationStepGateRow { stepId: string; title: string; stageId: string; category: ImplementationPlanStepCategory; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; sourceObjectIds: string[]; sourceRequirementIds: string[]; sourceTruthState?: NetworkObjectTruthState; preconditions: string[]; operatorAction: string; verificationEvidence: string[]; rollbackStep: string; riskLevel: ImplementationPlanStep["riskLevel"]; dependencyStepIds: string[]; blockingDependencyIds: string[]; readinessState: V1ImplementationState; readinessImpact: V1ImplementationReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+export interface V1ImplementationStepGateRow { stepId: string; title: string; stageId: string; category: ImplementationPlanStepCategory; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; sourceObjectIds: string[]; sourceRequirementIds: string[]; sourceTruthState?: NetworkObjectTruthState; preconditions: string[]; operatorAction: string; verificationEvidence: string[]; rollbackStep: string; riskLevel: ImplementationPlanStep["riskLevel"]; dependencyStepIds: string[]; blockingDependencyIds: string[]; readinessState: V1ImplementationState; readinessImpact: V1ImplementationReadiness; executionDisposition: V1ImplementationExecutionDisposition; structuralBlocker: boolean; evidence: string[]; reviewReason?: string; notes: string[]; }
 export interface V1ImplementationDependencyGateRow { dependencyId: string; sourceStepId?: string; targetStepId?: string; sourceObjectId?: string; targetObjectId?: string; relationship: ImplementationDependencyGraphEdge["relationship"]; required: boolean; readinessImpact: V1ImplementationReadiness; evidence: string[]; notes: string[]; }
 export interface V1ImplementationFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedStepIds: string[]; readinessImpact: V1ImplementationReadiness; remediation: string; }
-export interface V1ImplementationPlanningControlSummary { contract: "V1_IMPLEMENTATION_PLANNING_CONTRACT"; role: "VERIFIED_SOURCE_OBJECT_GATED_IMPLEMENTATION_PLAN_NOT_VENDOR_CONFIG"; overallReadiness: V1ImplementationReadiness; stageGateCount: number; stepGateCount: number; readyStepGateCount: number; reviewStepGateCount: number; blockedStepGateCount: number; highRiskStepCount: number; highRiskStepWithSafetyGateCount: number; dependencyGateCount: number; graphBackedDependencyCount: number; verificationEvidenceGateCount: number; rollbackGateCount: number; requirementLineageGapCount: number; sourceObjectGapCount: number; blockedFindingCount: number; reviewFindingCount: number; findingCount: number; implementationReadiness: ImplementationPlanSummary["implementationReadiness"]; stageGates: V1ImplementationStageGateRow[]; stepGates: V1ImplementationStepGateRow[]; dependencyGates: V1ImplementationDependencyGateRow[]; findings: V1ImplementationFinding[]; notes: string[]; }
+export interface V1ImplementationPlanningControlSummary { contract: "V1_IMPLEMENTATION_PLANNING_CONTRACT"; role: "VERIFIED_SOURCE_OBJECT_GATED_IMPLEMENTATION_PLAN_NOT_VENDOR_CONFIG"; overallReadiness: V1ImplementationReadiness; stageGateCount: number; stepGateCount: number; readyStepGateCount: number; reviewStepGateCount: number; blockedStepGateCount: number; planningCandidateStepCount: number; executionReadyStepCount: number; structuralBlockedStepCount: number; highRiskStepCount: number; highRiskStepWithSafetyGateCount: number; dependencyGateCount: number; graphBackedDependencyCount: number; verificationEvidenceGateCount: number; rollbackGateCount: number; requirementLineageGapCount: number; sourceObjectGapCount: number; blockedFindingCount: number; reviewFindingCount: number; findingCount: number; implementationReadiness: ImplementationPlanSummary["implementationReadiness"]; stageGates: V1ImplementationStageGateRow[]; stepGates: V1ImplementationStepGateRow[]; dependencyGates: V1ImplementationDependencyGateRow[]; findings: V1ImplementationFinding[]; notes: string[]; }
 
 export type VendorNeutralImplementationTemplateReadiness = "ready" | "review" | "blocked";
 
@@ -2518,8 +2538,12 @@ export interface DesignCoreSnapshot {
   };
   organizationBlock?: {
     sourceValue?: string | null;
+    effectiveSourceValue?: string | null;
     canonicalCidr?: string;
     validationState: "valid" | "invalid" | "missing";
+    sourceType?: "USER_PROVIDED" | "DERIVED_FROM_USER_INPUT" | "SYSTEM_ASSUMPTION" | "SYSTEM_PROPOSED" | "NOT_CAPTURED" | "REVIEW_REQUIRED";
+    approvalState?: "USER_CONFIRMED" | "SYSTEM_PROPOSED_REVIEW_REQUIRED";
+    reviewRequired?: boolean;
     prefix?: number;
     networkAddress?: string;
     broadcastAddress?: string;

@@ -52,6 +52,27 @@ interface ValidationNarrative {
   recommendation: string;
 }
 
+
+function severityForV1ValidationFinding(finding: { category?: string; findingClass?: string }): ValidationSeverity {
+  if (finding.category === "BLOCKING" && finding.findingClass === "ROOT_BLOCKER") return "ERROR";
+  if (finding.category === "BLOCKING" && !finding.findingClass) return "ERROR";
+  return "WARNING";
+}
+
+function ruleCodeForV1ValidationFinding(finding: { category?: string; findingClass?: string }): string {
+  if (finding.category === "BLOCKING" && finding.findingClass === "ROOT_BLOCKER") return "V1_STRICT_READINESS_ROOT_BLOCKER";
+  if (finding.findingClass === "PROPAGATED_BLOCKER") return "V1_STRICT_READINESS_PROPAGATED_BLOCKER";
+  if (finding.findingClass === "DERIVED_IMPACT") return "V1_STRICT_READINESS_DERIVED_IMPACT";
+  if (finding.category === "REVIEW_REQUIRED") return "V1_STRICT_READINESS_REVIEW_REQUIRED";
+  return "V1_STRICT_READINESS_WARNING";
+}
+
+function downstreamSurfaceSeverity(surface: "implementation" | "template" | "report" | "diagram" | "platform" | "discovery" | "ai" | "finalProof", severity: string): ValidationSeverity {
+  // These surfaces are consumers of upstream truth. A generated greenfield plan may keep them blocked/review-gated,
+  // but they should not become extra root ERROR rows unless the upstream authority has already emitted a root blocker.
+  return severity === "INFO" || severity === "PASSED" ? "INFO" : "WARNING";
+}
+
 const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>> = {
   REQ_SITE_COUNT_NOT_MATERIALIZED: {
     impact: "The requirements stage captured site scope, but the engineering model has no site objects, so addressing, WAN, diagram, and report outputs are not trustworthy.",
@@ -1117,12 +1138,13 @@ export async function runValidation(projectId: string) {
   if (designSnapshot?.V1ValidationReadiness) {
     const V1 = designSnapshot.V1ValidationReadiness;
     for (const finding of V1.findings.filter((item) => item.category !== "PASSED" && item.category !== "INFO")) {
+      const severity = severityForV1ValidationFinding(finding);
       results.push(makeItem({
         projectId,
-        severity: finding.category === "BLOCKING" ? "ERROR" : "WARNING",
-        ruleCode: finding.category === "BLOCKING" ? "V1_STRICT_READINESS_BLOCKING" : finding.category === "REVIEW_REQUIRED" ? "V1_STRICT_READINESS_REVIEW_REQUIRED" : "V1_STRICT_READINESS_WARNING",
+        severity,
+        ruleCode: ruleCodeForV1ValidationFinding(finding),
         title: finding.title,
-        message: `${finding.detail} Source: ${finding.sourceEngine}. Remediation: ${finding.remediation}`,
+        message: `${finding.detail} Source: ${finding.sourceEngine}. Class: ${finding.findingClass ?? "UNCLASSIFIED"}. ${finding.deEscalationReason ? `Classification note: ${finding.deEscalationReason}. ` : ""}Remediation: ${finding.remediation}`,
         entityType: "PROJECT",
         entityId: projectId,
       }));
@@ -1156,38 +1178,38 @@ export async function runValidation(projectId: string) {
 
   if (designSnapshot?.V1ImplementationPlanning) {
     for (const finding of designSnapshot.V1ImplementationPlanning.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_IMPLEMENTATION_PLANNING_BLOCKING" : "V1_IMPLEMENTATION_PLANNING_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("implementation", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_IMPLEMENTATION_PLANNING_PROPAGATED_BLOCKER" : "V1_IMPLEMENTATION_PLANNING_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   if (designSnapshot?.V1ImplementationTemplates) {
     for (const finding of designSnapshot.V1ImplementationTemplates.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_VENDOR_NEUTRAL_TEMPLATE_BLOCKING" : "V1_VENDOR_NEUTRAL_TEMPLATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("template", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_VENDOR_NEUTRAL_TEMPLATE_PROPAGATED_BLOCKER" : "V1_VENDOR_NEUTRAL_TEMPLATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   if (designSnapshot?.V1ReportExportTruth) {
     for (const finding of designSnapshot.V1ReportExportTruth.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_REPORT_EXPORT_TRUTH_BLOCKING" : "V1_REPORT_EXPORT_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("report", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_REPORT_EXPORT_TRUTH_PROPAGATED_BLOCKER" : "V1_REPORT_EXPORT_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   if (designSnapshot?.V1DiagramTruth) {
     for (const finding of designSnapshot.V1DiagramTruth.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_DIAGRAM_TRUTH_BLOCKING" : "V1_DIAGRAM_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("diagram", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_DIAGRAM_TRUTH_PROPAGATED_BLOCKER" : "V1_DIAGRAM_TRUTH_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   if (designSnapshot?.V1PlatformBomFoundation) {
     for (const finding of designSnapshot.V1PlatformBomFoundation.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_PLATFORM_BOM_BLOCKING" : "V1_PLATFORM_BOM_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("platform", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_PLATFORM_BOM_PROPAGATED_BLOCKER" : "V1_PLATFORM_BOM_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   // V1_DISCOVERY_CURRENT_STATE_CONTRACT: discovery/current-state must stay manual/imported/validated/review-labelled.
   if (designSnapshot?.V1DiscoveryCurrentState) {
     for (const finding of designSnapshot.V1DiscoveryCurrentState.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_DISCOVERY_CURRENT_STATE_BLOCKING" : "V1_DISCOVERY_CURRENT_STATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("discovery", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_DISCOVERY_CURRENT_STATE_PROPAGATED_BLOCKER" : "V1_DISCOVERY_CURRENT_STATE_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
@@ -1195,14 +1217,14 @@ export async function runValidation(projectId: string) {
   // V1_AI_DRAFT_HELPER_CONTRACT: AI output is draft-only; applied AI objects stay review-required and not authoritative.
   if (designSnapshot?.V1AiDraftHelper) {
     for (const finding of designSnapshot.V1AiDraftHelper.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_AI_DRAFT_BLOCKING" : "V1_AI_DRAFT_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("ai", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_AI_DRAFT_PROPAGATED_BLOCKER" : "V1_AI_DRAFT_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 
   // V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT: final proof pass must expose blocked/review gates and scenario failures.
   if (designSnapshot?.V1FinalProofPass) {
     for (const finding of designSnapshot.V1FinalProofPass.findings.filter((item) => item.severity !== "PASSED" && item.severity !== "INFO")) {
-      results.push(makeItem({ projectId, severity: finding.severity === "BLOCKING" ? "ERROR" : "WARNING", ruleCode: finding.severity === "BLOCKING" ? "V1_FINAL_PROOF_BLOCKING" : "V1_FINAL_PROOF_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
+      results.push(makeItem({ projectId, severity: downstreamSurfaceSeverity("finalProof", finding.severity), ruleCode: finding.severity === "BLOCKING" ? "V1_FINAL_PROOF_PROPAGATED_BLOCKER" : "V1_FINAL_PROOF_REVIEW_REQUIRED", title: finding.title, message: `${finding.detail} Remediation: ${finding.remediation}`, entityType: "PROJECT", entityId: projectId }));
     }
   }
 

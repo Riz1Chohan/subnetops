@@ -181,6 +181,25 @@ export function buildBackendDesignGraph(params: {
   const linkNodeByLinkId = new Map<string, string>();
   const routeDomainNodeByRouteDomainId = new Map<string, string>();
   const securityZoneNodeByZoneId = new Map<string, string>();
+  const securityServiceNodeByName = new Map<string, string>();
+
+  function ensureSecurityServiceNode(serviceName: string, truthState: NetworkObjectTruthState = "proposed", notes: string[] = []) {
+    const normalizedName = String(serviceName || "any").trim() || "any";
+    const key = normalizedName.toLowerCase();
+    const existingNodeId = securityServiceNodeByName.get(key);
+    if (existingNodeId) return existingNodeId;
+
+    const serviceNode = addNode(nodesById, {
+      id: objectNodeId("security-service", `security-service:${normalizedName}`),
+      objectType: "security-service",
+      objectId: `security-service:${normalizedName}`,
+      label: normalizedName,
+      truthState,
+      notes: notes.length > 0 ? notes : [`Service ${normalizedName} was referenced by wizard-generated security policy evidence.`],
+    });
+    securityServiceNodeByName.set(key, serviceNode.id);
+    return serviceNode.id;
+  }
 
   for (const site of project.sites) {
     addNode(nodesById, {
@@ -284,7 +303,7 @@ export function buildBackendDesignGraph(params: {
     }
 
     for (const serviceObject of params.securityPolicyFlow.serviceObjects) {
-      addNode(nodesById, {
+      const serviceNode = addNode(nodesById, {
         id: objectNodeId("security-service", serviceObject.id),
         objectType: "security-service",
         objectId: serviceObject.id,
@@ -292,6 +311,7 @@ export function buildBackendDesignGraph(params: {
         truthState: "proposed",
         notes: serviceObject.notes,
       });
+      securityServiceNodeByName.set(serviceObject.name.toLowerCase(), serviceNode.id);
     }
 
     for (const flowRequirement of params.securityPolicyFlow.flowRequirements) {
@@ -333,6 +353,19 @@ export function buildBackendDesignGraph(params: {
         affectedObjectIds: [flowRequirement.id, flowRequirement.destinationZoneId],
         remediation: "Attach every security flow requirement to a valid destination zone.",
       });
+
+      for (const serviceName of flowRequirement.serviceNames) {
+        const serviceNodeId = securityServiceNodeByName.get(String(serviceName).toLowerCase());
+        if (!serviceNodeId) continue;
+        addEdge(edgesById, {
+          relationship: "security-flow-uses-service",
+          sourceNodeId: flowNode.id,
+          targetNodeId: serviceNodeId,
+          truthState: flowRequirement.truthState,
+          required: false,
+          notes: [`Security flow references service ${serviceName}.`],
+        });
+      }
 
       for (const policyRuleId of flowRequirement.matchedPolicyRuleIds) {
         addRequiredRelationship({
@@ -380,6 +413,23 @@ export function buildBackendDesignGraph(params: {
       notes: routeDomain.notes,
     });
     routeDomainNodeByRouteDomainId.set(routeDomain.id, node.id);
+
+    for (const siteId of routeDomain.siteIds) {
+      addRequiredRelationship({
+        edgesById,
+        findings,
+        relationship: "site-owns-route-domain",
+        sourceNodeId: nodeExists(nodesById, siteNodeId(siteId)) ? siteNodeId(siteId) : undefined,
+        targetNodeId: node.id,
+        truthState: routeDomain.truthState,
+        notes: [`Site ${siteId} owns route-domain/VRF evidence ${routeDomain.name}.`],
+        missingRelationshipCode: "DESIGN_GRAPH_ROUTE_DOMAIN_SITE_MISSING",
+        missingRelationshipTitle: "Route domain references a missing site",
+        missingRelationshipDetail: `${routeDomain.name} references site ${siteId}, but that site is not present in the saved project record.`,
+        affectedObjectIds: [routeDomain.id, siteId],
+        remediation: "Attach every site-scoped route domain to a saved site or mark it as project-scoped review evidence.",
+      });
+    }
 
     for (const subnetCidr of routeDomain.subnetCidrs) {
       const subnetNode = addNode(nodesById, {
@@ -440,6 +490,15 @@ export function buildBackendDesignGraph(params: {
         detail: `${zone.name} references route domain ${zone.routeDomainId}, but that route domain is not present in the object model.`,
         affectedObjectIds: [zone.id, zone.routeDomainId],
         remediation: "Attach every security zone to a valid route domain before using the design graph for implementation planning.",
+      });
+    } else {
+      addEdge(edgesById, {
+        relationship: "security-zone-belongs-to-route-domain",
+        sourceNodeId: node.id,
+        targetNodeId: routeDomainNodeId,
+        truthState: zone.truthState,
+        required: true,
+        notes: ["Security zone is scoped to this route domain / VRF boundary."],
       });
     }
   }
@@ -663,6 +722,19 @@ export function buildBackendDesignGraph(params: {
       truthState: rule.truthState,
       notes: rule.notes,
     });
+
+    for (const serviceName of rule.services) {
+      const serviceNodeId = ensureSecurityServiceNode(String(serviceName), rule.truthState, [`Policy rule ${rule.name} references service ${serviceName}.`]);
+      addEdge(edgesById, {
+        relationship: "policy-rule-uses-service",
+        sourceNodeId: node.id,
+        targetNodeId: serviceNodeId,
+        truthState: rule.truthState,
+        required: false,
+        notes: [`Policy rule ${rule.name} is scoped to service ${serviceName}.`],
+      });
+    }
+
     addRequiredRelationship({
       edgesById,
       findings,
@@ -732,6 +804,25 @@ export function buildBackendDesignGraph(params: {
         missingRelationshipDetail: `${natRule.name} references destination zone ${natRule.destinationZoneId}, but that zone is not present.`,
         affectedObjectIds: [natRule.id, natRule.destinationZoneId],
         remediation: "Attach every NAT destination to a valid zone or leave it explicitly unset for a review-only NAT posture.",
+      });
+    }
+
+    for (const subnetCidr of natRule.sourceSubnetCidrs) {
+      const subnetNode = addNode(nodesById, {
+        id: subnetNodeId(subnetCidr),
+        objectType: "subnet",
+        objectId: subnetCidr,
+        label: subnetCidr,
+        truthState: natRule.truthState,
+        notes: [`Subnet translated by NAT rule ${natRule.name}.`],
+      });
+      addEdge(edgesById, {
+        relationship: "nat-rule-translates-subnet",
+        sourceNodeId: node.id,
+        targetNodeId: subnetNode.id,
+        truthState: natRule.truthState,
+        required: false,
+        notes: ["NAT rule explicitly references this source subnet."],
       });
     }
   }
@@ -888,6 +979,24 @@ export function buildBackendDesignGraph(params: {
           affectedObjectIds: [routeIntent.id, routeIntent.nextHopObjectId],
           remediation: "Attach connected route intents to existing routed interfaces.",
         });
+      }
+
+      if (routeIntent.nextHopObjectId) {
+        const nextHopNodeId = interfaceNodeByInterfaceId.get(routeIntent.nextHopObjectId)
+          ?? deviceNodeByDeviceId.get(routeIntent.nextHopObjectId)
+          ?? linkNodeByLinkId.get(routeIntent.nextHopObjectId)
+          ?? securityZoneNodeByZoneId.get(routeIntent.nextHopObjectId)
+          ?? routeDomainNodeByRouteDomainId.get(routeIntent.nextHopObjectId);
+        if (nextHopNodeId && nextHopNodeId !== routeIntentNode.id) {
+          addEdge(edgesById, {
+            relationship: "route-intent-uses-next-hop-object",
+            sourceNodeId: routeIntentNode.id,
+            targetNodeId: nextHopNodeId,
+            truthState: routeIntent.truthState,
+            required: false,
+            notes: [`Route intent next-hop type ${routeIntent.nextHopType} resolves to backend object ${routeIntent.nextHopObjectId}.`],
+          });
+        }
       }
     }
 

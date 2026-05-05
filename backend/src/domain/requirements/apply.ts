@@ -3,6 +3,7 @@ import {
   type GatewayConvention,
 } from "../addressing/allocation-fit.js";
 import {
+  canonicalCidr,
   parseCidr,
   recommendedCapacityPlanForHosts,
 } from "../addressing/cidr.js";
@@ -644,6 +645,66 @@ export function buildRequirementSegments(requirements: RequirementsInput) {
   }
 
   return segments.sort((left, right) => left.vlanId - right.vlanId);
+}
+
+export type ProjectBaseRangeResolution = {
+  effectiveBaseRange: string;
+  sourceValue?: string | null;
+  canonicalCidr: string;
+  sourceType: RequirementSourceType;
+  approvalState: "USER_CONFIRMED" | "SYSTEM_PROPOSED_REVIEW_REQUIRED";
+  reviewRequired: boolean;
+  notes: string[];
+};
+
+export function proposedProjectBaseRangeForSiteCount(siteCount?: number | null) {
+  const count = Math.max(1, Math.min(500, Math.floor(siteCount ?? 1)));
+  if (count <= 1) return "10.60.0.0/16";
+  if (count <= 2) return "10.60.0.0/15";
+  if (count <= 4) return "10.60.0.0/14";
+  return "10.0.0.0/8";
+}
+
+function canonicalBaseRangeOrOriginal(value: string) {
+  try {
+    return canonicalCidr(value);
+  } catch {
+    return value;
+  }
+}
+
+export function resolveProjectBaseRangeForRequirements(
+  projectBaseRange: string | null | undefined,
+  requirements?: RequirementsInput | null,
+): ProjectBaseRangeResolution {
+  const siteCount = asNumber(requirements?.siteCount, 1, 1, 500);
+  const sourceValue = typeof projectBaseRange === "string" && projectBaseRange.trim() ? projectBaseRange.trim() : undefined;
+  if (sourceValue) {
+    const canonical = canonicalBaseRangeOrOriginal(sourceValue);
+    return {
+      effectiveBaseRange: canonical,
+      sourceValue,
+      canonicalCidr: canonical,
+      sourceType: "USER_PROVIDED",
+      approvalState: "USER_CONFIRMED",
+      reviewRequired: false,
+      notes: [`Project base private range was provided: ${canonical}.`],
+    };
+  }
+
+  const proposed = proposedProjectBaseRangeForSiteCount(siteCount);
+  return {
+    effectiveBaseRange: proposed,
+    sourceValue: null,
+    canonicalCidr: proposed,
+    sourceType: "SYSTEM_PROPOSED",
+    approvalState: "SYSTEM_PROPOSED_REVIEW_REQUIRED",
+    reviewRequired: true,
+    notes: [
+      `No project base private range was saved; SubnetOps proposed ${proposed} as a greenfield planning parent for ${siteCount} site(s).`,
+      "This is not user-approved IPAM authority and remains review-required until confirmed or replaced.",
+    ],
+  };
 }
 
 export function parseProjectBaseSecondOctet(basePrivateRange?: string | null) {

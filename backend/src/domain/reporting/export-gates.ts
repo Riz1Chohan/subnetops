@@ -58,12 +58,34 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function replacementForForbiddenClaim(phrase: string): string {
+  if (phrase === "validated") return "review-gated";
+  if (phrase === "complete") return "evidence-incomplete";
+  if (phrase === "ready for deployment") return "deployment-gated";
+  if (phrase === "production-ready") return "production-gated";
+  if (phrase === "implementation-ready") return "implementation-gated";
+  if (phrase === "best practice compliant") return "standards-review-gated";
+  return "review-gated";
+}
+
+function isAlreadyNegated(prefix: string): boolean {
+  return /(?:\bnot|\bno|\bwithout|\bcannot|\bmust not|\bdoes not|\bdo not)\s+(?:currently\s+|yet\s+|claim\s+|claiming\s+|be\s+|become\s+|treat(?:ed)?\s+as\s+)?$/i.test(prefix.slice(-48));
+}
+
 export function rewriteForbiddenReportClaim(text: string, canClaimReady: boolean): string {
   if (canClaimReady) return text;
   let output = text;
   for (const phrase of FORBIDDEN_CLEAN_CLAIMS) {
     const pattern = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "gi");
-    output = output.replace(pattern, phrase === "validated" ? "review-gated" : phrase === "complete" ? "evidence-incomplete" : "not implementation-ready");
+    output = output.replace(pattern, (match, offset: number, fullText: string) => {
+      const prefix = String(fullText).slice(0, offset);
+      return isAlreadyNegated(prefix) ? match : replacementForForbiddenClaim(phrase);
+    });
   }
-  return output;
+  return output
+    .replace(/\bnot\s+not\s+implementation-ready\b/gi, "not implementation-ready")
+    .replace(/\bnot\s+implementation-gated\b/gi, "not implementation-ready")
+    .replace(/\bnot\s+deployment-gated\b/gi, "not ready for deployment")
+    .replace(/\bnot\s+production-gated\b/gi, "not production-ready")
+    .replace(/\bnot\s+standards-review-gated\b/gi, "not best-practice-compliant");
 }

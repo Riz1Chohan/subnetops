@@ -27,6 +27,13 @@ const requiredScripts = [
   'scripts/check-readiness-ladder-enforcement.cjs',
   'scripts/check-api-service-database-integration-proof.cjs',
   'scripts/check-readme-proof-map.cjs',
+  'scripts/check-wizard-blocker-taxonomy.cjs',
+  'scripts/check-wizard-base-range-source-truth.cjs',
+  'scripts/check-requirement-consumer-closure-registry.cjs',
+  'scripts/check-security-policy-matrix-completion.cjs',
+  'scripts/check-wizard-implementation-stage-gating.cjs',
+  'scripts/check-wizard-design-graph-lineage-completion.cjs',
+  'scripts/check-report-professional-compression.cjs',
 ];
 
 const packageJson = JSON.parse(read('package.json'));
@@ -67,5 +74,16 @@ assert(readme.includes('Regression kill-switch checks'), 'README must document r
 assert(readme.includes('V1_README_PROOF_MAP'), 'README must document the consolidated proof map');
 assert(readme.includes('check-no-frontend-engineering-facts.cjs'), 'README must document frontend engineering-facts guard');
 assert(readme.includes('check-no-diagram-clean-inference.cjs'), 'README must document diagram clean-inference guard');
+assert(readme.includes('check-wizard-base-range-source-truth.cjs'), 'README must document wizard base-range source-truth guard');
+assert(readme.includes('Requirement-consumer closure registry'), 'README must document requirement-consumer closure registry');
+assert(readme.includes('check-requirement-consumer-closure-registry.cjs'), 'README must document requirement-consumer closure registry guard');
+assert(readme.includes('Security-policy matrix completion'), 'README must document security-policy matrix completion');
+assert(readme.includes('check-security-policy-matrix-completion.cjs'), 'README must document security-policy matrix completion guard');
+assert(readme.includes('Wizard implementation stage gating'), 'README must document wizard implementation stage gating');
+assert(readme.includes('check-wizard-implementation-stage-gating.cjs'), 'README must document wizard implementation stage-gating guard');
+assert(readme.includes('Wizard design-graph lineage completion'), 'README must document wizard design-graph lineage completion');
+assert(readme.includes('check-wizard-design-graph-lineage-completion.cjs'), 'README must document wizard design-graph lineage guard');
+assert(readme.includes('Report professional compression'), 'README must document report professional compression');
+assert(readme.includes('check-report-professional-compression.cjs'), 'README must document report professional compression guard');
 
 console.log('[regression-kill-switches] ok');
