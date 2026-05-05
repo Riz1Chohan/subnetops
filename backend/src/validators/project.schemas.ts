@@ -1,26 +1,46 @@
 import { z } from "zod";
+import {
+  normalizeProjectBasePrivateRange,
+  validateProjectBasePrivateRange,
+} from "../domain/addressing/addressing-validation.js";
+
+const optionalText = (max: number) => z.string().max(max).optional();
+
+export const projectBasePrivateRangeSchema = z.preprocess(
+  (value) => normalizeProjectBasePrivateRange(value),
+  z.string().max(50).nullable().optional(),
+).superRefine((value, ctx) => {
+  const validation = validateProjectBasePrivateRange(value);
+  for (const issue of validation.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [],
+      message: issue.message,
+    });
+  }
+});
 
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
-  description: z.string().max(4000).optional(),
-  organizationName: z.string().max(100).optional(),
+  description: optionalText(4000),
+  organizationName: optionalText(100),
   organizationId: z.string().uuid().optional().or(z.literal("")),
-  environmentType: z.string().max(50).optional(),
-  basePrivateRange: z.string().max(50).optional(),
+  environmentType: optionalText(50),
+  basePrivateRange: projectBasePrivateRangeSchema,
   logoUrl: z.string().url().max(500).optional().or(z.literal("")),
-  reportHeader: z.string().max(120).optional(),
-  reportFooter: z.string().max(160).optional(),
+  reportHeader: optionalText(120),
+  reportFooter: optionalText(160),
   approvalStatus: z.enum(["DRAFT", "IN_REVIEW", "APPROVED"]).optional(),
-  reviewerNotes: z.string().max(1200).optional(),
-  requirementsJson: z.string().max(50000).optional(),
-  discoveryJson: z.string().max(50000).optional(),
-  platformProfileJson: z.string().max(50000).optional(),
+  reviewerNotes: optionalText(1200),
+  requirementsJson: optionalText(50000),
+  discoveryJson: optionalText(50000),
+  platformProfileJson: optionalText(50000),
 });
 
 export const updateProjectSchema = createProjectSchema.partial();
 
 export const saveProjectRequirementsSchema = z.object({
   requirementsJson: z.string().min(2).max(50000),
-  environmentType: z.string().max(50).optional(),
-  description: z.string().max(4000).optional(),
+  environmentType: optionalText(50),
+  description: optionalText(4000),
 });

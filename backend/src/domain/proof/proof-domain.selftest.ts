@@ -5,6 +5,7 @@ import {
   V1_PROOF_ROLE,
   V1_RELEASE_TARGET,
   type V1ProofContext,
+  type V1ScenarioExecutionResult,
 } from "./index.js";
 
 const contracts = [
@@ -29,6 +30,46 @@ const contracts = [
   ["V1AiDraftHelper", "V1_AI_DRAFT_HELPER_CONTRACT"],
 ] as const;
 
+const scenarioIds = [
+  "clean-small-branch-network",
+  "multi-site-enterprise",
+  "missing-capacity-input",
+  "invalid-gateway",
+  "invalid-cidr",
+  "overlapping-subnet",
+  "partial-vlan-update",
+  "routing-required-missing-wan-intent",
+  "security-policy-review-required",
+  "diagram-omitted-evidence",
+  "report-blocked-unresolved-review-item",
+  "read-repair-materialization",
+  "project-reload-after-saved-requirements",
+];
+
+function scenarioExecutionResults(reviewScenarioId?: string, failedScenarioId?: string): V1ScenarioExecutionResult[] {
+  return scenarioIds.map((scenarioId) => ({
+    scenarioId,
+    scenarioName: scenarioId.replace(/-/g, " "),
+    scenarioCategory: scenarioId,
+    inputFixture: { scenarioId, source: "proof-domain-selftest-fixture" },
+    executedAt: "2026-01-01T00:00:00.000Z",
+    snapshotResult: { overallReadiness: failedScenarioId === scenarioId ? "blocked" : reviewScenarioId === scenarioId ? "review" : "ready" },
+    assertions: [
+      {
+        assertionId: `${scenarioId}:executed`,
+        description: "Scenario execution result must come from a completed scenario run.",
+        expected: "PASS",
+        actual: failedScenarioId === scenarioId ? "FAIL" : reviewScenarioId === scenarioId ? "REVIEW" : "PASS",
+        status: failedScenarioId === scenarioId ? "FAIL" : reviewScenarioId === scenarioId ? "REVIEW" : "PASS",
+      },
+    ],
+    affectedEngines: ["scenario-matrix", "design-core", "validation", "report-export", "diagram-truth"],
+    reportEvidence: [`report=${scenarioId}`],
+    diagramEvidence: [`diagram=${scenarioId}`],
+    validationEvidence: [`validation=${scenarioId}`],
+  }));
+}
+
 function readyContext(): V1ProofContext {
   const context: V1ProofContext = {
     projectName: "V1 Proof Project",
@@ -37,6 +78,7 @@ function readyContext(): V1ProofContext {
     issueCount: 0,
     reportTruth: { overallReadiness: "READY", blockedFindingCount: 0 },
     diagramTruth: { overallReadiness: "READY", renderModel: { nodes: [] } },
+    scenarioExecutionResults: scenarioExecutionResults(),
   };
   for (const [key, contract] of contracts) {
     context[key] = { contract, contractVersion: contract, overallReadiness: "READY", findingCount: 0, blockingFindingCount: 0 };
@@ -49,19 +91,26 @@ assert.equal(ready.contract, V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT);
 assert.equal(ready.role, V1_PROOF_ROLE);
 assert.equal(ready.releaseTarget, V1_RELEASE_TARGET);
 assert.equal(ready.engineProofCount, 19);
-assert.equal(ready.scenarioCount, 12);
+assert.equal(ready.scenarioCount, scenarioIds.length);
+assert.equal(ready.scenarioExecutionResultCount, scenarioIds.length);
 assert.equal(ready.gateCount, 8);
 assert.equal(ready.overallReadiness, "PROOF_READY");
 assert.ok(ready.releaseGates.some((gate) => gate.gateKey === "no-a-plus-overclaim" && gate.state === "PASSED"));
+assert.ok(ready.scenarioRows.every((row) => row.executedAt && row.assertionCount > 0));
 assert.ok(ready.scenarioRows.every((row) => row.expectedProofChain.includes("test/golden scenario proof")));
 assert.ok(ready.findings.some((finding) => finding.code === "V1_FINAL_PROOF_CONTROLLED"));
+
+const scenarioReviewContext = readyContext();
+scenarioReviewContext.scenarioExecutionResults = scenarioExecutionResults("missing-capacity-input");
+const scenarioReview = buildV1FinalProofPassControl(scenarioReviewContext);
+assert.equal(scenarioReview.overallReadiness, "REVIEW_REQUIRED");
+assert.ok(scenarioReview.scenarioRows.some((row) => row.scenarioKey === "missing-capacity-input" && row.readinessImpact === "REVIEW_REQUIRED"));
 
 const reviewContext = readyContext();
 reviewContext.V1DiscoveryCurrentState = { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT", overallReadiness: "REVIEW_REQUIRED", findingCount: 1 };
 const review = buildV1FinalProofPassControl(reviewContext);
 assert.equal(review.overallReadiness, "REVIEW_REQUIRED");
 assert.ok(review.findings.some((finding) => finding.code === "V1_REVIEW_REQUIRED_LIMITATIONS"));
-assert.ok(review.scenarioRows.some((row) => row.scenarioKey === "brownfield-migration" && row.readinessImpact === "REVIEW_REQUIRED"));
 
 const blockedContext = readyContext();
 delete blockedContext.V1ValidationReadiness;
@@ -69,5 +118,11 @@ const blocked = buildV1FinalProofPassControl(blockedContext);
 assert.equal(blocked.overallReadiness, "BLOCKED");
 assert.ok(blocked.engineProofRows.some((row) => row.engineKey === "V1ValidationReadiness" && row.status === "MISSING"));
 assert.ok(blocked.findings.some((finding) => finding.code === "V1_ENGINE_CONTRACT_GAP"));
+
+const missingExecutionContext = readyContext();
+delete missingExecutionContext.scenarioExecutionResults;
+const missingExecution = buildV1FinalProofPassControl(missingExecutionContext);
+assert.equal(missingExecution.overallReadiness, "BLOCKED");
+assert.ok(missingExecution.scenarioRows.some((row) => row.scenarioKey === "scenario-execution-missing" && row.readinessImpact === "BLOCKED"));
 
 console.log("[V1] proof domain selftest passed");

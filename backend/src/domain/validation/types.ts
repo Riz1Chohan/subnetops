@@ -17,6 +17,7 @@ export type ValidationCategory =
   | string;
 
 export type ValidationReadinessState = 'ready' | 'ready_with_warnings' | 'needs_review' | 'blocked' | 'incomplete';
+export type ValidationReadinessLadderState = 'BLOCKED' | 'REVIEW_REQUIRED' | 'DRAFT' | 'PLANNING_READY' | 'IMPLEMENTATION_READY';
 export type ValidationReadinessLabel = 'Ready' | 'Ready with warnings' | 'Needs review' | 'Blocked' | 'Incomplete';
 export type LegacyValidationCategory = 'BLOCKING' | 'REVIEW_REQUIRED' | 'WARNING' | 'INFO' | 'PASSED';
 
@@ -80,6 +81,7 @@ export interface ValidationReadinessSummary {
   label: ValidationReadinessLabel;
   score: number;
   implementationGateAllows: boolean;
+  readinessLadder: ValidationReadinessLadderState;
   findingCount: number;
   openFindingCount: number;
   acceptedRiskCount: number;

@@ -7,6 +7,7 @@ import { assertRequirementsRuntimeProofPass, buildRequirementsRuntimeProof, REQU
 import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
 import { recordSecurityAuditEvent } from "./securityAudit.service.js";
+import { assertGeneratedProjectBasePrivateRangeWritable, assertGeneratedSiteAddressingWritable, assertGeneratedVlanAddressingWritable, buildProjectWriteCandidate } from "./engineeringWritePaths.js";
 
 type TemplateKey = "small-office" | "branch-office" | "clinic-starter";
 
@@ -126,6 +127,19 @@ async function enforceProjectLimit(userId: string, planTier: PlanTier) {
   }
 }
 
+
+function normalizeProjectDataForWrite(existing: { basePrivateRange?: unknown }, patch: Record<string, unknown>) {
+  const candidate = buildProjectWriteCandidate(existing, patch);
+  const normalized: Record<string, unknown> = { ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, "basePrivateRange")) {
+    normalized.basePrivateRange = candidate.basePrivateRange;
+  }
+  for (const key of Object.keys(normalized)) {
+    if (typeof normalized[key] === "undefined") delete normalized[key];
+  }
+  return normalized;
+}
+
 export async function listProjects(userId: string) {
   const projects = await prisma.project.findMany({
     where: {
@@ -157,7 +171,7 @@ export async function createProject(
     organizationName?: string;
     organizationId?: string;
     environmentType?: string;
-    basePrivateRange?: string;
+    basePrivateRange?: string | null;
     logoUrl?: string;
     reportHeader?: string;
     reportFooter?: string;
@@ -171,10 +185,11 @@ export async function createProject(
 ) {
   await enforceProjectLimit(userId, planTier);
   const organizationId = await ensureOrganizationAssignable(userId, data.organizationId || null);
+  const normalizedProjectData = normalizeProjectDataForWrite({}, data as Record<string, unknown>);
 
   return prisma.$transaction(async (tx: any) => {
     const project = await tx.project.create({
-      data: { userId, ...data, organizationId: organizationId || undefined },
+      data: { userId, ...normalizedProjectData, organizationId: organizationId || undefined },
     });
 
     const requirementsMaterialization = data.requirementsJson
@@ -228,6 +243,14 @@ export async function createProjectFromTemplate(
 
   const template = templateMap[templateKey];
   if (!template) throw new ApiError(404, "Template not found");
+  assertGeneratedProjectBasePrivateRangeWritable({ basePrivateRange: template.basePrivateRange }, "Project template");
+
+  for (const siteTemplate of template.sites) {
+    assertGeneratedSiteAddressingWritable(siteTemplate, "Project template");
+    for (const vlanTemplate of siteTemplate.vlans) {
+      assertGeneratedVlanAddressingWritable(vlanTemplate, "Project template");
+    }
+  }
 
   const project = await prisma.$transaction(async (tx: any) => {
     const createdProject = await tx.project.create({
@@ -265,6 +288,14 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
   });
   if (!source) throw new ApiError(404, "Source project not found");
   const sourceProjectForCopy = source as any;
+  assertGeneratedProjectBasePrivateRangeWritable({ basePrivateRange: sourceProjectForCopy.basePrivateRange }, "Project duplication");
+
+  for (const sourceSite of source.sites) {
+    assertGeneratedSiteAddressingWritable(sourceSite, "Project duplication");
+    for (const sourceVlan of sourceSite.vlans) {
+      assertGeneratedVlanAddressingWritable(sourceVlan, "Project duplication");
+    }
+  }
 
   const newProject = await prisma.$transaction(async (tx: any) => {
     const createdProject = await tx.project.create({
@@ -315,7 +346,11 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
 
 export async function getProject(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "project-read");
+  const requirementsReadRepair = await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "project-read", {
+    operation: "project-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["project-response", "change-log", "security-audit"],
+  });
   const project = await prisma.project.findFirst({
     where: { id: projectId },
     include: {
@@ -324,19 +359,27 @@ export async function getProject(projectId: string, userId: string) {
     },
   });
   if (!project) return null;
-  return { ...project, canEdit: await canEditProject(userId, projectId) };
+  return { ...project, canEdit: await canEditProject(userId, projectId), requirementsReadRepair };
 }
 
 export async function getProjectSites(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "sites-read");
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "sites-read", {
+    operation: "sites-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["sites-response", "change-log", "security-audit"],
+  });
   const project = await prisma.project.findFirst({ where: { id: projectId }, select: { sites: { orderBy: { createdAt: "asc" } } } });
   return project?.sites ?? [];
 }
 
 export async function getProjectVlans(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "vlans-read");
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "vlans-read", {
+    operation: "vlans-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["vlans-response", "change-log", "security-audit"],
+  });
   return prisma.vlan.findMany({
     where: { site: { projectId } },
     include: { site: { select: { id: true, name: true, siteCode: true } } },
@@ -347,7 +390,7 @@ export async function getProjectVlans(projectId: string, userId: string) {
 export async function updateProject(projectId: string, userId: string, data: Record<string, unknown>, actorLabel?: string) {
   const project = await ensureCanEditProject(userId, projectId);
   const organizationId = await ensureOrganizationAssignable(userId, (data.organizationId as string | undefined) || project.organizationId || null);
-  const normalizedData: Record<string, unknown> = { ...data, organizationId: organizationId || undefined };
+  const normalizedData: Record<string, unknown> = normalizeProjectDataForWrite({ basePrivateRange: (project as any).basePrivateRange }, { ...data, organizationId: organizationId || undefined });
   return prisma.$transaction(async (tx: any) => {
     const result = await tx.project.update({ where: { id: projectId }, data: normalizedData });
     const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
@@ -400,7 +443,7 @@ export async function saveProjectRequirements(
 
     await addChangeLog(
       projectId,
-      `V1 requirements read-repair materialization passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
+      `V1 requirements save materialization passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
       actorLabel,
       tx,
     );

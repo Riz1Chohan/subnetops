@@ -165,6 +165,11 @@ export function buildV1DiagramTruthControl(params: {
 
   const nodesWithoutBackendObjectId = nodeCoverage.filter((row) => !row.hasBackendIdentity).length;
   const edgesWithoutRelatedObjects = edgeCoverage.filter((row) => !row.hasBackendIdentity).length;
+  const renderNodesMissingTruthEvidence = renderModel.nodes.filter((node) => !node.truthStateV1 || !node.readinessImpact || !node.sourceRefs?.length || !node.validationRefs?.length);
+  const renderEdgesMissingTruthEvidence = renderModel.edges.filter((edge) => !edge.truthState || !edge.truthStateV1 || !edge.readinessImpact || !edge.sourceRefs?.length || !edge.validationRefs?.length);
+  const cleanAssumedNodes = renderModel.nodes.filter((node) => (node.truthStateV1 === "ASSUMED" || node.truthState === "inferred" || node.truthState === "proposed" || node.truthState === "planned") && node.readinessImpact === "NONE");
+  const cleanAssumedEdges = renderModel.edges.filter((edge) => (edge.truthStateV1 === "ASSUMED" || edge.truthState === "inferred" || edge.truthState === "proposed" || edge.truthState === "planned") && edge.readinessImpact === "NONE");
+  const omittedWarningMissing = (renderModel.summary.omittedEvidenceHasBlockers || renderModel.summary.omittedEvidenceHasReviewRequired) && !renderModel.omittedEvidenceSummaries?.some((row) => row.omittedCount > 0 && (row.omittedHasBlockers || row.omittedHasReviewRequired));
   const inferredOrReviewVisibleCount = nodeCoverage.filter((row) => row.truthState === "inferred" || row.truthState === "review-required" || row.readiness === "review" || row.readiness === "blocked").length;
   const blockedModeCount = modeContracts.filter((row) => row.status === "BLOCKED" || row.readinessImpact === "BLOCKED").length;
   const reviewModeCount = modeContracts.filter((row) => row.status === "REVIEW_REQUIRED" || row.readinessImpact === "REVIEW_REQUIRED").length;
@@ -202,6 +207,42 @@ export function buildV1DiagramTruthControl(params: {
       affectedRenderIds: edgeCoverage.filter((row) => !row.hasBackendIdentity).map((row) => row.renderId),
       readinessImpact: "BLOCKED",
       remediation: "Attach relatedObjectIds or a design graph relationship to each edge before rendering it.",
+    });
+  }
+
+  if (renderNodesMissingTruthEvidence.length || renderEdgesMissingTruthEvidence.length) {
+    addFinding(findings, {
+      severity: "BLOCKING",
+      code: "V1_DIAGRAM_TRUTH_EVIDENCE_MISSING",
+      title: "Diagram render elements lack truth/evidence fields",
+      detail: `${renderNodesMissingTruthEvidence.length} node(s) and ${renderEdgesMissingTruthEvidence.length} edge(s) are missing truthStateV1, readinessImpact, sourceRefs, or validationRefs.`,
+      affectedRenderIds: [...renderNodesMissingTruthEvidence.map((node) => node.id), ...renderEdgesMissingTruthEvidence.map((edge) => edge.id)],
+      readinessImpact: "BLOCKED",
+      remediation: "Decorate every backend-rendered node/edge with source refs, validation refs, V1 truth state, and readiness impact before the frontend sees it.",
+    });
+  }
+
+  if (cleanAssumedNodes.length || cleanAssumedEdges.length) {
+    addFinding(findings, {
+      severity: "BLOCKING",
+      code: "V1_DIAGRAM_CLEAN_INFERENCE_LEAK",
+      title: "Assumed/inferred diagram evidence was marked clean",
+      detail: `${cleanAssumedNodes.length} node(s) and ${cleanAssumedEdges.length} edge(s) carry assumed/inferred/proposed truth but no review impact.`,
+      affectedRenderIds: [...cleanAssumedNodes.map((node) => node.id), ...cleanAssumedEdges.map((edge) => edge.id)],
+      readinessImpact: "BLOCKED",
+      remediation: "Assumed/inferred/proposed diagram evidence must show review styling and warning badges, never clean production truth.",
+    });
+  }
+
+  if (omittedWarningMissing) {
+    addFinding(findings, {
+      severity: "BLOCKING",
+      code: "V1_DIAGRAM_OMITTED_BLOCKER_BADGE_MISSING",
+      title: "Diagram omitted blocker/review warning is missing",
+      detail: "The render summary says omitted blockers/review-required evidence exists, but no omitted evidence summary carries the visible warning detail.",
+      affectedRenderIds: [],
+      readinessImpact: "BLOCKED",
+      remediation: "Preserve omitted evidence counters and warning badges on diagram summaries before rendering/exporting.",
     });
   }
 
@@ -278,8 +319,8 @@ export function buildV1DiagramTruthControl(params: {
     findings,
     proofBoundary: [
       "Requirement-driven visual elements must originate from backend requirement/object/graph/routing/security/implementation truth.",
-      "Every render node must carry backend objectId, sourceEngine, readiness, and truthState.",
-      "Every render edge must carry relatedObjectIds or a design graph relationship; decoration-only links are blocked.",
+      "Every render node must carry backend objectId, sourceEngine, readiness, truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, and readinessImpact.",
+      "Every render edge must carry relatedObjectIds or a design graph relationship plus truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, and readinessImpact.",
       "Physical, logical, WAN/cloud, security, per-site, and implementation modes have separate declared purposes and allowed layers.",
       "Frontend canvas may lay out backend renderModel data, but it may not create engineering facts.",
     ],

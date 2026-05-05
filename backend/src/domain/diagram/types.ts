@@ -1,4 +1,7 @@
+import type { OmittedEvidenceSummary } from "../evidence/index.js";
 export type DiagramReadiness = 'ready' | 'review' | 'blocked' | 'unknown';
+export type DiagramReadinessImpact = 'NONE' | 'REVIEW' | 'BLOCKING';
+export type DiagramV1TruthState = 'USER_PROVIDED' | 'DERIVED' | 'ASSUMED' | 'IMPORTED' | 'REVIEW_REQUIRED' | 'BLOCKED';
 
 export type DiagramTruthState =
   | 'configured'
@@ -84,6 +87,11 @@ export interface DiagramRenderNode {
   y: number;
   sourceEngine: DiagramSourceEngine;
   relatedFindingIds: string[];
+  truthStateV1: DiagramV1TruthState;
+  readinessImpact: DiagramReadinessImpact;
+  sourceRefs: string[];
+  validationRefs: string[];
+  warningBadges: string[];
   notes: string[];
 }
 
@@ -94,8 +102,14 @@ export interface DiagramRenderEdge {
   targetNodeId: string;
   label: string;
   readiness: DiagramReadiness;
+  truthState: DiagramTruthState;
+  truthStateV1: DiagramV1TruthState;
+  readinessImpact: DiagramReadinessImpact;
   overlayKeys: DiagramOverlayKey[];
   relatedObjectIds: string[];
+  sourceRefs: string[];
+  validationRefs: string[];
+  warningBadges: string[];
   notes: string[];
 }
 
@@ -129,12 +143,17 @@ export interface DiagramRenderModel {
     contractId?: 'V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT';
     truthContract?: 'backend-only-render-model';
     modeCount?: number;
+    evidenceWindowCount?: number;
+    omittedEvidenceTotalCount?: number;
+    omittedEvidenceHasBlockers?: boolean;
+    omittedEvidenceHasReviewRequired?: boolean;
   };
   nodes: DiagramRenderNode[];
   edges: DiagramRenderEdge[];
   groups: DiagramRenderGroup[];
   overlays: DiagramRenderOverlay[];
   emptyState?: { reason: string; requiredInputs: string[] };
+  omittedEvidenceSummaries: OmittedEvidenceSummary[];
 }
 
 export interface DiagramOverlaySummaryInput {

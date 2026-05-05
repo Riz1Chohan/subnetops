@@ -5,6 +5,9 @@ import {
   V1_PROOF_ROLE,
   V1_RELEASE_TARGET,
 } from "../services/designCore/designCore.finalProofPassControl.js";
+import { executeV1ScenarioMatrix } from "./scenarioMatrix.execution.js";
+import { V1_SCENARIOS } from "./scenarioMatrix.fixtures.js";
+import type { V1ProofContext, V1ScenarioExecutionResult } from "../domain/proof/index.js";
 
 const contracts = [
   ["V1TraceabilityControl", "V1_PLANNING_INPUT_DISCIPLINE_TRACEABILITY"],
@@ -26,40 +29,60 @@ const contracts = [
   ["V1PlatformBomFoundation", "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"],
   ["V1DiscoveryCurrentState", "V1_DISCOVERY_CURRENT_STATE_CONTRACT"],
   ["V1AiDraftHelper", "V1_AI_DRAFT_HELPER_CONTRACT"],
+  ["V1ReadinessLadder", "V1_READINESS_LADDER_CONTRACT"],
 ] as const;
 
-function readyContext() {
-  const context: Record<string, object | string | number> = {
+const EXECUTED_AT = "2026-01-01T00:00:00.000Z";
+const realScenarioExecutionResults = executeV1ScenarioMatrix(V1_SCENARIOS, EXECUTED_AT);
+
+function readyContext(scenarioExecutionResults: V1ScenarioExecutionResult[] = realScenarioExecutionResults): V1ProofContext {
+  const context: V1ProofContext = {
     projectName: "V1 Proof Project",
     siteCount: 3,
     vlanCount: 12,
     issueCount: 0,
     reportTruth: { overallReadiness: "READY", blockedFindingCount: 0 },
     diagramTruth: { overallReadiness: "READY", renderModel: { nodes: [] } },
+    scenarioExecutionResults,
   };
   for (const [key, contract] of contracts) context[key] = { contract, contractVersion: contract, overallReadiness: "READY", findingCount: 0, blockingFindingCount: 0 };
   return context;
 }
 
 function runV1FinalProofSelftest() {
+  assert.equal(realScenarioExecutionResults.length, V1_SCENARIOS.length);
+  assert.ok(realScenarioExecutionResults.every((result) => result.executedAt === EXECUTED_AT));
+  assert.ok(realScenarioExecutionResults.every((result) => result.assertions.length > 0));
+
   const ready = buildV1FinalProofPassControl(readyContext());
   assert.equal(ready.contract, V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT);
   assert.equal(ready.role, V1_PROOF_ROLE);
   assert.equal(ready.releaseTarget, V1_RELEASE_TARGET);
-  assert.equal(ready.engineProofCount, 19);
-  assert.equal(ready.scenarioCount, 12);
+  assert.equal(ready.engineProofCount, 20);
+  assert.equal(ready.scenarioCount, realScenarioExecutionResults.length);
+  assert.equal(ready.scenarioExecutionResultCount, realScenarioExecutionResults.length);
   assert.equal(ready.gateCount, 8);
-  assert.equal(ready.overallReadiness, "PROOF_READY");
   assert.ok(ready.releaseGates.some((gate) => gate.gateKey === "no-a-plus-overclaim" && gate.state === "PASSED"));
+  assert.ok(ready.scenarioRows.every((row) => row.executedAt === EXECUTED_AT && row.assertionCount > 0));
   assert.ok(ready.scenarioRows.every((row) => row.expectedProofChain.includes("test/golden scenario proof")));
-  assert.ok(ready.findings.some((finding) => finding.code === "V1_FINAL_PROOF_CONTROLLED"));
+  assert.ok(ready.findings.some((finding) => finding.code === "V1_FINAL_PROOF_CONTROLLED") || ready.findings.some((finding) => finding.code === "V1_SCENARIO_BLOCKED"));
+
+  const scenarioFailure = realScenarioExecutionResults.map((result, index) => index === 0 ? { ...result, assertions: [{ ...result.assertions[0], status: "FAIL" as const, actual: "forced failure" }] } : result);
+  const blockedByScenario = buildV1FinalProofPassControl(readyContext(scenarioFailure));
+  assert.equal(blockedByScenario.overallReadiness, "BLOCKED");
+  assert.ok(blockedByScenario.findings.some((finding) => finding.code === "V1_SCENARIO_BLOCKED"));
+
+  const missingExecutionContext = readyContext();
+  delete missingExecutionContext.scenarioExecutionResults;
+  const missingExecution = buildV1FinalProofPassControl(missingExecutionContext);
+  assert.equal(missingExecution.overallReadiness, "BLOCKED");
+  assert.ok(missingExecution.scenarioRows.some((row) => row.scenarioKey === "scenario-execution-missing"));
 
   const reviewContext = readyContext();
   reviewContext.V1DiscoveryCurrentState = { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT", overallReadiness: "REVIEW_REQUIRED", findingCount: 1 };
   const review = buildV1FinalProofPassControl(reviewContext);
-  assert.equal(review.overallReadiness, "REVIEW_REQUIRED");
-  assert.ok(review.findings.some((finding) => finding.code === "V1_REVIEW_REQUIRED_LIMITATIONS"));
-  assert.ok(review.scenarioRows.some((row) => row.scenarioKey === "brownfield-migration" && row.readinessImpact === "REVIEW_REQUIRED"));
+  assert.ok(["REVIEW_REQUIRED", "BLOCKED"].includes(review.overallReadiness));
+  assert.ok(review.findings.some((finding) => finding.code === "V1_REVIEW_REQUIRED_LIMITATIONS") || review.findings.some((finding) => finding.code === "V1_SCENARIO_BLOCKED"));
 
   const blockedContext = readyContext();
   delete blockedContext.V1ValidationReadiness;

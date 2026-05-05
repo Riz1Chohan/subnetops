@@ -29,5 +29,10 @@ export function buildReportEvidenceDocument(summary: V1ReportExportTruthControlS
     sections,
     findings: summary.findings,
     proofBoundary: summary.proofBoundary,
+    omittedEvidenceSummaries: summary.omittedEvidenceSummaries,
+    fullEvidenceInventory: summary.fullEvidenceInventory,
+    antiOverclaimRules: summary.antiOverclaimRules,
+    canClaimImplementationReady: summary.implementationReadyClaimAllowed,
+    canClaimProductionReady: summary.productionReadyClaimAllowed,
   };
 }

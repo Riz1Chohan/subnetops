@@ -3,14 +3,7 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { ensureCanEditProject } from "./access.service.js";
-import { collectVlanAddressingValidationMessages } from "../validators/addressingTrust.schemas.js";
-
-function assertVlanAddressingWritable(candidate: { subnetCidr?: unknown; gatewayIp?: unknown; segmentRole?: unknown; vlanName?: unknown; purpose?: unknown; department?: unknown; notes?: unknown }) {
-  const messages = collectVlanAddressingValidationMessages(candidate);
-  if (messages.length > 0) {
-    throw new ApiError(400, `VLAN addressing failed engineering validation: ${messages.join(" ")}`);
-  }
-}
+import { assertVlanAddressingWritable, buildVlanWriteCandidate } from "./engineeringWritePaths.js";
 
 export async function createVlan(userId: string, planTier: PlanTier, data: { siteId: string; vlanId: number; vlanName: string; purpose?: string; segmentRole?: string; subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; estimatedHosts?: number; department?: string; notes?: string }, actorLabel?: string) {
   const site = await prisma.site.findFirst({ where: { id: data.siteId }, include: { project: true } });
@@ -34,17 +27,7 @@ export async function updateVlan(vlanId: string, userId: string, data: Record<st
   const vlan = await prisma.vlan.findFirst({ where: { id: vlanId }, include: { site: true } });
   if (!vlan) throw new ApiError(404, "VLAN not found");
   await ensureCanEditProject(userId, vlan.site.projectId);
-  const merged = {
-    subnetCidr: vlan.subnetCidr,
-    gatewayIp: vlan.gatewayIp,
-    segmentRole: vlan.segmentRole,
-    vlanName: vlan.vlanName,
-    purpose: vlan.purpose,
-    department: vlan.department,
-    notes: vlan.notes,
-    ...data,
-  };
-  assertVlanAddressingWritable(merged);
+  buildVlanWriteCandidate(vlan, data);
 
   return prisma.$transaction(async (tx: any) => {
     const updated = await tx.vlan.update({ where: { id: vlanId }, data });

@@ -188,7 +188,11 @@ function validationNarrative(item: ValidationItem) {
 
 
 export async function getProjectExportData(projectId: string) {
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps export", "export-read");
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps export", "export-read", {
+    operation: "export-read",
+    authorization: { permission: "system-internal-authorized", checkedBy: "export.controller ensureCanExportProject" },
+    surfacedTo: ["report-export", "change-log", "security-audit"],
+  });
   // V1: export validation detail must be generated from the same
   // repaired materialized rows as the report/design-core snapshot.
   await runValidation(projectId);
@@ -893,6 +897,46 @@ export async function getCsvRows(projectId: string) {
           Notes: finding.remediation,
         });
       }
+      for (const summary of designCore.V1ReportExportTruth.omittedEvidenceSummaries ?? []) {
+        rows.push({
+          Section: "V1 Report Omitted Evidence",
+          Scope: summary.surface,
+          Name: summary.collection,
+          Key: summary.readinessImpact,
+          Value: `${summary.shownCount}/${summary.totalCount} shown; ${summary.omittedCount} omitted`,
+          Notes: `Omitted blockers ${summary.omittedHasBlockers ? "yes" : "no"} | Omitted review ${summary.omittedHasReviewRequired ? "yes" : "no"} | Severity ${joinCsvList(Object.entries(summary.omittedSeveritySummary ?? {}).map(([key, value]) => `${key}:${value}`), "none")} | ${summary.exportImpact}`,
+        });
+      }
+      for (const item of designCore.V1ReportExportTruth.fullEvidenceInventory ?? []) {
+        rows.push({
+          Section: "V1 Report Full Evidence Inventory",
+          Scope: item.collection,
+          Name: item.collection,
+          Key: item.readinessImpact,
+          Value: `${item.surfacedCount}/${item.totalCount} surfaced; ${item.omittedCount} omitted`,
+          Notes: "Full evidence appendix preserves the machine-readable collection instead of hiding sliced rows.",
+        });
+      }
+      for (const rule of designCore.V1ReportExportTruth.antiOverclaimRules ?? []) {
+        rows.push({
+          Section: "V1 Report Anti-Overclaim Rules",
+          Scope: rule.allowedOnlyWhen,
+          Name: rule.phrase,
+          Key: rule.claimAllowed ? "claim-allowed" : "claim-blocked",
+          Value: rule.replacement,
+          Notes: joinCsvList(rule.evidence, "no evidence"),
+        });
+      }
+      if (designCore.V1ReportExportTruth.fullMachineReadableAppendix) {
+        rows.push({
+          Section: "V1 Report Machine-Readable Appendix",
+          Scope: "PDF/DOCX/CSV/JSON",
+          Name: "Full evidence appendix",
+          Key: designCore.V1ReportExportTruth.fullMachineReadableAppendix.machineReadable ? "machine-readable" : "missing",
+          Value: joinCsvList(designCore.V1ReportExportTruth.fullMachineReadableAppendix.exportFormats, "none"),
+          Notes: `Traceability ${designCore.V1ReportExportTruth.fullMachineReadableAppendix.includesRequirementTraceability ? "yes" : "no"} | Omitted summaries ${designCore.V1ReportExportTruth.fullMachineReadableAppendix.includesOmittedEvidenceSummaries ? "yes" : "no"} | Full inventory ${designCore.V1ReportExportTruth.fullMachineReadableAppendix.includesFullEvidenceInventory ? "yes" : "no"}`,
+        });
+      }
     }
 
     rows.push({
@@ -1321,6 +1365,28 @@ export async function getCsvRows(projectId: string) {
         });
       }
     }
+    if (designCore.V1ReadinessLadder) {
+      const V1 = designCore.V1ReadinessLadder;
+      rows.push({
+        Section: "V1 Central Readiness Ladder",
+        Scope: V1.overallReadiness,
+        Name: designCore.projectName,
+        Key: V1.contract,
+        Value: `Implementation allowed ${V1.implementationOutputAllowed ? "yes" : "no"}; planning allowed ${V1.planningOutputAllowed ? "yes" : "no"}`,
+        Notes: `Report may claim implementation-ready ${V1.reportMayClaimImplementationReady ? "yes" : "no"}; diagram clean production truth ${V1.diagramMayShowCleanProductionTruth ? "yes" : "no"}; AI authority ${V1.aiMayProduceAuthority ? "yes" : "no"}`,
+      });
+      for (const reason of V1.reasons.slice(0, 120)) {
+        rows.push({
+          Section: "V1 Readiness Ladder Reasons",
+          Scope: reason.severity,
+          Name: reason.code,
+          Key: reason.sourcePath,
+          Value: reason.readinessImpact,
+          Notes: reason.detail,
+        });
+      }
+    }
+
     if (designCore.V1NetworkObjectModel) {
       const V1 = designCore.V1NetworkObjectModel;
       rows.push({ Section: "V1 Network Object Model Truth", Scope: V1.overallReadiness, Name: designCore.projectName, Key: V1.contract, Value: `${V1.objectCount} objects / ${V1.metadataGapObjectCount} metadata gaps / ${V1.requirementLineageGapCount} lineage gaps`, Notes: `Ready ${V1.implementationReadyObjectCount}; review ${V1.implementationReviewObjectCount}; blocked ${V1.implementationBlockedObjectCount}` });

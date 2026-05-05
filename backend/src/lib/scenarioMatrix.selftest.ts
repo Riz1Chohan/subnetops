@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { buildDesignCoreSnapshot } from "../services/designCore.service.js";
-import { V1_SCENARIOS, type V1ScenarioFixture } from "./scenarioMatrix.fixtures.js";
+import { executeV1ScenarioMatrix } from "./scenarioMatrix.execution.js";
+import { V1_SCENARIOS } from "./scenarioMatrix.fixtures.js";
 
 function run(name: string, fn: () => void) {
   try {
@@ -12,99 +12,8 @@ function run(name: string, fn: () => void) {
   }
 }
 
-type Snapshot = NonNullable<ReturnType<typeof buildDesignCoreSnapshot>>;
-type FindingLike = { code?: string };
-
-function codesFrom(values: FindingLike[]) {
-  return values.map((item) => item.code).filter((code): code is string => Boolean(code));
-}
-
-function collectFindingCodes(snapshot: Snapshot) {
-  const buckets: FindingLike[][] = [
-    snapshot.issues,
-    snapshot.networkObjectModel.designGraph.integrityFindings,
-    snapshot.networkObjectModel.routingSegmentation.routeConflictReviews,
-    snapshot.networkObjectModel.routingSegmentation.reachabilityFindings,
-    snapshot.networkObjectModel.securityPolicyFlow.findings,
-    snapshot.networkObjectModel.implementationPlan.findings,
-  ];
-
-  return new Set(buckets.flatMap(codesFrom));
-}
-
-function assertAtLeast(actual: number, minimum: number | undefined, label: string, scenario: V1ScenarioFixture) {
-  if (minimum === undefined) return;
-  assert.ok(actual >= minimum, `${scenario.id}: expected at least ${minimum} ${label}, got ${actual}`);
-}
-
-function assertScenario(scenario: V1ScenarioFixture) {
-  const snapshot = buildDesignCoreSnapshot(scenario.project as never);
-  assert.ok(snapshot, `${scenario.id}: snapshot was not generated`);
-
-  const expected = scenario.expected;
-  const findingCodes = collectFindingCodes(snapshot);
-  const zoneRoles = new Set<string>(snapshot.networkObjectModel.securityZones.map((zone) => zone.zoneRole));
-  const overlayKeys = new Set(snapshot.diagramTruth.renderModel.overlays.map((overlay) => overlay.key));
-  const standardsViolations = new Set(snapshot.standardsAlignment.violatedRuleIds);
-
-  assert.equal(snapshot.authority.source, "backend-design-core", `${scenario.id}: scenario must use backend design core authority`);
-  assert.equal(snapshot.diagramTruth.renderModel.summary.backendAuthored, true, `${scenario.id}: diagram render model must be backend-authored`);
-  assert.ok(expected.readinessOneOf.includes(snapshot.reportTruth.overallReadiness), `${scenario.id}: expected readiness in ${expected.readinessOneOf.join(", ")}, got ${snapshot.reportTruth.overallReadiness}`);
-
-  for (const code of expected.requiredCodes ?? []) {
-    assert.ok(findingCodes.has(code), `${scenario.id}: expected finding code ${code}`);
-  }
-
-  for (const code of expected.forbiddenCodes ?? []) {
-    assert.equal(findingCodes.has(code), false, `${scenario.id}: forbidden finding code ${code} appeared`);
-  }
-
-  for (const ruleId of expected.requiredStandardsViolations ?? []) {
-    assert.ok(standardsViolations.has(ruleId), `${scenario.id}: expected standards violation ${ruleId}`);
-  }
-
-  for (const zoneRole of expected.requiredZoneRoles ?? []) {
-    assert.ok(zoneRoles.has(zoneRole), `${scenario.id}: expected zone role ${zoneRole}`);
-  }
-
-  for (const overlayKey of expected.requiredOverlayKeys ?? []) {
-    assert.ok(overlayKeys.has(overlayKey as never), `${scenario.id}: expected backend render overlay ${overlayKey}`);
-  }
-
-  assertAtLeast(snapshot.summary.siteCount, expected.minSites, "sites", scenario);
-  assertAtLeast(snapshot.summary.vlanCount, expected.minVlans, "VLAN/address rows", scenario);
-  assertAtLeast(snapshot.networkObjectModel.devices.length, expected.minDevices, "devices", scenario);
-  assertAtLeast(snapshot.networkObjectModel.interfaces.length, expected.minInterfaces, "interfaces", scenario);
-  assertAtLeast(snapshot.networkObjectModel.links.length, expected.minLinks, "links", scenario);
-  assertAtLeast(snapshot.networkObjectModel.routingSegmentation.summary.routeIntentCount, expected.minRouteIntents, "route intents", scenario);
-  assertAtLeast(snapshot.networkObjectModel.securityPolicyFlow.summary.flowRequirementCount, expected.minSecurityFlows, "security flow requirements", scenario);
-  assertAtLeast(snapshot.networkObjectModel.implementationPlan.summary.stepCount, expected.minImplementationSteps, "implementation steps", scenario);
-  assertAtLeast(snapshot.networkObjectModel.implementationPlan.verificationChecks.length, expected.minVerificationChecks, "verification checks", scenario);
-  assertAtLeast(snapshot.networkObjectModel.implementationPlan.rollbackActions.length, expected.minRollbackActions, "rollback actions", scenario);
-  assertAtLeast(snapshot.diagramTruth.renderModel.nodes.length, expected.minDiagramRenderNodes, "backend render nodes", scenario);
-  assertAtLeast(snapshot.reportTruth.implementationReviewQueue.length, expected.minImplementationReviewQueue, "implementation review queue items", scenario);
-
-  if (expected.mustHaveProposal) {
-    assert.ok(snapshot.proposedRows.length > 0, `${scenario.id}: expected at least one allocator proposal`);
-  }
-
-  if (expected.mustHaveTransitPlan) {
-    assert.ok(snapshot.transitPlan.length > 0, `${scenario.id}: expected backend transit plan rows`);
-  }
-
-  if (expected.mustHaveLoopbackPlan) {
-    assert.ok(snapshot.loopbackPlan.length > 0, `${scenario.id}: expected backend loopback plan rows`);
-  }
-
-  if (expected.mustHaveBlockedReportTruth) {
-    assert.equal(snapshot.reportTruth.overallReadiness, "blocked", `${scenario.id}: blocked scenario must remain blocked in reportTruth`);
-    assert.ok(snapshot.reportTruth.blockedFindings.length > 0, `${scenario.id}: blocked scenario must expose blocked findings`);
-  }
-
-  if (expected.mustDocumentKnownGap) {
-    assert.ok(scenario.knownGaps.length > 0, `${scenario.id}: known-gap scenario must document the current product limitation`);
-  }
-}
+const EXECUTED_AT = "2026-01-01T00:00:00.000Z";
+const executionResults = executeV1ScenarioMatrix(V1_SCENARIOS, EXECUTED_AT);
 
 run("V1 scenario library is broad enough to be useful", () => {
   assert.ok(V1_SCENARIOS.length >= 8, "V1 needs at least eight scenario fixtures, not a toy matrix.");
@@ -114,15 +23,29 @@ run("V1 scenario library is broad enough to be useful", () => {
   }
 });
 
-for (const scenario of V1_SCENARIOS) {
-  run(`V1 scenario: ${scenario.id}`, () => assertScenario(scenario));
+for (const result of executionResults) {
+  run(`V1 executed scenario: ${result.scenarioId}`, () => {
+    assert.equal(result.executedAt, EXECUTED_AT, `${result.scenarioId}: execution timestamp must be deterministic in selftest`);
+    assert.ok(result.assertions.length > 0, `${result.scenarioId}: scenario produced no executable assertions`);
+    assert.ok(result.snapshotResult, `${result.scenarioId}: scenario must preserve snapshot result evidence`);
+    assert.ok(result.reportEvidence.length > 0, `${result.scenarioId}: report evidence missing`);
+    assert.ok(result.diagramEvidence.length > 0, `${result.scenarioId}: diagram evidence missing`);
+    assert.ok(result.validationEvidence.length > 0, `${result.scenarioId}: validation evidence missing`);
+    assert.ok(result.affectedEngines.length >= 5, `${result.scenarioId}: affected engines evidence too thin`);
+    const failed = result.assertions.filter((assertion) => assertion.status === "FAIL");
+    assert.deepEqual(failed, [], `${result.scenarioId}: scenario execution had failed assertions`);
+  });
 }
 
 run("V1 scenario matrix protects export/report/diagram truth from drift", () => {
   const blockedScenarioCount = V1_SCENARIOS.filter((scenario) => scenario.expected.mustHaveBlockedReportTruth).length;
   const diagramScenarioCount = V1_SCENARIOS.filter((scenario) => (scenario.expected.minDiagramRenderNodes ?? 0) > 0).length;
   const verificationScenarioCount = V1_SCENARIOS.filter((scenario) => (scenario.expected.minVerificationChecks ?? 0) > 0).length;
+  const executedScenarioCount = executionResults.length;
+  const totalAssertionCount = executionResults.reduce((sum, result) => sum + result.assertions.length, 0);
 
+  assert.equal(executedScenarioCount, V1_SCENARIOS.length, "Every fixture must produce a scenario execution result.");
+  assert.ok(totalAssertionCount >= executedScenarioCount * 8, "Scenario execution must assert real backend evidence, not just smoke-test snapshots.");
   assert.ok(blockedScenarioCount >= 6, "Most V1 scenarios should intentionally prove blocked truth, not greenwashed readiness.");
   assert.equal(diagramScenarioCount, V1_SCENARIOS.length, "Every scenario must protect backend diagram render truth.");
   assert.equal(verificationScenarioCount, V1_SCENARIOS.length, "Every scenario must protect verification matrix generation.");

@@ -157,7 +157,8 @@ export function synthesizePlatformBomFoundation(input: {
 }): BomFoundationSummary {
   const { sites, vlans, profile, synthesized, state } = input;
   const siteCount = countSites(profile, sites);
-  const usersPerSite = Math.max(1, toNumber(profile.usersPerSite, 50));
+  const usersPerSite = Math.max(0, toNumber(profile.usersPerSite, 0));
+  const usersPerSiteCaptured = usersPerSite > 0;
   const printersPerSite = profile.printers ? Math.max(1, normalizePerSiteCount(profile.printerCount, 3, siteCount, Math.max(10, Math.ceil(usersPerSite / 15)))) : 0;
   const phonesPerSite = profile.voice ? Math.max(1, normalizePerSiteCount(profile.phoneCount, Math.ceil(usersPerSite * 0.3), siteCount, Math.max(20, usersPerSite))) : 0;
   const apsPerSite = profile.wireless || profile.guestWifi ? Math.max(1, normalizePerSiteCount(profile.apCount, Math.ceil(usersPerSite / 25), siteCount, Math.max(4, Math.ceil(usersPerSite / 8)))) : 0;
@@ -205,6 +206,9 @@ export function synthesizePlatformBomFoundation(input: {
   }
   if (/mixed vendor/i.test(state.vendorStrategy) && /small internal team|generalist/i.test(`${state.operationsModel} ${profile.teamCapability}`)) {
     deploymentRisks.push("A mixed-vendor environment may outpace the current team model unless standards and support boundaries stay very disciplined.");
+  }
+  if (!usersPerSiteCaptured) {
+    deploymentRisks.push("Users per site is not captured, so access switching, wireless density, DHCP readiness, and final BOM quantities must remain review-required.");
   }
   if (deploymentRisks.length === 0) {
     deploymentRisks.push("This platform profile is directionally aligned with the current logical design, but quantities and final models still need engineering review before procurement.");
@@ -334,7 +338,9 @@ export function synthesizePlatformBomFoundation(input: {
   ];
 
   const bomAssumptions = [
-    `BOM quantities are derived from approximately ${usersPerSite} users per site across ${siteCount} site(s) plus the saved device counts in the requirements workspace.`,
+    usersPerSiteCaptured
+      ? `BOM quantities are derived from approximately ${usersPerSite} users per site across ${siteCount} site(s) plus the saved device counts in the requirements workspace.`
+      : `User capacity was not captured, so BOM quantities are review-required and must not be treated as final sizing evidence.`,
     `This is a role-based BOM foundation, not a final SKU list. Platform family, form factor, and licensing still need engineering and procurement review.`,
     `Addressing, segmentation, WAN, and security roles from the synthesized design are treated as the minimum structural drivers for the BOM.` ,
   ];

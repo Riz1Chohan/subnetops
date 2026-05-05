@@ -687,7 +687,11 @@ function enrichValidationResult<T extends { message: string; ruleCode: string; t
 }
 
 export async function runValidation(projectId: string) {
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps validation", "validation-read");
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps validation", "validation-read", {
+    operation: "validation-read",
+    authorization: { permission: "system-internal-authorized", checkedBy: "validation route/export authorization boundary" },
+    surfacedTo: ["validation", "change-log", "security-audit", "report-export"],
+  });
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {

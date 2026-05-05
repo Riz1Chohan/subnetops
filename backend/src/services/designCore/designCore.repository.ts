@@ -2,7 +2,11 @@ import { prisma } from "../../db/prisma.js";
 import { ensureRequirementsMaterializedForRead } from "../requirementsMaterialization.service.js";
 
 export async function getProjectDesignData(projectId: string) {
-  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps runtime", "design-core-read");
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps runtime", "design-core-read", {
+    operation: "design-core-read",
+    authorization: { permission: "system-internal-authorized", checkedBy: "designCore.service ensureCanViewProject or export controller authorization" },
+    surfacedTo: ["design-core", "change-log", "security-audit", "report-export"],
+  });
   return prisma.project.findUnique({
     where: { id: projectId },
     include: {

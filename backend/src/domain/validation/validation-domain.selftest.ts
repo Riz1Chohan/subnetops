@@ -86,7 +86,8 @@ const mediumWarning = deriveReadinessFromFindings([
   }),
 ]);
 assert(mediumWarning.readiness === 'ready_with_warnings', 'open medium findings should allow readiness only with warnings.');
-assert(mediumWarning.implementationGateAllows === true, 'non-blocking warnings should not block the implementation gate by themselves.');
+assert(mediumWarning.readinessLadder === 'PLANNING_READY', 'warnings may be planning-ready but not implementation-ready.');
+assert(mediumWarning.implementationGateAllows === false, 'non-blocking warnings must still block the implementation gate until the central ladder is clean.');
 
 const acceptedRisk = deriveReadinessFromFindings([
   buildValidationFinding({
@@ -103,11 +104,13 @@ const acceptedRisk = deriveReadinessFromFindings([
 ]);
 assert(acceptedRisk.readiness === 'ready_with_warnings', 'accepted risk must remain visible without pretending to be clean.');
 assert(acceptedRisk.acceptedRiskCount === 1, 'accepted risk must be counted explicitly.');
-assert(acceptedRisk.implementationGateAllows === true, 'accepted risk should allow the gate only as warning evidence.');
+assert(acceptedRisk.readinessLadder === 'PLANNING_READY', 'accepted risk may be planning-ready but not implementation-ready.');
+assert(acceptedRisk.implementationGateAllows === false, 'accepted risk must block clean implementation-ready output until explicitly resolved.');
 
 const incomplete = deriveReadinessFromFindings([], { noFindingState: 'incomplete' });
 assert(incomplete.readiness === 'incomplete', 'missing validation data must be representable as incomplete.');
 assert(incomplete.label === 'Incomplete', 'incomplete readiness needs a user-friendly label.');
+assert(incomplete.readinessLadder === 'DRAFT', 'incomplete validation stays draft-only in the readiness ladder.');
 
 const coverage = buildCoverageSummary({
   domain: 'Addressing',

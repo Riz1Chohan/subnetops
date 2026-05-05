@@ -266,6 +266,9 @@ export interface RequirementMaterializationOutcome {
   materializationStatus: RequirementMaterializationStatus;
   evidenceObjectIds: string[];
   actualEvidence: string[];
+  sourceType: "USER_PROVIDED" | "DERIVED_FROM_USER_INPUT" | "SYSTEM_ASSUMPTION" | "NOT_CAPTURED" | "REVIEW_REQUIRED";
+  readinessImpact: "NONE" | "REVIEW" | "BLOCKING";
+  implementationBlocked: boolean;
   reviewReason?: string;
 }
 
@@ -2067,15 +2070,47 @@ export interface V1ImplementationTemplateFinding { severity: "BLOCKING" | "REVIE
 export interface V1ImplementationTemplateControlSummary { contract: "V1_VENDOR_NEUTRAL_IMPLEMENTATION_TEMPLATES_CONTRACT"; role: "VENDOR_NEUTRAL_TEMPLATES_NO_PLATFORM_COMMANDS_SOURCE_OBJECT_GATED"; overallReadiness: V1ImplementationTemplateReadiness; commandGenerationAllowed: false; vendorSpecificCommandCount: 0; templateCount: number; domainCount: number; readyTemplateCount: number; reviewTemplateCount: number; blockedTemplateCount: number; sourceObjectGapCount: number; requirementLineageGapCount: number; variableGapCount: number; evidenceGapCount: number; rollbackGapCount: number; commandLeakCount: number; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; domainRows: V1ImplementationTemplateDomainRow[]; templateGates: V1ImplementationTemplateGateRow[]; findings: V1ImplementationTemplateFinding[]; proofBoundary: string[]; notes: string[]; }
 
 
+
+export type V1ReadinessLadderState = "BLOCKED" | "REVIEW_REQUIRED" | "DRAFT" | "PLANNING_READY" | "IMPLEMENTATION_READY";
+export type V1ReadinessLadderReasonSeverity = "BLOCKING" | "REVIEW_REQUIRED" | "DRAFT" | "INFO";
+export interface V1ReadinessLadderReason { code: string; severity: V1ReadinessLadderReasonSeverity; detail: string; sourcePath: string; readinessImpact: V1ReadinessLadderState; }
+export interface V1ReadinessLadderControlSummary {
+  contract: "V1_READINESS_LADDER_CONTRACT";
+  role: "CENTRAL_IMPLEMENTATION_READINESS_AUTHORITY";
+  ladder: readonly V1ReadinessLadderState[];
+  overallReadiness: V1ReadinessLadderState;
+  implementationOutputAllowed: boolean;
+  planningOutputAllowed: boolean;
+  reportMayClaimImplementationReady: boolean;
+  diagramMayShowCleanProductionTruth: boolean;
+  aiMayProduceAuthority: false;
+  validationGateAllowsImplementation: boolean;
+  implementationReadinessImpact: "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+  reportReadinessImpact: "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+  diagramReadinessImpact: "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+  blockingReasonCount: number;
+  reviewReasonCount: number;
+  draftReasonCount: number;
+  reasons: V1ReadinessLadderReason[];
+  notes: string[];
+}
+
+
+export interface OmittedEvidenceSummary { collection: string; surface: string; shownCount: number; totalCount: number; omittedCount: number; omittedHasBlockers: boolean; omittedHasReviewRequired: boolean; omittedSeveritySummary: Record<string, number>; readinessImpact: "NONE" | "REVIEW" | "BLOCKING"; exportImpact: string; }
+
 export type V1ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "DURABLE_IPAM" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
 export interface V1ReportSectionGateRow { sectionKey: string; title: string; required: boolean; readinessImpact: V1ReportExportTruthReadiness; reportSection: string; frontendLocation: string; truthLabels: V1ReportTruthLabel[]; evidence: string[]; blockers: string[]; }
 export interface V1ReportTraceabilityMatrixRow { requirementKey: string; requirementLabel: string; designConsequence: string; enginesAffected: string[]; frontendLocation: string; reportSection: string; diagramImpact: string; readinessStatus: V1ReportExportTruthReadiness; missingConsumers: string[]; sourceObjectIds: string[]; }
 export interface V1ReportTruthLabelRow { truthLabel: V1ReportTruthLabel; count: number; reportUsage: string; readinessImpact: V1ReportExportTruthReadiness; evidence: string[]; }
 export interface V1ReportExportTruthFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedSectionKeys: string[]; readinessImpact: V1ReportExportTruthReadiness; remediation: string; }
-export interface V1ReportExportTruthControlSummary { contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT"; role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE"; overallReadiness: V1ReportExportTruthReadiness; requiredSectionCount: number; readySectionCount: number; reviewSectionCount: number; blockedSectionCount: number; traceabilityRowCount: number; missingTraceabilityConsumerCount: number; truthLabelRowCount: number; blockedTruthLabelCount: number; pdfDocxCsvCovered: boolean; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; sectionGates: V1ReportSectionGateRow[]; traceabilityMatrix: V1ReportTraceabilityMatrixRow[]; truthLabelRows: V1ReportTruthLabelRow[]; findings: V1ReportExportTruthFinding[]; proofBoundary: string[]; notes: string[]; }
+export interface V1ReportAntiOverclaimRule { phrase: string; allowedOnlyWhen: "IMPLEMENTATION_READY" | "BACKEND_PROOF_SUPPORTS"; claimAllowed: boolean; replacement: string; evidence: string[]; }
+export interface V1ReportFullEvidenceAppendix { machineReadable: true; generatedFrom: "V1ReportExportTruth"; includesRequirementTraceability: boolean; includesSectionGates: boolean; includesTruthLabels: boolean; includesFindings: boolean; includesOmittedEvidenceSummaries: boolean; includesFullEvidenceInventory: boolean; exportFormats: Array<"PDF" | "DOCX" | "CSV" | "JSON">; }
+export interface V1ReportExportTruthControlSummary { contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT"; role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE"; overallReadiness: V1ReportExportTruthReadiness; requiredSectionCount: number; readySectionCount: number; reviewSectionCount: number; blockedSectionCount: number; traceabilityRowCount: number; missingTraceabilityConsumerCount: number; truthLabelRowCount: number; blockedTruthLabelCount: number; pdfDocxCsvCovered: boolean; fullMachineReadableAppendix: V1ReportFullEvidenceAppendix; implementationReadyClaimAllowed: boolean; productionReadyClaimAllowed: boolean; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; sectionGates: V1ReportSectionGateRow[]; traceabilityMatrix: V1ReportTraceabilityMatrixRow[]; truthLabelRows: V1ReportTruthLabelRow[]; findings: V1ReportExportTruthFinding[]; proofBoundary: string[]; omittedEvidenceSummaries: OmittedEvidenceSummary[]; fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[]; antiOverclaimRules: V1ReportAntiOverclaimRule[]; notes: string[]; }
 
 export type DesignTruthReadiness = "ready" | "review" | "blocked" | "unknown";
+export type BackendDiagramReadinessImpact = "NONE" | "REVIEW" | "BLOCKING";
+export type BackendDiagramV1TruthState = "USER_PROVIDED" | "DERIVED" | "ASSUMED" | "IMPORTED" | "REVIEW_REQUIRED" | "BLOCKED";
 
 export interface BackendTruthFinding { title: string; detail: string; severity: "ERROR" | "WARNING" | "INFO"; source: "design-graph" | "routing" | "security" | "implementation" | "validation"; }
 export interface BackendReportTruthVerificationSummary { checkType: string; totalCount: number; blockedCount: number; reviewCount: number; readyCount: number; }
@@ -2112,6 +2147,11 @@ export interface BackendDiagramRenderNode {
   y: number;
   sourceEngine: "design-graph" | "object-model" | "routing" | "security" | "implementation";
   relatedFindingIds: string[];
+  truthStateV1: BackendDiagramV1TruthState;
+  readinessImpact: BackendDiagramReadinessImpact;
+  sourceRefs: string[];
+  validationRefs: string[];
+  warningBadges: string[];
   notes: string[];
 }
 export interface BackendDiagramRenderEdge {
@@ -2121,8 +2161,14 @@ export interface BackendDiagramRenderEdge {
   targetNodeId: string;
   label: string;
   readiness: DesignTruthReadiness;
+  truthState: NetworkObjectTruthState;
+  truthStateV1: BackendDiagramV1TruthState;
+  readinessImpact: BackendDiagramReadinessImpact;
   overlayKeys: BackendDiagramRenderOverlayKey[];
   relatedObjectIds: string[];
+  sourceRefs: string[];
+  validationRefs: string[];
+  warningBadges: string[];
   notes: string[];
 }
 export interface BackendDiagramRenderGroup {
@@ -2142,6 +2188,18 @@ export interface BackendDiagramRenderOverlay {
   hotspotIndexes: number[];
   detail: string;
 }
+export interface BackendOmittedEvidenceSummary {
+  collection: string;
+  surface: string;
+  shownCount: number;
+  totalCount: number;
+  omittedCount: number;
+  omittedHasBlockers: boolean;
+  omittedHasReviewRequired: boolean;
+  omittedSeveritySummary: Record<string, number>;
+  readinessImpact: string;
+  exportImpact: string;
+}
 export interface BackendDiagramRenderModel {
   summary: {
     nodeCount: number;
@@ -2153,12 +2211,17 @@ export interface BackendDiagramRenderModel {
     contractId?: "V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT";
     truthContract?: "backend-only-render-model";
     modeCount?: number;
+    evidenceWindowCount?: number;
+    omittedEvidenceTotalCount?: number;
+    omittedEvidenceHasBlockers?: boolean;
+    omittedEvidenceHasReviewRequired?: boolean;
   };
   nodes: BackendDiagramRenderNode[];
   edges: BackendDiagramRenderEdge[];
   groups: BackendDiagramRenderGroup[];
   overlays: BackendDiagramRenderOverlay[];
   emptyState?: { reason: string; requiredInputs: string[]; };
+  omittedEvidenceSummaries?: BackendOmittedEvidenceSummary[];
 }
 export interface BackendDiagramTruthModel {
   overallReadiness: DesignTruthReadiness;
@@ -2277,16 +2340,48 @@ export interface V1EngineProofRow {
   blockers: string[];
 }
 
+export interface V1ScenarioAssertion {
+  assertionId: string;
+  description: string;
+  expected: unknown;
+  actual: unknown;
+  status: "PASS" | "FAIL" | "REVIEW";
+}
+
+export interface V1ScenarioExecutionResult {
+  scenarioId: string;
+  scenarioName: string;
+  scenarioCategory: string;
+  inputFixture: unknown;
+  executedAt: string;
+  snapshotResult: unknown;
+  assertions: V1ScenarioAssertion[];
+  affectedEngines: string[];
+  reportEvidence: string[];
+  diagramEvidence: string[];
+  validationEvidence: string[];
+}
+
 export interface V1ScenarioProofRow {
   contract: "V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT";
   scenarioKey: string;
   scenarioName: string;
+  scenarioCategory: string;
   requirementsCovered: string[];
   expectedProofChain: string[];
   expectedEngineStages: number[];
   actualEvidence: string[];
   missingEvidence: string[];
   readinessImpact: V1ProofReadiness;
+  executedAt: string | null;
+  assertionCount: number;
+  passedAssertionCount: number;
+  failedAssertionCount: number;
+  reviewAssertionCount: number;
+  affectedEngines: string[];
+  reportEvidence: string[];
+  diagramEvidence: string[];
+  validationEvidence: string[];
   notes: string[];
 }
 
@@ -2317,6 +2412,7 @@ export interface V1FinalProofPassControlSummary {
   sourceOfTruthLevel: "final-cross-engine-proof-gate";
   overallReadiness: V1ProofReadiness;
   scenarioCount: number;
+  scenarioExecutionResultCount: number;
   scenarioProofReadyCount: number;
   scenarioReviewCount: number;
   scenarioBlockedCount: number;
@@ -2474,6 +2570,9 @@ export interface DesignCoreSnapshot {
     implementationPlanBlockingFindingCount: number;
     designReviewReadiness: DesignTruthReadiness;
     implementationExecutionReadiness: DesignTruthReadiness;
+    readinessLadder: V1ReadinessLadderState;
+    readinessLadderAllowsImplementation: boolean;
+    implementationBlockedByReadinessLadder: boolean;
     readyForBackendAuthority: boolean;
     readyForLiveMappingSplit: boolean;
   };
@@ -2516,6 +2615,7 @@ export interface DesignCoreSnapshot {
   V1PlatformBomFoundation: V1PlatformBomFoundationControlSummary;
   V1DiscoveryCurrentState: V1DiscoveryCurrentStateControlSummary;
   V1AiDraftHelper: V1AiDraftHelperControlSummary;
+  V1ReadinessLadder: V1ReadinessLadderControlSummary;
   V1FinalProofPass: V1FinalProofPassControlSummary;
   requirementsCoverage: RequirementsCoverageSummary;
   requirementsImpactClosure: RequirementsImpactClosureSummary;

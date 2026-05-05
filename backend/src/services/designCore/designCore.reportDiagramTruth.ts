@@ -33,6 +33,78 @@ type FindingRef = {
   affectedObjectIds: string[];
 };
 
+type BackendDiagramRenderNodeDraft = Omit<BackendDiagramRenderNode, "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges"> & Partial<Pick<BackendDiagramRenderNode, "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges">>;
+type BackendDiagramRenderEdgeDraft = Omit<BackendDiagramRenderEdge, "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges"> & Partial<Pick<BackendDiagramRenderEdge, "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges">>;
+
+function diagramReadinessImpact(readiness: DesignTruthReadiness) {
+  if (readiness === "blocked") return "BLOCKING" as const;
+  if (readiness === "review" || readiness === "unknown") return "REVIEW" as const;
+  return "NONE" as const;
+}
+
+function diagramV1TruthState(truthState: NetworkObjectTruthState | undefined | null) {
+  switch (truthState) {
+    case "configured":
+    case "approved":
+    case "durable":
+      return "USER_PROVIDED" as const;
+    case "materialized":
+    case "discovered":
+      return "DERIVED" as const;
+    case "imported":
+      return "IMPORTED" as const;
+    case "review-required":
+      return "REVIEW_REQUIRED" as const;
+    case "blocked":
+      return "BLOCKED" as const;
+    case "inferred":
+    case "proposed":
+    case "planned":
+    default:
+      return "ASSUMED" as const;
+  }
+}
+
+function warningBadges(readiness: DesignTruthReadiness, truthState: NetworkObjectTruthState, notes: string[] = []) {
+  const badges: string[] = [];
+  const v1 = diagramV1TruthState(truthState);
+  if (readiness === "blocked") badges.push("BLOCKED");
+  if (readiness === "review" || readiness === "unknown") badges.push("REVIEW_REQUIRED");
+  if (v1 === "ASSUMED") badges.push("ASSUMED_OR_INFERRED");
+  if (v1 === "IMPORTED") badges.push("IMPORTED_NOT_PROVEN");
+  if (truthState === "review-required") badges.push("SOURCE_REVIEW_REQUIRED");
+  if (notes.some((note) => /omitted|hidden|windowed/i.test(note))) badges.push("OMITTED_EVIDENCE_WARNING");
+  return Array.from(new Set(badges));
+}
+
+function decorateBackendRenderNode(node: BackendDiagramRenderNodeDraft): BackendDiagramRenderNode {
+  const sourceRefs = node.sourceRefs?.length ? node.sourceRefs : [`${node.sourceEngine}:${node.objectId}`];
+  const validationRefs = node.validationRefs?.length ? node.validationRefs : (node.relatedFindingIds.length ? node.relatedFindingIds : [`diagram-readiness:${node.readiness}`]);
+  return {
+    ...node,
+    truthStateV1: node.truthStateV1 ?? diagramV1TruthState(node.truthState),
+    readinessImpact: node.readinessImpact ?? diagramReadinessImpact(node.readiness),
+    sourceRefs,
+    validationRefs,
+    warningBadges: node.warningBadges?.length ? node.warningBadges : warningBadges(node.readiness, node.truthState, node.notes),
+  };
+}
+
+function decorateBackendRenderEdge(edge: BackendDiagramRenderEdgeDraft): BackendDiagramRenderEdge {
+  const truthState = edge.truthState ?? (edge.readiness === "blocked" ? "blocked" : edge.readiness === "ready" ? "materialized" : "review-required");
+  const sourceRefs = edge.sourceRefs?.length ? edge.sourceRefs : (edge.relatedObjectIds.length ? edge.relatedObjectIds.map((id) => `${edge.relationship}:${id}`) : [`diagram-edge:${edge.id}`]);
+  const validationRefs = edge.validationRefs?.length ? edge.validationRefs : [`diagram-edge-readiness:${edge.readiness}`, `diagram-edge-truth:${truthState}`];
+  return {
+    ...edge,
+    truthState,
+    truthStateV1: edge.truthStateV1 ?? diagramV1TruthState(truthState),
+    readinessImpact: edge.readinessImpact ?? diagramReadinessImpact(edge.readiness),
+    sourceRefs,
+    validationRefs,
+    warningBadges: edge.warningBadges?.length ? edge.warningBadges : warningBadges(edge.readiness, truthState, edge.notes),
+  };
+}
+
 function normalizeReadiness(value: string | undefined | null): DesignTruthReadiness {
   return value === "ready" || value === "review" || value === "blocked" ? value : "unknown";
 }
@@ -290,11 +362,11 @@ function buildProfessionalTopologyRenderModel(networkObjectModel: NetworkObjectM
     sitePoints.set(site.siteId, { x: branchStartX + column * branchGapX, y: branchStartY + row * branchGapY });
   });
 
-  const addNode = (node: BackendDiagramRenderNode) => {
-    if (!renderNodes.some((existing) => existing.id === node.id)) renderNodes.push(node);
+  const addNode = (node: BackendDiagramRenderNodeDraft) => {
+    if (!renderNodes.some((existing) => existing.id === node.id)) renderNodes.push(decorateBackendRenderNode(node));
   };
-  const addEdge = (edge: BackendDiagramRenderEdge) => {
-    if (!renderEdges.some((existing) => existing.id === edge.id)) renderEdges.push(edge);
+  const addEdge = (edge: BackendDiagramRenderEdgeDraft) => {
+    if (!renderEdges.some((existing) => existing.id === edge.id)) renderEdges.push(decorateBackendRenderEdge(edge));
   };
 
   const routeDomain = networkObjectModel.routeDomains[0];

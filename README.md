@@ -1079,3 +1079,1032 @@ static check: package versions remain 1.0.0
 ```
 
 Important limitation: the full scenario matrix could not execute in this container because dependency installation is unavailable and `@prisma/client` is not installed. The scenario matrix must still be run locally or in CI with dependencies installed.
+
+## Consolidated repair history
+
+The project keeps all durable documentation in this root README. Historical repair notes that previously lived as separate Markdown files are folded here so the repository has one documentation source of truth.
+
+### Foundation/build-truth repair
+
+Scope: build/truth-gate repair only. This pass intentionally does not include the broader Pass 2 network-engineer trust/validation improvements.
+
+Changes:
+- Root release gate now runs real backend Prisma generation, backend TypeScript build, and frontend production build before the custom V1 proof scripts.
+- Existing V1 custom proof scripts moved under `check:quality`; `check:v1` now runs `check:build` first.
+- Durable enterprise IPAM truth-source labels were normalized from `ENGINE2_DURABLE` to `DURABLE_IPAM` where the shared `DesignTruthSourceType` contract expects it.
+- `ENGINE2_DURABLE_CANDIDATE` and `ENGINE2_DURABLE_AUTHORITY` state/authority labels were preserved because they are distinct workflow states, not generic truth-source labels.
+- Backend production TypeScript build now excludes `*.selftest.ts`; selftests remain runnable through their explicit npm scripts.
+- Backend build script no longer uses `--listEmittedFiles`.
+- The implementation-plan bridge in `designCore.networkObjectModel.ts` now explicitly casts the full backend model into the implementation domain's narrower facade.
+- Starter template subnet/gateway mismatches were fixed so gateways live inside their declared subnet CIDRs.
+
+Validation performed in the repair session before packaging:
+- Backend TypeScript build passed after these changes.
+- Frontend TypeScript/Vite production build passed after these changes.
+
+Known Pass 2 work:
+- Tighten write-time CIDR/gateway validation or add explicit invalid-draft state.
+- Add golden scenario tests across requirements → materialization → IPAM → validation → diagram → report/export.
+- Prove reports and diagrams never claim readiness beyond backend validation evidence.
+
+### Network-engineer trust repair
+
+Pass 2 hardens the V1 package for network-engineer trust without expanding scope into vendor config generation, live discovery, or advanced routing simulation.
+
+## Repairs
+
+- Added write-time engineering validation for VLAN CIDR/gateway pairs.
+- Blocked gateway-outside-subnet, gateway-as-broadcast/network address, invalid IPv4 notation, and non-canonical CIDR writes.
+- Added service-layer merged update validation so gateway-only or subnet-only edits cannot drift from the saved companion field.
+- Added site default-address-block write validation.
+- Added validation result readiness metadata: `readinessState`, `engineeringReviewState`, and `canClaimReady`.
+- Hardened diagram readiness so planned/proposed/inferred/imported/review-required objects cannot render as `ready` just because no finding points at them.
+- Hardened report/export readiness so a READY document with review findings, blocking findings, missing proof boundary, missing section evidence, or verified sections carrying limitations cannot claim ready.
+- Added `selftest:network-engineer-trust` and wired it into backend `selftest:all`.
+- Added root `check:trust` and inserted it between real builds and release quality checks.
+
+## Scope deliberately not added
+
+- No vendor-specific config compiler.
+- No live network discovery.
+- No BGP/OSPF/VRF implementation-depth simulation.
+- No frontend-invented diagram topology.
+
+### README-only documentation gate
+
+SubnetOps documentation must remain README-only. Do not create standalone Markdown notes, pass notes, release notes, or docs-folder Markdown files outside this README. Any durable project note, repair note, proof map, limitation, or release explanation must be folded into this file.
+
+Enforced command:
+
+```text
+npm run check:docs
+```
+
+The gate fails if any Markdown file exists outside `README.md`.
+
+## Service write-path validation repair
+
+Manual engineering writes now have a dedicated service-layer validation boundary before persisted data is changed.
+
+Current service write-path rules:
+
+- VLAN create requests validate subnet CIDR and gateway usability before the database write.
+- VLAN update requests merge the saved VLAN state with the patch payload before validation. A partial update is never validated as if missing persisted fields do not exist.
+- A gateway-only VLAN update cannot move the gateway outside the saved subnet.
+- A subnet-only VLAN update cannot strand the saved gateway outside the new subnet.
+- Noncanonical VLAN subnet CIDR values are rejected instead of normalized silently.
+- Network and broadcast addresses cannot be saved as normal VLAN gateways.
+- DHCP scope writes validate the scope CIDR, default gateway usability, selected VLAN parent subnet, and selected allocation parent when those relationships are present.
+- Generated or manual writes must use the same addressing validation boundary instead of private one-off checks.
+
+New backend files for this repair:
+
+```text
+backend/src/domain/addressing/addressing-validation.ts
+backend/src/services/engineeringWritePaths.ts
+backend/src/services/engineeringWritePaths.selftest.ts
+scripts/check-service-validation-coverage.cjs
+```
+
+The addressing validation module exports the shared validator names used by write paths and schema refinements:
+
+```text
+validateSiteAddressBlock
+validateVlanAddressing
+validateDhcpScope
+validateGateway
+validateCanonicalCidr
+```
+
+Service coverage gates:
+
+```bash
+npm --prefix backend run selftest:engineering-write-paths
+npm --prefix backend run selftest:services
+node scripts/check-service-validation-coverage.cjs
+```
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-service-validation-coverage.cjs
+npm run check:quality
+```
+
+All three passed in the repair container. The full root check still requires backend and frontend dependencies to be installed first; without those dependencies, `npm run check:v1` stops at Prisma client generation because the Prisma CLI is unavailable in `backend/node_modules`.
+
+## Centralized engineering validation repair
+
+This repair strengthens the shared addressing validation boundary so service writes and generated writes use one validation brain instead of scattered one-off checks.
+
+Current centralized validation rules:
+
+- `backend/src/domain/addressing/addressing-validation.ts` remains the pure domain validation source for site address blocks, VLAN subnet/gateway pairs, DHCP scopes, gateway usability, and canonical IPv4 CIDR checks.
+- `backend/src/services/engineeringWritePaths.ts` is the service write-path adapter. It converts pure validation failures into API errors and exposes the same validation entry points for manual writes and generated writes.
+- Manual VLAN create/update writes continue to validate through the shared service write-path adapter.
+- Manual site create/update writes now validate through the shared service write-path adapter instead of keeping a private validator path in `site.service.ts`.
+- Requirement materialization now validates every generated site address block, VLAN subnet/gateway pair, and DHCP scope before database create/update calls.
+- Project template creation validates all template site blocks and VLAN addressing before writing template objects.
+- Project duplication validates copied site blocks and VLAN addressing before writing the duplicate project. Bad legacy saved addressing can no longer be cloned as clean data.
+- DHCP scope validation in Enterprise IPAM remains bound to selected VLAN subnet and selected allocation parent when those relationships are present.
+- Site default address blocks now use the canonical CIDR validator, so host-bit CIDRs such as `10.30.1.9/24` are rejected instead of silently accepted.
+
+Centralization proof points:
+
+```text
+backend/src/domain/addressing/addressing-validation.ts
+backend/src/services/engineeringWritePaths.ts
+backend/src/services/site.service.ts
+backend/src/services/vlan.service.ts
+backend/src/services/requirementsMaterialization.service.ts
+backend/src/services/project.service.ts
+backend/src/services/enterpriseIpam.service.ts
+backend/src/services/engineeringWritePaths.selftest.ts
+scripts/check-service-validation-coverage.cjs
+```
+
+Service coverage gates now check that:
+
+- site service uses `buildSiteWriteCandidate` before site updates;
+- VLAN service uses `buildVlanWriteCandidate` before VLAN updates;
+- requirement materialization calls generated-object validators before site/VLAN/DHCP writes;
+- project templates and project duplication validate generated/copied addressing before write;
+- Enterprise IPAM DHCP scope validation is still parent-bound;
+- the pure addressing validation domain does not import Prisma, Express, controllers, or service code.
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-service-validation-coverage.cjs
+npm run check:quality
+```
+
+All three passed in the repair container. Backend selftests and the full root `check:v1` still require dependencies to be installed first; without `backend/node_modules`, `tsx` and Prisma are unavailable.
+
+## Requirement materialization source truth
+
+Requirement materialization must not convert missing survey fields into fake engineering intent. The materializer now treats capacity-sensitive fields as source-classified signals instead of silent defaults.
+
+Source classifications used by generated objects:
+
+```text
+USER_PROVIDED
+DERIVED_FROM_USER_INPUT
+SYSTEM_ASSUMPTION
+NOT_CAPTURED
+REVIEW_REQUIRED
+```
+
+Rules:
+
+- Missing `usersPerSite` must not become 50 users.
+- Missing `siteCount` must not be presented as confirmed user intent.
+- A baseline USERS segment may exist for planning visibility, but its capacity must be `REVIEW_REQUIRED` when user count is not captured.
+- Review-required capacity blocks implementation-ready DHCP scope creation.
+- Materialized VLAN notes must preserve source references, capacity source, readiness impact, and implementation-blocking status.
+- Reports, diagrams, implementation templates, and frontend summaries may show review-required planning candidates, but must not claim final sizing confidence until backend evidence proves the input.
+- The requirements form must not prefill site count or users per site with values that look user-selected.
+
+The source-truth regression gate is:
+
+```bash
+node scripts/check-requirement-materialization-source-truth.cjs
+```
+
+It is included in:
+
+```bash
+npm run check:quality
+```
+
+## Explicit read-repair policy
+
+Saved requirements may be used to repair missing or incomplete durable design rows, but read-repair is no longer a silent side effect. Any service that can trigger read-repair must declare the operation, authorization boundary, evidence destination, and audit path before mutation is allowed.
+
+Current read-repair source paths:
+
+```text
+backend/src/services/readRepairPolicy.ts
+backend/src/services/readRepairPolicy.selftest.ts
+scripts/check-no-silent-read-repair.cjs
+```
+
+Read-repair is allowed only when all of the following are true:
+
+- saved `requirementsJson` exists
+- materialized site, VLAN, addressing, or DHCP rows are missing or incomplete
+- the caller declares an explicit read operation such as `project-read`, `sites-read`, `vlans-read`, `design-core-read`, `validation-read`, `export-read`, or `report-read`
+- the caller declares the authorization boundary that already permitted the read
+- the repair creates a structured evidence object
+- the repair writes an explicit change log entry
+- the repair writes a security audit event
+- the result is surfaced to the relevant response, design-core path, validation path, or report/export path
+
+Read-repair evidence includes:
+
+```text
+action
+projectId
+operation
+reason
+authorizedBy
+beforeState
+afterState
+createdObjects
+updatedObjects
+skippedObjects
+reviewRequiredObjects
+blockedImplementationObjects
+materializationStatus
+repairLogged
+surfacedTo
+```
+
+A normal read that does not need repair returns a no-op evidence object instead of pretending nothing happened. A caller that omits an authorization declaration is blocked before mutation.
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-no-silent-read-repair.cjs
+npm run check:quality
+```
+
+The full `npm run check:v1` command still requires installed backend dependencies because Prisma and TSX are not available in the repair container. Re-run it locally or in CI after dependency installation.
+
+## Scenario-executed final proof
+
+The final proof pass must not pass from static expected summaries. It now consumes scenario execution results produced by the backend scenario matrix. A final proof row is valid only when it has an executed scenario result with snapshot evidence, assertion results, affected engines, report evidence, diagram evidence, and validation evidence.
+
+Current source paths:
+
+```text
+backend/src/domain/proof/types.ts
+backend/src/domain/proof/final-proof.ts
+backend/src/lib/scenarioMatrix.execution.ts
+backend/src/lib/scenarioMatrix.fixtures.ts
+backend/src/lib/scenarioMatrix.selftest.ts
+backend/src/lib/finalProofPass.selftest.ts
+scripts/check-final-proof-scenario-execution.cjs
+```
+
+Required scenario execution shape:
+
+```text
+scenarioId
+scenarioName
+scenarioCategory
+inputFixture
+executedAt
+snapshotResult
+assertions[] with PASS / FAIL / REVIEW
+affectedEngines
+reportEvidence
+diagramEvidence
+validationEvidence
+```
+
+Rules:
+
+- Final proof must block when `scenarioExecutionResults` is missing.
+- Final proof must not keep a static scenario registry as proof.
+- Scenario rows are graded from actual assertion statuses, not from the presence of expected engine stages.
+- Failed scenario assertions make the final proof `BLOCKED`.
+- Review scenario assertions make the final proof `REVIEW_REQUIRED`.
+- Passing scenario assertions make the row `PROOF_READY`, but only after a backend design-core snapshot was actually executed.
+- The scenario matrix selftest must execute real backend snapshots through `buildDesignCoreSnapshot`.
+- The final proof selftest must feed real scenario matrix execution results into `buildV1FinalProofPassControl`.
+
+The regression gate is:
+
+```bash
+node scripts/check-final-proof-scenario-execution.cjs
+```
+
+It is included in:
+
+```bash
+npm run check:quality
+```
+
+Trust impact:
+
+```text
+old: expected scenario exists -> final proof may pass
+new: scenario ran -> assertions produced -> evidence preserved -> final proof grades PASS / REVIEW / FAIL
+```
+
+That means final proof can no longer pass because a scenario name or expected stage list exists. It passes only from executed scenario evidence.
+
+## Omitted evidence preservation and counters
+
+SubnetOps now treats evidence windowing as a trust boundary. Any surface that trims rows for readability must expose a counter summary so hidden blockers or review-required items cannot disappear behind `.slice()` output.
+
+Shared omitted-evidence model:
+
+```text
+backend/src/domain/evidence/omitted-evidence.ts
+backend/src/domain/evidence/omitted-evidence.selftest.ts
+scripts/check-omitted-evidence-counters.cjs
+```
+
+Every omitted-evidence summary records:
+
+```text
+collection
+surface
+shownCount
+totalCount
+omittedCount
+omittedHasBlockers
+omittedHasReviewRequired
+omittedSeveritySummary
+readinessImpact
+exportImpact
+```
+
+Applied surfaces:
+
+- requirement traceability rows
+- report section gates and report findings
+- validation/check evidence
+- review queues
+- VLAN/addressing rows
+- site summaries
+- network interfaces and DHCP pools
+- routing rows and routing findings
+- security flow requirements and security policy findings
+- implementation steps, verification checks, rollback actions, and vendor-neutral templates
+- diagram render nodes, diagram render edges, policy-rule windows, security-zone windows, hotspot windows, and dangling-edge repair prompts
+
+Rules:
+
+- A sliced visible table is allowed only when the omitted counter states shown, total, and omitted counts.
+- Hidden blockers must set `omittedHasBlockers` and keep readiness blocking.
+- Hidden review-required rows must set `omittedHasReviewRequired` and keep readiness review-gated.
+- Diagram render models expose `omittedEvidenceSummaries` and rollup flags in the render summary.
+- Report/export truth exposes `omittedEvidenceSummaries` and `fullEvidenceInventory`.
+- Professional, technical, and full-proof reports include a `V1 Omitted Evidence Summary` section so a clean visible table cannot hide unresolved evidence.
+
+Regression gates:
+
+```bash
+npm --prefix backend run selftest:omitted-evidence
+node scripts/check-omitted-evidence-counters.cjs
+npm run check:quality
+```
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-omitted-evidence-counters.cjs
+npm run check:quality
+```
+
+All three passed in the repair container. The full `npm run check:v1` command still requires installed backend dependencies because Prisma and TSX are not available in the repair container.
+
+## Project-level CIDR validation
+
+SubnetOps now treats the project `basePrivateRange` as an engineering input, not a loose text label. A max-length string check is not enough for a network design tool.
+
+Shared validation source:
+
+```text
+backend/src/domain/addressing/addressing-validation.ts
+backend/src/validators/project.schemas.ts
+backend/src/services/engineeringWritePaths.ts
+scripts/check-project-cidr-validation.cjs
+```
+
+Allowed project base-range states:
+
+```text
+blank / null -> allowed as planning not captured
+10.0.0.0/8 -> allowed
+172.16.0.0/12 -> allowed
+192.168.0.0/16 -> allowed
+canonical RFC1918 subnet inside those blocks -> allowed
+```
+
+Rejected states:
+
+```text
+10.0.0.9/24 -> rejected because it is not on the network boundary
+999.1.1.1/24 -> rejected as malformed IPv4 CIDR
+hello -> rejected as non-CIDR text
+8.8.8.0/24 -> rejected as public/non-RFC1918 clean project truth
+172.0.0.0/8 -> rejected because it crosses outside private RFC1918 space
+```
+
+Rules:
+
+- `basePrivateRange` must be blank or valid canonical IPv4 CIDR.
+- Saved clean project base ranges must be fully contained in RFC1918 private IPv4 space.
+- Public CIDR space is not saved as clean project truth. A future explicit exception/review workflow may model it, but the default write path rejects it.
+- Create/update project writes call the same shared validation brain as service write-path tests.
+- Project templates and duplication validate the base range before creating copied engineering truth.
+- Blank values are normalized to `null`, meaning the parent addressing block is not captured yet.
+
+Regression gates:
+
+```bash
+node scripts/check-project-cidr-validation.cjs
+npm run check:quality
+```
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-project-cidr-validation.cjs
+npm run check:quality
+```
+
+Those static gates pass in the repair container. The full `npm run check:v1` command still requires installed backend dependencies because Prisma and TSX are not available in the repair container.
+
+## Centralized readiness ladder repair
+
+SubnetOps now has a backend-only readiness ladder so validation, implementation planning, vendor-neutral templates, reports/exports, diagrams, frontend summary cards, and AI helper output cannot each invent their own meaning of “ready.”
+
+Readiness ladder order:
+
+```text
+BLOCKED → REVIEW_REQUIRED → DRAFT → PLANNING_READY → IMPLEMENTATION_READY
+```
+
+Contract marker:
+
+```text
+V1_READINESS_LADDER_CONTRACT
+```
+
+Rules enforced by the ladder:
+
+- Invalid addressing or IPAM conflict evidence produces `BLOCKED`.
+- Missing capacity source, including missing `usersPerSite`, produces `REVIEW_REQUIRED` and blocks final prefix/DHCP confidence.
+- Inferred security policy output produces `REVIEW_REQUIRED` until reviewed.
+- Omitted blockers from sliced evidence produce `BLOCKED`; omitted review-required evidence produces `REVIEW_REQUIRED`.
+- Generated objects without validation/source-object proof cannot become `IMPLEMENTATION_READY`.
+- Reports may not claim implementation-ready unless the ladder is `IMPLEMENTATION_READY`.
+- Diagrams may not show clean production truth unless the ladder is `IMPLEMENTATION_READY`.
+- Vendor-neutral implementation templates remain gated by the ladder.
+- AI helper output remains draft-only and cannot produce engineering authority.
+- Frontend summary cards must display the backend ladder state instead of manufacturing readiness.
+
+The ladder is implemented in:
+
+```text
+backend/src/domain/readiness/readiness-ladder.ts
+backend/src/services/designCore/designCore.readinessLadderControl.ts
+```
+
+Regression gate:
+
+```bash
+node scripts/check-readiness-ladder-enforcement.cjs
+```
+
+This repair does not make the product magically implementation-ready. It does the opposite: it prevents the product from sounding implementation-ready when validation, capacity, security, omitted evidence, generated objects, reports, diagrams, templates, or AI evidence do not support that claim.
+
+## Diagram truth enforcement repair
+
+SubnetOps now treats diagram render output as evidence, not decoration. Every backend-rendered diagram node and edge carries explicit truth and validation metadata so the canvas cannot make inferred, assumed, imported, review-required, or blocked objects look like clean production topology.
+
+Diagram enforcement fields on render nodes and edges:
+
+```text
+truthState
+truthStateV1
+readinessImpact
+sourceRefs
+validationRefs
+warningBadges
+```
+
+V1 diagram truth states:
+
+```text
+USER_PROVIDED
+DERIVED
+ASSUMED
+IMPORTED
+REVIEW_REQUIRED
+BLOCKED
+```
+
+Diagram enforcement rules:
+
+- Invalid or blocked topology evidence must render with `readinessImpact: BLOCKING`.
+- Review-required topology evidence must render with `readinessImpact: REVIEW`.
+- Inferred, proposed, or planned diagram objects must not appear as clean production truth.
+- Imported evidence is visible but not treated as proven production truth without validation refs.
+- Diagram edges now carry truth state and source lineage, not just endpoints and labels.
+- Every node and edge exposes source refs and validation refs for traceability.
+- Warning badges identify blocked, review-required, assumed/inferred, imported, source-review, and omitted-evidence states.
+- Omitted blockers/review-required rows from diagram evidence windows stay surfaced through rollup warnings.
+- The frontend may show badges, refs, layout, filters, and selection details, but may not manufacture backend engineering truth.
+
+Implementation paths:
+
+```text
+backend/src/domain/diagram/types.ts
+backend/src/domain/diagram/render-model.ts
+backend/src/domain/diagram/coverage.ts
+backend/src/services/designCore/designCore.diagramTruthControl.ts
+backend/src/services/designCore.types.ts
+frontend/src/lib/designCoreSnapshot.ts
+frontend/src/features/diagram/components/BackendDiagramCanvas.tsx
+scripts/check-diagram-truth-enforcement.cjs
+```
+
+Regression gate:
+
+```bash
+node scripts/check-diagram-truth-enforcement.cjs
+```
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-diagram-truth-enforcement.cjs
+npm run check:quality
+```
+
+Those gates pass in the repair container. Full `npm run check:v1` still requires installed backend dependencies because `prisma` is unavailable in the repair container.
+
+## Report/export truth repair
+
+SubnetOps now treats reports and exports as backend evidence deliverables, not marketing copy. A report may summarize evidence, but it must not claim deployment readiness, production readiness, completeness, validation, or best-practice compliance unless backend proof and the central readiness ladder explicitly allow that claim.
+
+Report/export truth contract marker:
+
+```text
+V1_REPORT_EXPORT_TRUTH_CONTRACT
+```
+
+Report/export rules now enforced:
+
+- Executive summaries must carry the backend readiness status.
+- Blocking issues and review-required issues must remain visible in the report and export surfaces.
+- Assumptions, limitations, and proof boundaries must be included.
+- Requirement traceability must show requirement consequence, affected engines, frontend location, report section, diagram impact, and readiness.
+- Materialized object evidence, addressing evidence, IPAM evidence, routing evidence, security evidence, diagram truth evidence, implementation readiness, and validation evidence must remain connected to backend proof.
+- Omitted evidence summaries must expose shown count, total count, omitted count, omitted blockers, omitted review-required items, severity rollups, readiness impact, and export impact.
+- A full evidence inventory must be available for machine-readable export so shortened report tables do not hide blockers.
+- PDF, DOCX, CSV, and JSON-style evidence surfaces must preserve the same truth gates.
+- Clean phrases such as `ready for deployment`, `validated`, `complete`, `best practice compliant`, `production-ready`, and `implementation-ready` are blocked unless backend report/export proof and the readiness ladder allow them.
+- When clean claims are not allowed, report text is rewritten toward blocked, review-required, or planning-only wording.
+
+Implementation paths:
+
+```text
+backend/src/domain/reporting/types.ts
+backend/src/domain/reporting/report-export-truth.ts
+backend/src/domain/reporting/section-model.ts
+backend/src/domain/reporting/export-gates.ts
+backend/src/domain/reporting/reporting-domain.selftest.ts
+backend/src/services/exportDesignCoreReport.service.ts
+backend/src/services/export.service.ts
+backend/src/services/designCore.types.ts
+frontend/src/lib/designCoreSnapshot.ts
+scripts/check-no-report-overclaim.cjs
+```
+
+Regression gate:
+
+```bash
+node scripts/check-no-report-overclaim.cjs
+```
+
+Validation performed during this update:
+
+```text
+npm run check:docs
+node scripts/check-no-report-overclaim.cjs
+npm run check:quality
+```
+
+Those static gates pass in the repair container. Full `npm run check:v1` still requires installed backend and frontend dependencies because `prisma`, `tsx`, and build tooling are not available in the repair container.
+
+## API/service/database integration proof
+
+SubnetOps now includes an integration-style proof harness for the product chain rather than relying only on isolated helper selftests.
+
+Integration proof file:
+
+```text
+backend/src/services/apiServiceDatabaseIntegration.selftest.ts
+```
+
+The harness uses an in-memory Prisma-like transaction to prove the same class of flow the product depends on:
+
+```text
+save requirements
+→ materialize requirements into durable site/VLAN/DHCP rows
+→ read the repaired project state
+→ build a design-core snapshot
+→ derive validation evidence
+→ render diagram evidence
+→ build report/export evidence
+→ preserve a full machine-readable appendix
+```
+
+Required integration scenarios covered by the harness:
+
+| Scenario | Required proof |
+| --- | --- |
+| Valid requirements | Materialization creates durable rows and design-core consumes them. |
+| Missing `usersPerSite` | Capacity becomes review-required and implementation output stays blocked. |
+| Invalid gateway save attempt | Bad partial VLAN update is rejected before persistence. |
+| Existing project reload | Materialization updates existing rows and does not duplicate them. |
+| Read-repair required | Explicit read-repair evidence lists before/after state and created objects. |
+| Diagram evidence sliced | Omitted diagram evidence exposes hidden blockers. |
+| Report evidence sliced | Full machine-readable appendix is preserved. |
+| Inferred security policy | Security policy remains review-required, not final implementation truth. |
+| Missing WAN intent | Routing stays review-required when multi-site requirements lack WAN detail. |
+| Invalid `basePrivateRange` | Public/malformed project CIDR is rejected or blocked before clean persistence. |
+
+Regression gate:
+
+```bash
+node scripts/check-api-service-database-integration-proof.cjs
+```
+
+The backend exposes:
+
+```bash
+npm --prefix backend run selftest:api-service-database-integration
+npm --prefix backend run selftest:integration-proof
+```
+
+The root trust and quality gates include this proof so the chain cannot silently slide back to helper-only validation.
+
+## CI gate restructuring
+
+The release gate is now split into explicit root gates instead of hiding dependency-backed checks behind one early command.
+
+Root scripts:
+
+```text
+npm run check:docs
+npm run check:quality
+npm run check:backend
+npm run check:frontend
+npm run check:trust
+npm run check:proof
+npm run check:v1
+```
+
+`check:v1` runs the gates in this order:
+
+```text
+check:docs -> check:quality -> check:backend -> check:frontend -> check:trust -> check:proof
+```
+
+That order matters. Static repository rules run before build work. Backend and frontend build gates run only after dependencies exist. Trust and proof gates run after the code can compile and Prisma client generation is available.
+
+Backend selftest groups are now explicit:
+
+```text
+npm --prefix backend run selftest:domain
+npm --prefix backend run selftest:services
+npm --prefix backend run selftest:scenario
+npm --prefix backend run selftest:proof
+npm --prefix backend run selftest:all
+```
+
+The CI workflow now installs dependencies before running dependency-backed gates:
+
+```text
+checkout
+setup Node 20.12.2
+npm ci at repository root
+npm ci in backend
+npm ci in frontend
+generate Prisma client
+apply Prisma migrations
+run backend checks
+run frontend checks
+run root quality checks
+run root trust checks
+run root proof checks
+run final check:v1
+build backend and frontend containers
+```
+
+The root repository now includes `package-lock.json` so the root `npm ci` step is real and reproducible.
+
+Regression guard:
+
+```text
+node scripts/check-ci-hardening.cjs
+```
+
+That guard now fails if:
+
+- `check:v1` is not split into docs, quality, backend, frontend, trust, and proof gates
+- backend scenario/proof/domain/service selftest groups are missing
+- CI runs `check:v1` before backend or frontend dependencies are installed
+- Prisma generation or migrations are missing from CI
+- CI falls back to unsafe Prisma schema push
+- production startup bypasses the migration-safe entrypoint
+
+Validation performed in the repair container:
+
+```text
+npm run check:docs
+node scripts/check-ci-hardening.cjs
+npm run check:quality
+```
+
+Those static gates pass. Full `npm run check:v1` still requires installed backend and frontend dependencies because Prisma, TSX, TypeScript, and Vite are not available in this repair container until dependency installation runs.
+
+## Regression kill-switch checks
+
+SubnetOps now treats the trust rules as executable guards, not reminders. The static quality gate includes kill switches that fail the repository when old weak patterns come back.
+
+Required guards:
+
+| Guard | Blocks |
+| --- | --- |
+| `scripts/check-readme-only.cjs` | Extra standalone Markdown documentation outside the single root `README.md`. |
+| `scripts/check-no-frontend-engineering-facts.cjs` | Browser-side CIDR math, VLAN generation, route/security policy generation, or frontend fallback authority. |
+| `scripts/check-service-validation-coverage.cjs` | Manual or generated service writes bypassing shared addressing validation. |
+| `scripts/check-requirement-materialization-source-truth.cjs` | Missing capacity becoming fake user intent or implementation-ready DHCP/addressing truth. |
+| `scripts/check-no-silent-read-repair.cjs` | Read paths mutating project state without authorization, audit evidence, and surfaced repair evidence. |
+| `scripts/check-final-proof-scenario-execution.cjs` | Final proof passing from static expected summaries instead of executed scenario results. |
+| `scripts/check-omitted-evidence-counters.cjs` | Sliced evidence hiding omitted blockers or review-required items. |
+| `scripts/check-project-cidr-validation.cjs` | Bad project base CIDRs entering as clean values. |
+| `scripts/check-readiness-ladder-enforcement.cjs` | Implementation-ready output bypassing the central readiness ladder. |
+| `scripts/check-diagram-truth-enforcement.cjs` | Diagram nodes/edges missing truth state, source refs, validation refs, or omitted-evidence warnings. |
+| `scripts/check-no-diagram-clean-inference.cjs` | Assumed, inferred, proposed, or planned diagram evidence being marked clean. |
+| `scripts/check-no-report-overclaim.cjs` | Reports/exports claiming production-ready, implementation-ready, complete, validated, or best-practice-compliant without backend proof. |
+| `scripts/check-api-service-database-integration-proof.cjs` | Trust proof sliding back to isolated helper tests instead of product-like API/service/database flow coverage. |
+| `scripts/check-regression-kill-switches.cjs` | Any required kill switch being deleted or removed from `check:quality`. |
+
+Run all static kill switches with:
+
+```bash
+npm run check:quality
+```
+
+The kill switches are intentionally blunt. If a future change wants browser-generated engineering facts, clean inferred diagrams, silent read-repair, hidden blockers, or report overclaims, it has to break the gate loudly instead of quietly rotting the product.
+
+## SubnetOps V1 proof map
+
+Proof map marker:
+
+```text
+V1_README_PROOF_MAP
+```
+
+This section is the single README-owned proof map for V1. It replaces separate phase notes, handoff files, docs/doc files, and version-sidecar documents. README.md is the single repository documentation file.
+
+### Engineering Truth Contract
+
+SubnetOps must never invent engineering facts. User intent, derived design data, assumptions, validation results, implementation readiness, report claims, and diagram truth must be traceable to backend evidence.
+
+Permanent rules:
+
+- Frontend code may display, filter, sort, expand, collapse, and visualize backend evidence, but it must not calculate final subnets, VLANs, gateways, routing, security policy, or implementation readiness.
+- Reports and exports must not claim `production-ready`, `implementation-ready`, `ready for deployment`, `validated`, `complete`, or `best practice compliant` unless backend proof and the readiness ladder allow the claim.
+- Diagrams must not render assumed, inferred, proposed, imported, or review-required objects as clean production truth.
+- Read paths must not mutate state silently. No silent mutation. Any read-repair must be authorized, audited, and surfaced as evidence.
+- Missing user input must become review-required or blocked evidence, not fake defaults that pretend the user selected a value.
+- README-only documentation remains mandatory. New notes go into this README, not separate Markdown files.
+
+### Requirement Propagation Contract
+
+Every requirement must follow this evidence chain:
+
+```text
+requirement input
+→ normalized requirement signal
+→ materialized source object or explicit no-op/review reason
+→ backend design-core input
+→ engine-specific computation
+→ traceability evidence
+→ validation/readiness impact
+→ frontend display
+→ report/export impact
+→ diagram impact where relevant
+→ test/golden scenario proof
+```
+
+No ghost outputs are allowed. A frontend card, diagram edge, export sentence, or report claim must be backed by a backend source object, an explicit review/no-op reason, or validation evidence.
+
+### README-only documentation rule
+
+README-only documentation rule:
+
+```bash
+npm run check:docs
+```
+
+The guard is:
+
+```text
+scripts/check-readme-only.cjs
+```
+
+The repository must have one Markdown documentation file only:
+
+```text
+README.md
+```
+
+Do not create standalone markdown notes, separate pass notes, docs/doc folders, release sidecars, or temporary implementation notes outside this README.
+
+### Validation gates
+
+Validation gates are intentionally layered:
+
+| Gate | Purpose |
+| --- | --- |
+| `scripts/check-service-validation-coverage.cjs` | No DB write may create or update engineering address objects unless it passes shared validation or produces explicit review/blocked/no-op evidence. |
+| `scripts/check-requirement-materialization-source-truth.cjs` | Missing `siteCount`, `usersPerSite`, capacity, DHCP, or addressing data cannot become fake user intent. |
+| `scripts/check-project-cidr-validation.cjs` | Project `basePrivateRange` cannot accept malformed, noncanonical, or public CIDR as clean truth. |
+| `scripts/check-readiness-ladder-enforcement.cjs` | Implementation output cannot bypass the central readiness ladder. |
+| `scripts/check-no-silent-read-repair.cjs` | Read repair requires authorization, logging, surfaced evidence, and `READ_REPAIR_MATERIALIZATION` evidence. |
+| `scripts/check-omitted-evidence-counters.cjs` | Sliced evidence must expose `omittedHasBlockers`, omitted review-required items, severity rollups, and export impact. |
+| `scripts/check-regression-kill-switches.cjs` | Required kill switches cannot be deleted or removed from quality checks. |
+| `scripts/check-readme-proof-map.cjs` | This consolidated proof map must remain in the single README. |
+
+The shared addressing validation source is:
+
+```text
+backend/src/domain/addressing/addressing-validation.ts
+```
+
+Core write rule:
+
+```text
+existing persisted object + patch payload
+→ candidate object
+→ shared validation
+→ DB write or explicit blocked/review/no-op evidence
+```
+
+No DB write may create or update engineering address objects unless this boundary is respected.
+
+### Scenario proof matrix
+
+Final proof must consume executed scenario evidence, not static expected summaries.
+
+Required proof markers:
+
+```text
+scenarioExecutionResults
+executeV1ScenarioMatrix
+```
+
+Final proof cannot pass because an expected scenario row exists. It can pass only when scenarios execute and produce assertions with actual evidence.
+
+Minimum V1 scenario coverage:
+
+| Scenario | Required evidence |
+| --- | --- |
+| Clean small branch network | Planning-ready materialization, validation evidence, diagram/report evidence. |
+| Multi-site enterprise | Multi-site requirements, addressing/IPAM evidence, routing/security review impact. |
+| Missing capacity input | Capacity review-required, no fake `50 users`, no implementation-ready DHCP. |
+| Invalid gateway | Rejected before write. |
+| Invalid CIDR | Malformed/noncanonical CIDR rejected or blocked. |
+| Overlapping subnet | Validation evidence blocks or flags design. |
+| Partial VLAN update | Existing VLAN + patch validates as one candidate object. |
+| Routing required but missing WAN intent | Review-required routing evidence, no confirmed route. |
+| Security policy review required | Inferred policy remains review-required, not final implementation truth. |
+| Diagram omitted evidence | Hidden blockers surface through omitted counters and warnings. |
+| Report blocked by review item | Report/export cannot overclaim readiness. |
+| Read-repair materialization | `READ_REPAIR_MATERIALIZATION` evidence includes before/after and surfaced impact. |
+| Project reload after saved requirements | No duplicate materialization and no silent mutation. |
+
+### Readiness ladder
+
+Readiness ladder order:
+
+```text
+BLOCKED
+REVIEW_REQUIRED
+DRAFT
+PLANNING_READY
+IMPLEMENTATION_READY
+```
+
+Rules:
+
+- Invalid addressing means `BLOCKED`.
+- Missing capacity source means `REVIEW_REQUIRED`.
+- Inferred security policy means `REVIEW_REQUIRED`.
+- Omitted blockers mean `BLOCKED` or `REVIEW_REQUIRED`.
+- Unvalidated generated objects cannot become `IMPLEMENTATION_READY`.
+- Only `IMPLEMENTATION_READY` may produce clean implementation-ready language.
+
+### Report/export truth rules
+
+Reports and exports are evidence deliverables, not marketing copy.
+
+Required report/export evidence:
+
+- executive summary readiness status
+- blocking issues
+- review-required issues
+- assumptions
+- requirement traceability
+- materialized object evidence
+- addressing evidence
+- IPAM evidence
+- routing evidence
+- security evidence
+- diagram truth evidence
+- implementation readiness
+- omitted evidence summary
+- full machine-readable appendix
+
+No blocker can be hidden by shortened report sections. Short summaries are allowed only when omitted counters and the full appendix preserve the evidence.
+
+### Diagram truth rules
+
+Every diagram node and edge must carry backend truth evidence:
+
+```text
+truthState
+readinessImpact
+sourceRefs
+validationRefs
+warningBadges
+```
+
+Allowed truth states:
+
+```text
+USER_PROVIDED
+DERIVED
+ASSUMED
+IMPORTED
+REVIEW_REQUIRED
+BLOCKED
+```
+
+Diagram rules:
+
+- Invalid subnet nodes must show blocked evidence.
+- Assumed segments must show review evidence.
+- Inferred security edges must show review evidence.
+- Missing routing intent must not be drawn as a confirmed route.
+- Omitted blockers must appear as warning badges or rollups.
+- Frontend diagram code may render truth evidence, but must not invent it.
+
+### CI proof commands
+
+Root commands:
+
+```bash
+npm run check:docs
+npm run check:quality
+npm run check:backend
+npm run check:frontend
+npm run check:trust
+npm run check:proof
+npm run check:v1
+```
+
+Expected `check:v1` order:
+
+```text
+check:docs -> check:quality -> check:backend -> check:frontend -> check:trust -> check:proof
+```
+
+CI must install dependencies before dependency-backed gates:
+
+```text
+checkout
+setup Node 20.12.2
+npm ci at repository root
+npm ci in backend
+npm ci in frontend
+generate Prisma client
+apply Prisma migrations
+run backend checks
+run frontend checks
+run root quality checks
+run root trust checks
+run root proof checks
+run final check:v1
+build backend and frontend containers
+```
+
+### Known limitations
+
+Known limitations for this repaired archive:
+
+- Full `npm run check:v1` still requires installed backend/frontend dependencies. In the repair container, `prisma`, `tsx`, TypeScript, and Vite may be unavailable until dependency installation runs.
+- Prisma generation and migration execution require a dependency-installed environment and a reachable database or CI service database.
+- Static kill-switches prove architecture guards, but they do not replace the full backend build, frontend build, Prisma generation, migrations, and executable selftest suite.
+- The integration proof harness is product-like and Prisma-shaped, but final deployment trust still requires CI/local execution with dependencies installed.
+- SubnetOps remains V1 only. Do not add multiple public version labels or separate release note files.
+
+V1 is done only when `npm run check:v1` is meaningful in an installed environment and proves docs, quality, backend, frontend, trust, and proof together.

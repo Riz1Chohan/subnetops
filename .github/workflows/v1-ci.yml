@@ -45,14 +45,19 @@ jobs:
           node-version: 20.12.2
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             backend/package-lock.json
             frontend/package-lock.json
 
-      - name: Run root V1 release checks
-        run: npm run check:v1
+      - name: Install root dependencies
+        run: npm ci --include=dev --no-audit --no-fund
 
       - name: Install backend dependencies
         working-directory: backend
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: Install frontend dependencies
+        working-directory: frontend
         run: npm ci --include=dev --no-audit --no-fund
 
       - name: Generate Prisma client
@@ -63,21 +68,23 @@ jobs:
         working-directory: backend
         run: npm run prisma:migrate:deploy
 
-      - name: Build backend
-        working-directory: backend
-        run: npm run build
+      - name: Run backend checks
+        run: npm run check:backend
 
-      - name: Run backend selftests
-        working-directory: backend
-        run: npm run selftest:all
+      - name: Run frontend checks
+        run: npm run check:frontend
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci --include=dev --no-audit --no-fund
+      - name: Run root quality checks
+        run: npm run check:quality
 
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+      - name: Run root trust checks
+        run: npm run check:trust
+
+      - name: Run root proof checks
+        run: npm run check:proof
+
+      - name: Run final V1 gate
+        run: npm run check:v1
 
       - name: Build backend container
         run: docker build -t subnetops-backend-ci ./backend

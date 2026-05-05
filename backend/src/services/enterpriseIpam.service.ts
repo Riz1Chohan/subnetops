@@ -5,6 +5,7 @@ import { ipv6Contains, parseIpv6Cidr } from "../domain/addressing/ipv6.js";
 import { ensureCanEditProject, ensureCanViewProject } from "./access.service.js";
 import { addChangeLog } from "./changeLog.service.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
+import { assertDhcpScopeAddressingWritable } from "./engineeringWritePaths.js";
 import {
   applyBrownfieldConflictResolutions,
   buildBrownfieldConflictReviewFromData,
@@ -513,15 +514,30 @@ async function validateDhcpScopeInput(projectId: string, data: Record<string, un
   parseJsonArrayText("relayTargetsJson", data.relayTargetsJson as string | undefined | null);
 
   await requireSiteInProject(data.siteId as string | undefined, projectId, tx);
-  await requireVlanInProject(data.vlanId as string | undefined, projectId, tx);
+  const vlan = await requireVlanInProject(data.vlanId as string | undefined, projectId, tx) as Record<string, unknown> | null;
   await requireModelInProject("designRouteDomain", data.routeDomainId as string | undefined, projectId, "Route domain", tx);
   const allocation = await requireModelInProject("designIpAllocation", data.allocationId as string | undefined, projectId, "Allocation", tx);
+
+  assertDhcpScopeAddressingWritable({
+    addressFamily: family,
+    scopeCidr: data.scopeCidr,
+    defaultGateway: data.defaultGateway,
+    parentSubnetCidr: vlan?.subnetCidr,
+    segmentRole: vlan?.segmentRole,
+  });
 
   if (allocation) {
     if (toFamily(allocation.addressFamily) !== family) {
       throw new ApiError(400, `DHCP scope family ${family} must match allocation family ${allocation.addressFamily}.`);
     }
     ensureCidrInsideParent(String(data.scopeCidr), allocation.cidr, family, "DHCP scope", "allocation");
+    assertDhcpScopeAddressingWritable({
+      addressFamily: family,
+      scopeCidr: data.scopeCidr,
+      defaultGateway: data.defaultGateway,
+      parentSubnetCidr: allocation.cidr,
+      segmentRole: vlan?.segmentRole,
+    });
   }
 
   await ensureDhcpScopeWriteIntegrity(projectId, data, tx, excludeId);

@@ -16,6 +16,24 @@ export function asBoolean(value: unknown) {
   return value === true || String(value).toLowerCase() === "true";
 }
 
+export function hasCapturedRequirement(requirements: RequirementsInput, key: string) {
+  return Object.prototype.hasOwnProperty.call(requirements, key);
+}
+
+export function asOptionalNumber(value: unknown, min = 0, max = 10_000): number | null {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const raw = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(raw)) return null;
+  return Math.max(min, Math.min(max, raw));
+}
+
+export function isCapturedPositiveNumber(requirements: RequirementsInput, key: string, min = 1, max = 10_000) {
+  if (!hasCapturedRequirement(requirements, key)) return false;
+  const value = asOptionalNumber(requirements[key], min, max);
+  return typeof value === "number" && value >= min;
+}
+
+
 export function isNotApplicable(value: unknown) {
   return asString(value).toLowerCase().includes("not applicable");
 }

@@ -1,7 +1,8 @@
 // V1_DISCOVERY_CURRENT_STATE_CONTRACT report wiring
 // V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: professional report exposes diagram mode contracts.
 import type { ProfessionalReport } from "./export.types.js";
-import { buildReportEvidenceDocument, findOverclaimRisks, reportCanClaimReady } from "../domain/reporting/index.js";
+import { buildOmittedEvidenceSummary, mergeOmittedEvidenceSummaries } from "../domain/evidence/index.js";
+import { buildReportEvidenceDocument, findOverclaimRisks, reportCanClaimReady, rewriteForbiddenReportClaim } from "../domain/reporting/index.js";
 // V1_ENGINE1_CIDR_ADDRESSING_TRUTH
 // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 // V1_DESIGN_CORE_ORCHESTRATOR_CONTRACT
@@ -32,6 +33,22 @@ function isBlocked(value: unknown) {
 
 function compactRows(rows: string[][], fallback: string[][]) {
   return rows.length > 0 ? rows : fallback;
+}
+
+function omittedEvidenceRows(summaries: any[]) {
+  const rows = summaries.map((summary: any) => [
+    asString(summary.collection, "evidence"),
+    asString(summary.surface, "report"),
+    String(summary.shownCount ?? 0),
+    String(summary.totalCount ?? 0),
+    String(summary.omittedCount ?? 0),
+    summary.omittedHasBlockers ? "yes" : "no",
+    summary.omittedHasReviewRequired ? "yes" : "no",
+    Object.entries(summary.omittedSeveritySummary ?? {}).map(([key, value]) => `${key}:${value}`).join("; ") || "none",
+    asString(summary.readinessImpact, "NONE"),
+    asString(summary.exportImpact, "Full evidence preserved in source data/export appendix."),
+  ]);
+  return compactRows(rows, [["No omitted evidence", "all surfaces", "0", "0", "0", "no", "no", "none", "NONE", "No sliced blockers or review items were omitted."]]);
 }
 
 function sanitizeProfessionalReportText(value: string) {
@@ -71,6 +88,25 @@ function sanitizeProfessionalReportRows(rows: string[][] | undefined) {
   return Array.isArray(rows)
     ? rows.map((row) => row.map((value) => sanitizeProfessionalReportText(String(value))))
     : rows;
+}
+
+function applyReportOverclaimGuard(report: ProfessionalReport, canClaimReady: boolean) {
+  report.title = rewriteForbiddenReportClaim(report.title, canClaimReady);
+  report.subtitle = rewriteForbiddenReportClaim(report.subtitle, canClaimReady);
+  report.executiveSummary = report.executiveSummary.map((line) => rewriteForbiddenReportClaim(line, canClaimReady));
+  for (const section of [...report.sections, ...(report.appendices ?? [])]) {
+    section.title = rewriteForbiddenReportClaim(section.title, canClaimReady);
+    section.paragraphs = section.paragraphs.map((line) => rewriteForbiddenReportClaim(line, canClaimReady));
+    if (section.bullets) section.bullets = section.bullets.map((line) => rewriteForbiddenReportClaim(line, canClaimReady));
+    if (section.tables) {
+      for (const table of section.tables) {
+        table.title = rewriteForbiddenReportClaim(table.title, canClaimReady);
+        table.headers = table.headers.map((header) => rewriteForbiddenReportClaim(header, canClaimReady));
+        table.rows = table.rows.map((row) => row.map((cell) => rewriteForbiddenReportClaim(cell, canClaimReady)));
+      }
+    }
+  }
+  return report;
 }
 
 function professionalizeReportForAudience(report: ProfessionalReport) {
@@ -174,6 +210,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const V1DesignGraph = designCore.V1DesignGraph && typeof designCore.V1DesignGraph === "object" ? designCore.V1DesignGraph : null;
   const V1SecurityPolicyFlow = designCore.V1SecurityPolicyFlow && typeof designCore.V1SecurityPolicyFlow === "object" ? designCore.V1SecurityPolicyFlow : null;
   const V1ImplementationPlanning = designCore.V1ImplementationPlanning && typeof designCore.V1ImplementationPlanning === "object" ? designCore.V1ImplementationPlanning : null;
+  const V1ReadinessLadder = designCore.V1ReadinessLadder && typeof designCore.V1ReadinessLadder === "object" ? designCore.V1ReadinessLadder : null;
   const V1RoutingSegmentation = designCore.V1RoutingSegmentation && typeof designCore.V1RoutingSegmentation === "object" ? designCore.V1RoutingSegmentation : null;
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
@@ -184,7 +221,9 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const reportTruthLimitations = asArray(reportTruth?.limitations);
   const implementationReadiness = asString(reportTruth?.readiness?.implementation, asString(implementationPlan?.summary?.implementationReadiness, "review"));
   const overallReadiness = asString(reportTruth?.overallReadiness, asString(reportTruth?.overallReadinessLabel, "review"));
-  const blockedDesign = isBlocked(implementationReadiness) || isBlocked(overallReadiness);
+  const readinessLadderState = asString(V1ReadinessLadder?.overallReadiness, asString(designCore.summary?.readinessLadder, "REVIEW_REQUIRED"));
+  const readinessLadderAllowsImplementation = Boolean(V1ReadinessLadder?.implementationOutputAllowed ?? designCore.summary?.readinessLadderAllowsImplementation);
+  const blockedDesign = isBlocked(implementationReadiness) || isBlocked(overallReadiness) || !readinessLadderAllowsImplementation;
   const diagramEmptyInputs = asArray(diagramTruth?.renderModel?.emptyState?.requiredInputs);
   const diagramEmptyReason = asString(diagramTruth?.emptyStateReason, asString(diagramTruth?.renderModel?.emptyState?.reason, ""));
   const scenarioStatus = asString(requirementsScenarioProof?.status, "");
@@ -200,8 +239,32 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const reportEvidenceDocument = V1ReportExportTruth ? buildReportEvidenceDocument(V1ReportExportTruth as any) : null;
   const reportOverclaimRisks = reportEvidenceDocument ? findOverclaimRisks(reportEvidenceDocument) : ["Report/export readiness evidence is not available."];
   const reportExportNotReady = !reportEvidenceDocument || !reportCanClaimReady(reportEvidenceDocument);
+  const cleanReportClaimsAllowed = !reportExportNotReady && readinessLadderAllowsImplementation && V1ReadinessLadder?.reportMayClaimImplementationReady !== false;
+  const reportOmittedEvidenceSummaries = [
+    ...asArray(V1ReportExportTruth?.omittedEvidenceSummaries),
+    buildOmittedEvidenceSummary({ collection: "requirements traceability rows", surface: "Report.RequirementTraceability", items: asArray(V1ReportExportTruth?.traceabilityMatrix), shownCount: Math.min(40, asArray(V1ReportExportTruth?.traceabilityMatrix).length) }),
+    buildOmittedEvidenceSummary({ collection: "blocked findings", surface: "Report.BlockingFindings", items: backendBlockedFindings, shownCount: Math.min(30, backendBlockedFindings.length) }),
+    buildOmittedEvidenceSummary({ collection: "review findings", surface: "Report.ReviewFindings", items: backendReviewFindings, shownCount: Math.min(30, backendReviewFindings.length) }),
+    buildOmittedEvidenceSummary({ collection: "implementation review queue", surface: "Report.ImplementationReviewQueue", items: implementationReviewQueue, shownCount: Math.min(30, implementationReviewQueue.length) }),
+    buildOmittedEvidenceSummary({ collection: "validation checks", surface: "Report.VerificationMatrix", items: verificationChecks, shownCount: Math.min(40, verificationChecks.length) }),
+    buildOmittedEvidenceSummary({ collection: "rollback actions", surface: "Report.RollbackActions", items: rollbackActions, shownCount: Math.min(30, rollbackActions.length) }),
+    buildOmittedEvidenceSummary({ collection: "diagram nodes", surface: "Report.DiagramRenderNodes", items: asArray(diagramTruth?.renderModel?.nodes), shownCount: Math.min(20, asArray(diagramTruth?.renderModel?.nodes).length) }),
+    buildOmittedEvidenceSummary({ collection: "diagram edges", surface: "Report.DiagramRenderEdges", items: asArray(diagramTruth?.renderModel?.edges), shownCount: Math.min(20, asArray(diagramTruth?.renderModel?.edges).length) }),
+    buildOmittedEvidenceSummary({ collection: "diagram omitted evidence", surface: "DiagramRenderModel.omittedEvidenceSummaries", items: asArray(diagramTruth?.renderModel?.omittedEvidenceSummaries), shownCount: asArray(diagramTruth?.renderModel?.omittedEvidenceSummaries).length }),
+    buildOmittedEvidenceSummary({ collection: "VLAN/addressing rows", surface: "Report.AddressingRows", items: proposedRows, shownCount: Math.min(20, proposedRows.length) }),
+    buildOmittedEvidenceSummary({ collection: "site summaries", surface: "Report.SiteSummaries", items: siteSummaries, shownCount: Math.min(20, siteSummaries.length) }),
+    buildOmittedEvidenceSummary({ collection: "network interfaces", surface: "Report.NetworkInterfaces", items: networkInterfaces, shownCount: Math.min(30, networkInterfaces.length) }),
+    buildOmittedEvidenceSummary({ collection: "DHCP pools", surface: "Report.DhcpPools", items: dhcpPools, shownCount: Math.min(25, dhcpPools.length) }),
+    buildOmittedEvidenceSummary({ collection: "routing rows", surface: "Report.RouteIntents", items: routeIntents, shownCount: Math.min(30, routeIntents.length) }),
+    buildOmittedEvidenceSummary({ collection: "routing findings", surface: "Report.RoutingFindings", items: routingSegmentationFindings, shownCount: Math.min(25, routingSegmentationFindings.length) }),
+    buildOmittedEvidenceSummary({ collection: "security flow requirements", surface: "Report.SecurityFlows", items: securityFlowRequirements, shownCount: Math.min(30, securityFlowRequirements.length) }),
+    buildOmittedEvidenceSummary({ collection: "security policy findings", surface: "Report.SecurityPolicyFindings", items: securityPolicyFindings, shownCount: Math.min(25, securityPolicyFindings.length) }),
+    buildOmittedEvidenceSummary({ collection: "implementation steps", surface: "Report.ImplementationSteps", items: implementationSteps, shownCount: Math.min(35, implementationSteps.length) }),
+    buildOmittedEvidenceSummary({ collection: "vendor-neutral templates", surface: "Report.VendorNeutralTemplates", items: asArray(vendorNeutralTemplates?.templates), shownCount: Math.min(35, asArray(vendorNeutralTemplates?.templates).length) }),
+  ];
+  const reportOmittedEvidenceRollup = mergeOmittedEvidenceSummaries(reportOmittedEvidenceSummaries);
 
-  if (V1TruthBlocked || reportExportNotReady) {
+  if (V1TruthBlocked || reportExportNotReady || reportOmittedEvidenceRollup.omittedHasBlockers) {
     report.metadata = report.metadata ?? {
       organizationName: "To be confirmed",
       environment: "To be confirmed",
@@ -220,11 +283,43 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   }
 
   report.sections.push({
+    title: "Central Readiness Ladder Gate",
+    paragraphs: [
+      "This backend gate is the single ladder used to prevent validation, implementation templates, reports, diagrams, frontend summary cards, and AI helper output from overclaiming readiness.",
+      readinessLadderAllowsImplementation
+        ? "The central ladder currently allows implementation-ready language."
+        : "The central ladder does not allow implementation-ready language. Output must remain blocked, review-required, draft, or planning-only until the listed reasons are resolved.",
+    ],
+    tables: [
+      {
+        title: "Readiness Ladder",
+        headers: ["State", "Implementation allowed", "Report claim allowed", "Diagram clean-truth allowed"],
+        rows: [[
+          readinessLadderState,
+          readinessLadderAllowsImplementation ? "yes" : "no",
+          V1ReadinessLadder?.reportMayClaimImplementationReady ? "yes" : "no",
+          V1ReadinessLadder?.diagramMayShowCleanProductionTruth ? "yes" : "no",
+        ]],
+      },
+      {
+        title: "Readiness Ladder Reasons",
+        headers: ["Severity", "Code", "Source", "Detail"],
+        rows: compactRows(asArray(V1ReadinessLadder?.reasons).slice(0, 40).map((reason: any) => [
+          asString(reason.severity),
+          asString(reason.code),
+          asString(reason.sourcePath),
+          asString(reason.detail),
+        ]), [["INFO", "READINESS_LADDER_CLEAN", "V1ReadinessLadder", "No readiness-ladder blockers or review reasons recorded."]]),
+      },
+    ],
+  });
+
+  report.sections.push({
     title: "Report Export Readiness Gate",
     paragraphs: [
-      reportExportNotReady
-        ? "The export is not final-ready. Blocked or review-required sections must remain visible in PDF, DOCX, CSV, and the report page."
-        : "The export readiness gate is clear based on current report/export evidence.",
+      reportExportNotReady || !readinessLadderAllowsImplementation
+        ? "The export is not implementation-ready. Blocked, review-required, draft, or planning-only ladder states must remain visible in PDF, DOCX, CSV, and the report page."
+        : "The export readiness gate is clear based on current report/export and readiness-ladder evidence.",
       "This gate prevents the report from claiming readiness when routing, security, implementation, validation, diagram, or traceability evidence is missing or review-required.",
     ],
     tables: [
@@ -236,7 +331,49 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           ["Blocked sections", String(V1ReportExportTruth?.blockedSectionCount ?? 0), joinText(asArray(V1ReportExportTruth?.sectionGates).filter((row: any) => row.readinessImpact === "BLOCKED").map((row: any) => row.title).slice(0, 6), "none")],
           ["Review sections", String(V1ReportExportTruth?.reviewSectionCount ?? 0), joinText(asArray(V1ReportExportTruth?.sectionGates).filter((row: any) => row.readinessImpact === "REVIEW_REQUIRED").map((row: any) => row.title).slice(0, 6), "none")],
           ["Overclaim risks", reportOverclaimRisks.length ? "review" : "ready", joinText(reportOverclaimRisks.slice(0, 6), "No overclaim risks recorded")],
+          ["Readiness ladder", readinessLadderState, `Implementation output allowed: ${readinessLadderAllowsImplementation ? "yes" : "no"}`],
+          ["Clean readiness claims", cleanReportClaimsAllowed ? "allowed" : "blocked", cleanReportClaimsAllowed ? "Backend report/export proof and readiness ladder allow implementation-ready language." : "Forbidden claims remain blocked; report must use blocked/review/planning wording."],
+          ["Full evidence appendix", V1ReportExportTruth?.fullMachineReadableAppendix?.machineReadable ? "present" : "missing", `Formats: ${joinText(asArray(V1ReportExportTruth?.fullMachineReadableAppendix?.exportFormats), "none")}`],
         ],
+      },
+    ],
+  });
+
+  report.appendices = report.appendices ?? [];
+  report.appendices.push({
+    title: "Full Evidence Appendix",
+    paragraphs: [
+      "Machine-readable evidence is preserved here so shortened report tables do not hide blockers, review-required items, assumptions, or omitted evidence.",
+      `Implementation-ready claim allowed: ${cleanReportClaimsAllowed ? "yes" : "no"}.`,
+      `Report/export readiness: ${asString(V1ReportExportTruth?.overallReadiness, "REVIEW_REQUIRED")}.`,
+    ],
+    tables: [
+      {
+        title: "Omitted Evidence Summary",
+        headers: ["Collection", "Surface", "Shown", "Total", "Omitted", "Omitted Blockers", "Omitted Review", "Severity Summary", "Readiness Impact", "Export Impact"],
+        rows: omittedEvidenceRows(reportOmittedEvidenceSummaries),
+      },
+      {
+        title: "Full Evidence Inventory",
+        headers: ["Collection", "Total", "Surfaced", "Omitted", "Readiness"],
+        rows: compactRows(asArray(V1ReportExportTruth?.fullEvidenceInventory).map((item: any) => [
+          asString(item.collection, "evidence"),
+          String(item.totalCount ?? 0),
+          String(item.surfacedCount ?? 0),
+          String(item.omittedCount ?? 0),
+          asString(item.readinessImpact, "NONE"),
+        ]), [["No full evidence inventory", "0", "0", "0", "NONE"]]),
+      },
+      {
+        title: "Anti-overclaim Rules",
+        headers: ["Forbidden Claim", "Allowed Only When", "Allowed", "Replacement", "Evidence"],
+        rows: compactRows(asArray(V1ReportExportTruth?.antiOverclaimRules).map((rule: any) => [
+          asString(rule.phrase, "claim"),
+          asString(rule.allowedOnlyWhen, "BACKEND_PROOF_SUPPORTS"),
+          rule.claimAllowed ? "yes" : "no",
+          asString(rule.replacement, "Use review-gated language"),
+          joinText(asArray(rule.evidence), "No evidence"),
+        ]), [["implementation-ready", "IMPLEMENTATION_READY", "no", "Use review-gated language", "Report/export proof unavailable"]]),
       },
     ],
   });
@@ -255,7 +392,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         headers: ["Gate", "Status", "Evidence"],
         rows: [
           ["Requirement-output evidence", V1TruthBlocked ? "blocked" : "ready", "Materialized sites " + siteSummaries.length + "; addressing rows " + requirementOutputAddressRowCount + "; diagram missing inputs " + diagramEmptyInputs.length],
-          ["Implementation execution readiness", blockedDesign ? "blocked" : "review", `Overall readiness ${overallReadiness}; implementation readiness ${implementationReadiness}; blocked implementation ${blockedDesign ? "yes" : "no"}`],
+          ["Implementation execution readiness", blockedDesign ? "blocked" : "review", `Overall readiness ${overallReadiness}; implementation readiness ${implementationReadiness}; ladder ${readinessLadderState}; blocked implementation ${blockedDesign ? "yes" : "no"}`],
           ["Requirement scenario proof", isBlocked(scenarioStatus) || (scenarioExpected > 0 && scenarioPassed === 0) ? "blocked" : "review/ready", `${scenarioPassed}/${scenarioExpected} scenario proof signal(s) passed; status ${scenarioStatus || "unavailable"}`],
           ["Diagram topology evidence", diagramEmptyReason ? "blocked" : "ready", diagramEmptyReason || "Backend diagram has modeled topology evidence."],
           ["Diagram required inputs", diagramEmptyInputs.length > 0 ? "blocked" : "ready", joinText(diagramEmptyInputs, "No missing diagram inputs recorded")],
@@ -279,6 +416,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         rows: [
           ["Design review", asString(designCore.summary?.designReviewReadiness, designCore.summary?.readyForBackendAuthority ? "review" : "blocked"), `${designCore.summary?.siteCount ?? siteSummaries.length} site(s), ${designCore.summary?.vlanCount ?? requirementOutputAddressRowCount} addressing row(s), ${designCore.summary?.networkObjectCount ?? networkDevices.length + networkInterfaces.length} modeled object(s), ${designCore.summary?.issueCount ?? 0} design issue(s).`],
           ["Implementation execution", asString(designCore.summary?.implementationExecutionReadiness, designCore.summary?.implementationPlanBlockingFindingCount ? "blocked" : "review"), `${designCore.summary?.implementationPlanStepCount ?? implementationSteps.length} step(s), ${designCore.summary?.implementationPlanBlockingFindingCount ?? 0} blocking implementation finding(s), ${designCore.summary?.implementationPlanReviewStepCount ?? 0} review step(s).`],
+          ["Central readiness ladder", readinessLadderState, `Implementation allowed ${readinessLadderAllowsImplementation ? "yes" : "no"}; report may claim implementation-ready ${V1ReadinessLadder?.reportMayClaimImplementationReady ? "yes" : "no"}; diagram may show clean production truth ${V1ReadinessLadder?.diagramMayShowCleanProductionTruth ? "yes" : "no"}.`],
         ],
       },
       {
@@ -1652,6 +1790,36 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     ],
   };
 
+  const omittedEvidenceSection: any = {
+    title: "V1 Omitted Evidence Summary",
+    paragraphs: [
+      "Displayed tables are intentionally windowed for readability. This section prevents hidden blockers or review-required rows from disappearing behind slice limits.",
+      `Omitted evidence rollup: ${reportOmittedEvidenceRollup.totalOmittedCount} omitted row(s) across ${reportOmittedEvidenceRollup.surfaceCount} surface(s); hidden blockers=${reportOmittedEvidenceRollup.omittedHasBlockers ? "yes" : "no"}; hidden review-required=${reportOmittedEvidenceRollup.omittedHasReviewRequired ? "yes" : "no"}.`,
+      "If hidden blockers or review-required rows exist, the export must remain blocked or review-required even when the visible summary looks clean.",
+    ],
+    tables: [
+      {
+        title: "Omitted Evidence Counters",
+        headers: ["Collection", "Surface", "Shown", "Total", "Omitted", "Hidden blockers", "Hidden review", "Hidden severity summary", "Readiness impact", "Export impact"],
+        rows: omittedEvidenceRows(reportOmittedEvidenceSummaries),
+      },
+      {
+        title: "Omitted Evidence Rollup",
+        headers: ["Surfaces", "Shown", "Total", "Omitted", "Hidden blockers", "Hidden review", "Blocking surfaces", "Review surfaces"],
+        rows: [[
+          String(reportOmittedEvidenceRollup.surfaceCount),
+          String(reportOmittedEvidenceRollup.totalShownCount),
+          String(reportOmittedEvidenceRollup.totalEvidenceCount),
+          String(reportOmittedEvidenceRollup.totalOmittedCount),
+          reportOmittedEvidenceRollup.omittedHasBlockers ? "yes" : "no",
+          reportOmittedEvidenceRollup.omittedHasReviewRequired ? "yes" : "no",
+          String(reportOmittedEvidenceRollup.blockingSurfaceCount),
+          String(reportOmittedEvidenceRollup.reviewSurfaceCount),
+        ]],
+      },
+    ],
+  };
+
 
   const V1VendorNeutralTemplatesSection: any = {
     title: "14. V1 Vendor-Neutral Implementation Templates",
@@ -1749,7 +1917,9 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       },
     ],
   };
+  report.sections.push(omittedEvidenceSection);
   if (reportMode === "full-proof") report.sections.push(V1ExportTruthSection, V1VendorNeutralTemplatesSection);
 
+  applyReportOverclaimGuard(report, cleanReportClaimsAllowed);
   return reportMode === "professional" ? professionalizeReportForAudience(report) : report;
 }

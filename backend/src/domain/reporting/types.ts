@@ -1,3 +1,4 @@
+import type { OmittedEvidenceSummary } from "../evidence/index.js";
 export type ReportExportReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type DesignTruthReadiness = "ready" | "review" | "blocked" | "unknown" | string;
 
@@ -55,6 +56,26 @@ export interface V1ReportExportTruthFinding {
   remediation: string;
 }
 
+export interface V1ReportAntiOverclaimRule {
+  phrase: string;
+  allowedOnlyWhen: "IMPLEMENTATION_READY" | "BACKEND_PROOF_SUPPORTS";
+  claimAllowed: boolean;
+  replacement: string;
+  evidence: string[];
+}
+
+export interface V1ReportFullEvidenceAppendix {
+  machineReadable: true;
+  generatedFrom: "V1ReportExportTruth";
+  includesRequirementTraceability: boolean;
+  includesSectionGates: boolean;
+  includesTruthLabels: boolean;
+  includesFindings: boolean;
+  includesOmittedEvidenceSummaries: boolean;
+  includesFullEvidenceInventory: boolean;
+  exportFormats: Array<"PDF" | "DOCX" | "CSV" | "JSON">;
+}
+
 export interface V1ReportExportTruthControlSummary {
   contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT";
   role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE";
@@ -68,6 +89,9 @@ export interface V1ReportExportTruthControlSummary {
   truthLabelRowCount: number;
   blockedTruthLabelCount: number;
   pdfDocxCsvCovered: boolean;
+  fullMachineReadableAppendix: V1ReportFullEvidenceAppendix;
+  implementationReadyClaimAllowed: boolean;
+  productionReadyClaimAllowed: boolean;
   findingCount: number;
   blockedFindingCount: number;
   reviewFindingCount: number;
@@ -76,6 +100,9 @@ export interface V1ReportExportTruthControlSummary {
   truthLabelRows: V1ReportTruthLabelRow[];
   findings: V1ReportExportTruthFinding[];
   proofBoundary: string[];
+  omittedEvidenceSummaries: OmittedEvidenceSummary[];
+  fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[];
+  antiOverclaimRules: V1ReportAntiOverclaimRule[];
   notes: string[];
 }
 
@@ -109,4 +136,9 @@ export interface ReportExportEvidenceDocument {
   sections: ReportExportSection[];
   findings: V1ReportExportTruthFinding[];
   proofBoundary: string[];
+  omittedEvidenceSummaries: OmittedEvidenceSummary[];
+  fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[];
+  antiOverclaimRules: V1ReportAntiOverclaimRule[];
+  canClaimImplementationReady: boolean;
+  canClaimProductionReady: boolean;
 }

@@ -284,6 +284,11 @@ function createLocalInternetNode(site: BackendDiagramRenderNode, template?: Back
     y: site.y,
     sourceEngine: "routing",
     relatedFindingIds: template?.relatedFindingIds ?? [],
+    truthStateV1: template?.truthStateV1 ?? "ASSUMED",
+    readinessImpact: template?.readinessImpact ?? "REVIEW",
+    sourceRefs: template?.sourceRefs ?? [`frontend-presentation:${site.objectId}`],
+    validationRefs: template?.validationRefs ?? ["presentation-only:local-internet-breakout"],
+    warningBadges: template?.warningBadges ?? ["PRESENTATION_ONLY", "REVIEW_REQUIRED"],
     notes: [
       "Local ISP or Internet breakout for this site. This is underlay transport only; VPN overlay tunnels are drawn separately between site edge devices.",
       ...(template?.notes ?? []).slice(0, 1),
@@ -501,6 +506,11 @@ function addV1VpnFabric(nodes: BackendDiagramRenderNode[], mode: DiagramMode, sc
     y: 610,
     sourceEngine: "routing",
     relatedFindingIds: [],
+    truthStateV1: "ASSUMED",
+    readinessImpact: "REVIEW",
+    sourceRefs: ["frontend-presentation:wan-cloud-vpn-fabric"],
+    validationRefs: ["presentation-only:vpn-fabric-summary"],
+    warningBadges: ["PRESENTATION_ONLY", "ASSUMED_OR_INFERRED", "REVIEW_REQUIRED"],
     notes: [
       "V1 enterprise-scale WAN summary: branch tunnels collapse into a shared VPN fabric rail so 7+ site diagrams do not turn into unreadable tunnel spaghetti.",
       "Traffic meaning is still hub-and-spoke: local ISP underlay stays per site; secure VPN overlay terminates on the security/VPN edge when present.",
@@ -666,8 +676,14 @@ function presentationEdge(id: string, source: BackendDiagramRenderNode, target: 
     targetNodeId: target.id,
     label,
     readiness,
+    truthState: readiness === "blocked" ? "blocked" : readiness === "ready" ? "materialized" : "review-required",
+    truthStateV1: readiness === "ready" ? "DERIVED" : readiness === "blocked" ? "BLOCKED" : "REVIEW_REQUIRED",
+    readinessImpact: readiness === "blocked" ? "BLOCKING" : readiness === "ready" ? "NONE" : "REVIEW",
     overlayKeys: ["routing"],
     relatedObjectIds: [source.objectId, target.objectId].filter(Boolean),
+    sourceRefs: [source.objectId, target.objectId].filter(Boolean).map((objectId) => `presentation-edge:${objectId}`),
+    validationRefs: [`presentation-edge-readiness:${readiness}`],
+    warningBadges: readiness === "ready" ? ["PRESENTATION_ONLY"] : ["PRESENTATION_ONLY", "REVIEW_REQUIRED"],
     notes: ["Professional topology connector: transport handoff, secure tunnel, and internal handoff are rendered as separate network meanings rather than raw database relationships."],
   };
 }
@@ -1569,6 +1585,8 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
   const zoneCount = visibleNodes.filter((node) => node.objectType === "security-zone").length;
   const policyCount = visibleNodes.filter(isPolicyNode).length;
   const hiddenProofCount = Math.max(0, renderModel.summary.nodeCount - visibleNodes.length);
+  const omittedEvidenceWarning = Boolean(renderModel.summary.omittedEvidenceHasBlockers || renderModel.summary.omittedEvidenceHasReviewRequired);
+  const omittedEvidenceCount = renderModel.summary.omittedEvidenceTotalCount ?? 0;
   const canvasTitle = scope === "boundaries" ? "Security policy matrix" : "Network topology canvas";
   const countBadges = scope === "boundaries"
     ? [
@@ -1617,6 +1635,7 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {countBadges.map((badge) => <span key={badge} className="badge-soft">{badge}</span>)}
+          {omittedEvidenceWarning ? <span className="badge-soft danger">Omitted blocker/review evidence {omittedEvidenceCount}</span> : null}
         </div>
       </div>
 
@@ -1693,7 +1712,12 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               </div>
               <div>
                 <strong>Design evidence</strong>
-                <p className="muted" style={{ margin: "6px 0 0 0" }}>{selectedNode.truthState}</p>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>{selectedNode.truthState} / {selectedNode.truthStateV1}</p>
+                {selectedNode.warningBadges.length ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                    {selectedNode.warningBadges.slice(0, 4).map((badge) => <span key={badge} className="badge-soft danger">{badge.replace(/_/g, " ")}</span>)}
+                  </div>
+                ) : null}
               </div>
               <div>
                 <strong>Execution readiness</strong>
@@ -1708,6 +1732,8 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
                       : "No visible blocker is attached to this topology object."
                     : `${selectedNode.relatedFindingIds.length} engineering review item(s) are attached to this object.`}
                 </p>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>Source refs: {selectedNode.sourceRefs.slice(0, 3).join(", ") || "—"}</p>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>Validation refs: {selectedNode.validationRefs.slice(0, 3).join(", ") || "—"}</p>
               </div>
               <div>
                 <strong>Notes</strong>

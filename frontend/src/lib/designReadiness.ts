@@ -61,7 +61,7 @@ export function buildValidationReadinessSummary(
     backendAddressingEvidenceCount,
   );
   const plannedSiteCount = Math.max(1, num(profile.siteCount, sites.length || backendSiteEvidenceCount || 1));
-  const expectedUsersPerSite = Math.max(1, num(profile.usersPerSite, 50));
+  const expectedUsersPerSite = Math.max(0, num(profile.usersPerSite, 0));
   const effectiveSiteCount = Math.max(sites.length, backendSiteEvidenceCount);
   const configuredSiteBlocks = Math.max(sites.filter((site) => site.defaultAddressBlock?.trim()).length, backendConfiguredBlockCount);
   const configuredVlans = Math.max(vlans.length, backendSegmentEvidenceCount);
@@ -79,6 +79,17 @@ export function buildValidationReadinessSummary(
     });
   } else {
     strengths.push('Organization base private range is explicitly defined.');
+  }
+
+  if (expectedUsersPerSite <= 0) {
+    missingInfo.push({
+      id: 'users-per-site-not-captured',
+      level: 'warning',
+      title: 'Users per site is not captured',
+      detail: 'Capacity-driven subnet sizing, DHCP readiness, and BOM quantities must stay review-required until user capacity is confirmed.',
+      fixPath: `/projects/${project?.id ?? ''}/requirements#requirements-core`,
+      actionLabel: 'Confirm users per site',
+    });
   }
 
   if (effectiveSiteCount === 0) {

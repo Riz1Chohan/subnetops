@@ -7,6 +7,7 @@ import type {
   ValidationReadinessSummary,
   ValidationSeverity,
   ValidationSeverityCounts,
+  ValidationReadinessLadderState,
 } from './types.js';
 import { normalizeValidationSeverity } from './findings.js';
 
@@ -82,13 +83,23 @@ export function deriveReadinessFromFindings(
   const rawScore = 100 - findings.reduce((sum, finding) => sum + penaltyForFinding(finding), 0);
   const minimumScore = options.minimumScore ?? 0;
   const score = Math.max(minimumScore, Math.min(100, rawScore));
-  const implementationGateAllows = readiness === 'ready' || readiness === 'ready_with_warnings';
+  const readinessLadder: ValidationReadinessLadderState = readiness === 'blocked'
+    ? 'BLOCKED'
+    : readiness === 'needs_review'
+      ? 'REVIEW_REQUIRED'
+      : readiness === 'incomplete'
+        ? 'DRAFT'
+        : readiness === 'ready_with_warnings'
+          ? 'PLANNING_READY'
+          : 'IMPLEMENTATION_READY';
+  const implementationGateAllows = readinessLadder === 'IMPLEMENTATION_READY';
 
   return {
     readiness,
     label: labelForReadiness(readiness),
     score,
     implementationGateAllows,
+    readinessLadder,
     findingCount: findings.length,
     openFindingCount,
     acceptedRiskCount,

@@ -52,6 +52,21 @@ assert.deepEqual(segmentNames, [
 assert.equal(segments.find((segment) => segment.vlanName === "USERS")?.estimatedHosts, 120);
 assert.equal(segments.find((segment) => segment.vlanName === "MANAGEMENT")?.dhcpEnabled, false);
 
+const missingCapacitySegments = buildRequirementSegments({ primaryGoal: "segmentation", wireless: true });
+const missingUsersSegment = missingCapacitySegments.find((segment) => segment.vlanName === "USERS");
+assert.ok(missingUsersSegment, "USERS segment should exist as a review-required baseline when capacity is missing");
+assert.equal(missingUsersSegment?.estimatedHosts, null);
+assert.equal(missingUsersSegment?.capacitySourceType, "REVIEW_REQUIRED");
+assert.equal(missingUsersSegment?.implementationBlocked, true);
+assert.equal(missingUsersSegment?.dhcpEnabled, false);
+assert.ok(!String(missingUsersSegment?.purpose).includes("50"), "Missing usersPerSite must not silently become 50 users");
+assert.ok(missingUsersSegment?.sourceRefs.some((ref) => ref.includes("requirements:usersPerSite:not-captured")));
+const missingCapacityPolicy = buildRequirementMaterializationPolicySummary({ primaryGoal: "segmentation" }, { sites: [] });
+const missingUsersOutcome = missingCapacityPolicy.fieldOutcomes.find((outcome) => outcome.key === "usersPerSite");
+assert.equal(missingUsersOutcome?.materializationStatus, "review-required");
+assert.equal(missingUsersOutcome?.sourceType, "REVIEW_REQUIRED");
+assert.equal(missingUsersOutcome?.implementationBlocked, true);
+
 assert.equal(buildSiteBlock("10.44.0.0/16", 0), "10.44.0.0/16");
 assert.equal(buildSiteBlock("10.44.0.0/16", 1), "10.45.0.0/16");
 

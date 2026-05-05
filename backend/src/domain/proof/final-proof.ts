@@ -7,7 +7,7 @@ import type {
   V1ProofContext,
   V1ReleaseGateRow,
   V1ReleaseGateState,
-  V1ScenarioDefinition,
+  V1ScenarioExecutionResult,
   V1ScenarioProofRow,
 } from "./types.js";
 
@@ -53,21 +53,7 @@ const EXPECTED_ENGINES: V1ExpectedProofModule[] = [
   { stage: 17, engineKey: "V1PlatformBomFoundation", expectedContract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT", proofFocus: "BOM is backend-controlled advisory estimate with calculation basis and review notes" },
   { stage: 18, engineKey: "V1DiscoveryCurrentState", expectedContract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT", proofFocus: "discovery/current-state separates not-provided/manual/imported/validated/conflicting/review states" },
   { stage: 19, engineKey: "V1AiDraftHelper", expectedContract: "V1_AI_DRAFT_HELPER_CONTRACT", proofFocus: "AI stays draft-only, review-required, and non-authoritative" },
-];
-
-const SCENARIOS: V1ScenarioDefinition[] = [
-  { scenarioKey: "small-office", scenarioName: "Small office", requirementsCovered: ["planningFor", "usersPerSite", "siteCount", "basic VLAN/addressing"], expectedStageNumbers: [1, 2, 3, 4, 7, 8, 9, 10, 13, 15, 16], notes: ["Baseline scenario must prove the normal path without hiding missing requirements behind defaults."] },
-  { scenarioKey: "healthcare-clinic", scenarioName: "Healthcare clinic", requirementsCovered: ["security-sensitive", "guest access", "segmentation", "report evidence"], expectedStageNumbers: [1, 2, 3, 4, 7, 8, 9, 10, 12, 13, 15, 16], notes: ["Security-sensitive outputs must be review-labelled where the backend cannot prove policy implementation."] },
-  { scenarioKey: "multi-site-enterprise", scenarioName: "Multi-site enterprise", requirementsCovered: ["multiSite", "siteCount", "WAN", "summary routes", "inter-site reachability"], expectedStageNumbers: [1, 2, 3, 4, 5, 8, 10, 11, 13, 15, 16, 18], notes: ["Multi-site planning must feed addressing, IPAM, routing review, diagram, and discovery tasks."] },
-  { scenarioKey: "ten-site-enterprise", scenarioName: "10-site enterprise", requirementsCovered: ["siteCount", "large topology", "WAN scale", "diagram readability", "BOM scale"], expectedStageNumbers: [1, 2, 3, 4, 5, 8, 9, 10, 11, 16, 17, 18], notes: ["Large designs must expose review states instead of collapsing into pretty garbage."] },
-  { scenarioKey: "guest-wifi-heavy", scenarioName: "Guest Wi-Fi heavy", requirementsCovered: ["guestAccess", "wireless", "isolation", "DHCP", "security zones"], expectedStageNumbers: [1, 2, 3, 4, 7, 8, 9, 11, 12, 13, 16, 17], notes: ["Guest isolation must have routing, security, validation, diagram, and BOM consequences."] },
-  { scenarioKey: "voice-wireless", scenarioName: "Voice + wireless", requirementsCovered: ["voice", "wireless", "PoE", "VLANs", "QoS review"], expectedStageNumbers: [1, 2, 3, 4, 7, 8, 13, 14, 15, 17], notes: ["Voice/wireless should drive addressing, implementation review, templates, and advisory platform/BOM estimates."] },
-  { scenarioKey: "cloud-hybrid", scenarioName: "Cloud/hybrid", requirementsCovered: ["cloudHybrid", "cloud edge", "route tables", "boundary policy", "discovery/import review"], expectedStageNumbers: [1, 2, 3, 5, 7, 8, 10, 11, 12, 13, 15, 18], notes: ["Cloud outputs must stay review-required unless actual cloud network objects/imports exist."] },
-  { scenarioKey: "dual-isp", scenarioName: "Dual ISP", requirementsCovered: ["dualIsp", "WAN resilience", "failover routing", "implementation blockers"], expectedStageNumbers: [1, 2, 3, 5, 7, 8, 11, 13, 15, 16, 18], notes: ["Dual ISP must create routing/failover evidence or a blocker; it must not create fake circuits."] },
-  { scenarioKey: "brownfield-migration", scenarioName: "Brownfield migration", requirementsCovered: ["brownfield", "migration", "current-state", "IPAM conflict", "route/firewall comparison"], expectedStageNumbers: [1, 2, 3, 5, 8, 9, 10, 12, 13, 15, 18], notes: ["Brownfield mode must create import/reconciliation tasks and distinguish missing current-state evidence."] },
-  { scenarioKey: "overlapping-vrf-ipam", scenarioName: "Overlapping VRF/IPAM", requirementsCovered: ["route domains", "VRF overlap", "durable IPAM", "standards/validation"], expectedStageNumbers: [1, 3, 4, 5, 7, 8, 10, 11, 15, 18], notes: ["Overlaps are only acceptable with route-domain/IPAM evidence; otherwise they stay blocked/review-required."] },
-  { scenarioKey: "security-sensitive-environment", scenarioName: "Security-sensitive environment", requirementsCovered: ["management access", "remote access", "DMZ", "logging", "default deny"], expectedStageNumbers: [1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 15, 16], notes: ["Security claims must be policy consequences and review findings, not marketing text."] },
-  { scenarioKey: "large-vlan-site-count", scenarioName: "Large VLAN/site count", requirementsCovered: ["large VLAN count", "site reserve", "capacity", "diagram layout", "export scale"], expectedStageNumbers: [1, 2, 3, 4, 5, 8, 9, 10, 15, 16, 17], notes: ["Scale pressure must remain deterministic and reportable, with frontend using backend truth only."] },
+  { stage: 20, engineKey: "V1ReadinessLadder", expectedContract: "V1_READINESS_LADDER_CONTRACT", proofFocus: "single readiness ladder blocks implementation/report/diagram/template/AI overclaim" },
 ];
 
 function asRecord(value: StageSummary): Record<string, unknown> {
@@ -136,28 +122,75 @@ function engineByStage(rows: V1ProofModuleRow[]) {
   return new Map(rows.map((row) => [row.stage, row]));
 }
 
-function buildScenarioRows(engineRows: V1ProofModuleRow[]): V1ScenarioProofRow[] {
-  const rowsByStage = engineByStage(engineRows);
-  return SCENARIOS.map((scenario) => {
-    const expectedRows = scenario.expectedStageNumbers.map((stage) => rowsByStage.get(stage)).filter(Boolean) as V1ProofModuleRow[];
-    const missingStages = scenario.expectedStageNumbers.filter((stage) => !rowsByStage.has(stage));
-    const blockedEngines = expectedRows.filter((row) => row.readinessImpact === "BLOCKED");
-    const reviewEngines = expectedRows.filter((row) => row.readinessImpact === "REVIEW_REQUIRED");
-    const readinessImpact: V1ProofReadiness = missingStages.length || blockedEngines.length ? "BLOCKED" : reviewEngines.length ? "REVIEW_REQUIRED" : "PROOF_READY";
+function buildScenarioRows(scenarioExecutionResults: V1ScenarioExecutionResult[] | null | undefined): V1ScenarioProofRow[] {
+  const executions = Array.isArray(scenarioExecutionResults) ? scenarioExecutionResults : [];
+  if (!executions.length) {
+    return [
+      {
+        contract: V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT,
+        scenarioKey: "scenario-execution-missing",
+        scenarioName: "Scenario execution results missing",
+        scenarioCategory: "proof-execution",
+        requirementsCovered: ["test/golden scenario proof"],
+        expectedProofChain: PROPAGATION_CHAIN,
+        expectedEngineStages: [],
+        actualEvidence: [],
+        missingEvidence: [
+          "No scenarioExecutionResults were supplied to the final proof builder.",
+          "Final proof cannot pass from static expected summaries or engine-stage presence alone.",
+        ],
+        readinessImpact: "BLOCKED",
+        executedAt: null,
+        assertionCount: 0,
+        passedAssertionCount: 0,
+        failedAssertionCount: 1,
+        reviewAssertionCount: 0,
+        affectedEngines: ["scenario-matrix", "final-proof"],
+        reportEvidence: [],
+        diagramEvidence: [],
+        validationEvidence: [],
+        notes: ["Run the scenario matrix and pass real execution results into buildV1FinalProofPassControl."],
+      },
+    ];
+  }
+
+  return executions.map((execution) => {
+    const failedAssertions = execution.assertions.filter((assertion) => assertion.status === "FAIL");
+    const reviewAssertions = execution.assertions.filter((assertion) => assertion.status === "REVIEW");
+    const passedAssertions = execution.assertions.filter((assertion) => assertion.status === "PASS");
+    const readinessImpact: V1ProofReadiness = failedAssertions.length ? "BLOCKED" : reviewAssertions.length ? "REVIEW_REQUIRED" : "PROOF_READY";
+
     return {
       contract: V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT,
-      scenarioKey: scenario.scenarioKey,
-      scenarioName: scenario.scenarioName,
-      requirementsCovered: scenario.requirementsCovered,
+      scenarioKey: execution.scenarioId,
+      scenarioName: execution.scenarioName,
+      scenarioCategory: execution.scenarioCategory,
+      requirementsCovered: [execution.scenarioCategory, "scenario matrix execution", "backend design-core snapshot"],
       expectedProofChain: PROPAGATION_CHAIN,
-      expectedEngineStages: scenario.expectedStageNumbers,
-      actualEvidence: expectedRows.map((row) => `Stage ${row.stage} ${row.engineKey}: ${row.status} (${row.readinessImpact})`),
-      missingEvidence: [
-        ...missingStages.map((stage) => `Stage ${stage} engine proof row missing.`),
-        ...blockedEngines.map((row) => `Stage ${row.stage} ${row.engineKey} is ${row.status}.`),
+      expectedEngineStages: [],
+      actualEvidence: [
+        `Executed at: ${execution.executedAt}`,
+        `Assertions: ${passedAssertions.length} pass / ${reviewAssertions.length} review / ${failedAssertions.length} fail`,
+        ...execution.reportEvidence,
+        ...execution.diagramEvidence,
+        ...execution.validationEvidence.slice(0, 8),
       ],
+      missingEvidence: failedAssertions.map((assertion) => `${assertion.assertionId}: expected ${String(assertion.expected)} but got ${String(assertion.actual)}`),
       readinessImpact,
-      notes: scenario.notes,
+      executedAt: execution.executedAt,
+      assertionCount: execution.assertions.length,
+      passedAssertionCount: passedAssertions.length,
+      failedAssertionCount: failedAssertions.length,
+      reviewAssertionCount: reviewAssertions.length,
+      affectedEngines: execution.affectedEngines,
+      reportEvidence: execution.reportEvidence,
+      diagramEvidence: execution.diagramEvidence,
+      validationEvidence: execution.validationEvidence,
+      notes: failedAssertions.length
+        ? ["Scenario execution failed. This is a real blocker, not a static expected-stage mismatch."]
+        : reviewAssertions.length
+          ? ["Scenario execution passed with review-required assertions. Keep limitations visible in report/export/diagram output."]
+          : ["Scenario execution passed from an actual backend snapshot result."],
     };
   });
 }
@@ -211,18 +244,18 @@ function buildReleaseGates(context: V1ProofContext, engineRows: V1ProofModuleRow
       gateKey: "implementation-template-truth",
       gate: "Implementation plan and vendor-neutral templates are gated on verified upstream evidence",
       required: true,
-      state: gateStateFromRows([13, 14], engineRows),
-      evidence: ["V1 implementation planning", "V1 vendor-neutral templates"],
-      remediation: "Remove any implementation step/template that lacks source objects, evidence, preconditions, and rollback.",
+      state: gateStateFromRows([13, 14, 20], engineRows),
+      evidence: ["V1 implementation planning", "V1 vendor-neutral templates", "V1 readiness ladder"],
+      remediation: "Remove any implementation step/template that lacks source objects, evidence, preconditions, rollback, or central readiness-ladder approval.",
     },
     {
       contract: V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT,
       gateKey: "report-diagram-no-overclaim",
       gate: "Reports/exports and diagrams use backend truth and do not overclaim",
       required: true,
-      state: reportBlocked || !diagramHasBackendModel ? "BLOCKED" : gateStateFromRows([15, 16], engineRows),
-      evidence: [`Report blocked findings: ${asNumber(reportRecord.blockedFindingCount, 0)}`, `Diagram backend model visible: ${diagramHasBackendModel ? "yes" : "no"}`],
-      remediation: "Fix blocked report/diagram truth findings before release; no pretty garbage and no report claims without backend proof.",
+      state: reportBlocked || !diagramHasBackendModel ? "BLOCKED" : gateStateFromRows([15, 16, 20], engineRows),
+      evidence: [`Report blocked findings: ${asNumber(reportRecord.blockedFindingCount, 0)}`, `Diagram backend model visible: ${diagramHasBackendModel ? "yes" : "no"}`, "V1 readiness ladder must allow implementation-ready claims before reports or diagrams can use that language"],
+      remediation: "Fix blocked report/diagram truth findings and central readiness-ladder blockers before release; no pretty garbage and no report claims without backend proof.",
     },
     {
       contract: V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT,
@@ -339,7 +372,7 @@ function buildFindings(engineRows: V1ProofModuleRow[], scenarioRows: V1ScenarioP
 
 export function buildV1FinalProofPassControl(context: V1ProofContext): V1FinalProofPassControlSummary {
   const engineRows = buildEngineProofRows(context);
-  const scenarioRows = buildScenarioRows(engineRows);
+  const scenarioRows = buildScenarioRows(context.scenarioExecutionResults);
   const releaseGates = buildReleaseGates(context, engineRows, scenarioRows);
   const findings = buildFindings(engineRows, scenarioRows, releaseGates);
 
@@ -358,6 +391,7 @@ export function buildV1FinalProofPassControl(context: V1ProofContext): V1FinalPr
     sourceOfTruthLevel: "final-cross-engine-proof-gate",
     overallReadiness,
     scenarioCount: scenarioRows.length,
+    scenarioExecutionResultCount: Array.isArray(context.scenarioExecutionResults) ? context.scenarioExecutionResults.length : 0,
     scenarioProofReadyCount: scenarioRows.filter((row) => row.readinessImpact === "PROOF_READY").length,
     scenarioReviewCount: reviewScenarioCount,
     scenarioBlockedCount: blockedScenarioCount,
@@ -375,14 +409,14 @@ export function buildV1FinalProofPassControl(context: V1ProofContext): V1FinalPr
     findings,
     proofBoundary: [
       "V1 is a proof pass, not a feature expansion stage.",
-      "The final proof must preserve the full Requirements Propagation Contract from requirement input through scenario proof.",
+      "The final proof must preserve the full Requirements Propagation Contract from requirement input through actual scenario execution proof.",
       "Review-required evidence is allowed only when validation, report/export, diagrams, and implementation planning label it honestly.",
       "Blocked evidence is not acceptable for a release claim and must not be hidden by frontend copy.",
       "The platform may be called A-/A planning-grade only after proof gates pass; it is not A+ until routing, security, and discovery become deeper authoritative engines.",
     ],
     notes: [
       `Project: ${context.projectName || "unknown"}; sites=${context.siteCount ?? 0}; VLANs=${context.vlanCount ?? 0}; design issues=${context.issueCount ?? 0}.`,
-      "This control layer intentionally grades proof quality instead of creating new design objects.",
+      "This control layer intentionally grades proof quality from actual scenario execution results instead of creating new design objects.",
       overallReadiness === "BLOCKED" ? "Final proof is blocked. Do not ship as complete." : overallReadiness === "REVIEW_REQUIRED" ? "Final proof is controlled but review-required limitations remain." : "Final proof is controlled and proof-ready.",
     ],
   };

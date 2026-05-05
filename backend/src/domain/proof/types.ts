@@ -20,7 +20,8 @@ export type V1ProofStageKey =
   | "V1DiagramTruth"
   | "V1PlatformBomFoundation"
   | "V1DiscoveryCurrentState"
-  | "V1AiDraftHelper";
+  | "V1AiDraftHelper"
+  | "V1ReadinessLadder";
 
 export type V1ProofContext = {
   projectName?: string;
@@ -46,9 +47,11 @@ export type V1ProofContext = {
   V1PlatformBomFoundation?: object | null;
   V1DiscoveryCurrentState?: object | null;
   V1AiDraftHelper?: object | null;
+  V1ReadinessLadder?: object | null;
   requirementsScenarioProof?: object | null;
   reportTruth?: object | null;
   diagramTruth?: object | null;
+  scenarioExecutionResults?: V1ScenarioExecutionResult[] | null;
 };
 
 export interface V1ProofModuleRow {
@@ -63,16 +66,48 @@ export interface V1ProofModuleRow {
   blockers: string[];
 }
 
+export interface V1ScenarioAssertion {
+  assertionId: string;
+  description: string;
+  expected: unknown;
+  actual: unknown;
+  status: "PASS" | "FAIL" | "REVIEW";
+}
+
+export interface V1ScenarioExecutionResult {
+  scenarioId: string;
+  scenarioName: string;
+  scenarioCategory: string;
+  inputFixture: unknown;
+  executedAt: string;
+  snapshotResult: unknown;
+  assertions: V1ScenarioAssertion[];
+  affectedEngines: string[];
+  reportEvidence: string[];
+  diagramEvidence: string[];
+  validationEvidence: string[];
+}
+
 export interface V1ScenarioProofRow {
   contract: "V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT";
   scenarioKey: string;
   scenarioName: string;
+  scenarioCategory: string;
   requirementsCovered: string[];
   expectedProofChain: string[];
   expectedEngineStages: number[];
   actualEvidence: string[];
   missingEvidence: string[];
   readinessImpact: V1ProofReadiness;
+  executedAt: string | null;
+  assertionCount: number;
+  passedAssertionCount: number;
+  failedAssertionCount: number;
+  reviewAssertionCount: number;
+  affectedEngines: string[];
+  reportEvidence: string[];
+  diagramEvidence: string[];
+  validationEvidence: string[];
   notes: string[];
 }
 
@@ -103,6 +138,7 @@ export interface V1FinalProofPassControlSummary {
   sourceOfTruthLevel: "final-cross-engine-proof-gate";
   overallReadiness: V1ProofReadiness;
   scenarioCount: number;
+  scenarioExecutionResultCount: number;
   scenarioProofReadyCount: number;
   scenarioReviewCount: number;
   scenarioBlockedCount: number;

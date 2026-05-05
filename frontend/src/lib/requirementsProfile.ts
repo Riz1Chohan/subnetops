@@ -89,8 +89,8 @@ export const defaultRequirementsProfile: RequirementsProfile = {
   projectStage: "New network build",
   environmentType: "On-prem",
   complianceProfile: "General business",
-  siteCount: "1",
-  usersPerSite: "50",
+  siteCount: "",
+  usersPerSite: "",
   internetModel: "internet at each site",
   serverPlacement: "centralized servers or services",
   primaryGoal: "security and segmentation",
@@ -204,7 +204,9 @@ export function buildGuidedPrompt(values: RequirementsProfile) {
   features.push(`budget model of ${values.budgetModel}`, `vendor preference of ${values.vendorPreference}`, `implementation timeline of ${values.implementationTimeline}`, `rollout model of ${values.rolloutModel}`, `downtime constraint of ${values.downtimeConstraint}`, `team capability of ${values.teamCapability}`, `output package of ${values.outputPackage}`, `primary audience of ${values.primaryAudience}`);
   if (values.customRequirementsNotes.trim()) features.push(`custom requirements notes: ${values.customRequirementsNotes.trim()}`);
 
-  return `${values.planningFor} network, ${values.projectStage.toLowerCase()}, ${values.environmentType} environment, ${values.complianceProfile} context, about ${values.siteCount} site(s), around ${values.usersPerSite} users per site, ${values.internetModel}, ${values.serverPlacement}, primary goal is ${values.primaryGoal}. Include ${features.length > 0 ? features.join(", ") : "realistic segmentation and subnet planning"}.`;
+  const siteScope = values.siteCount.trim() ? `about ${values.siteCount} site(s)` : "site count not captured";
+  const userScope = values.usersPerSite.trim() ? `around ${values.usersPerSite} users per site` : "users per site not captured";
+  return `${values.planningFor} network, ${values.projectStage.toLowerCase()}, ${values.environmentType} environment, ${values.complianceProfile} context, ${siteScope}, ${userScope}, ${values.internetModel}, ${values.serverPlacement}, primary goal is ${values.primaryGoal}. Include ${features.length > 0 ? features.join(", ") : "realistic segmentation and subnet planning"}.`;
 }
 
 
@@ -339,8 +341,8 @@ export function buildProjectSummaryDescription(values: RequirementsProfile, maxL
   const parts = [
     `${values.projectStage} ${values.planningFor.toLowerCase()} network`,
     `${values.environmentType.toLowerCase()} environment`,
-    `${values.siteCount} site(s)`,
-    `${values.usersPerSite} users/site`,
+    values.siteCount.trim() ? `${values.siteCount} site(s)` : "site count not captured",
+    values.usersPerSite.trim() ? `${values.usersPerSite} users/site` : "users/site not captured",
     `primary goal: ${values.primaryGoal}`,
   ];
 
@@ -378,7 +380,7 @@ export function buildGuidedDescription(values: RequirementsProfile) {
 
   return [
     `${values.projectStage} ${values.planningFor.toLowerCase()} network plan for a ${values.environmentType.toLowerCase()} environment.`,
-    `Planned scope: ${values.siteCount} site(s), about ${values.usersPerSite} users per site, ${values.internetModel}, ${values.serverPlacement}.`,
+    `Planned scope: ${values.siteCount.trim() ? `${values.siteCount} site(s)` : "site count not captured"}, ${values.usersPerSite.trim() ? `about ${values.usersPerSite} users per site` : "users per site not captured"}, ${values.internetModel}, ${values.serverPlacement}.`,
     `Primary design priority: ${values.primaryGoal}. Compliance or policy context: ${values.complianceProfile}.`,
     details.length > 0 ? `Scenario details include ${details.join(", ")}.` : "Planning assumptions will be refined during logical design.",
   ].join(" ");

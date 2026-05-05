@@ -1,3 +1,6 @@
+/**
+ * Frontend truth contract: the browser may display backend facts, but it does not compute CIDR, VLAN, route, security-policy, report, or diagram engineering truth.
+ */
 export type FrontendEngineeringFactState =
   | "user_provided"
   | "system_calculated"

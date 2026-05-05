@@ -20,27 +20,100 @@ function has(text, pattern) {
   return pattern instanceof RegExp ? pattern.test(text) : text.includes(pattern);
 }
 
-const rootPkg = readJson('package.json');
-assert(
-  typeof rootPkg.scripts?.['check:v1'] === 'string' && rootPkg.scripts['check:v1'].includes('check-ci-hardening.cjs'),
-  'root check:v1 must include the CI/deployment hardening check'
-);
+function assertOrder(text, orderedSnippets, label) {
+  let cursor = -1;
+  for (const snippet of orderedSnippets) {
+    const next = text.indexOf(snippet);
+    assert(next !== -1, `${label} is missing required command: ${snippet}`);
+    assert(next > cursor, `${label} has command out of order: ${snippet}`);
+    cursor = next;
+  }
+}
 
+const rootPkg = readJson('package.json');
+const backendPkg = readJson('backend/package.json');
+
+const expectedRootScripts = {
+  'check:docs': 'node scripts/check-readme-only.cjs',
+  'check:backend': 'npm --prefix backend run prisma:generate && npm --prefix backend run build',
+  'check:frontend': 'npm --prefix frontend run build',
+};
+
+for (const [scriptName, scriptValue] of Object.entries(expectedRootScripts)) {
+  assert(rootPkg.scripts?.[scriptName] === scriptValue, `root ${scriptName} script must be ${scriptValue}`);
+}
+
+for (const requiredScript of ['check:quality', 'check:trust', 'check:proof', 'check:v1']) {
+  assert(typeof rootPkg.scripts?.[requiredScript] === 'string', `root ${requiredScript} script is required`);
+}
+
+assert(
+  rootPkg.scripts['check:v1'] === 'npm run check:docs && npm run check:quality && npm run check:backend && npm run check:frontend && npm run check:trust && npm run check:proof',
+  'root check:v1 must run docs, quality, backend, frontend, trust, and proof gates in the approved order'
+);
+assert(rootPkg.scripts['check:quality'].includes('check-ci-hardening.cjs'), 'root check:quality must include the CI/deployment hardening check');
+assert(rootPkg.scripts['check:trust'].includes('selftest:services'), 'root check:trust must include backend service selftests');
+assert(rootPkg.scripts['check:trust'].includes('selftest:scenario'), 'root check:trust must include scenario execution selftests');
+assert(rootPkg.scripts['check:trust'].includes('selftest:proof'), 'root check:trust must include proof selftests');
+assert(rootPkg.scripts['check:proof'].includes('check-final-proof-scenario-execution.cjs'), 'root check:proof must include final proof execution guard');
+assert(rootPkg.scripts['check:proof'].includes('check-api-service-database-integration-proof.cjs'), 'root check:proof must include integration proof guard');
+
+for (const requiredBackendScript of ['selftest:domain', 'selftest:services', 'selftest:scenario', 'selftest:proof', 'selftest:all']) {
+  assert(typeof backendPkg.scripts?.[requiredBackendScript] === 'string', `backend ${requiredBackendScript} script is required`);
+}
+assert(backendPkg.scripts['selftest:scenario'].includes('selftest:scenario-matrix'), 'backend scenario group must execute the scenario matrix');
+assert(backendPkg.scripts['selftest:proof'].includes('selftest:final-proof'), 'backend proof group must execute final proof');
+assert(backendPkg.scripts['selftest:all'].includes('selftest:domain'), 'backend selftest:all must include domain group');
+assert(backendPkg.scripts['selftest:all'].includes('selftest:services'), 'backend selftest:all must include service group');
+assert(backendPkg.scripts['selftest:all'].includes('selftest:integration-proof'), 'backend selftest:all must include integration proof group');
+
+assert(exists('package-lock.json'), 'root package-lock.json is required so CI can run npm ci at the root');
 assert(exists('.github/workflows/v1-ci.yml'), 'GitHub Actions workflow .github/workflows/v1-ci.yml is required');
 const workflow = readText('.github/workflows/v1-ci.yml');
 for (const requiredSnippet of [
   'node-version: 20.12.2',
-  'npm run check:v1',
-  'npm ci --include=dev --no-audit --no-fund',
+  'package-lock.json',
+  'backend/package-lock.json',
+  'frontend/package-lock.json',
   'npm run prisma:generate',
   'npm run prisma:migrate:deploy',
-  'npm run build',
-  'npm run selftest:all',
+  'npm run check:backend',
+  'npm run check:frontend',
+  'npm run check:quality',
+  'npm run check:trust',
+  'npm run check:proof',
+  'npm run check:v1',
   'docker build -t subnetops-backend-ci ./backend',
   'docker build -t subnetops-frontend-ci ./frontend',
 ]) {
   assert(workflow.includes(requiredSnippet), `CI workflow is missing required command: ${requiredSnippet}`);
 }
+
+assertOrder(
+  workflow,
+  [
+    'actions/checkout@v4',
+    'actions/setup-node@v4',
+    'Install root dependencies',
+    'Install backend dependencies',
+    'Install frontend dependencies',
+    'Generate Prisma client',
+    'Apply database migrations',
+    'Run backend checks',
+    'Run frontend checks',
+    'Run root quality checks',
+    'Run root trust checks',
+    'Run root proof checks',
+    'Run final V1 gate',
+  ],
+  'CI workflow'
+);
+
+const firstFinalGate = workflow.indexOf('npm run check:v1');
+const backendInstall = workflow.indexOf('Install backend dependencies');
+const frontendInstall = workflow.indexOf('Install frontend dependencies');
+assert(backendInstall !== -1 && firstFinalGate > backendInstall, 'CI must not run check:v1 before backend dependencies are installed');
+assert(frontendInstall !== -1 && firstFinalGate > frontendInstall, 'CI must not run check:v1 before frontend dependencies are installed');
 assert(has(workflow, /postgres:16-alpine/), 'CI workflow must include a Postgres service for migration/selftest coverage');
 assert(!has(workflow, /prisma\s+db\s+push/), 'CI workflow must not use prisma db push');
 

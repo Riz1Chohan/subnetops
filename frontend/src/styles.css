@@ -453,6 +453,11 @@ tr:last-child td {
   font-weight: 700;
 }
 
+.badge-soft.danger {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
 .project-shell-header {
   display: flex;
   justify-content: space-between;

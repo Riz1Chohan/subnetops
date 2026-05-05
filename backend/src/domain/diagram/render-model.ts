@@ -1,3 +1,4 @@
+import { buildOmittedEvidenceSummary, mergeOmittedEvidenceSummaries } from '../evidence/index.js';
 import { enforceTruthStateReadiness, normalizeDiagramReadiness, readinessFromFindingSeverity, rollupDiagramReadiness } from './readiness.js';
 import type {
   BuildDiagramRenderModelInput,
@@ -16,6 +17,84 @@ import type {
 type FindingRef = { id: string; severity: 'ERROR' | 'WARNING' | 'INFO'; affectedObjectIds: string[] };
 type SiteSummary = { siteId: string; siteName: string; siteCode?: string | null; deviceIds: string[] };
 type Point = { x: number; y: number };
+
+type DiagramRenderNodeDraft = Omit<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'> & Partial<Pick<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'>>;
+type DiagramRenderEdgeDraft = Omit<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'> & Partial<Pick<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'>>;
+
+function readinessImpactFromDiagramReadiness(readiness: 'ready' | 'review' | 'blocked' | 'unknown') {
+  if (readiness === 'blocked') return 'BLOCKING' as const;
+  if (readiness === 'review' || readiness === 'unknown') return 'REVIEW' as const;
+  return 'NONE' as const;
+}
+
+function v1TruthStateFromDiagramTruthState(truthState: DiagramTruthState | undefined | null) {
+  switch (truthState) {
+    case 'configured':
+    case 'approved':
+    case 'durable':
+      return 'USER_PROVIDED' as const;
+    case 'materialized':
+    case 'discovered':
+      return 'DERIVED' as const;
+    case 'imported':
+      return 'IMPORTED' as const;
+    case 'review-required':
+      return 'REVIEW_REQUIRED' as const;
+    case 'blocked':
+      return 'BLOCKED' as const;
+    case 'inferred':
+    case 'proposed':
+    case 'planned':
+    default:
+      return 'ASSUMED' as const;
+  }
+}
+
+function warningBadgesForDiagramEvidence(params: { readiness: 'ready' | 'review' | 'blocked' | 'unknown'; truthState: DiagramTruthState; truthStateV1: ReturnType<typeof v1TruthStateFromDiagramTruthState>; notes?: string[] }) {
+  const badges: string[] = [];
+  if (params.readiness === 'blocked') badges.push('BLOCKED');
+  if (params.readiness === 'review' || params.readiness === 'unknown') badges.push('REVIEW_REQUIRED');
+  if (params.truthStateV1 === 'ASSUMED') badges.push('ASSUMED_OR_INFERRED');
+  if (params.truthStateV1 === 'IMPORTED') badges.push('IMPORTED_NOT_PROVEN');
+  if (params.truthState === 'review-required') badges.push('SOURCE_REVIEW_REQUIRED');
+  if (params.notes?.some((note) => /omitted|hidden|windowed/i.test(note))) badges.push('OMITTED_EVIDENCE_WARNING');
+  return Array.from(new Set(badges));
+}
+
+function decorateRenderNode(node: DiagramRenderNodeDraft): DiagramRenderNode {
+  const readiness = enforceTruthStateReadiness(node.readiness, node.truthState);
+  const truthStateV1 = node.truthStateV1 ?? v1TruthStateFromDiagramTruthState(node.truthState);
+  const sourceRefs = node.sourceRefs?.length ? node.sourceRefs : [`${node.sourceEngine}:${node.objectId}`];
+  const validationRefs = node.validationRefs?.length ? node.validationRefs : (node.relatedFindingIds.length ? node.relatedFindingIds : [`diagram-readiness:${readiness}`]);
+  return {
+    ...node,
+    readiness,
+    truthStateV1,
+    readinessImpact: node.readinessImpact ?? readinessImpactFromDiagramReadiness(readiness),
+    sourceRefs,
+    validationRefs,
+    warningBadges: node.warningBadges?.length ? node.warningBadges : warningBadgesForDiagramEvidence({ readiness, truthState: node.truthState, truthStateV1, notes: node.notes }),
+  };
+}
+
+function decorateRenderEdge(edge: DiagramRenderEdgeDraft): DiagramRenderEdge {
+  const truthState = edge.truthState ?? (edge.readiness === 'blocked' ? 'blocked' : edge.readiness === 'review' || edge.readiness === 'unknown' ? 'review-required' : 'materialized');
+  const readiness = enforceTruthStateReadiness(edge.readiness, truthState);
+  const truthStateV1 = edge.truthStateV1 ?? v1TruthStateFromDiagramTruthState(truthState);
+  const sourceRefs = edge.sourceRefs?.length ? edge.sourceRefs : (edge.relatedObjectIds.length ? edge.relatedObjectIds.map((id) => `${edge.relationship}:${id}`) : [`diagram-edge:${edge.id}`]);
+  const validationRefs = edge.validationRefs?.length ? edge.validationRefs : [`diagram-edge-readiness:${readiness}`, `diagram-edge-truth:${truthState}`];
+  return {
+    ...edge,
+    readiness,
+    truthState,
+    truthStateV1,
+    readinessImpact: edge.readinessImpact ?? readinessImpactFromDiagramReadiness(readiness),
+    sourceRefs,
+    validationRefs,
+    warningBadges: edge.warningBadges?.length ? edge.warningBadges : warningBadgesForDiagramEvidence({ readiness, truthState, truthStateV1, notes: edge.notes }),
+  };
+}
+
 
 function safeId(value: string) {
   return value.replace(/[^a-z0-9_-]/gi, '-');
@@ -56,12 +135,12 @@ function deviceDiagramLabel(device: DiagramNetworkObjectModelInput['devices'][nu
   return `${siteCode} Network Device`;
 }
 
-function addNode(nodes: DiagramRenderNode[], node: DiagramRenderNode) {
-  if (!nodes.some((existing) => existing.id === node.id)) nodes.push(node);
+function addNode(nodes: DiagramRenderNode[], node: DiagramRenderNodeDraft) {
+  if (!nodes.some((existing) => existing.id === node.id)) nodes.push(decorateRenderNode(node));
 }
 
-function addEdge(edges: DiagramRenderEdge[], edge: DiagramRenderEdge) {
-  if (!edges.some((existing) => existing.id === edge.id)) edges.push(edge);
+function addEdge(edges: DiagramRenderEdge[], edge: DiagramRenderEdgeDraft) {
+  if (!edges.some((existing) => existing.id === edge.id)) edges.push(decorateRenderEdge(edge));
 }
 
 function collectFindingRefs(networkObjectModel: DiagramNetworkObjectModelInput): FindingRef[] {
@@ -608,6 +687,13 @@ export function buildDiagramRenderModel(input: BuildDiagramRenderModelInput): Di
     .slice(0, 8);
   const groups = buildGroups({ nodes, sites, routeDomain, visibleZones, networkObjectModel, findingRefs });
   const overlays = buildOverlays({ nodes, edges, overlaySummaries, hotspots });
+  const omittedEvidenceSummaries = [
+    buildOmittedEvidenceSummary({ collection: 'diagram security zones', surface: 'DiagramRenderModel.securityZones', items: networkObjectModel.securityZones.filter((zone) => zone.zoneRole !== 'wan'), shownCount: visibleZones.length, exportImpact: 'Diagram hides extra zones only with an omitted counter; hidden blocked/review zones keep the diagram review-gated.' }),
+    buildOmittedEvidenceSummary({ collection: 'diagram policy rules', surface: 'DiagramRenderModel.policyRules', items: networkObjectModel.policyRules.filter((policy) => policy.action === 'deny' || /guest|management|dmz|wan/i.test(policy.name)), shownCount: Math.min(10, networkObjectModel.policyRules.filter((policy) => policy.action === 'deny' || /guest|management|dmz|wan/i.test(policy.name)).length), exportImpact: 'Policy nodes are windowed visually; hidden policy blockers/review states must remain visible in summary/report evidence.' }),
+    buildOmittedEvidenceSummary({ collection: 'diagram hotspots', surface: 'DiagramRenderModel.overlays.hotspotIndexes', items: hotspots, shownCount: Math.min(6, hotspots.length), exportImpact: 'Overlay hotspots are windowed visually; hidden hotspots require counters so warnings do not disappear.' }),
+    buildOmittedEvidenceSummary({ collection: 'dangling diagram edges', surface: 'DiagramRenderModel.emptyState.requiredInputs', items: validateRenderGraph(nodes, edges)?.requiredInputs ?? [], shownCount: Math.min(8, validateRenderGraph(nodes, edges)?.requiredInputs?.length ?? 0), exportImpact: 'Dangling-edge repair prompts are windowed but any omitted repair prompt keeps diagram output review-gated.' }),
+  ];
+  const omittedEvidenceRollup = mergeOmittedEvidenceSummaries(omittedEvidenceSummaries);
 
   const routeLinkCount = edges.filter((edge) => edge.overlayKeys.includes('routing')).length;
   const missingRenderInputs = [
@@ -634,12 +720,17 @@ export function buildDiagramRenderModel(input: BuildDiagramRenderModelInput): Di
       contractId: 'V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT',
       truthContract: 'backend-only-render-model',
       modeCount: 6,
+      evidenceWindowCount: omittedEvidenceRollup.surfaceCount,
+      omittedEvidenceTotalCount: omittedEvidenceRollup.totalOmittedCount,
+      omittedEvidenceHasBlockers: omittedEvidenceRollup.omittedHasBlockers,
+      omittedEvidenceHasReviewRequired: omittedEvidenceRollup.omittedHasReviewRequired,
     },
     nodes,
     edges,
     groups,
     overlays,
     emptyState,
+    omittedEvidenceSummaries,
   };
 }
 

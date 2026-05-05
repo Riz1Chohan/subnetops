@@ -66,9 +66,16 @@ assert(summary.truthLabelRows.some((row) => row.truthLabel === "BACKEND_COMPUTED
 assert.equal(summary.pdfDocxCsvCovered, true);
 assert(summary.proofBoundary.some((line) => line.includes("PDF/DOCX/CSV")));
 assert.notEqual(summary.overallReadiness, "READY");
+assert.equal(summary.implementationReadyClaimAllowed, false);
+assert.equal(summary.productionReadyClaimAllowed, false);
+assert(summary.antiOverclaimRules.some((rule) => rule.phrase === "implementation-ready" && rule.claimAllowed === false));
+assert(summary.fullMachineReadableAppendix.machineReadable);
+assert(summary.omittedEvidenceSummaries.every((row) => typeof row.omittedCount === "number"));
+assert(summary.fullEvidenceInventory.some((row) => row.collection === "requirement traceability matrix"));
 
 const evidenceDocument = buildReportEvidenceDocument(summary);
 assert.equal(evidenceDocument.readiness, summary.overallReadiness);
+assert.equal(evidenceDocument.canClaimImplementationReady, false);
 assert(evidenceDocument.sections.every((section) => section.evidence.length > 0));
 assert.equal(reportCanClaimReady(evidenceDocument), false);
 assert(findOverclaimRisks(evidenceDocument).some((risk) => risk.includes("must not claim")));

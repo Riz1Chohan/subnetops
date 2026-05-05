@@ -26,6 +26,7 @@ const requiredFiles = [
   'backend/src/lib/finalProofPass.selftest.ts',
   'backend/src/lib/scenarioMatrix.fixtures.ts',
   'backend/src/lib/scenarioMatrix.selftest.ts',
+  'backend/src/lib/scenarioMatrix.execution.ts',
 ];
 for (const rel of requiredFiles) assert(exists(rel), `missing ${rel}`);
 
@@ -36,7 +37,8 @@ assert(backendPackage.scripts['selftest:all'].includes('selftest:proof-domain'),
 
 const rootPackage = JSON.parse(read('package.json'));
 assert(rootPackage.version === '1.0.0', 'root package version must remain 1.0.0');
-assert(rootPackage.scripts['check:v1'].includes('check-final-proof-package.cjs'), 'root check:v1 must include final proof package check');
+assert(rootPackage.scripts['check:v1'].includes('check:quality'), 'root check:v1 must run the quality gate');
+assert(rootPackage.scripts['check:quality'].includes('check-final-proof-package.cjs'), 'root check:quality must include final proof package check');
 
 const proofDomain = read('backend/src/domain/proof/final-proof.ts');
 const forbiddenImports = [
@@ -49,13 +51,18 @@ const forbiddenImports = [
 for (const pattern of forbiddenImports) assert(!pattern.test(proofDomain), `proof domain has forbidden import matching ${pattern}`);
 assert(proofDomain.includes('V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT'), 'proof domain must preserve existing V1 compatibility contract');
 assert(proofDomain.includes('buildV1FinalProofPassControl'), 'proof domain must own final proof builder');
-assert((proofDomain.match(/scenarioKey:/g) || []).length >= 12, 'final proof scenario registry must include at least twelve scenario definitions');
+assert(proofDomain.includes('scenarioExecutionResults'), 'final proof must consume scenario execution results');
+assert(proofDomain.includes('scenario-execution-missing'), 'final proof must block when scenario execution evidence is absent');
+assert(!/const\s+SCENARIOS\s*:\s*V1ScenarioDefinition\[\]/.test(proofDomain), 'final proof must not keep static scenario definitions as proof');
 
 const wrapper = read('backend/src/services/designCore/designCore.finalProofPassControl.ts');
 assert(wrapper.includes('../../domain/proof/index.js'), 'design-core final proof control must be a compatibility wrapper over the proof domain');
 assert(!wrapper.includes('const EXPECTED_ENGINES'), 'compatibility wrapper must not keep duplicated final proof registry logic');
 
 const fixtures = read('backend/src/lib/scenarioMatrix.fixtures.ts');
+const scenarioExecution = read('backend/src/lib/scenarioMatrix.execution.ts');
+assert(scenarioExecution.includes('buildDesignCoreSnapshot'), 'scenario execution must execute real design-core snapshots');
+assert(scenarioExecution.includes('executeV1ScenarioMatrix'), 'scenario execution must expose a matrix runner');
 const requiredScenarioNeedles = [
   'small-office-baseline-review-gated',
   'multi-site-guest-dmz-security-boundary',

@@ -1,3 +1,4 @@
+import { buildOmittedEvidenceSummary, evidenceWindow } from "../evidence/index.js";
 import type {
   BackendDiagramTruthModel,
   BackendReportTruthModel,
@@ -70,12 +71,10 @@ function compact(value: unknown, fallback = "—") {
 }
 
 function makeTraceabilityRows(params: {
-  V1RequirementsClosure: V1RequirementsClosureControlSummary;
+  closureRows: any[];
   networkObjectModel: NetworkObjectModel;
 }): V1ReportTraceabilityMatrixRow[] {
-  const rows = asArray<any>(params.V1RequirementsClosure.closureMatrix)
-    .filter((item) => item?.active || item?.consumerCoverage?.captured)
-    .slice(0, 60)
+  const rows = params.closureRows
     .map((item): V1ReportTraceabilityMatrixRow => {
       const affectedAreas = uniq(asArray<string>(item.actualAffectedEngines));
       const missingConsumers = uniq(asArray<string>(item.missingConsumers));
@@ -225,6 +224,31 @@ function buildFindings(params: {
   return findings;
 }
 
+function buildAntiOverclaimRules(params: { overallReadiness: V1Readiness; blockedFindingCount: number; reviewFindingCount: number; omittedHasBlockers: boolean; omittedHasReviewRequired: boolean; pdfDocxCsvCovered: boolean }) {
+  const claimAllowed = params.overallReadiness === "READY"
+    && params.blockedFindingCount === 0
+    && params.reviewFindingCount === 0
+    && !params.omittedHasBlockers
+    && !params.omittedHasReviewRequired
+    && params.pdfDocxCsvCovered;
+  const evidence = [
+    `Report/export readiness: ${params.overallReadiness}`,
+    `Blocked findings: ${params.blockedFindingCount}`,
+    `Review findings: ${params.reviewFindingCount}`,
+    `Omitted blockers: ${params.omittedHasBlockers ? "yes" : "no"}`,
+    `Omitted review-required: ${params.omittedHasReviewRequired ? "yes" : "no"}`,
+    `PDF/DOCX/CSV coverage: ${params.pdfDocxCsvCovered ? "yes" : "no"}`,
+  ];
+  return [
+    { phrase: "ready for deployment", allowedOnlyWhen: "IMPLEMENTATION_READY" as const, claimAllowed, replacement: "planning package with explicit review/implementation gates", evidence },
+    { phrase: "validated", allowedOnlyWhen: "BACKEND_PROOF_SUPPORTS" as const, claimAllowed, replacement: "validated only for the listed backend evidence, with unresolved sections shown", evidence },
+    { phrase: "complete", allowedOnlyWhen: "BACKEND_PROOF_SUPPORTS" as const, claimAllowed, replacement: "complete only for proven sections; unresolved items remain visible", evidence },
+    { phrase: "best practice compliant", allowedOnlyWhen: "BACKEND_PROOF_SUPPORTS" as const, claimAllowed, replacement: "aligned to modeled standards evidence, pending engineer review", evidence },
+    { phrase: "production-ready", allowedOnlyWhen: "IMPLEMENTATION_READY" as const, claimAllowed, replacement: "not production-ready until backend proof reaches implementation-ready", evidence },
+    { phrase: "implementation-ready", allowedOnlyWhen: "IMPLEMENTATION_READY" as const, claimAllowed, replacement: "implementation gated until blockers/review items are resolved", evidence },
+  ];
+}
+
 export function buildV1ReportExportTruthControl(params: {
   reportTruth: BackendReportTruthModel;
   diagramTruth: BackendDiagramTruthModel;
@@ -239,7 +263,16 @@ export function buildV1ReportExportTruthControl(params: {
   V1ImplementationTemplates: V1ImplementationTemplateControlSummary;
   networkObjectModel: NetworkObjectModel;
 }): V1ReportExportTruthControlSummary {
-  const traceabilityMatrix = makeTraceabilityRows({ V1RequirementsClosure: params.V1RequirementsClosure, networkObjectModel: params.networkObjectModel });
+  const closureSourceRows = asArray<any>(params.V1RequirementsClosure.closureMatrix)
+    .filter((item) => item?.active || item?.consumerCoverage?.captured);
+  const traceabilityWindow = evidenceWindow({
+    collection: "requirement traceability matrix",
+    surface: "V1ReportExportTruth.traceabilityMatrix",
+    items: closureSourceRows,
+    limit: 60,
+    exportImpact: "Traceability summary is windowed for readability; the omitted counter must expose hidden blockers/review items and the full closure matrix remains machine-readable in design-core evidence.",
+  });
+  const traceabilityMatrix = makeTraceabilityRows({ closureRows: traceabilityWindow.shown, networkObjectModel: params.networkObjectModel });
   const sectionGates = buildSectionGates(params);
   const truthLabelRows = buildTruthLabelRows({ reportTruth: params.reportTruth, networkObjectModel: params.networkObjectModel, traceabilityRows: traceabilityMatrix, sectionGates });
   const findings = buildFindings({ sectionGates, traceabilityRows: traceabilityMatrix, truthLabelRows, reportTruth: params.reportTruth, V1ImplementationTemplates: params.V1ImplementationTemplates });
@@ -256,6 +289,43 @@ export function buildV1ReportExportTruthControl(params: {
   if (blockedFindingCount) overallReadiness = "BLOCKED";
   else if (reviewFindingCount && overallReadiness === "READY") overallReadiness = "REVIEW_REQUIRED";
 
+  const omittedEvidenceSummaries = [
+    traceabilityWindow.summary,
+    buildOmittedEvidenceSummary({ collection: "report section gates", surface: "V1ReportExportTruth.sectionGates", items: sectionGates, shownCount: sectionGates.length }),
+    buildOmittedEvidenceSummary({ collection: "report truth labels", surface: "V1ReportExportTruth.truthLabelRows", items: truthLabelRows, shownCount: truthLabelRows.length }),
+    buildOmittedEvidenceSummary({ collection: "report findings", surface: "V1ReportExportTruth.findings", items: findings, shownCount: findings.length }),
+  ];
+  if (omittedEvidenceSummaries.some((summary) => summary.omittedHasBlockers)) overallReadiness = "BLOCKED";
+  else if (overallReadiness === "READY" && omittedEvidenceSummaries.some((summary) => summary.omittedHasReviewRequired)) overallReadiness = "REVIEW_REQUIRED";
+  const fullEvidenceInventory = omittedEvidenceSummaries.map((summary) => ({
+    collection: summary.collection,
+    totalCount: summary.totalCount,
+    surfacedCount: summary.shownCount,
+    omittedCount: summary.omittedCount,
+    readinessImpact: summary.readinessImpact,
+  }));
+  const antiOverclaimRules = buildAntiOverclaimRules({
+    overallReadiness,
+    blockedFindingCount,
+    reviewFindingCount,
+    omittedHasBlockers: omittedEvidenceSummaries.some((summary) => summary.omittedHasBlockers),
+    omittedHasReviewRequired: omittedEvidenceSummaries.some((summary) => summary.omittedHasReviewRequired),
+    pdfDocxCsvCovered,
+  });
+  const implementationReadyClaimAllowed = overallReadiness === "READY" && antiOverclaimRules.every((rule) => rule.claimAllowed);
+  const productionReadyClaimAllowed = implementationReadyClaimAllowed;
+  const fullMachineReadableAppendix = {
+    machineReadable: true as const,
+    generatedFrom: "V1ReportExportTruth" as const,
+    includesRequirementTraceability: traceabilityMatrix.length > 0,
+    includesSectionGates: sectionGates.length > 0,
+    includesTruthLabels: truthLabelRows.length > 0,
+    includesFindings: findings.length > 0,
+    includesOmittedEvidenceSummaries: omittedEvidenceSummaries.length > 0,
+    includesFullEvidenceInventory: fullEvidenceInventory.length > 0,
+    exportFormats: ["PDF", "DOCX", "CSV", "JSON"] as Array<"PDF" | "DOCX" | "CSV" | "JSON">,
+  };
+
   return {
     contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT",
     role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE",
@@ -269,6 +339,9 @@ export function buildV1ReportExportTruthControl(params: {
     truthLabelRowCount: truthLabelRows.length,
     blockedTruthLabelCount: truthLabelRows.filter((row) => row.readinessImpact === "BLOCKED").length,
     pdfDocxCsvCovered,
+    fullMachineReadableAppendix,
+    implementationReadyClaimAllowed,
+    productionReadyClaimAllowed,
     findingCount: findings.length,
     blockedFindingCount,
     reviewFindingCount,
@@ -277,11 +350,14 @@ export function buildV1ReportExportTruthControl(params: {
     truthLabelRows,
     findings,
     proofBoundary: [
-      "Modeled: executive summary, readiness, requirements traceability, addressing, enterprise IPAM, object model, routing, security, implementation, validation, diagram truth, assumptions, review items, and appendices.",
+      "Modeled: executive summary, readiness, requirements traceability, addressing, enterprise IPAM, object model, routing, security, implementation, validation, diagram truth, assumptions, review items, omitted evidence summaries, and appendices.",
       "Allowed: PDF/DOCX/CSV exports may summarize backend-computed evidence and review blockers.",
       "Blocked: reports must not claim live device state, vendor syntax correctness, cabling truth, production firewall rulebase truth, or change-window success.",
       "Required: every requirement row must show design consequence, affected planning area, frontend location, report section, diagram impact, and readiness status.",
     ],
+    omittedEvidenceSummaries,
+    fullEvidenceInventory,
+    antiOverclaimRules,
     notes: [
       "V1 is a deliverable truth gate, not a cosmetic report rewrite.",
       "Reports remain blocked/review-required when upstream requirement, IPAM, routing, security, implementation, diagram, or validation evidence is blocked/review-required.",

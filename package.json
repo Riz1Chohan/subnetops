@@ -5,9 +5,12 @@
   "type": "commonjs",
   "scripts": {
     "check": "npm run check:v1",
-    "check:v1": "npm run check:build && npm run check:trust && npm run check:quality",
-    "check:build": "npm --prefix backend run prisma:generate && npm --prefix backend run build && npm --prefix frontend run build",
-    "check:quality": "node scripts/check-v1-release.cjs && node scripts/check-frontend-truth.cjs && node scripts/check-ci-hardening.cjs && node scripts/check-ux-simplification.cjs && node scripts/check-ai-containment.cjs && node scripts/check-final-proof-package.cjs",
-    "check:trust": "npm --prefix backend run selftest:network-engineer-trust && npm --prefix backend run selftest:scenario-matrix && npm --prefix backend run selftest:diagram-domain && npm --prefix backend run selftest:reporting-domain"
+    "check:v1": "npm run check:docs && npm run check:quality && npm run check:backend && npm run check:frontend && npm run check:trust && npm run check:proof",
+    "check:docs": "node scripts/check-readme-only.cjs",
+    "check:quality": "node scripts/check-readme-only.cjs && node scripts/check-v1-release.cjs && node scripts/check-frontend-truth.cjs && node scripts/check-no-frontend-engineering-facts.cjs && node scripts/check-ci-hardening.cjs && node scripts/check-ux-simplification.cjs && node scripts/check-ai-containment.cjs && node scripts/check-final-proof-package.cjs && node scripts/check-service-validation-coverage.cjs && node scripts/check-requirement-materialization-source-truth.cjs && node scripts/check-no-silent-read-repair.cjs && node scripts/check-final-proof-scenario-execution.cjs && node scripts/check-omitted-evidence-counters.cjs && node scripts/check-project-cidr-validation.cjs && node scripts/check-readiness-ladder-enforcement.cjs && node scripts/check-diagram-truth-enforcement.cjs && node scripts/check-no-diagram-clean-inference.cjs && node scripts/check-no-report-overclaim.cjs && node scripts/check-api-service-database-integration-proof.cjs && node scripts/check-regression-kill-switches.cjs && node scripts/check-readme-proof-map.cjs",
+    "check:backend": "npm --prefix backend run prisma:generate && npm --prefix backend run build",
+    "check:frontend": "npm --prefix frontend run build",
+    "check:trust": "npm --prefix backend run selftest:services && npm --prefix backend run selftest:reporting-domain && npm --prefix backend run selftest:network-engineer-trust && npm --prefix backend run selftest:scenario && npm --prefix backend run selftest:proof && npm --prefix backend run selftest:integration-proof",
+    "check:proof": "npm --prefix backend run selftest:scenario && npm --prefix backend run selftest:proof && node scripts/check-final-proof-package.cjs && node scripts/check-final-proof-scenario-execution.cjs && node scripts/check-api-service-database-integration-proof.cjs"
   }
 }
