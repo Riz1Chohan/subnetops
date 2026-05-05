@@ -6,6 +6,7 @@ const root = process.cwd();
 const frontendReport = fs.readFileSync(path.join(root, 'frontend/src/pages/ProjectReportPage.tsx'), 'utf8');
 const frontendApi = fs.readFileSync(path.join(root, 'frontend/src/lib/api.ts'), 'utf8');
 const exportController = fs.readFileSync(path.join(root, 'backend/src/controllers/export.controller.ts'), 'utf8');
+const projectLayout = fs.readFileSync(path.join(root, 'frontend/src/layouts/ProjectLayout.tsx'), 'utf8');
 
 const failures = [];
 function mustContain(label, haystack, needle) {
@@ -26,6 +27,16 @@ mustContain('backend interactive export stabilization', exportController, 'stabi
 mustContain('backend interactive export stabilization', exportController, 'INTERACTIVE_EXPORT_ROW_LIMITS');
 mustContain('backend interactive export stabilization', exportController, 'Export Stability Appendix');
 mustContain('backend interactive export stabilization', exportController, 'setExportResponseHeaders');
+
+mustContain('backend export lease guard', exportController, 'activeInteractiveExports');
+mustContain('backend export lease guard', exportController, 'acquireExportLease');
+mustContain('backend export memory guard', exportController, 'assertExportMemoryAvailable');
+mustContain('backend export controlled failure', exportController, 'controlledExportFailure');
+mustContain('backend export total row budget', exportController, 'maxTotalRows');
+mustContain('backend export table budget', exportController, 'maxTables');
+mustContain('project workspace retry recovery', projectLayout, 'Retry workspace');
+mustContain('project workspace retry recovery', projectLayout, 'projectQuery.refetch');
+mustContain('project workspace retry recovery', projectLayout, 'If this happened after an export attempt');
 
 if (!/buildPdf[\s\S]*stabilizeReportForInteractiveExport\(report, "pdf", reportMode\)/.test(exportController)) {
   failures.push('PDF builder must stabilize/bound report rows before rendering.');

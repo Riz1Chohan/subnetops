@@ -2245,3 +2245,5 @@ Wizard-generated greenfield output must not treat candidate IPAM authority, DHCP
 ### Export failure recovery guard
 
 Interactive PDF/DOCX exports must never leave the report page stuck after a backend timeout or oversized evidence set. The export path now enforces bounded interactive tables, validates returned blobs, exposes a cancel/timeout recovery path, and keeps full row-level evidence available through CSV/full-proof exports. `npm run check:export-recovery` fails if these guards are removed.
+
+The export path also has an API survival contract: one oversized or repeated export attempt must not make `/api/projects`, `/api/design-core`, or workspace reloads fall into browser-level `Failed to fetch`. Backend export handlers now use a per-user/project export lease, memory-pressure guard, bounded total row/table budgets, controlled JSON error responses, and frontend workspace retry recovery. If a project page becomes unavailable after an export attempt, the UI must offer a retry path instead of forcing the user back into stacked export clicks.
