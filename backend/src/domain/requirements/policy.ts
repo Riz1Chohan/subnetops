@@ -182,10 +182,9 @@ const REVIEW_ONLY_REQUIREMENTS = new Set([
   "customRequirementsNotes",
 ]);
 
-const VALIDATION_BLOCKER_REQUIREMENTS = new Set([
-  "dualIsp",
-  "cloudConnected",
-  "remoteAccess",
+const VALIDATION_BLOCKER_REQUIREMENTS = new Set<string>([]);
+
+const SYSTEM_ADDRESSING_POLICY_REQUIREMENTS = new Set([
   "reservedRangePolicy",
   "addressHierarchyModel",
   "siteBlockStrategy",
@@ -213,6 +212,8 @@ function policyDispositionFor(
 ): RequirementMaterializationDisposition {
   if (MATERIALIZED_SEGMENT_BY_REQUIREMENT[item.key])
     return "MATERIALIZED_OBJECT";
+  if (SYSTEM_ADDRESSING_POLICY_REQUIREMENTS.has(item.key))
+    return "ENGINE_INPUT_SIGNAL";
   if (VALIDATION_BLOCKER_REQUIREMENTS.has(item.key))
     return "VALIDATION_BLOCKER";
   if (REVIEW_ONLY_REQUIREMENTS.has(item.key)) return "REVIEW_ITEM";

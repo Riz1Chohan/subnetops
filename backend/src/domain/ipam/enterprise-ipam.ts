@@ -444,6 +444,12 @@ function evaluateBrownfieldDiff(rows: EnterpriseAllocatorInputRow[], source: Ent
   return conflictCount;
 }
 
+function isGatewayReservation(reservation: EnterpriseReservationRecord, scope: EnterpriseDhcpScopeRecord) {
+  if (!scope.defaultGateway || reservation.ipAddress !== scope.defaultGateway) return false;
+  const owner = String(reservation.ownerLabel ?? reservation.hostname ?? '').toLowerCase();
+  return owner.includes('gateway') || owner.includes('svi') || owner.includes('router') || owner.includes('default-gateway');
+}
+
 function evaluateDhcpAndReservations(rows: EnterpriseAllocatorInputRow[], source: EnterpriseAllocatorSource, findings: EnterpriseReviewFinding[]) {
   let dhcpFindings = 0;
   const scopes = source.dhcpScopes ?? [];
@@ -490,9 +496,9 @@ function evaluateDhcpAndReservations(rows: EnterpriseAllocatorInputRow[], source
             dhcpFindings += 1;
             addFinding(findings, { code: 'DHCP_RESERVATION_OUTSIDE_SCOPE', severity: 'blocked', title: 'Reservation outside DHCP scope', detail: `${reservation.ipAddress} is outside DHCP scope ${scope.scopeCidr}.` });
           }
-          if (scope.defaultGateway && reservation.ipAddress === scope.defaultGateway) {
+          if (scope.defaultGateway && reservation.ipAddress === scope.defaultGateway && !isGatewayReservation(reservation, scope)) {
             dhcpFindings += 1;
-            addFinding(findings, { code: 'DHCP_RESERVATION_GATEWAY_CONFLICT', severity: 'blocked', title: 'Reservation conflicts with gateway', detail: `${reservation.ipAddress} is both a reservation and the default gateway.` });
+            addFinding(findings, { code: 'DHCP_RESERVATION_GATEWAY_CONFLICT', severity: 'blocked', title: 'Reservation conflicts with gateway', detail: `${reservation.ipAddress} is both a client reservation and the default gateway.` });
           }
         }
       } else {

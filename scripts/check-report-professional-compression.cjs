@@ -14,7 +14,7 @@ for (const token of [
   'Requirement propagation closure',
   'Security policy / NAT review',
   'Implementation/template readiness',
-  'Root blockers:',
+  'Root blocker groups:',
   'Review / warning items:',
   'buildOpenReviewBullets',
 ]) {

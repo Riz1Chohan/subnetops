@@ -101,6 +101,7 @@ type V1Input = {
 };
 
 const REVIEW_ONLY_MATERIALIZATION_STATUSES = new Set(["review-required", "validation-blocker"]);
+const WIZARD_REVIEW_CONSUMER_GAPS = new Set(["ProjectOverviewPage.V1Closure", "report/export.requirementEvidence", "diagramTruth.requirementImpact", "designCore.requirementsScenarioProof"]);
 const NON_ACTIVE_MATERIALIZATION_STATUSES = new Set(["explicit-no-op", "unsupported", "policy-missing"]);
 
 function includesText(values: string[], fragments: string[]) {
@@ -226,7 +227,9 @@ function lifecycleFor(args: {
   const { outcome, coverage, missingConsumers } = args;
   if (!coverage.captured) return "NOT_CAPTURED" as const;
   if (outcome.materializationStatus === "unsupported") return "UNSUPPORTED" as const;
-  if (outcome.materializationStatus === "validation-blocker") return "BLOCKED" as const;
+  if (outcome.materializationStatus === "validation-blocker") {
+    return missingConsumers.some((consumer) => !WIZARD_REVIEW_CONSUMER_GAPS.has(consumer)) ? "BLOCKED" as const : "REVIEW_REQUIRED" as const;
+  }
   if (outcome.materializationStatus === "review-required") return "REVIEW_REQUIRED" as const;
   if (!coverage.normalized && !coverage.materialized && !coverage.backendConsumed) return "CAPTURED_ONLY" as const;
   if (coverage.materialized && missingConsumers.length > 0 && missingConsumers.every((item) => item.includes("report") || item.includes("diagram") || item.includes("ProjectOverview"))) return "PARTIALLY_PROPAGATED" as const;
@@ -237,14 +240,14 @@ function lifecycleFor(args: {
   return "CAPTURED_ONLY" as const;
 }
 
-function readinessFor(lifecycleStatus: RequirementPropagationLifecycleStatus, active: boolean) {
+function readinessFor(lifecycleStatus: RequirementPropagationLifecycleStatus, active: boolean, missingConsumers: string[] = []) {
   if (!active && lifecycleStatus !== "UNSUPPORTED") return "PASSED" as const;
   if (lifecycleStatus === "FULLY_PROPAGATED") return "PASSED" as const;
   if (lifecycleStatus === "UNSUPPORTED") return "UNSUPPORTED" as const;
-  if (lifecycleStatus === "BLOCKED") return "BLOCKING" as const;
+  if (lifecycleStatus === "BLOCKED") return missingConsumers.length > 0 && missingConsumers.every((consumer) => WIZARD_REVIEW_CONSUMER_GAPS.has(consumer)) ? "REVIEW_REQUIRED" as const : "BLOCKING" as const;
   if (lifecycleStatus === "REVIEW_REQUIRED") return "REVIEW_REQUIRED" as const;
   if (lifecycleStatus === "PARTIALLY_PROPAGATED" || lifecycleStatus === "MATERIALIZED") return "WARNING" as const;
-  return "BLOCKING" as const;
+  return "REVIEW_REQUIRED" as const;
 }
 
 function buildCoverage(args: {
@@ -340,7 +343,7 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
     ? expectedAffectedEngines.filter((expected) => !actualAffectedEngines.includes(expected))
     : [];
   const lifecycleStatus = lifecycleFor({ outcome, coverage, missingConsumers });
-  const readinessImpact = readinessFor(lifecycleStatus, active);
+  const readinessImpact = readinessFor(lifecycleStatus, active, missingConsumers);
   const reviewReason = outcome.reviewReason
     ?? (closure?.missingEvidence.length ? closure.missingEvidence.join(" ") : undefined)
     ?? (missingConsumers.length ? `Missing consumer proof: ${missingConsumers.join(", ")}` : undefined);

@@ -48,6 +48,9 @@ const REVIEW_ONLY_AUTHORITY_PATTERNS = [
   /candidate allocation/i,
   /candidate pool/i,
   /candidate ledger/i,
+  /CANDIDATE_REVIEW/i,
+  /ENGINE2_DURABLE_CANDIDATE/i,
+  /DHCP scope evidence/i,
   /requires Engine 2 review/i,
   /No durable Engine 2 pool exists/i,
   /No matching Engine 2 durable allocation found/i,
@@ -75,6 +78,15 @@ const HARD_BLOCKER_PATTERNS = [
   /Expected default deny is not explicitly modeled/i,
 ];
 
+const SYSTEM_POLICY_KEYS = new Set([
+  "addressHierarchyModel",
+  "siteBlockStrategy",
+  "gatewayConvention",
+  "growthBufferModel",
+  "reservedRangePolicy",
+  "managementIpPolicy",
+]);
+
 type TaxonomyInput = Omit<V1ValidationFinding, "id">;
 
 function combinedFindingText(input: Pick<TaxonomyInput, "ruleCode" | "title" | "detail" | "sourceEngine" | "evidence">): string {
@@ -95,6 +107,19 @@ function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
 
   if (input.category !== "BLOCKING") {
     return { ...input, originalCategory, findingClass: "REVIEW_ITEM", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+  }
+
+  const affectedSystemPolicyOnly = input.affectedRequirementKeys.length > 0 && input.affectedRequirementKeys.every((key) => SYSTEM_POLICY_KEYS.has(key));
+  if (affectedSystemPolicyOnly && /missing consumers:\s*none recorded/i.test(text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "REVIEW_ITEM",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "System policy keys were materialized as wizard policy evidence; with no missing mandatory consumers recorded, they are review-required policy confirmation, not root blockers.",
+    };
   }
 
   if (DOWNSTREAM_ECHO_RULES.has(input.ruleCode) || matchesAny(PROPAGATED_BOUNDARY_PATTERNS, text)) {

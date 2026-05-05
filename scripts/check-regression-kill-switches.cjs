@@ -34,6 +34,7 @@ const requiredScripts = [
   'scripts/check-wizard-implementation-stage-gating.cjs',
   'scripts/check-wizard-design-graph-lineage-completion.cjs',
   'scripts/check-report-professional-compression.cjs',
+  'scripts/check-wizard-candidate-review-root-cause.cjs',
 ];
 
 const packageJson = JSON.parse(read('package.json'));
@@ -85,5 +86,7 @@ assert(readme.includes('Wizard design-graph lineage completion'), 'README must d
 assert(readme.includes('check-wizard-design-graph-lineage-completion.cjs'), 'README must document wizard design-graph lineage guard');
 assert(readme.includes('Report professional compression'), 'README must document report professional compression');
 assert(readme.includes('check-report-professional-compression.cjs'), 'README must document report professional compression guard');
+assert(readme.includes('check-wizard-candidate-review-root-cause.cjs'), 'README must document wizard candidate/review root-cause guard');
+assert(readme.includes('Wizard candidate/review root-cause classification'), 'README must document wizard candidate/review root-cause classification');
 
 console.log('[regression-kill-switches] ok');

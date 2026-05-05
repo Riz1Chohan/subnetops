@@ -2237,3 +2237,7 @@ Wizard-generated greenfield plans must not dump repeated downstream review findi
 The full row-level evidence remains in the appendix and machine-readable export, but the main report must lead with root-cause rollups and review actions. Forbidden readiness wording is also rewritten without creating double-negative phrases such as `not not implementation-ready`.
 
 Regression guard: `node scripts/check-report-professional-compression.cjs`.
+
+### Wizard candidate/review root-cause classification
+
+Wizard-generated greenfield output must not treat candidate IPAM authority, DHCP review, system addressing policy evidence, diagram-only consumer gaps, or downstream propagated report/implementation echoes as backend root blockers. The root cause pass keeps mathematically invalid addressing, contradictory objects, stale approved allocations, and true missing backend graph nodes as blockers, while candidate/review evidence remains review-required. Guard: `node scripts/check-wizard-candidate-review-root-cause.cjs`.
