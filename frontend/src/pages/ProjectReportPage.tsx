@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -58,13 +58,19 @@ const EXPORT_STAGES = [
   "Finalizing downloadable file",
 ];
 
+const EXPORT_TIMEOUT_MS = 150_000;
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 function exportKindLabel(kind: ExportKind) {
   if (kind === "pdf") return "professional PDF report";
   if (kind === "docx") return "professional DOCX report";
   return "Excel-friendly CSV export";
 }
 
-function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCancelNote: () => void }) {
+function ExportProgressModal({ run, onCancelNote, onCancelExport }: { run: ExportRunState; onCancelNote: () => void; onCancelExport: () => void }) {
   if (!run) return null;
   const stage = EXPORT_STAGES[Math.min(run.stageIndex, EXPORT_STAGES.length - 1)] ?? EXPORT_STAGES[0];
   const longRunning = run.elapsedSeconds >= 60;
@@ -88,9 +94,10 @@ function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCan
             <span>Elapsed: {run.elapsedSeconds}s</span>
             <span>{longRunning ? "Still working — do not click export again." : "Request is active."}</span>
           </div>
-          <button type="button" className="link-button" onClick={onCancelNote}>
-            Keep working note
-          </button>
+          <div className="form-actions" style={{ marginTop: 2 }}>
+            <button type="button" className="link-button" onClick={onCancelNote}>Keep working note</button>
+            <button type="button" className="link-button" onClick={onCancelExport}>Cancel export request</button>
+          </div>
         </div>
       </div>
     </div>
@@ -176,6 +183,7 @@ export function ProjectReportPage() {
   const validationQuery = useValidationResults(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeExport, setActiveExport] = useState<ExportRunState>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!activeExport) return;
@@ -194,6 +202,20 @@ export function ProjectReportPage() {
 
     return () => window.clearInterval(timer);
   }, [activeExport?.startedAt]);
+
+  useEffect(() => {
+    return () => {
+      exportAbortRef.current?.abort();
+      exportAbortRef.current = null;
+    };
+  }, []);
+
+  const cancelActiveExport = () => {
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = null;
+    setActiveExport(null);
+    setExportMessage("Export request cancelled. You can start a new export now.");
+  };
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
@@ -291,17 +313,23 @@ export function ProjectReportPage() {
 
   const downloadExport = async (kind: ExportKind) => {
     if (activeExport) {
-      setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish before starting another export.`);
+      setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish, cancel it, or reload the report page before starting another export.`);
       return;
     }
 
     const startedAt = Date.now();
+    const controller = new AbortController();
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), EXPORT_TIMEOUT_MS);
+
     setActiveExport({ kind, startedAt, elapsedSeconds: 0, stageIndex: 0 });
-    setExportMessage(`Generating ${exportKindLabel(kind)}. This may take 1–4 minutes for large designs.`);
+    setExportMessage(`Generating ${exportKindLabel(kind)}. Large reports are bounded for export stability; full row-level detail remains available through CSV/full-proof evidence.`);
 
     try {
       const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
         method: "POST",
+        signal: controller.signal,
       });
       saveBlob(
         blob,
@@ -314,8 +342,16 @@ export function ProjectReportPage() {
       const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
       setExportMessage(`${exportKindLabel(kind)} generated in ${elapsedSeconds}s.`);
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "Export failed. The backend did not return a downloadable file.");
+      setExportMessage(
+        isAbortError(error)
+          ? "Export timed out or was cancelled before a file was returned. The request was cleared, so you can try again; use CSV first for very large evidence sets."
+          : error instanceof Error
+            ? error.message
+            : "Export failed. The backend did not return a downloadable file.",
+      );
     } finally {
+      window.clearTimeout(timeoutId);
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
       setActiveExport(null);
     }
   };
@@ -340,7 +376,7 @@ export function ProjectReportPage() {
   if (!selectedSection) {
     return (
       <section style={{ display: "grid", gap: 18 }}>
-        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} onCancelExport={cancelActiveExport} />
         <div className="panel workspace-selection-blank report-landing-shell">
           <p className="workspace-detail-kicker">Deliver</p>
           <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
@@ -393,7 +429,7 @@ export function ProjectReportPage() {
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
-        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} onCancelExport={cancelActiveExport} />
       {isFocusedSectionView ? (
         <>
         <div className="panel workspace-detail-toolbar">

@@ -27,6 +27,7 @@ const requiredScripts = [
   'scripts/check-readiness-ladder-enforcement.cjs',
   'scripts/check-api-service-database-integration-proof.cjs',
   'scripts/check-readme-proof-map.cjs',
+  'scripts/check-export-failure-recovery.cjs',
   'scripts/check-wizard-blocker-taxonomy.cjs',
   'scripts/check-wizard-base-range-source-truth.cjs',
   'scripts/check-requirement-consumer-closure-registry.cjs',

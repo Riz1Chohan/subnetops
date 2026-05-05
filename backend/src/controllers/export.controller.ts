@@ -27,6 +27,65 @@ function parseReportMode(value: unknown): "professional" | "technical" | "full-p
   return mode === "technical" || mode === "full-proof" ? mode : "professional";
 }
 
+const INTERACTIVE_EXPORT_ROW_LIMITS: Record<"pdf" | "docx", { maxRowsPerTable: number; maxCellChars: number }> = {
+  pdf: { maxRowsPerTable: 80, maxCellChars: 420 },
+  docx: { maxRowsPerTable: 140, maxCellChars: 720 },
+};
+
+function compactExportCell(value: string, maxCellChars: number) {
+  const text = String(value ?? "");
+  if (text.length <= maxCellChars) return text;
+  return `${text.slice(0, Math.max(0, maxCellChars - 34)).trim()}… [truncated for export stability]`;
+}
+
+function stabilizeReportForInteractiveExport(report: ProfessionalReport, format: "pdf" | "docx", reportMode: "professional" | "technical" | "full-proof") {
+  // Interactive DOCX/PDF generation must always return a file or a controlled API error.
+  // Full row-level evidence remains available through CSV/full-proof paths; the clickable
+  // professional exports keep very large tables bounded so repeated clicks cannot exhaust
+  // the Render process or leave the browser stuck waiting forever.
+  if (reportMode === "full-proof") return report;
+
+  const limits = INTERACTIVE_EXPORT_ROW_LIMITS[format];
+  let trimmedTableCount = 0;
+  let trimmedRowCount = 0;
+  const sections = [...report.sections, ...(report.appendices ?? [])];
+
+  for (const section of sections) {
+    if (!Array.isArray(section.tables)) continue;
+    for (const table of section.tables) {
+      const originalRows = Array.isArray(table.rows) ? table.rows : [];
+      if (originalRows.length > limits.maxRowsPerTable) {
+        const omitted = originalRows.length - limits.maxRowsPerTable;
+        table.rows = [
+          ...originalRows.slice(0, limits.maxRowsPerTable),
+          table.headers.map((header, index) => index === 0 ? `${omitted} additional row(s) omitted from this interactive ${format.toUpperCase()} export` : (index === 1 ? "Use CSV or full-proof export for complete row-level evidence." : "—")),
+        ];
+        trimmedTableCount += 1;
+        trimmedRowCount += omitted;
+      }
+      table.rows = table.rows.map((row) => row.map((cell) => compactExportCell(cell, limits.maxCellChars)));
+    }
+  }
+
+  if (trimmedRowCount > 0) {
+    report.executiveSummary = [
+      ...report.executiveSummary,
+      `Export stability note: ${trimmedRowCount} appendix/detail row(s) across ${trimmedTableCount} table(s) were omitted from this interactive ${format.toUpperCase()} file. Full evidence remains available through CSV/full-proof exports and saved project evidence.`,
+    ];
+    report.appendices = report.appendices ?? [];
+    report.appendices.push({
+      title: "Export Stability Appendix",
+      paragraphs: [
+        `This interactive ${format.toUpperCase()} export was bounded to prevent browser/backend timeout during large multi-site reports.`,
+        `Omitted row count: ${trimmedRowCount}. Omitted table count: ${trimmedTableCount}.`,
+        "Use the CSV export or full-proof evidence export for complete machine-readable row-level detail.",
+      ],
+    });
+  }
+
+  return report;
+}
+
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
 
@@ -120,6 +179,12 @@ async function tryEmbedRemoteLogo(pdf: PDFDocument, logoUrl?: string | null) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function setExportResponseHeaders(res: Response, format: "pdf" | "docx" | "csv") {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-SubnetOps-Export", format);
+  res.setHeader("X-Content-Type-Options", "nosniff");
 }
 
 function requireAuthenticatedUserId(req: Request) {
@@ -264,6 +329,7 @@ function drawMetricCards(
 async function buildPdf(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
   const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
+  stabilizeReportForInteractiveExport(report, "pdf", reportMode);
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
   const environmentType = project.environmentType ?? "Custom";
@@ -365,6 +431,7 @@ function cellParagraph(text: string, bold = false) {
 async function buildDocx(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
   const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
+  stabilizeReportForInteractiveExport(report, "docx", reportMode);
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
   const environmentType = project.environmentType ?? "Custom";
@@ -510,6 +577,7 @@ export async function exportCsv(req: Request, res: Response) {
   const rows = await getCsvRows(projectId);
   const csv = toCsv(rows);
 
+  setExportResponseHeaders(res, "csv");
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", 'attachment; filename="subnetops-export.csv"');
   res.send(csv);
@@ -525,6 +593,7 @@ export async function exportPdf(req: Request, res: Response) {
     return res.status(404).json({ message: "Project not found" });
   }
 
+  setExportResponseHeaders(res, "pdf");
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.pdf"');
   return res.send(Buffer.from(pdfBytes));
@@ -540,6 +609,7 @@ export async function exportDocx(req: Request, res: Response) {
     return res.status(404).json({ message: "Project not found" });
   }
 
+  setExportResponseHeaders(res, "docx");
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.docx"');
   return res.send(Buffer.from(docxBytes));

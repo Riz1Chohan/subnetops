@@ -2241,3 +2241,7 @@ Regression guard: `node scripts/check-report-professional-compression.cjs`.
 ### Wizard candidate/review root-cause classification
 
 Wizard-generated greenfield output must not treat candidate IPAM authority, DHCP review, system addressing policy evidence, diagram-only consumer gaps, or downstream propagated report/implementation echoes as backend root blockers. The root cause pass keeps mathematically invalid addressing, contradictory objects, stale approved allocations, and true missing backend graph nodes as blockers, while candidate/review evidence remains review-required. Guard: `node scripts/check-wizard-candidate-review-root-cause.cjs`.
+
+### Export failure recovery guard
+
+Interactive PDF/DOCX exports must never leave the report page stuck after a backend timeout or oversized evidence set. The export path now enforces bounded interactive tables, validates returned blobs, exposes a cancel/timeout recovery path, and keeps full row-level evidence available through CSV/full-proof exports. `npm run check:export-recovery` fails if these guards are removed.

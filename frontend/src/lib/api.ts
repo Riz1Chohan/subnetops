@@ -107,6 +107,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function parseBlobError(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const errorBody = await response.json().catch(() => ({ message: "Request failed" }));
+    return errorBody.message || "Request failed";
+  }
+
+  const text = await response.text().catch(() => "");
+  return text.trim().slice(0, 300) || `Request failed with status ${response.status}`;
+}
+
 export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   const headers = new Headers(init?.headers || {});
   if (init?.body && !headers.has("Content-Type")) {
@@ -127,9 +138,18 @@ export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({ message: "Request failed" }));
-    throw new Error(errorBody.message || "Request failed");
+    throw new Error(await parseBlobError(response));
   }
 
-  return response.blob();
+  const blob = await response.blob();
+  const contentType = response.headers.get("content-type") || blob.type || "";
+  if (blob.size === 0) {
+    throw new Error("Export failed because the backend returned an empty file.");
+  }
+  if (contentType.includes("application/json") || contentType.includes("text/html")) {
+    const text = await blob.text().catch(() => "");
+    throw new Error(text.trim().slice(0, 300) || "Export failed because the backend did not return a downloadable file.");
+  }
+
+  return blob;
 }
