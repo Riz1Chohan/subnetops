@@ -5,5 +5,9 @@ export * from './rule-model.js';
 export * from './matrix.js';
 export * from './nat-model.js';
 export * from './risk.js';
-export * from './review-classifier.js';
+export {
+  classifySecurityPolicyFinding,
+  severityForSecurityPolicyReviewClass,
+  readinessForSecurityPolicyReviewClass,
+} from './review-classifier.js';
 export * from './security-policy-model.js';

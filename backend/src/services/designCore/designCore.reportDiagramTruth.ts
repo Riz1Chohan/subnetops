@@ -33,8 +33,14 @@ type FindingRef = {
   affectedObjectIds: string[];
 };
 
-type BackendDiagramRenderNodeDraft = Omit<BackendDiagramRenderNode, "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges"> & Partial<Pick<BackendDiagramRenderNode, "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges">>;
-type BackendDiagramRenderEdgeDraft = Omit<BackendDiagramRenderEdge, "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges"> & Partial<Pick<BackendDiagramRenderEdge, "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges">>;
+type BackendDiagramRenderNodeDraft = Omit<
+  BackendDiagramRenderNode,
+  "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges" | "lineageStatus" | "graphEdgeIds" | "implementationEvidence" | "lineageRefs"
+> & Partial<Pick<BackendDiagramRenderNode, "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges" | "lineageStatus" | "graphEdgeIds" | "implementationEvidence" | "lineageRefs">>;
+type BackendDiagramRenderEdgeDraft = Omit<
+  BackendDiagramRenderEdge,
+  "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges" | "lineageStatus" | "graphEdgeIds" | "implementationEvidence" | "lineageRefs"
+> & Partial<Pick<BackendDiagramRenderEdge, "truthState" | "truthStateV1" | "readinessImpact" | "sourceRefs" | "validationRefs" | "warningBadges" | "lineageStatus" | "graphEdgeIds" | "implementationEvidence" | "lineageRefs">>;
 
 function diagramReadinessImpact(readiness: DesignTruthReadiness) {
   if (readiness === "blocked") return "BLOCKING" as const;
@@ -80,6 +86,10 @@ function warningBadges(readiness: DesignTruthReadiness, truthState: NetworkObjec
 function decorateBackendRenderNode(node: BackendDiagramRenderNodeDraft): BackendDiagramRenderNode {
   const sourceRefs = node.sourceRefs?.length ? node.sourceRefs : [`${node.sourceEngine}:${node.objectId}`];
   const validationRefs = node.validationRefs?.length ? node.validationRefs : (node.relatedFindingIds.length ? node.relatedFindingIds : [`diagram-readiness:${node.readiness}`]);
+  const graphEdgeIds = node.graphEdgeIds ?? [];
+  const implementationEvidence = node.implementationEvidence ?? (node.sourceEngine === "implementation");
+  const lineageRefs = node.lineageRefs?.length ? node.lineageRefs : Array.from(new Set([...sourceRefs, ...validationRefs, ...(node.graphNodeId ? [`graph-node:${node.graphNodeId}`] : []), ...graphEdgeIds.map((id) => `graph-edge:${id}`)]));
+  const lineageStatus = node.lineageStatus ?? (node.graphNodeId ? "GRAPH_BACKED" : implementationEvidence ? "AGGREGATED_BACKEND_EVIDENCE" : graphEdgeIds.length > 0 ? "GRAPH_RELATIONSHIP_BACKED" : "AGGREGATED_BACKEND_EVIDENCE");
   return {
     ...node,
     truthStateV1: node.truthStateV1 ?? diagramV1TruthState(node.truthState),
@@ -87,6 +97,10 @@ function decorateBackendRenderNode(node: BackendDiagramRenderNodeDraft): Backend
     sourceRefs,
     validationRefs,
     warningBadges: node.warningBadges?.length ? node.warningBadges : warningBadges(node.readiness, node.truthState, node.notes),
+    lineageStatus,
+    graphEdgeIds,
+    implementationEvidence,
+    lineageRefs,
   };
 }
 
@@ -94,6 +108,10 @@ function decorateBackendRenderEdge(edge: BackendDiagramRenderEdgeDraft): Backend
   const truthState = edge.truthState ?? (edge.readiness === "blocked" ? "blocked" : edge.readiness === "ready" ? "materialized" : "review-required");
   const sourceRefs = edge.sourceRefs?.length ? edge.sourceRefs : (edge.relatedObjectIds.length ? edge.relatedObjectIds.map((id) => `${edge.relationship}:${id}`) : [`diagram-edge:${edge.id}`]);
   const validationRefs = edge.validationRefs?.length ? edge.validationRefs : [`diagram-edge-readiness:${edge.readiness}`, `diagram-edge-truth:${truthState}`];
+  const graphEdgeIds = edge.graphEdgeIds ?? [];
+  const implementationEvidence = edge.implementationEvidence ?? edge.overlayKeys.includes("implementation");
+  const lineageRefs = edge.lineageRefs?.length ? edge.lineageRefs : Array.from(new Set([...sourceRefs, ...validationRefs, ...graphEdgeIds.map((id) => `graph-edge:${id}`)]));
+  const lineageStatus = edge.lineageStatus ?? (graphEdgeIds.length > 0 ? "GRAPH_RELATIONSHIP_BACKED" : implementationEvidence ? "AGGREGATED_BACKEND_EVIDENCE" : "AGGREGATED_BACKEND_EVIDENCE");
   return {
     ...edge,
     truthState,
@@ -102,6 +120,10 @@ function decorateBackendRenderEdge(edge: BackendDiagramRenderEdgeDraft): Backend
     sourceRefs,
     validationRefs,
     warningBadges: edge.warningBadges?.length ? edge.warningBadges : warningBadges(edge.readiness, truthState, edge.notes),
+    lineageStatus,
+    graphEdgeIds,
+    implementationEvidence,
+    lineageRefs,
   };
 }
 

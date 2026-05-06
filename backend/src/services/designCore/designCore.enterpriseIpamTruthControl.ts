@@ -143,6 +143,13 @@ const REQUIREMENT_POLICIES: RequirementPolicy[] = [
   },
 ];
 
+function sourceTruthForReconciliationState(state: V1IpamReconciliationState): "ENGINE1_PLANNED" | "CANDIDATE_IPAM" | "APPROVED_IPAM" {
+  if (state === "ENGINE2_CANDIDATE_ALLOCATION") return sourceTruthForIpamAuthorityState("ENGINE2_CANDIDATE_ALLOCATION");
+  if (state === "ENGINE2_APPROVED_ALLOCATION") return sourceTruthForIpamAuthorityState("ENGINE2_APPROVED_ALLOCATION");
+  if (state === "ENGINE2_APPROVED_WITH_REVIEW_NOTES") return sourceTruthForIpamAuthorityState("ENGINE2_APPROVED_WITH_REVIEW_NOTES");
+  return "ENGINE1_PLANNED";
+}
+
 function normalizeFamily(value: unknown): "IPV4" | "IPV6" {
   return String(value ?? "IPV4").toUpperCase().includes("6") ? "IPV6" : "IPV4";
 }
@@ -282,7 +289,7 @@ function buildReconciliationRows(input: BuilderInput): V1EnterpriseIpamReconcili
       engine2PoolId: allocation?.poolId ?? undefined,
       engine2PoolName: pool?.name,
       routeDomainKey,
-      sourceTruth: sourceTruthForIpamAuthorityState(state.state),
+      sourceTruth: sourceTruthForReconciliationState(state.state),
       reconciliationState: state.state,
       readinessImpact: state.readinessImpact,
       approvedHashMatches,
@@ -368,9 +375,11 @@ export function buildV1EnterpriseIpamTruthControl(input: BuilderInput): V1Enterp
   const requirementIpamMatrix = buildRequirementMatrix(reconciliationRows);
   const conflictRows = buildConflictRows(input.enterpriseAllocatorPosture);
   const engine1ProposalOnlyCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE1_PLANNED_ONLY").length;
-  const candidateAllocationCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE2_CANDIDATE_ALLOCATION").length;
-  const durableCandidateCount = candidateAllocationCount;
-  const approvedAllocationCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE2_APPROVED_ALLOCATION" || row.reconciliationState === "ENGINE2_APPROVED_WITH_REVIEW_NOTES").length;
+  const reconciledCandidateAllocationCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE2_CANDIDATE_ALLOCATION").length;
+  const candidateAllocationCount = input.enterpriseAllocatorPosture.candidateAllocationCount ?? reconciledCandidateAllocationCount;
+  const durableCandidateCount = reconciledCandidateAllocationCount;
+  const reconciledApprovedAllocationCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE2_APPROVED_ALLOCATION" || row.reconciliationState === "ENGINE2_APPROVED_WITH_REVIEW_NOTES").length;
+  const approvedAllocationCount = input.enterpriseAllocatorPosture.approvedAllocationCount ?? reconciledApprovedAllocationCount;
   const staleAllocationCount = reconciliationRows.filter((row) => row.reconciliationState === "ENGINE2_STALE_APPROVAL").length;
   const conflictBlockerCount = conflictRows.filter((row) => row.readinessImpact === "BLOCKING").length + reconciliationRows.filter((row) => row.readinessImpact === "BLOCKING").length;
   const reviewRequiredCount = reconciliationRows.filter((row) => row.readinessImpact === "REVIEW_REQUIRED").length + conflictRows.filter((row) => row.readinessImpact === "REVIEW_REQUIRED").length;
@@ -395,8 +404,6 @@ export function buildV1EnterpriseIpamTruthControl(input: BuilderInput): V1Enterp
     routeDomainCount: input.enterpriseAllocatorPosture.vrfDomainCount,
     durablePoolCount: input.enterpriseAllocatorPosture.durablePoolCount,
     durableAllocationCount: input.enterpriseAllocatorPosture.durableAllocationCount,
-    candidateAllocationCount: input.enterpriseAllocatorPosture.candidateAllocationCount ?? candidateAllocationCount,
-    approvedAllocationCount: input.enterpriseAllocatorPosture.approvedAllocationCount ?? approvedAllocationCount,
     conflictAllocationCount: input.enterpriseAllocatorPosture.conflictAllocationCount ?? 0,
     dhcpScopeCount: input.enterpriseAllocatorPosture.dhcpScopeCount,
     reservationCount: input.enterpriseAllocatorPosture.reservationPolicyCount,

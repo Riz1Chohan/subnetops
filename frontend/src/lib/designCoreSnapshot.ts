@@ -1472,6 +1472,9 @@ export interface EnterpriseAllocatorPostureSummary {
   brownfieldEvidenceState: "configured" | "proposed" | "import-required" | "unsupported";
   durablePoolCount: number;
   durableAllocationCount: number;
+  candidateAllocationCount: number;
+  approvedAllocationCount: number;
+  conflictAllocationCount: number;
   durableBrownfieldNetworkCount: number;
   allocationApprovalCount: number;
   allocationLedgerEntryCount: number;
