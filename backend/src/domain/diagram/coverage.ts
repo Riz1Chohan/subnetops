@@ -39,11 +39,14 @@ export function coverageForDiagramNode(node: DiagramRenderNode): DiagramCoverage
     hasReadiness: Boolean(node.readiness),
     sourceEngine: node.sourceEngine,
     relatedFindingIds: node.relatedFindingIds,
+<<<<<<< HEAD
     lineageStatus: node.lineageStatus,
     graphNodeId: node.graphNodeId,
     graphEdgeIds: node.graphEdgeIds,
     implementationEvidence: node.implementationEvidence,
     hasGraphLineage: node.lineageStatus === 'GRAPH_BACKED' || node.lineageStatus === 'AGGREGATED_BACKEND_EVIDENCE' || node.lineageStatus === 'VISUAL_ONLY_NON_EVIDENCE',
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     modeImpacts: diagramModeImpactsForNode(node),
   };
 }
@@ -61,10 +64,13 @@ export function coverageForDiagramEdge(edge: DiagramRenderEdge): DiagramCoverage
     hasReadiness: Boolean(edge.readiness),
     sourceEngine: 'design-graph',
     relatedFindingIds: [],
+<<<<<<< HEAD
     lineageStatus: edge.lineageStatus,
     graphEdgeIds: edge.graphEdgeIds,
     implementationEvidence: edge.implementationEvidence,
     hasGraphLineage: edge.lineageStatus === 'GRAPH_RELATIONSHIP_BACKED' || edge.lineageStatus === 'AGGREGATED_BACKEND_EVIDENCE' || edge.lineageStatus === 'VISUAL_ONLY_NON_EVIDENCE',
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     modeImpacts: diagramModeImpactsForEdge(edge),
   };
 }

@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 import { buildOmittedEvidenceDecisionSummary, buildOmittedEvidenceSummary, evidenceWindow } from "../evidence/index.js";
 import { buildReportEvidenceView } from "./report-evidence-view.js";
 import { buildRuntimeExportConsistencyProof } from "./export-consistency.js";
+=======
+import { buildOmittedEvidenceSummary, evidenceWindow } from "../evidence/index.js";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import type {
   BackendDiagramTruthModel,
   BackendReportTruthModel,
@@ -85,8 +89,12 @@ function makeTraceabilityRows(params: {
         ...asArray<string>(item.sourceObjectIds),
         ...asArray<string>(item.objectIds),
       ]);
+<<<<<<< HEAD
       const hasRequirementBlockerProof = Boolean(item.blockedReason) || missingConsumers.length > 0;
       const readinessStatus = hasRequirementBlockerProof && item.lifecycleStatus === "BLOCKED"
+=======
+      const readinessStatus = missingConsumers.length > 0 || item.lifecycleStatus === "BLOCKED"
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ? "BLOCKED"
         : item.lifecycleStatus === "REVIEW_REQUIRED" || item.lifecycleStatus === "PARTIALLY_PROPAGATED"
           ? "REVIEW_REQUIRED"
@@ -146,7 +154,11 @@ function buildSectionGates(params: {
     "readiness-status": { readiness: readinessFromBackend(params.reportTruth.overallReadiness), evidence: [`Blocked findings ${params.reportTruth.blockedFindings.length}; review findings ${params.reportTruth.reviewFindings.length}`], blockers: params.reportTruth.blockedFindings.map((f: any) => f.title), truthLabels: ["BACKEND_COMPUTED", "BLOCKED", "REVIEW_REQUIRED"] },
     "requirement-traceability": { readiness: params.V1RequirementsClosure.missingConsumerCount > 0 || params.V1RequirementsClosure.blockedCount > 0 ? "BLOCKED" : params.V1RequirementsClosure.reviewRequiredCount > 0 || params.V1RequirementsClosure.partialPropagatedCount > 0 ? "REVIEW_REQUIRED" : "READY", evidence: [`${params.V1RequirementsClosure.closureMatrix.length} closure row(s); ${params.V1RequirementsClosure.fullPropagatedCount} fully propagated.`], blockers: [`${params.V1RequirementsClosure.missingConsumerCount} missing consumer link(s)`].filter((x) => !x.startsWith("0 ")), truthLabels: ["USER_PROVIDED", "REQUIREMENT_MATERIALIZED", "BACKEND_COMPUTED"] },
     "addressing-plan": { readiness: params.V1CidrAddressingTruth.invalidSubnetCount || params.V1CidrAddressingTruth.overlapIssueCount || params.V1CidrAddressingTruth.blockedProposalCount ? "BLOCKED" : params.V1CidrAddressingTruth.undersizedSubnetCount || params.V1CidrAddressingTruth.gatewayIssueCount || params.V1CidrAddressingTruth.requirementAddressingGapCount ? "REVIEW_REQUIRED" : "READY", evidence: [`${params.V1CidrAddressingTruth.validSubnetCount} valid subnet row(s); ${params.V1CidrAddressingTruth.invalidSubnetCount} invalid row(s).`], blockers: [params.V1CidrAddressingTruth.invalidSubnetCount ? `${params.V1CidrAddressingTruth.invalidSubnetCount} invalid subnet row(s)` : "", params.V1CidrAddressingTruth.overlapIssueCount ? `${params.V1CidrAddressingTruth.overlapIssueCount} overlap issue(s)` : ""].filter(Boolean), truthLabels: ["BACKEND_COMPUTED", "REQUIREMENT_MATERIALIZED", "REVIEW_REQUIRED"] },
+<<<<<<< HEAD
     "enterprise-ipam-status": { readiness: readinessFromBackend(params.V1EnterpriseIpamTruth.overallReadiness), evidence: [`Enterprise IPAM readiness ${params.V1EnterpriseIpamTruth.overallReadiness}; candidate allocation rows ${params.V1EnterpriseIpamTruth.candidateAllocationCount ?? params.V1EnterpriseIpamTruth.durableCandidateCount}; approved allocation rows ${params.V1EnterpriseIpamTruth.approvedAllocationCount}.`], blockers: [params.V1EnterpriseIpamTruth.conflictBlockerCount ? `${params.V1EnterpriseIpamTruth.conflictBlockerCount} conflict blocker(s)` : "", params.V1EnterpriseIpamTruth.activeRequirementIpamGapCount ? `${params.V1EnterpriseIpamTruth.activeRequirementIpamGapCount} active requirement/IPAM gap(s)` : ""].filter(Boolean), truthLabels: ["CANDIDATE_IPAM", "APPROVED_IPAM", "BACKEND_COMPUTED", "REVIEW_REQUIRED"] },
+=======
+    "enterprise-ipam-status": { readiness: readinessFromBackend(params.V1EnterpriseIpamTruth.overallReadiness), evidence: [`Enterprise IPAM readiness ${params.V1EnterpriseIpamTruth.overallReadiness}; durable allocation rows ${params.V1EnterpriseIpamTruth.durableAllocationCount}.`], blockers: [params.V1EnterpriseIpamTruth.conflictBlockerCount ? `${params.V1EnterpriseIpamTruth.conflictBlockerCount} conflict blocker(s)` : "", params.V1EnterpriseIpamTruth.activeRequirementIpamGapCount ? `${params.V1EnterpriseIpamTruth.activeRequirementIpamGapCount} active requirement/IPAM gap(s)` : ""].filter(Boolean), truthLabels: ["DURABLE_IPAM", "BACKEND_COMPUTED", "REVIEW_REQUIRED"] },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     "network-object-model": { readiness: params.V1NetworkObjectModel.overallReadiness, evidence: [`${params.networkObjectModel.summary.deviceCount} device(s), ${params.networkObjectModel.summary.interfaceCount} interface(s), ${params.networkObjectModel.summary.linkCount} link(s).`], blockers: params.V1NetworkObjectModel.findings?.filter((f: any) => f.severity === "BLOCKING").map((f: any) => f.title) ?? [], truthLabels: ["BACKEND_COMPUTED", "INFERRED", "REVIEW_REQUIRED"] },
     "routing-review": { readiness: params.V1RoutingSegmentation.overallReadiness, evidence: [`${params.V1RoutingSegmentation.routeIntentCount} route intent(s); ${params.V1RoutingSegmentation.protocolIntentCount} protocol intent/review row(s).`], blockers: params.V1RoutingSegmentation.findings?.filter((f: any) => f.severity === "BLOCKING").map((f: any) => f.title) ?? [], truthLabels: ["BACKEND_COMPUTED", "INFERRED", "REVIEW_REQUIRED"] },
     "security-policy-review": { readiness: params.V1SecurityPolicyFlow.overallReadiness, evidence: [`${params.V1SecurityPolicyFlow.flowConsequenceCount} flow consequence(s); ${params.V1SecurityPolicyFlow.zonePolicyReviewCount} zone policy row(s).`], blockers: params.V1SecurityPolicyFlow.findings?.filter((f: any) => f.severity === "BLOCKING").map((f: any) => f.title) ?? [], truthLabels: ["BACKEND_COMPUTED", "INFERRED", "REVIEW_REQUIRED"] },
@@ -195,7 +207,11 @@ function buildTruthLabelRows(params: {
     { truthLabel: "USER_PROVIDED", count: params.traceabilityRows.length, reportUsage: "Requirement traceability rows retain requirement labels/keys before any generated conclusion.", readinessImpact: params.traceabilityRows.length ? "READY" : "REVIEW_REQUIRED", evidence: [`${params.traceabilityRows.length} requirement matrix row(s).`] },
     { truthLabel: "REQUIREMENT_MATERIALIZED", count: sourceObjectIds.length, reportUsage: "Report matrix must name design consequences or review/no-op reasons created from requirements.", readinessImpact: sourceObjectIds.length ? "READY" : "REVIEW_REQUIRED", evidence: [`${sourceObjectIds.length} source object id(s) referenced in report traceability.`] },
     { truthLabel: "BACKEND_COMPUTED", count: params.sectionGates.length, reportUsage: "Readiness, routing, security, implementation, validation, diagram, and export gates come from backend design-core only.", readinessImpact: "READY", evidence: [`${params.sectionGates.length} required report section gate(s).`] },
+<<<<<<< HEAD
     { truthLabel: "DURABLE_IPAM", count: durable, reportUsage: "IPAM evidence rows must not be contradicted by addressing tables.", readinessImpact: durable ? "READY" : "REVIEW_REQUIRED", evidence: [`${durable} DHCP/reservation evidence row(s) modeled.`] },
+=======
+    { truthLabel: "DURABLE_IPAM", count: durable, reportUsage: "Durable IPAM rows must not be contradicted by addressing tables.", readinessImpact: durable ? "READY" : "REVIEW_REQUIRED", evidence: [`${durable} durable DHCP/reservation row(s) modeled.`] },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     { truthLabel: "INFERRED", count: inferred, reportUsage: "Inferred topology/security/routing facts remain labelled and review-gated instead of being sold as live truth.", readinessImpact: inferred ? "REVIEW_REQUIRED" : "READY", evidence: [`${inferred} inferred network object(s).`] },
     { truthLabel: "ESTIMATED", count: 0, reportUsage: "BOM/platform estimates are not V1 authority and must stay out of final proof claims until V1.", readinessImpact: "READY", evidence: ["No V1 export section treats estimates as authoritative production facts."] },
     { truthLabel: "REVIEW_REQUIRED", count: review, reportUsage: "Review findings and review section gates remain visible in report/PDF/DOCX/CSV instead of hidden in UI only.", readinessImpact: review ? "REVIEW_REQUIRED" : "READY", evidence: [`${review} review item(s) visible across report gates/findings.`] },
@@ -300,7 +316,10 @@ export function buildV1ReportExportTruthControl(params: {
   ];
   if (omittedEvidenceSummaries.some((summary) => summary.omittedHasBlockers)) overallReadiness = "BLOCKED";
   else if (overallReadiness === "READY" && omittedEvidenceSummaries.some((summary) => summary.omittedHasReviewRequired)) overallReadiness = "REVIEW_REQUIRED";
+<<<<<<< HEAD
   const omittedEvidenceDecisionSummary = buildOmittedEvidenceDecisionSummary(omittedEvidenceSummaries);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const fullEvidenceInventory = omittedEvidenceSummaries.map((summary) => ({
     collection: summary.collection,
     totalCount: summary.totalCount,
@@ -330,6 +349,7 @@ export function buildV1ReportExportTruthControl(params: {
     exportFormats: ["PDF", "DOCX", "CSV", "JSON"] as Array<"PDF" | "DOCX" | "CSV" | "JSON">,
   };
 
+<<<<<<< HEAD
   const evidenceView = buildReportEvidenceView({
     V1ValidationReadiness: params.V1ValidationReadiness,
     V1RequirementsClosure: params.V1RequirementsClosure,
@@ -352,6 +372,8 @@ export function buildV1ReportExportTruthControl(params: {
     evidenceView,
   });
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   return {
     contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT",
     role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE",
@@ -382,11 +404,16 @@ export function buildV1ReportExportTruthControl(params: {
       "Required: every requirement row must show design consequence, affected planning area, frontend location, report section, diagram impact, and readiness status.",
     ],
     omittedEvidenceSummaries,
+<<<<<<< HEAD
     omittedEvidenceDecisionSummary,
     fullEvidenceInventory,
     antiOverclaimRules,
     evidenceView,
     exportConsistencyProof,
+=======
+    fullEvidenceInventory,
+    antiOverclaimRules,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     notes: [
       "V1 is a deliverable truth gate, not a cosmetic report rewrite.",
       "Reports remain blocked/review-required when upstream requirement, IPAM, routing, security, implementation, diagram, or validation evidence is blocked/review-required.",

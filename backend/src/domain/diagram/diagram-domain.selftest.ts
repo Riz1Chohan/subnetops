@@ -140,6 +140,7 @@ const modelInput: DiagramNetworkObjectModelInput = {
     nodes: [
       { id: 'graph-site-hq', objectType: 'site', objectId: 'site-hq', label: 'HQ', truthState: 'configured', notes: [] },
       { id: 'graph-site-branch', objectType: 'site', objectId: 'site-branch', label: 'Branch 1', truthState: 'configured', notes: [] },
+<<<<<<< HEAD
       { id: 'graph-rd-corp', objectType: 'route-domain', objectId: 'rd-corp', label: 'Corporate routing domain', truthState: 'planned', notes: [] },
       { id: 'graph-zone-wan', objectType: 'security-zone', objectId: 'zone-wan', label: 'WAN', siteId: 'site-hq', truthState: 'planned', notes: [] },
       { id: 'graph-zone-internal', objectType: 'security-zone', objectId: 'zone-internal', label: 'Internal', siteId: 'site-hq', truthState: 'planned', notes: [] },
@@ -165,6 +166,13 @@ const modelInput: DiagramNetworkObjectModelInput = {
       { id: 'graph-edge-link-fw', relationship: 'network-link-terminates-on-device', sourceNodeId: 'graph-rd-corp', targetNodeId: 'graph-dev-hq-fw', truthState: 'planned', required: true, notes: [] },
       { id: 'graph-edge-link-core', relationship: 'network-link-terminates-on-device', sourceNodeId: 'graph-rd-corp', targetNodeId: 'graph-dev-hq-core', truthState: 'planned', required: true, notes: [] },
       { id: 'graph-edge-link-branch', relationship: 'network-link-terminates-on-device', sourceNodeId: 'graph-rd-corp', targetNodeId: 'graph-dev-branch-edge', truthState: 'planned', required: true, notes: [] },
+=======
+      { id: 'graph-vlan-users', objectType: 'vlan', objectId: 'site-hq:vlan:10', label: 'HQ VLAN 10 Users', siteId: 'site-hq', truthState: 'planned', notes: [] },
+      { id: 'graph-subnet-users', objectType: 'subnet', objectId: '10.10.10.0/24', label: '10.10.10.0/24', siteId: 'site-hq', truthState: 'planned', notes: [] },
+    ],
+    edges: [
+      { id: 'graph-edge-vlan-subnet', relationship: 'vlan-uses-subnet', sourceNodeId: 'graph-vlan-users', targetNodeId: 'graph-subnet-users', truthState: 'planned', required: true, notes: [] },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     ],
     integrityFindings: [],
   },
@@ -194,8 +202,11 @@ assert.equal(renderModel.edges.filter((edge) => edge.relatedObjectIds.length ===
 const assertion = assertBackendDiagramRenderModel(renderModel);
 assert.equal(assertion.ready, true);
 assert.equal(assertion.danglingEdges.length, 0);
+<<<<<<< HEAD
 assert.equal(assertion.nodesWithoutGraphLineage.length, 0, 'every implementation-evidence node needs design graph lineage');
 assert.equal(assertion.edgesWithoutGraphLineage.length, 0, 'every implementation-evidence edge needs design graph lineage');
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 const policyNode = renderModel.nodes.find((node) => node.objectId === 'policy-internal-wan-review');
 assert.ok(policyNode, 'security policy node should be rendered from backend policy evidence');
@@ -208,11 +219,17 @@ assert.ok(vlanSubnetEdge?.overlayKeys.includes('addressing'));
 const nodeCoverage = coverageForDiagramNode(renderModel.nodes[0]);
 assert.equal(nodeCoverage.hasBackendIdentity, true);
 assert.ok(nodeCoverage.modeImpacts.length > 0);
+<<<<<<< HEAD
 assert.ok(nodeCoverage.hasGraphLineage, 'node coverage should expose graph lineage');
 const edgeCoverage = coverageForDiagramEdge(renderModel.edges[0]);
 assert.equal(edgeCoverage.hasBackendIdentity, true);
 assert.ok(edgeCoverage.modeImpacts.length > 0);
 assert.ok(edgeCoverage.hasGraphLineage, 'edge coverage should expose graph lineage');
+=======
+const edgeCoverage = coverageForDiagramEdge(renderModel.edges[0]);
+assert.equal(edgeCoverage.hasBackendIdentity, true);
+assert.ok(edgeCoverage.modeImpacts.length > 0);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 assert.ok(layersForDiagramMode('physical').includes('device'));
 assert.ok(layersForDiagramMode('security').includes('security'));
@@ -229,6 +246,9 @@ const brokenInput: DiagramNetworkObjectModelInput = {
 const blocked = buildDiagramRenderModel({ networkObjectModel: brokenInput, overlaySummaries, hotspots: [] });
 assert.ok(blocked.emptyState?.reason.includes('missing'));
 assert.equal(blocked.summary.backendAuthored, true);
+<<<<<<< HEAD
 assert.ok(blocked.nodes.every((node) => node.lineageStatus === 'BLOCKED_LINEAGE'), 'empty graph must block rendered node lineage');
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 console.log('Diagram domain selftest passed.');

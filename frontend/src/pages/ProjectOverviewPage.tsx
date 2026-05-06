@@ -18,7 +18,10 @@ import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
 import { userFacingStatusLabel } from "../lib/userFacingCopy";
+<<<<<<< HEAD
 import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -65,7 +68,10 @@ export function ProjectOverviewPage() {
   const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const V1AiDraftHelper = designCore?.V1AiDraftHelper;
   const V1FinalProofPass = designCore?.V1FinalProofPass;
+<<<<<<< HEAD
   const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -990,7 +996,11 @@ export function ProjectOverviewPage() {
                 {summaryCard("Requirement gaps", designCore.V1CidrAddressingTruth.requirementAddressingGapCount)}
               </div>
               <p className="muted" style={{ margin: 0 }}>
+<<<<<<< HEAD
                 Addressing checks cover CIDR canonicalization, invalid CIDR rejection, /0-/32 edge behavior, role-aware gateway safety, deterministic allocator evidence, and requirement-driven subnet sizing. Addressing planning does not pretend to be approved IPAM authority.
+=======
+                Addressing checks cover CIDR canonicalization, invalid CIDR rejection, /0-/32 edge behavior, role-aware gateway safety, deterministic allocator evidence, and requirement-driven subnet sizing. Addressing planning does not pretend to be durable IPAM approval.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </p>
               {designCore.V1CidrAddressingTruth.requirementAddressingGapCount > 0 ? (
                 <div className="trust-note warning">
@@ -1085,11 +1095,19 @@ export function ProjectOverviewPage() {
               <div className="summary-grid">
                 {summaryCard("Readiness", designCore.V1EnterpriseIpamTruth.overallReadiness)}
                 {summaryCard("Proposal-only", designCore.V1EnterpriseIpamTruth.engine1ProposalOnlyCount)}
+<<<<<<< HEAD
                 {summaryCard("Approved", reportEvidenceView ? reportEvidenceView.ipam.approvedAllocations : designCore.V1EnterpriseIpamTruth.approvedAllocationCount)}
                 {summaryCard("Block/review", designCore.V1EnterpriseIpamTruth.conflictBlockerCount + designCore.V1EnterpriseIpamTruth.reviewRequiredCount)}
               </div>
               <p className="muted" style={{ margin: 0 }}>
                 This reconciles planned addressing with Engine 2 IPAM records. Addressing remains the mathematical planner; IPAM owns route domains, pools, candidate allocations, approved allocations, DHCP scopes, reservations, brownfield conflicts, approvals, and the ledger. A subnet cannot look implementation-ready while IPAM says it is planned-only, candidate, stale, conflicted, or review-required.
+=======
+                {summaryCard("Approved", designCore.V1EnterpriseIpamTruth.approvedAllocationCount)}
+                {summaryCard("Block/review", designCore.V1EnterpriseIpamTruth.conflictBlockerCount + designCore.V1EnterpriseIpamTruth.reviewRequiredCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This reconciles planned addressing with durable IPAM records. Addressing remains the mathematical planner; IPAM owns route domains, pools, allocations, DHCP scopes, reservations, brownfield conflicts, approvals, and the ledger. A subnet cannot look implementation-ready while IPAM says it is proposal-only, stale, conflicted, or review-required.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </p>
               {designCore.V1EnterpriseIpamTruth.overallReadiness === "BLOCKING" ? (
                 <div className="trust-note danger">
@@ -1098,8 +1116,13 @@ export function ProjectOverviewPage() {
                 </div>
               ) : designCore.V1EnterpriseIpamTruth.overallReadiness === "REVIEW_REQUIRED" ? (
                 <div className="trust-note warning">
+<<<<<<< HEAD
                   <strong>IPAM still needs candidate/approved allocation review.</strong>
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>Proposal-only rows are not approved IPAM authority.</p>
+=======
+                  <strong>IPAM still needs durable allocation review.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Proposal-only rows are not durable IPAM approval.</p>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
                 </div>
               ) : (
                 <div className="trust-note success"><strong>No active IPAM source gaps found.</strong></div>
@@ -1143,7 +1166,11 @@ export function ProjectOverviewPage() {
                       <tr key={item.requirementKey}>
                         <td>{item.requirementKey}<br /><span className="muted">{item.label}</span></td>
                         <td>{userFacingStatusLabel(item.readinessImpact)}</td>
+<<<<<<< HEAD
                         <td>{item.approvedAllocationCount} approved / {item.candidateAllocationCount ?? item.durableCandidateCount} candidate / {item.engine1ProposalOnlyCount} planned-only</td>
+=======
+                        <td>{item.approvedAllocationCount} approved / {item.durableCandidateCount} candidate / {item.engine1ProposalOnlyCount} proposal-only</td>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
                         <td>{item.materializedIpamEvidence[0] || item.missingIpamEvidence[0] || "—"}</td>
                       </tr>
                     ))}
@@ -1189,7 +1216,11 @@ export function ProjectOverviewPage() {
                 {summaryCard("Browser truth risks", designCore.V1DesignCoreOrchestrator.frontendIndependentTruthRiskCount)}
               </div>
               <p className="muted" style={{ margin: 0 }}>
+<<<<<<< HEAD
                 The design model coordinator keeps the snapshot organized into named system-owned sections: source inputs, applied objects, addressing, Engine 2 IPAM, object/graph model, routing, security, implementation, report, diagram, and readiness. The browser displays this ledger; it does not compute engineering truth independently.
+=======
+                The design model coordinator keeps the snapshot organized into named system-owned sections: source inputs, applied objects, addressing, durable IPAM, object/graph model, routing, security, implementation, report, diagram, and readiness. The browser displays this ledger; it does not compute engineering truth independently.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </p>
               {designCore.V1DesignCoreOrchestrator.overallReadiness === "BLOCKED" ? (
                 <div className="trust-note danger">
@@ -1389,6 +1420,7 @@ export function ProjectOverviewPage() {
           {designCore?.V1ValidationReadiness ? (
             <>
               <div className="summary-grid">
+<<<<<<< HEAD
                 {summaryCard("Readiness", reportEvidenceView ? reportEvidenceView.readiness.designReview : designCore.V1ValidationReadiness.overallReadiness)}
                 {summaryCard("Root blockers", reportEvidenceView ? reportEvidenceView.validation.rootBlockerCount : designCore.V1ValidationReadiness.rootBlockerCount ?? designCore.V1ValidationReadiness.blockingFindingCount)}
                 {summaryCard("Review required", reportEvidenceView ? reportEvidenceView.validation.reviewItemCount : designCore.V1ValidationReadiness.reviewItemCount ?? designCore.V1ValidationReadiness.reviewRequiredFindingCount)}
@@ -1396,6 +1428,15 @@ export function ProjectOverviewPage() {
               </div>
               <p className="muted" style={{ margin: 0 }}>
                 Validation checks requirements, addressing, Engine 2 IPAM, standards, routing, security, implementation, report evidence, and diagram evidence. It does not create new design facts; it exposes whether upstream evidence is clean enough to claim readiness.
+=======
+                {summaryCard("Readiness", designCore.V1ValidationReadiness.overallReadiness)}
+                {summaryCard("Blockers", designCore.V1ValidationReadiness.blockingFindingCount)}
+                {summaryCard("Review required", designCore.V1ValidationReadiness.reviewRequiredFindingCount)}
+                {summaryCard("Impl gate", designCore.V1ValidationReadiness.validationGateAllowsImplementation ? "allowed" : "blocked/review")}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Validation checks requirements, addressing, durable IPAM, standards, routing, security, implementation, report evidence, and diagram evidence. It does not create new design facts; it exposes whether upstream evidence is clean enough to claim readiness.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </p>
               {designCore.V1ValidationReadiness.overallReadiness === "BLOCKING" ? (
                 <div className="trust-note danger">

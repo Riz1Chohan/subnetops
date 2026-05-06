@@ -22,13 +22,17 @@ import {
   legacyReadinessFromCounts,
   normalizeLegacyReadinessCategory,
 } from "../../domain/validation/index.js";
+<<<<<<< HEAD
 import { classifyV1RootBlockerTaxonomy } from "../../domain/validation/root-blocker-taxonomy.js";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export const V1_VALIDATION_READINESS_AUTHORITY_CONTRACT = "V1_VALIDATION_READINESS_AUTHORITY_CONTRACT" as const;
 // V1ValidationReadiness snapshot field is the strict validation/readiness gate surface.
 
 const VALIDATION_CATEGORIES = [...LEGACY_VALIDATION_CATEGORIES] as V1ValidationReadinessCategory[];
 
+<<<<<<< HEAD
 type TaxonomyInput = Omit<V1ValidationFinding, "id">;
 
 function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
@@ -55,6 +59,127 @@ function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
     rootCauseTitle: classification.rootCauseTitle,
     deEscalationReason: input.deEscalationReason ?? classification.deEscalationReason,
   };
+=======
+const DOWNSTREAM_ECHO_RULES = new Set([
+  "VALIDATION_IMPLEMENTATION_READINESS_GAP",
+  "VALIDATION_REPORT_TRUTH_WARNING",
+  "VALIDATION_DIAGRAM_TRUTH_WARNING",
+]);
+
+const PROPAGATED_BOUNDARY_PATTERNS = [
+  /blocking upstream findings/i,
+  /upstream blocker/i,
+  /report truth is not fully clean/i,
+  /diagram truth is not fully clean/i,
+  /implementation plan is not execution-ready/i,
+  /final proof/i,
+];
+
+const REVIEW_ONLY_AUTHORITY_PATTERNS = [
+  /ENGINE1_PROPOSAL_ONLY/i,
+  /candidate allocation/i,
+  /candidate pool/i,
+  /candidate ledger/i,
+  /CANDIDATE_REVIEW/i,
+  /ENGINE2_DURABLE_CANDIDATE/i,
+  /DHCP scope evidence/i,
+  /requires Engine 2 review/i,
+  /No durable Engine 2 pool exists/i,
+  /No matching Engine 2 durable allocation found/i,
+  /approval/i,
+  /review-gated/i,
+  /not imported/i,
+  /not saved yet/i,
+  /profile is not saved/i,
+  /missing live inventory/i,
+];
+
+const HARD_BLOCKER_PATTERNS = [
+  /invalid CIDR/i,
+  /noncanonical/i,
+  /overlap/i,
+  /outside subnet/i,
+  /broadcast/i,
+  /network address/i,
+  /conflict blocker/i,
+  /contradict/i,
+  /cannot be resolved to the DesignGraph/i,
+  /no dependency edge/i,
+  /no source dependency edge/i,
+  /missing graph nodes/i,
+  /Expected default deny is not explicitly modeled/i,
+];
+
+const SYSTEM_POLICY_KEYS = new Set([
+  "addressHierarchyModel",
+  "siteBlockStrategy",
+  "gatewayConvention",
+  "growthBufferModel",
+  "reservedRangePolicy",
+  "managementIpPolicy",
+]);
+
+type TaxonomyInput = Omit<V1ValidationFinding, "id">;
+
+function combinedFindingText(input: Pick<TaxonomyInput, "ruleCode" | "title" | "detail" | "sourceEngine" | "evidence">): string {
+  return [input.ruleCode, input.title, input.detail, input.sourceEngine, ...(input.evidence ?? [])].join(" ");
+}
+
+function matchesAny(patterns: RegExp[], value: string): boolean {
+  return patterns.some((pattern) => pattern.test(value));
+}
+
+function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
+  const originalCategory = input.originalCategory ?? input.category;
+  const text = combinedFindingText(input);
+
+  if (input.category === "PASSED" || input.category === "INFO") {
+    return { ...input, originalCategory, findingClass: "REVIEW_ITEM", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+  }
+
+  if (input.category !== "BLOCKING") {
+    return { ...input, originalCategory, findingClass: "REVIEW_ITEM", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+  }
+
+  const affectedSystemPolicyOnly = input.affectedRequirementKeys.length > 0 && input.affectedRequirementKeys.every((key) => SYSTEM_POLICY_KEYS.has(key));
+  if (affectedSystemPolicyOnly && /missing consumers:\s*none recorded/i.test(text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "REVIEW_ITEM",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "System policy keys were materialized as wizard policy evidence; with no missing mandatory consumers recorded, they are review-required policy confirmation, not root blockers.",
+    };
+  }
+
+  if (DOWNSTREAM_ECHO_RULES.has(input.ruleCode) || matchesAny(PROPAGATED_BOUNDARY_PATTERNS, text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "PROPAGATED_BLOCKER",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "Downstream readiness/report/diagram/implementation evidence is a propagated impact. It must stay visible, but it must not inflate the root ERROR count for wizard-generated planning output.",
+    };
+  }
+
+  if (matchesAny(REVIEW_ONLY_AUTHORITY_PATTERNS, text) && !matchesAny(HARD_BLOCKER_PATTERNS, text)) {
+    return {
+      ...input,
+      category: "REVIEW_REQUIRED",
+      originalCategory,
+      findingClass: "REVIEW_ITEM",
+      rootCauseKey: input.ruleCode,
+      rootCauseTitle: input.title,
+      deEscalationReason: "Wizard-generated candidate/review authority is unresolved, but no invalid or contradictory engineering object was proven. This is review-required, not a root blocker.",
+    };
+  }
+
+  return { ...input, originalCategory, findingClass: "ROOT_BLOCKER", rootCauseKey: input.ruleCode, rootCauseTitle: input.title };
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function countFindingClasses(findings: V1ValidationFinding[]) {
@@ -157,6 +282,7 @@ function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationF
     if (!row.active) continue;
     const category = toCategory(row.readinessImpact);
     if (category === "PASSED" || category === "INFO") continue;
+<<<<<<< HEAD
     const missingConsumers = Array.isArray(row.missingConsumers) ? row.missingConsumers : [];
     const blockedReason = typeof row.blockedReason === "string" && row.blockedReason.trim() ? row.blockedReason.trim() : undefined;
     const hasRootProof = category === "BLOCKING" && row.lifecycleStatus === "BLOCKED" && Boolean(blockedReason);
@@ -167,6 +293,13 @@ function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationF
       ruleCode: "VALIDATION_REQUIREMENT_PROPAGATION_GAP",
       title: `Requirement propagation is incomplete for ${row.label}`,
       detail: `${row.key} is ${row.lifecycleStatus}; missing consumers: ${missingConsumers.join(", ") || "none recorded"}; blocker proof: ${blockedReason || "not proven"}.`,
+=======
+    pushFinding(findings, {
+      category,
+      ruleCode: "VALIDATION_REQUIREMENT_PROPAGATION_GAP",
+      title: `Requirement propagation is incomplete for ${row.label}`,
+      detail: `${row.key} is ${row.lifecycleStatus}; missing consumers: ${row.missingConsumers.join(", ") || "none recorded"}.`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       sourceEngine: "V1 requirements closure",
       sourceSnapshotPath: "V1RequirementsClosure.closureMatrix",
       affectedRequirementIds: [row.requirementId],
@@ -175,18 +308,28 @@ function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationF
       frontendImpact: row.consumerCoverage.frontendVisible ? "Frontend visible" : "Frontend evidence missing or weak",
       reportImpact: row.consumerCoverage.reportVisible ? "Report visible" : "Report evidence missing or weak",
       diagramImpact: row.consumerCoverage.diagramVisible ? "Diagram visible when relevant" : "Diagram evidence missing or not applicable",
+<<<<<<< HEAD
       remediation: "Complete the requirement chain from captured input to materialized object, engine output, validation, frontend, report, and diagram evidence where relevant. Do not mark the requirement blocked unless blocker proof is recorded.",
       evidence: blockedReason ? [...row.evidence, `Blocker proof: ${blockedReason}`] : row.evidence,
+=======
+      remediation: "Complete the requirement chain from captured input to materialized object, engine output, validation, frontend, report, and diagram evidence where relevant.",
+      evidence: row.evidence,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     });
   }
 
   for (const scenario of input.V1RequirementsClosure.goldenScenarioClosures) {
     if (!scenario.relevant || scenario.lifecycleStatus === "passed" || scenario.lifecycleStatus === "not-applicable") continue;
+<<<<<<< HEAD
     const scenarioCategory = scenario.lifecycleStatus === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
     const hasScenarioRootProof = scenarioCategory === "BLOCKING" && (scenario.missingRequirementKeys.length > 0 || scenario.blockingRequirementKeys.length > 0);
     pushFinding(findings, {
       category: scenarioCategory,
       findingClass: hasScenarioRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: scenario.lifecycleStatus === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_GOLDEN_SCENARIO_CLOSURE_GAP",
       title: `Golden scenario requires ${scenario.lifecycleStatus} review: ${scenario.label}`,
       detail: `Missing requirements: ${scenario.missingRequirementKeys.join(", ") || "none"}; blocking requirements: ${scenario.blockingRequirementKeys.join(", ") || "none"}; review requirements: ${scenario.reviewRequirementKeys.join(", ") || "none"}.`,
@@ -207,10 +350,15 @@ function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationF
 function addV1CidrAddressingFindings(input: V1Input, findings: V1ValidationFinding[]) {
   for (const proof of input.V1CidrAddressingTruth.edgeCaseProofs) {
     if (proof.status === "passed") continue;
+<<<<<<< HEAD
     const proofCategory = proof.status === "blocked" ? "BLOCKING" : "WARNING";
     pushFinding(findings, {
       category: proofCategory,
       findingClass: proofCategory === "BLOCKING" ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: proof.status === "blocked" ? "BLOCKING" : "WARNING",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: proof.status === "blocked" ? "VALIDATION_CIDR_EDGE_CASE_BLOCKER" : "VALIDATION_CIDR_EDGE_CASE_WARNING",
       title: `CIDR edge-case proof ${proof.label} is ${proof.status}`,
       detail: proof.evidence.join(" ") || "CIDR edge-case evidence is incomplete.",
@@ -230,11 +378,16 @@ function addV1CidrAddressingFindings(input: V1Input, findings: V1ValidationFindi
   for (const row of input.V1CidrAddressingTruth.addressingTruthRows) {
     const category = toCategory(row.readinessImpact);
     if (category === "PASSED" || category === "INFO") continue;
+<<<<<<< HEAD
     const hasAddressingRootProof = category === "BLOCKING" && row.blockers.length > 0;
     pushFinding(findings, {
       category,
       findingClass: hasAddressingRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
       deEscalationReason: hasAddressingRootProof ? undefined : "The addressing row is not clean, but the source did not prove a blocking CIDR/object defect. Treat it as review-required planning evidence.",
+=======
+    pushFinding(findings, {
+      category,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_CIDR_ADDRESSING_READINESS_GAP",
       title: `Addressing readiness gap on ${row.siteName} VLAN ${row.vlanId}`,
       detail: `${row.vlanName} is ${row.readinessImpact}: ${row.blockers.join(" ") || row.evidence.join(" ")}`,
@@ -254,10 +407,15 @@ function addV1CidrAddressingFindings(input: V1Input, findings: V1ValidationFindi
   for (const row of input.V1CidrAddressingTruth.requirementAddressingMatrix) {
     const category = toCategory(row.readinessImpact);
     if (!row.active || category === "PASSED" || category === "INFO") continue;
+<<<<<<< HEAD
     const hasRequirementAddressingRootProof = category === "BLOCKING" && row.missingAddressingEvidence.length > 0;
     pushFinding(findings, {
       category,
       findingClass: hasRequirementAddressingRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_REQUIREMENT_ADDRESSING_GAP",
       title: `Requirement ${row.requirementKey} has unresolved addressing impact`,
       detail: `${row.expectedAddressingImpact}. Missing: ${row.missingAddressingEvidence.join(" ") || "none recorded"}.`,
@@ -279,11 +437,16 @@ function addV1EnterpriseIpamFindings(input: V1Input, findings: V1ValidationFindi
   for (const row of input.V1EnterpriseIpamTruth.reconciliationRows) {
     const category = toCategory(row.readinessImpact);
     if (category === "PASSED" || category === "INFO") continue;
+<<<<<<< HEAD
     const hasIpamRootProof = category === "BLOCKING" && row.blockers.length > 0;
     pushFinding(findings, {
       category,
       findingClass: hasIpamRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
       deEscalationReason: hasIpamRootProof ? undefined : "The IPAM row is candidate/review authority, not an approved source-of-truth blocker.",
+=======
+    pushFinding(findings, {
+      category,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_IPAM_DURABLE_AUTHORITY_GAP",
       title: `Engine 2 IPAM authority is unresolved for ${row.siteName} VLAN ${row.vlanId}`,
       detail: `${row.reconciliationState}. ${[...row.blockers, ...row.reviewReasons].join(" ") || "Durable authority is not clean."}`,
@@ -305,9 +468,14 @@ function addV1EnterpriseIpamFindings(input: V1Input, findings: V1ValidationFindi
     if (!row.active || category === "PASSED" || category === "INFO") continue;
     pushFinding(findings, {
       category,
+<<<<<<< HEAD
       findingClass: "REVIEW_ITEM",
       ruleCode: "VALIDATION_REQUIREMENT_IPAM_GAP",
       title: `Requirement ${row.requirementKey} has unresolved Engine 2 IPAM impact`,
+=======
+      ruleCode: "VALIDATION_REQUIREMENT_IPAM_GAP",
+      title: `Requirement ${row.requirementKey} has unresolved durable IPAM impact`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       detail: `${row.expectedIpamImpact}. Missing: ${row.missingIpamEvidence.join(" ") || "none recorded"}.`,
       sourceEngine: "Engine 2 enterprise IPAM",
       sourceSnapshotPath: "V1EnterpriseIpamTruth.requirementIpamMatrix",
@@ -316,8 +484,13 @@ function addV1EnterpriseIpamFindings(input: V1Input, findings: V1ValidationFindi
       affectedObjectIds: [],
       frontendImpact: "Enterprise IPAM and Overview pages must show requirement-to-IPAM state.",
       reportImpact: "Report must show whether the requirement is only planned or durable/approved.",
+<<<<<<< HEAD
       diagramImpact: "Diagram must not turn planned-only addressing into approved approved truth.",
       remediation: "Create, approve, or review the Engine 2 IPAM object tied to this requirement.",
+=======
+      diagramImpact: "Diagram must not turn proposal-only addressing into approved durable truth.",
+      remediation: "Create, approve, or review the durable IPAM object tied to this requirement.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       evidence: row.materializedIpamEvidence,
     });
   }
@@ -327,7 +500,10 @@ function addV1And7Findings(input: V1Input, findings: V1ValidationFinding[]) {
   for (const finding of input.V1DesignCoreOrchestrator.boundaryFindings) {
     pushFinding(findings, {
       category: toCategory(finding.readinessImpact),
+<<<<<<< HEAD
       findingClass: "PROPAGATED_BLOCKER",
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_ORCHESTRATOR_BOUNDARY_GAP",
       title: finding.title,
       detail: finding.detail,
@@ -345,10 +521,15 @@ function addV1And7Findings(input: V1Input, findings: V1ValidationFinding[]) {
   }
 
   for (const finding of input.V1StandardsRulebookControl.findings) {
+<<<<<<< HEAD
     const standardsCategory = toCategory(finding.severity);
     pushFinding(findings, {
       category: standardsCategory,
       findingClass: standardsCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: toCategory(finding.severity),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_STANDARDS_RULE_GAP",
       title: finding.title,
       detail: finding.detail,
@@ -369,10 +550,15 @@ function addV1And7Findings(input: V1Input, findings: V1ValidationFinding[]) {
 function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFinding[]) {
   const routing = input.networkObjectModel.routingSegmentation.summary;
   if (routing.routingReadiness !== "ready" || routing.segmentationReadiness !== "ready") {
+<<<<<<< HEAD
     const routingCategory = routing.routingReadiness === "blocked" || routing.segmentationReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
     pushFinding(findings, {
       category: routingCategory,
       findingClass: routingCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: routing.routingReadiness === "blocked" || routing.segmentationReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_ROUTING_SEGMENTATION_READINESS_GAP",
       title: "Routing/segmentation readiness is not clean",
       detail: `Routing ${routing.routingReadiness}; segmentation ${routing.segmentationReadiness}; ${routing.blockingFindingCount} blocking finding(s), ${routing.reachabilityFindingCount} reachability finding(s).`,
@@ -391,10 +577,15 @@ function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFindin
 
   const security = input.networkObjectModel.securityPolicyFlow.summary;
   if (security.policyReadiness !== "ready" || security.natReadiness !== "ready") {
+<<<<<<< HEAD
     const securityCategory = security.policyReadiness === "blocked" || security.natReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
     pushFinding(findings, {
       category: securityCategory,
       findingClass: securityCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: security.policyReadiness === "blocked" || security.natReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_SECURITY_POLICY_READINESS_GAP",
       title: "Security policy / NAT readiness is not clean",
       detail: `Policy ${security.policyReadiness}; NAT ${security.natReadiness}; ${security.blockingFindingCount} blocking finding(s), ${security.missingPolicyCount} missing policy item(s), ${security.missingNatCount} missing NAT item(s).`,
@@ -415,7 +606,10 @@ function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFindin
   if (implementation.implementationReadiness !== "ready") {
     pushFinding(findings, {
       category: implementation.implementationReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED",
+<<<<<<< HEAD
       findingClass: "PROPAGATED_BLOCKER",
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_IMPLEMENTATION_READINESS_GAP",
       title: "Implementation plan is not execution-ready",
       detail: `${implementation.blockedStepCount} blocked step(s), ${implementation.reviewStepCount} review step(s), ${implementation.blockingFindingCount} blocking finding(s).`,
@@ -435,7 +629,10 @@ function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFindin
   if (input.reportTruth.overallReadiness !== "ready") {
     pushFinding(findings, {
       category: input.reportTruth.overallReadiness === "blocked" ? "BLOCKING" : "WARNING",
+<<<<<<< HEAD
       findingClass: "PROPAGATED_BLOCKER",
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_REPORT_TRUTH_WARNING",
       title: "Report truth is not fully clean",
       detail: `${input.reportTruth.overallReadinessLabel}; blocked findings ${input.reportTruth.blockedFindings.length}, review findings ${input.reportTruth.reviewFindings.length}.`,
@@ -455,7 +652,10 @@ function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFindin
   if (input.diagramTruth.overallReadiness !== "ready") {
     pushFinding(findings, {
       category: input.diagramTruth.overallReadiness === "blocked" ? "BLOCKING" : "WARNING",
+<<<<<<< HEAD
       findingClass: "PROPAGATED_BLOCKER",
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_DIAGRAM_TRUTH_WARNING",
       title: "Diagram truth is not fully clean",
       detail: `${input.diagramTruth.overallReadiness}; ${input.diagramTruth.hotspots.length} hotspot(s), modeled topology: ${input.diagramTruth.hasModeledTopology ? "yes" : "no"}.`,
@@ -478,10 +678,15 @@ function addDesignCoreIssueFindings(input: V1Input, findings: V1ValidationFindin
   for (const issue of input.issues) {
     if (hiddenCodes.has(issue.code)) continue;
     if (issue.severity === "INFO") continue;
+<<<<<<< HEAD
     const issueCategory = issue.severity === "ERROR" ? "BLOCKING" : "WARNING";
     pushFinding(findings, {
       category: issueCategory,
       findingClass: issueCategory === "BLOCKING" ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+=======
+    pushFinding(findings, {
+      category: issue.severity === "ERROR" ? "BLOCKING" : "WARNING",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ruleCode: "VALIDATION_DESIGN_CORE_ISSUE",
       title: issue.title,
       detail: issue.detail,

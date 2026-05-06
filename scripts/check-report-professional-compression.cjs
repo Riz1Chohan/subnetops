@@ -14,7 +14,11 @@ for (const token of [
   'Requirement propagation closure',
   'Security policy / NAT review',
   'Implementation/template readiness',
+<<<<<<< HEAD
   'Root blockers:',
+=======
+  'Root blocker groups:',
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   'Review / warning items:',
   'buildOpenReviewBullets',
 ]) {

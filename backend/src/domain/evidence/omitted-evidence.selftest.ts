@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { buildOmittedEvidenceDecisionSummary, buildOmittedEvidenceSummary, evidenceWindow, mergeOmittedEvidenceSummaries } from "./omitted-evidence.js";
+=======
+import { buildOmittedEvidenceSummary, evidenceWindow, mergeOmittedEvidenceSummaries } from "./omitted-evidence.js";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -26,6 +30,7 @@ const merged = mergeOmittedEvidenceSummaries([window.summary, noOmission]);
 assert(merged.totalOmittedCount === 2, "merged summary should preserve omitted count");
 assert(merged.omittedHasBlockers, "merged summary should preserve blocker flag");
 
+<<<<<<< HEAD
 const decision = buildOmittedEvidenceDecisionSummary([
   window.summary,
   buildOmittedEvidenceSummary({
@@ -44,4 +49,6 @@ assert(decision.implementationAffected, "implementation surfaces should affect i
 assert(decision.reportAffected, "report surfaces should affect report decision");
 assert(decision.decisionImpact === "BLOCKING", "hidden blockers should drive decision impact");
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 console.log("omitted evidence selftest passed");

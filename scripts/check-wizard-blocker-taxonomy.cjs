@@ -14,9 +14,14 @@ function must(rel, pattern, message) {
 
 must('backend/src/services/designCore.types.ts', /V1ValidationFindingClass\s*=\s*"ROOT_BLOCKER" \| "PROPAGATED_BLOCKER" \| "DERIVED_IMPACT" \| "REVIEW_ITEM"/, 'V1 validation findings must expose root/propagated/derived/review taxonomy.');
 must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /classifyValidationFinding/, 'Validation readiness must classify findings before counting.');
+<<<<<<< HEAD
 must('backend/src/domain/validation/root-blocker-taxonomy.ts', /classifyV1RootBlockerTaxonomy/, 'Root blocker taxonomy must live in a central validation domain module.');
 must('backend/src/domain/validation/root-blocker-taxonomy.ts', /PROPAGATED_RULE_CODES/, 'Downstream report/diagram/implementation blockers must be separated from root blockers.');
 must('backend/src/domain/validation/root-blocker-taxonomy.ts', /REVIEW_ONLY_RULE_CODES/, 'Wizard-generated candidate authority gaps must be review-required unless source-object blocker proof exists.');
+=======
+must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /DOWNSTREAM_ECHO_RULES/, 'Downstream report\/diagram\/implementation blockers must be separated from root blockers.');
+must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /REVIEW_ONLY_AUTHORITY_PATTERNS/, 'Wizard-generated candidate authority gaps must be review-required unless hard invalid evidence exists.');
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /rootBlockerCount/, 'Validation summary must publish root blocker counts.');
 must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /sourceSnapshotPath\.startsWith\("V1RequirementsClosure"\)/, 'Requirements coverage must not count all V1 findings.');
 must('backend/src/services/designCore/designCore.validationReadinessControl.ts', /sourceSnapshotPath\.startsWith\("V1CidrAddressingTruth"\)/, 'CIDR coverage must not count all V1 findings.');

@@ -302,6 +302,7 @@ export function buildBackendDesignGraph(params: {
       natRuleNodeByRuleId.set(natRule.id, objectNodeId("nat-rule", natRule.id));
     }
 
+<<<<<<< HEAD
     for (const serviceObject of params.securityPolicyFlow.serviceObjects) {
       const serviceNode = addNode(nodesById, {
         id: objectNodeId("security-service", serviceObject.id),
@@ -313,6 +314,11 @@ export function buildBackendDesignGraph(params: {
       });
       securityServiceNodeByName.set(serviceObject.name.toLowerCase(), serviceNode.id);
     }
+=======
+    // Do not pre-create every service object as a graph node. Service catalog entries are only
+    // graph authority when a policy or flow actually references them; otherwise they become
+    // orphan graph nodes and falsely look like broken topology.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
     for (const flowRequirement of params.securityPolicyFlow.flowRequirements) {
       const flowNode = addNode(nodesById, {
@@ -355,8 +361,12 @@ export function buildBackendDesignGraph(params: {
       });
 
       for (const serviceName of flowRequirement.serviceNames) {
+<<<<<<< HEAD
         const serviceNodeId = securityServiceNodeByName.get(String(serviceName).toLowerCase());
         if (!serviceNodeId) continue;
+=======
+        const serviceNodeId = ensureSecurityServiceNode(String(serviceName), flowRequirement.truthState, [`Security flow ${flowRequirement.name} references service ${serviceName}.`]);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         addEdge(edgesById, {
           relationship: "security-flow-uses-service",
           sourceNodeId: flowNode.id,

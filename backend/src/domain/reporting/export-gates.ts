@@ -18,7 +18,11 @@ export function reportCanClaimReady(document: ReportExportEvidenceDocument): boo
   if (!document.canClaimImplementationReady || !document.canClaimProductionReady) return false;
   if (document.findings.some(findingBlocksReady)) return false;
   if (document.proofBoundary.length === 0) return false;
+<<<<<<< HEAD
   if (document.omittedEvidenceDecisionSummary.decisionImpact !== "NONE") return false;
+=======
+  if (document.omittedEvidenceSummaries.some((summary) => summary.omittedHasBlockers || summary.omittedHasReviewRequired)) return false;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   if (document.antiOverclaimRules.some((rule) => !rule.claimAllowed)) return false;
   return document.sections.every((section) => (
     section.status === "verified" &&
@@ -38,11 +42,17 @@ export function findOverclaimRisks(document: ReportExportEvidenceDocument): stri
   const reviewFindings = document.findings.filter((finding) => finding.readinessImpact === "REVIEW_REQUIRED" || finding.severity === "REVIEW_REQUIRED" || finding.severity === "WARNING");
   if (blockingFindings.length > 0) risks.push(`${blockingFindings.length} blocking report/export finding(s) exist; the export must preserve blocked readiness.`);
   if (reviewFindings.length > 0) risks.push(`${reviewFindings.length} review/warning report/export finding(s) exist; the export must preserve review wording.`);
+<<<<<<< HEAD
   if (document.omittedEvidenceDecisionSummary.blockingSurfaces.length > 0) {
     risks.push(`${document.omittedEvidenceDecisionSummary.blockingSurfaces.length} omitted-evidence surface(s) contain hidden blockers; export must remain blocked and show the affected surfaces.`);
   }
   if (document.omittedEvidenceDecisionSummary.reviewSurfaces.length > 0) {
     risks.push(`${document.omittedEvidenceDecisionSummary.reviewSurfaces.length} omitted-evidence surface(s) contain hidden review-required rows; export must remain review-gated and show the affected surfaces.`);
+=======
+  for (const summary of document.omittedEvidenceSummaries) {
+    if (summary.omittedHasBlockers) risks.push(`${summary.collection} omitted blocker evidence on ${summary.surface}; export must show omitted warning and full appendix.`);
+    if (summary.omittedHasReviewRequired) risks.push(`${summary.collection} omitted review-required evidence on ${summary.surface}; export must show omitted warning and full appendix.`);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   }
   for (const rule of document.antiOverclaimRules) {
     if (!rule.claimAllowed) risks.push(`Clean claim '${rule.phrase}' is not allowed; use '${rule.replacement}'.`);

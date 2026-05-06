@@ -25,7 +25,10 @@ import type {
   SecurityPolicyFinding,
   SecurityPolicyFlowModel,
 } from "./types.js";
+<<<<<<< HEAD
 import { classifySecurityPolicyFinding, severityForSecurityPolicyReviewClass } from "../security-policy/review-classifier.js";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 
 type StepReadiness = ImplementationPlanStep["readiness"];
@@ -247,6 +250,7 @@ function normalizedRoutingFindings(findings: RoutingSegmentationReachabilityFind
 }
 
 function normalizedSecurityFindings(findings: SecurityPolicyFinding[]) {
+<<<<<<< HEAD
   return findings.map((finding, index): NormalizedUpstreamFinding => {
     const reviewClass = finding.reviewClass ?? classifySecurityPolicyFinding(finding);
     return {
@@ -260,6 +264,18 @@ function normalizedSecurityFindings(findings: SecurityPolicyFinding[]) {
       remediation: finding.remediation,
     };
   });
+=======
+  return findings.map((finding, index): NormalizedUpstreamFinding => ({
+    id: `security-policy-${normalizeIdentifierSegment(finding.code)}-${index + 1}`,
+    source: "security-policy",
+    severity: finding.severity,
+    code: finding.code,
+    title: finding.title,
+    detail: finding.detail,
+    affectedObjectIds: finding.affectedObjectIds,
+    remediation: finding.remediation,
+  }));
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function collectUpstreamFindings(params: {

@@ -15,7 +15,10 @@ import type {
   SecurityZone,
   SegmentationFlowExpectation,
 } from "./types.js";
+<<<<<<< HEAD
 import { classifySecurityPolicyFinding, severityForSecurityPolicyReviewClass } from "./review-classifier.js";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 type SecurityPolicyNetworkObjectModel = {
   securityZones: SecurityZone[];
@@ -812,12 +815,16 @@ function buildAdditionalFlowInputs(model: SecurityPolicyNetworkObjectModel): Bas
 
 function addFinding(findings: SecurityPolicyFinding[], finding: SecurityPolicyFinding) {
   if (findings.some((item) => item.code === finding.code && item.detail === finding.detail)) return;
+<<<<<<< HEAD
   const reviewClass = finding.reviewClass ?? classifySecurityPolicyFinding(finding);
   findings.push({
     ...finding,
     reviewClass,
     severity: severityForSecurityPolicyReviewClass(reviewClass),
   });
+=======
+  findings.push(finding);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function buildPolicyReferenceFindings(model: SecurityPolicyNetworkObjectModel): SecurityPolicyFinding[] {
@@ -881,7 +888,11 @@ function buildFlowFindings(flowRequirements: SecurityFlowRequirement[]): Securit
     .map<SecurityPolicyFinding>((flowRequirement) => {
       const isConflict = flowRequirement.state === "conflict";
       const isMissingNat = flowRequirement.state === "missing-nat";
+<<<<<<< HEAD
       const severity = isConflict ? "ERROR" : "WARNING";
+=======
+      const severity = isConflict || flowRequirement.severityIfMissing === "ERROR" ? "ERROR" : "WARNING";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
       return {
         severity,
@@ -927,7 +938,11 @@ function buildBroadPermitFindings(model: SecurityPolicyNetworkObjectModel): Secu
 
     if (policyRule.action === "allow" && highRiskSource && highValueDestination && broadlyPermissiveService) {
       addFinding(findings, {
+<<<<<<< HEAD
         severity: "WARNING",
+=======
+        severity: "ERROR",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         code: "SECURITY_BROAD_PERMIT_TO_TRUSTED_ZONE",
         title: "Broad permit reaches a trusted zone",
         detail: `${policyRule.name} broadly allows ${sourceZone.name} to reach ${destinationZone.name}.`,
@@ -962,7 +977,11 @@ function buildPolicyMatrix(params: {
     for (const destinationZone of params.securityZones) {
       const pairPolicyRules = params.policyRules.filter((rule) => rule.sourceZoneId === sourceZone.id && rule.destinationZoneId === destinationZone.id);
       const pairFlowRequirements = params.flowRequirements.filter((flow) => flow.sourceZoneId === sourceZone.id && flow.destinationZoneId === destinationZone.id);
+<<<<<<< HEAD
       const blockedFlow = pairFlowRequirements.some((flow) => flow.state === "conflict");
+=======
+      const blockedFlow = pairFlowRequirements.some((flow) => flow.state === "conflict" || (flow.state === "missing-policy" && flow.severityIfMissing === "ERROR"));
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       const reviewFlow = pairFlowRequirements.some((flow) => flow.state === "missing-policy" || flow.state === "missing-nat" || flow.state === "review");
       const defaultPosture = defaultZonePairPosture(sourceZone, destinationZone);
       const missingExplicitDeny = defaultPosture === "deny" && !pairPolicyRules.some((rule) => rule.action === "deny");
@@ -979,7 +998,11 @@ function buildPolicyMatrix(params: {
         explicitPolicyRuleIds: pairPolicyRules.map((rule) => rule.id).sort(),
         requiredFlowIds: pairFlowRequirements.map((flow) => flow.id).sort(),
         natRequiredFlowIds: pairFlowRequirements.filter((flow) => flow.natRequired).map((flow) => flow.id).sort(),
+<<<<<<< HEAD
         state: blockedFlow ? "blocked" : reviewFlow || missingExplicitDeny || pairFlowRequirements.length === 0 || pairPolicyRules.length === 0 ? "review" : "ready",
+=======
+        state: blockedFlow || missingExplicitDeny ? "blocked" : reviewFlow || pairFlowRequirements.length === 0 || pairPolicyRules.length === 0 ? "review" : "ready",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         notes: [
           `Default posture for ${sourceZone.name} to ${destinationZone.name} is ${defaultPosture}.`,
           pairPolicyRules.length > 0
@@ -1024,9 +1047,17 @@ function buildRuleOrderReviews(params: {
     const broadMatch = isBroadServiceList(rule.services);
     const loggingRequired = requiresLogging(sourceZone, destinationZone, rule.action, rule.services);
     const boundaryIsRisky = isHighRiskBoundary(sourceZone, destinationZone) || isManagementBoundary(sourceZone, destinationZone, rule.services);
+<<<<<<< HEAD
     const state: SecurityRuleOrderReview["state"] = shadowedByRuleIds.length > 0 || broadMatch || shadowsRuleIds.length > 0 || loggingRequired || boundaryIsRisky
       ? "review"
       : "ready";
+=======
+    const state: SecurityRuleOrderReview["state"] = shadowedByRuleIds.length > 0
+      ? "blocked"
+      : broadMatch || shadowsRuleIds.length > 0 || loggingRequired || boundaryIsRisky
+        ? "review"
+        : "ready";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
     reviews.push({
       id: `security-rule-order-${normalizeIdentifierSegment(rule.id)}`,
@@ -1087,7 +1118,11 @@ function evaluateNatReviewState(params: {
   }
 
   if (natRule.status === "required" && !natRuleHasConcreteTranslation(natRule)) {
+<<<<<<< HEAD
     return "review";
+=======
+    return "blocked";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   }
 
   if (natRule.status === "required" && coveredFlowCount > 0) return "ready";
@@ -1144,7 +1179,11 @@ function buildNatReviews(params: {
           natRule.status === "required" && state === "ready"
             ? "Required NAT is ready because the rule has valid zones, concrete translation mode, and covered NAT-required flow evidence."
             : natRule.status === "required" && state === "blocked"
+<<<<<<< HEAD
               ? "Required NAT is blocked because zone references are unresolved."
+=======
+              ? "Required NAT is blocked because zone references or translation mode are unresolved."
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               : natRule.status === "review"
                 ? "NAT rule is still in review state and should not be translated as final implementation."
                 : `NAT rule status is ${natRule.status}.`,
@@ -1172,7 +1211,11 @@ function buildImplicitDenyFindings(params: {
 
     if (explicitDenyRules.length === 0) {
       addFinding(findings, {
+<<<<<<< HEAD
         severity: "WARNING",
+=======
+        severity: "ERROR",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         code: "SECURITY_IMPLICIT_DENY_NOT_MODELED",
         title: "Expected default deny is not explicitly modeled",
         detail: explicitRules.length > 0
@@ -1204,7 +1247,11 @@ function buildRuleOrderFindings(ruleOrderReviews: SecurityRuleOrderReview[]): Se
   for (const review of ruleOrderReviews) {
     if (review.shadowedByRuleIds.length > 0) {
       addFinding(findings, {
+<<<<<<< HEAD
         severity: "WARNING",
+=======
+        severity: "ERROR",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         code: "SECURITY_RULE_SHADOWED_BY_EARLIER_RULE",
         title: "Policy rule is shadowed by an earlier contradictory rule",
         detail: `${review.ruleName} is shadowed by earlier rule(s): ${review.shadowedByRuleIds.join(", ")}.`,
@@ -1270,9 +1317,15 @@ function buildNatFindings(natReviews: SecurityNatReview[], flowRequirements: Sec
         severity: "ERROR",
         code: "SECURITY_NAT_REVIEW_BLOCKED",
         title: "NAT review is blocked",
+<<<<<<< HEAD
         detail: `${review.natRuleName} cannot be treated as ready because its source or destination zone reference is unresolved.`,
         affectedObjectIds: [review.natRuleId, review.sourceZoneId, ...(review.destinationZoneId ? [review.destinationZoneId] : [])],
         remediation: "Resolve NAT zone references before treating this NAT intent as valid design evidence.",
+=======
+        detail: `${review.natRuleName} cannot be treated as ready because its source/destination zone or required status is unresolved.`,
+        affectedObjectIds: [review.natRuleId, review.sourceZoneId, ...(review.destinationZoneId ? [review.destinationZoneId] : [])],
+        remediation: "Resolve NAT zone references and decide whether the NAT rule is required, review-only, or not required.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       });
     }
 
@@ -1290,7 +1343,11 @@ function buildNatFindings(natReviews: SecurityNatReview[], flowRequirements: Sec
 
   for (const flow of flowRequirements.filter((item) => item.natRequired && item.matchedNatRuleIds.length === 0)) {
     addFinding(findings, {
+<<<<<<< HEAD
       severity: "WARNING",
+=======
+      severity: flow.severityIfMissing,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       code: "SECURITY_NAT_REQUIRED_FLOW_UNCOVERED",
       title: "NAT-required flow has no NAT rule",
       detail: `${flow.name} requires NAT from ${flow.sourceZoneName} to ${flow.destinationZoneName}, but no NAT rule covers it.`,
@@ -1307,12 +1364,22 @@ function buildPolicyReadiness(params: {
   conflictingPolicyCount: number;
   missingPolicyCount: number;
   missingNatCount: number;
+<<<<<<< HEAD
   reviewFindingCount: number;
 }) {
   if (params.blockingFindingCount > 0 || params.conflictingPolicyCount > 0) {
     return "blocked" as const;
   }
   if (params.missingPolicyCount > 0 || params.missingNatCount > 0 || params.reviewFindingCount > 0) return "review" as const;
+=======
+  shadowedRuleCount: number;
+  implicitDenyGapCount: number;
+}) {
+  if (params.blockingFindingCount > 0 || params.conflictingPolicyCount > 0 || params.shadowedRuleCount > 0 || params.implicitDenyGapCount > 0) {
+    return "blocked" as const;
+  }
+  if (params.missingPolicyCount > 0 || params.missingNatCount > 0) return "review" as const;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   return "ready" as const;
 }
 
@@ -1373,6 +1440,7 @@ export function buildSecurityPolicyFlowModel(params: {
     ...buildRuleOrderFindings(ruleOrderReviews),
     ...buildLoggingFindings(flowRequirements, ruleOrderReviews),
     ...buildNatFindings(natReviews, flowRequirements),
+<<<<<<< HEAD
   ].map((finding) => {
     const reviewClass = finding.reviewClass ?? classifySecurityPolicyFinding(finding);
     return {
@@ -1381,12 +1449,18 @@ export function buildSecurityPolicyFlowModel(params: {
       severity: severityForSecurityPolicyReviewClass(reviewClass),
     };
   }).sort((left, right) => `${left.severity}-${left.code}-${left.detail}`.localeCompare(`${right.severity}-${right.code}-${right.detail}`));
+=======
+  ].sort((left, right) => `${left.severity}-${left.code}-${left.detail}`.localeCompare(`${right.severity}-${right.code}-${right.detail}`));
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const missingPolicyCount = flowRequirements.filter((flowRequirement) => flowRequirement.state === "missing-policy").length;
   const conflictingPolicyCount = flowRequirements.filter((flowRequirement) => flowRequirement.state === "conflict").length;
   const missingNatCount = flowRequirements.filter((flowRequirement) => flowRequirement.state === "missing-nat").length;
   const blockingFindingCount = findings.filter((finding) => finding.severity === "ERROR").length;
+<<<<<<< HEAD
   const reviewFindingCount = findings.filter((finding) => finding.severity === "WARNING").length;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const broadPermitFindingCount = findings.filter((finding) => finding.code === "SECURITY_BROAD_PERMIT_TO_TRUSTED_ZONE" || finding.code === "SECURITY_RULE_BROAD_ALLOW_REQUIRES_REVIEW").length;
   const shadowedRuleCount = ruleOrderReviews.filter((review) => review.shadowedByRuleIds.length > 0).length;
   const implicitDenyGapCount = findings.filter((finding) => finding.code === "SECURITY_IMPLICIT_DENY_NOT_MODELED").length;
@@ -1396,7 +1470,12 @@ export function buildSecurityPolicyFlowModel(params: {
     conflictingPolicyCount,
     missingPolicyCount,
     missingNatCount,
+<<<<<<< HEAD
     reviewFindingCount,
+=======
+    shadowedRuleCount,
+    implicitDenyGapCount,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   });
 
   return {
@@ -1418,7 +1497,11 @@ export function buildSecurityPolicyFlowModel(params: {
       findingCount: findings.length,
       blockingFindingCount,
       policyReadiness,
+<<<<<<< HEAD
       natReadiness: natReviews.some((review) => review.state === "blocked") ? "blocked" : missingNatCount > 0 || natReviews.some((review) => review.state === "review") ? "review" : "ready",
+=======
+      natReadiness: missingNatCount > 0 || natReviews.some((review) => review.state === "blocked") ? "blocked" : natReviews.some((review) => review.state === "review") ? "review" : "ready",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       notes: [
         "Captured requirements feed the security-flow model so guest, management, remote access, cloud/hybrid, voice, IoT, camera, printer, monitoring, and compliance selections become reviewable policy consequences.",
         "The engine exposes requirement keys on generated flows, making selected requirements traceable into zone-to-zone policy, NAT, logging, and blocker/review evidence.",

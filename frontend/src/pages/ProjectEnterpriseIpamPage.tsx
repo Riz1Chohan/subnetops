@@ -4,10 +4,13 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
 import { useEnterpriseIpam, useEnterpriseIpamMutations } from "../features/enterprise-ipam/hooks";
+<<<<<<< HEAD
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import type { AddressFamily, BrownfieldDryRunResult } from "../features/enterprise-ipam/api";
 
 function textValue(formData: FormData, key: string) {
@@ -67,19 +70,25 @@ function parseBrownfieldNetworks(raw: string) {
 export function ProjectEnterpriseIpamPage() {
   const { projectId = "" } = useParams();
   const query = useEnterpriseIpam(projectId);
+<<<<<<< HEAD
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const mutations = useEnterpriseIpamMutations(projectId);
   const [message, setMessage] = useState<string | null>(null);
   const [dryRunResult, setDryRunResult] = useState<BrownfieldDryRunResult | null>(null);
   const [conflictFilter, setConflictFilter] = useState<"open" | "all" | "resolved" | "blocked" | "review">("open");
+<<<<<<< HEAD
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const { designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const data = query.data;
 
   async function submit(label: string, event: FormEvent<HTMLFormElement>, handler: (formData: FormData) => Promise<void>) {
@@ -172,7 +181,11 @@ export function ProjectEnterpriseIpamPage() {
         purpose: `Applied allocator proposal for ${row.target}`,
         notes: row.explanation,
       });
+<<<<<<< HEAD
       setMessage(`Plan row ${row.proposedCidr} was saved as a candidate allocation.`);
+=======
+      setMessage(`Plan row ${row.proposedCidr} was saved as a durable allocation.`);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Plan row application failed.");
     }
@@ -186,8 +199,11 @@ export function ProjectEnterpriseIpamPage() {
         actions={<><Link to={`/projects/${projectId}/addressing`} className="link-button">Addressing Output</Link><Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link></>}
       />
 
+<<<<<<< HEAD
       <BackendEvidenceTruthCards evidenceView={reportEvidenceView} compact />
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       {message ? <div className="panel"><p className="muted" style={{ margin: 0 }}>{message}</p></div> : null}
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(8, minmax(0, 1fr))" }}>
@@ -281,7 +297,11 @@ export function ProjectEnterpriseIpamPage() {
         </details>
 
         <details>
+<<<<<<< HEAD
           <summary><strong>Edit Engine 2 allocations</strong></summary>
+=======
+          <summary><strong>Edit durable allocations</strong></summary>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             {allocations.length ? allocations.map((allocation: any) => (
               <form key={`edit-allocation-${allocation.id}`} onSubmit={(event) => submit("Allocation update", event, async (formData) => {
@@ -315,7 +335,11 @@ export function ProjectEnterpriseIpamPage() {
                 <input name="notes" defaultValue={allocation.notes ?? ""} placeholder="Notes / override tokens" />
                 <button type="submit">Update {allocation.cidr}</button>
               </form>
+<<<<<<< HEAD
             )) : <p className="muted">No Engine 2 allocations to edit yet.</p>}
+=======
+            )) : <p className="muted">No durable allocations to edit yet.</p>}
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           </div>
         </details>
 
@@ -487,7 +511,11 @@ export function ProjectEnterpriseIpamPage() {
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <h2 style={{ margin: 0 }}>3. Allocator plan application</h2>
+<<<<<<< HEAD
         <p className="muted" style={{ margin: 0 }}>These are backend-generated IPAM allocator proposals. Creating one here persists it as a candidate allocation with the current input hash; it is still review-required, not approved authority.</p>
+=======
+        <p className="muted" style={{ margin: 0 }}>These are backend-generated IPAM allocator proposals. Creating one here persists it as a durable allocation with the current input hash; it is still proposed/review-required, not approved.</p>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <p className="muted" style={{ margin: 0 }}><strong>Current IPAM input hash:</strong> {emptyCell(currentInputHash)}</p>
         <div style={{ overflowX: "auto" }}>
           <table>
@@ -498,7 +526,11 @@ export function ProjectEnterpriseIpamPage() {
                 const canMaterialize = row.status === "allocated" && row.proposedCidr && !alreadyDurable;
                 return <tr key={`${row.poolId}-${row.family}-${row.target}-${row.proposedCidr ?? row.requestedPrefix}`}>
                   <td>{row.family}</td><td>{row.poolName}</td><td>{row.target}</td><td>/{row.requestedPrefix}</td><td>{emptyCell(row.proposedCidr)}</td><td>{alreadyDurable ? "durable" : row.status}</td>
+<<<<<<< HEAD
                   <td><button type="button" disabled={!canMaterialize} onClick={() => materializePlanRow(row)}>{alreadyDurable ? "Already materialized" : "Create candidate allocation"}</button></td>
+=======
+                  <td><button type="button" disabled={!canMaterialize} onClick={() => materializePlanRow(row)}>{alreadyDurable ? "Already durable" : "Create durable allocation"}</button></td>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
                 </tr>;
               }) : <tr><td colSpan={7}>No allocator plan rows yet. Add active IPv4/IPv6 pools first.</td></tr>}
             </tbody>
@@ -507,7 +539,11 @@ export function ProjectEnterpriseIpamPage() {
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
+<<<<<<< HEAD
         <h2 style={{ margin: 0 }}>4. Engine 2 allocations</h2>
+=======
+        <h2 style={{ margin: 0 }}>4. Durable allocations</h2>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <form onSubmit={(event) => submit("Allocation", event, async (formData) => {
           await mutations.createIpAllocation.mutateAsync({
             poolId: textValue(formData, "poolId"),
@@ -639,7 +675,11 @@ export function ProjectEnterpriseIpamPage() {
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <h2 style={{ margin: 0 }}>8. Current vs proposed conflict review</h2>
+<<<<<<< HEAD
         <p className="muted" style={{ margin: 0 }}>This compares saved brownfield current-state networks against candidate/approved allocations, DHCP scopes, IP pools, and allocator plan rows. Durable conflict decisions keep review outcomes from being lost after refresh.</p>
+=======
+        <p className="muted" style={{ margin: 0 }}>This compares saved brownfield current-state networks against durable allocations, DHCP scopes, IP pools, and allocator plan rows. Durable conflict decisions keep review outcomes from being lost after refresh.</p>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <label className="muted">Filter conflicts</label>
           <select value={conflictFilter} onChange={(event) => setConflictFilter(event.target.value as typeof conflictFilter)}>
@@ -652,7 +692,11 @@ export function ProjectEnterpriseIpamPage() {
           <span className="muted">{visibleConflicts.length} shown / {conflicts.length} total</span>
         </div>
         <div style={{ overflowX: "auto" }}>
+<<<<<<< HEAD
           <table><thead><tr><th align="left">State</th><th align="left">Severity</th><th align="left">Route domain</th><th align="left">Imported current state</th><th align="left">Proposed/IPAM object</th><th align="left">Action required</th><th align="left">Decision</th></tr></thead><tbody>{visibleConflicts.length ? visibleConflicts.map((conflict: any, index: number) => <tr key={`${conflict.conflictKey ?? conflict.code}-${index}`}><td>{conflict.resolutionStatus === "resolved" ? `Resolved: ${conflict.resolution?.decision ?? "recorded"}` : "Open"}</td><td>{conflict.severity}</td><td>{conflict.routeDomainKey}</td><td>{conflict.importedCidr}</td><td>{conflict.existingObjectType} {emptyCell(conflict.proposedCidr)}</td><td>{conflict.recommendedAction}</td><td><form onSubmit={(event) => submit("Conflict resolution", event, async (formData) => resolveBrownfieldConflict(conflict, formData))} style={{ display: "grid", gap: 6, minWidth: 260 }}><select name="decision" defaultValue={conflict.existingObjectType === "candidate allocation" || conflict.existingObjectType === "approved allocation" ? "SUPERSEDE_PROPOSED" : "ACCEPT_BROWNFIELD"}><option>ACCEPT_BROWNFIELD</option><option>KEEP_PROPOSED</option><option>IGNORE_NOT_APPLICABLE</option><option>SUPERSEDE_PROPOSED</option><option>SPLIT_REQUIRED</option><option>CHANGE_WINDOW_REQUIRED</option></select><input name="reviewerLabel" placeholder="Reviewer" /><input name="designInputHash" defaultValue={currentInputHash} placeholder="Current design input hash" /><textarea name="reason" rows={2} placeholder="Required decision reason / evidence" required /><label className="muted"><input name="applySupersede" type="checkbox" disabled={!(conflict.existingObjectType === "candidate allocation" || conflict.existingObjectType === "approved allocation")} /> Apply supersede to IPAM allocation</label><button type="submit">Record decision</button></form></td></tr>) : <tr><td colSpan={7}>No saved brownfield conflicts match this filter.</td></tr>}</tbody></table>
+=======
+          <table><thead><tr><th align="left">State</th><th align="left">Severity</th><th align="left">Route domain</th><th align="left">Imported current state</th><th align="left">Proposed/durable object</th><th align="left">Action required</th><th align="left">Decision</th></tr></thead><tbody>{visibleConflicts.length ? visibleConflicts.map((conflict: any, index: number) => <tr key={`${conflict.conflictKey ?? conflict.code}-${index}`}><td>{conflict.resolutionStatus === "resolved" ? `Resolved: ${conflict.resolution?.decision ?? "recorded"}` : "Open"}</td><td>{conflict.severity}</td><td>{conflict.routeDomainKey}</td><td>{conflict.importedCidr}</td><td>{conflict.existingObjectType} {emptyCell(conflict.proposedCidr)}</td><td>{conflict.recommendedAction}</td><td><form onSubmit={(event) => submit("Conflict resolution", event, async (formData) => resolveBrownfieldConflict(conflict, formData))} style={{ display: "grid", gap: 6, minWidth: 260 }}><select name="decision" defaultValue={conflict.existingObjectType === "durable allocation" ? "SUPERSEDE_PROPOSED" : "ACCEPT_BROWNFIELD"}><option>ACCEPT_BROWNFIELD</option><option>KEEP_PROPOSED</option><option>IGNORE_NOT_APPLICABLE</option><option>SUPERSEDE_PROPOSED</option><option>SPLIT_REQUIRED</option><option>CHANGE_WINDOW_REQUIRED</option></select><input name="reviewerLabel" placeholder="Reviewer" /><input name="designInputHash" defaultValue={currentInputHash} placeholder="Current design input hash" /><textarea name="reason" rows={2} placeholder="Required decision reason / evidence" required /><label className="muted"><input name="applySupersede" type="checkbox" disabled={conflict.existingObjectType !== "durable allocation"} /> Apply supersede to durable allocation</label><button type="submit">Record decision</button></form></td></tr>) : <tr><td colSpan={7}>No saved brownfield conflicts match this filter.</td></tr>}</tbody></table>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         </div>
       </div>
 

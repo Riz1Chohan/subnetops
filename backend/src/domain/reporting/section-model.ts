@@ -30,7 +30,10 @@ export function buildReportEvidenceDocument(summary: V1ReportExportTruthControlS
     findings: summary.findings,
     proofBoundary: summary.proofBoundary,
     omittedEvidenceSummaries: summary.omittedEvidenceSummaries,
+<<<<<<< HEAD
     omittedEvidenceDecisionSummary: summary.omittedEvidenceDecisionSummary,
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     fullEvidenceInventory: summary.fullEvidenceInventory,
     antiOverclaimRules: summary.antiOverclaimRules,
     canClaimImplementationReady: summary.implementationReadyClaimAllowed,

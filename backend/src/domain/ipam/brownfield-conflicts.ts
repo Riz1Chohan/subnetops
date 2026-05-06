@@ -1,6 +1,9 @@
 import { parseCidr } from '../addressing/cidr.js';
 import { parseIpv6Cidr } from '../addressing/ipv6.js';
+<<<<<<< HEAD
 import { isApprovedIpamAllocationStatus } from './authority-state.js';
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export type IpamAddressFamilyInput = 'IPV4' | 'IPV6' | 'ipv4' | 'ipv6' | string | undefined | null;
 export type BrownfieldConflictSeverity = 'info' | 'review' | 'blocked';
@@ -103,8 +106,12 @@ export function sameConflictDomain(importedDomain: string, candidateDomain?: str
 
 export function conflictSeverityForOverlap(importedCidr: string, candidateCidr: string, objectType: string): BrownfieldConflictSeverity {
   if (importedCidr === candidateCidr) return 'blocked';
+<<<<<<< HEAD
   if (objectType === 'approved allocation' || objectType === 'DHCP scope') return 'blocked';
   if (objectType === 'candidate allocation') return 'review';
+=======
+  if (objectType === 'durable allocation' || objectType === 'DHCP scope') return 'blocked';
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   return 'review';
 }
 
@@ -169,19 +176,32 @@ export function buildBrownfieldConflictReviewFromData(input: BrownfieldConflictR
       const routeDomainKey = normalizeRouteDomainKey((allocation.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? ((allocation.pool as Record<string, unknown> | undefined)?.routeDomain as Record<string, unknown> | undefined)?.routeDomainKey ?? allocation.routeDomainKey);
       if (!sameConflictDomain(importedDomain, routeDomainKey)) continue;
       if (!cidrsOverlap(importedCidr, candidateCidr, family)) continue;
+<<<<<<< HEAD
       const allocationObjectType = isApprovedIpamAllocationStatus(allocation.status) ? 'approved allocation' : 'candidate allocation';
       const severity = conflictSeverityForOverlap(importedCidr, candidateCidr, allocationObjectType);
       conflicts.push({
         code: importedCidr === candidateCidr ? 'BROWNFIELD_DUPLICATES_IPAM_ALLOCATION' : 'BROWNFIELD_OVERLAPS_IPAM_ALLOCATION',
+=======
+      const severity = conflictSeverityForOverlap(importedCidr, candidateCidr, 'durable allocation');
+      conflicts.push({
+        code: importedCidr === candidateCidr ? 'BROWNFIELD_DUPLICATES_DURABLE_ALLOCATION' : 'BROWNFIELD_OVERLAPS_DURABLE_ALLOCATION',
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         severity,
         routeDomainKey: importedDomain,
         addressFamily: family,
         importedCidr,
         proposedCidr: candidateCidr,
+<<<<<<< HEAD
         existingObjectType: allocationObjectType,
         existingObjectId: String(allocation.id ?? ''),
         existingObjectLabel: String(allocation.purpose ?? allocation.cidr ?? 'allocation'),
         detail: `Imported ${importedCidr} overlaps ${allocationObjectType} ${candidateCidr}.`,
+=======
+        existingObjectType: 'durable allocation',
+        existingObjectId: String(allocation.id ?? ''),
+        existingObjectLabel: String(allocation.purpose ?? allocation.cidr ?? 'allocation'),
+        detail: `Imported ${importedCidr} overlaps durable allocation ${candidateCidr}.`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         recommendedAction: severity === 'blocked' ? 'Reconcile ownership before approving or implementing this allocation.' : 'Review whether the imported current-state block should supersede or constrain the proposed allocation.',
       });
     }

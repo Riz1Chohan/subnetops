@@ -38,7 +38,11 @@ const EXPECTED_ENGINES: V1ExpectedProofModule[] = [
   { stage: 2, engineKey: "V1RequirementsMaterialization", expectedContract: "V1_REQUIREMENTS_MATERIALIZATION_POLICY_CONTRACT", proofFocus: "requirements materialize into source objects, signals, blockers, review items, no-ops, or unsupported states" },
   { stage: 3, engineKey: "V1RequirementsClosure", expectedContract: "V1_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF", proofFocus: "nothing gets lost between capture, materialization, engines, UI, report, and diagram" },
   { stage: 4, engineKey: "V1CidrAddressingTruth", expectedContract: "V1_ENGINE1_CIDR_ADDRESSING_TRUTH", proofFocus: "CIDR/addressing math and requirement-driven host demand proof" },
+<<<<<<< HEAD
   { stage: 5, engineKey: "V1EnterpriseIpamTruth", expectedContract: "V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW", proofFocus: "Engine 1 planner reconciles with Engine 2 candidate and approved IPAM authority" },
+=======
+  { stage: 5, engineKey: "V1EnterpriseIpamTruth", expectedContract: "V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW", proofFocus: "Engine 1 planner reconciles with Engine 2 durable IPAM authority" },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   { stage: 6, engineKey: "V1DesignCoreOrchestrator", expectedContract: "V1_DESIGN_CORE_ORCHESTRATOR_CONTRACT", proofFocus: "design-core coordinates engines without becoming a god-file authority mess" },
   { stage: 7, engineKey: "V1StandardsRulebookControl", expectedContract: "V1_STANDARDS_ALIGNMENT_RULEBOOK_CONTRACT", proofFocus: "standards activate by requirement/object applicability with severity and remediation" },
   { stage: 8, engineKey: "V1ValidationReadiness", expectedContract: "V1_VALIDATION_READINESS_AUTHORITY_CONTRACT", proofFocus: "validation aggregates readiness across all truth-bearing engines" },
@@ -224,7 +228,11 @@ function buildReleaseGates(context: V1ProofContext, engineRows: V1ProofModuleRow
     {
       contract: V1_FINAL_CROSS_ENGINE_PROOF_CONTRACT,
       gateKey: "addressing-ipam-foundation",
+<<<<<<< HEAD
       gate: "CIDR/addressing planner and Engine 2 IPAM reconciliation are both visible",
+=======
+      gate: "CIDR/addressing planner and durable IPAM reconciliation are both visible",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       required: true,
       state: gateStateFromRows([4, 5], engineRows),
       evidence: ["V1 CIDR/addressing", "V1 enterprise IPAM"],

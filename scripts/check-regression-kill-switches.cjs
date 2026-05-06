@@ -17,7 +17,10 @@ const requiredScripts = [
   'scripts/check-no-frontend-engineering-facts.cjs',
   'scripts/check-no-report-overclaim.cjs',
   'scripts/check-no-diagram-clean-inference.cjs',
+<<<<<<< HEAD
   'scripts/check-diagram-graph-lineage-enforcement.cjs',
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   'scripts/check-readme-only.cjs',
   'scripts/check-service-validation-coverage.cjs',
   'scripts/check-final-proof-scenario-execution.cjs',
@@ -28,10 +31,15 @@ const requiredScripts = [
   'scripts/check-readiness-ladder-enforcement.cjs',
   'scripts/check-api-service-database-integration-proof.cjs',
   'scripts/check-readme-proof-map.cjs',
+<<<<<<< HEAD
+=======
+  'scripts/check-export-failure-recovery.cjs',
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   'scripts/check-wizard-blocker-taxonomy.cjs',
   'scripts/check-wizard-base-range-source-truth.cjs',
   'scripts/check-requirement-consumer-closure-registry.cjs',
   'scripts/check-security-policy-matrix-completion.cjs',
+<<<<<<< HEAD
   'scripts/check-security-policy-review-classification.cjs',
   'scripts/check-platform-bom-discovery-state-cleanup.cjs',
   'scripts/check-deployment-api-stability.cjs',
@@ -51,6 +59,12 @@ const requiredScripts = [
   'scripts/check-professional-report-evidence-boundary.cjs',
   'scripts/check-omitted-evidence-decision-summary.cjs',
   'scripts/check-final-readme-only-cleanup-pass.cjs',
+=======
+  'scripts/check-wizard-implementation-stage-gating.cjs',
+  'scripts/check-wizard-design-graph-lineage-completion.cjs',
+  'scripts/check-report-professional-compression.cjs',
+  'scripts/check-wizard-candidate-review-root-cause.cjs',
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 ];
 
 const packageJson = JSON.parse(read('package.json'));
@@ -91,13 +105,17 @@ assert(readme.includes('Regression kill-switch checks'), 'README must document r
 assert(readme.includes('V1_README_PROOF_MAP'), 'README must document the consolidated proof map');
 assert(readme.includes('check-no-frontend-engineering-facts.cjs'), 'README must document frontend engineering-facts guard');
 assert(readme.includes('check-no-diagram-clean-inference.cjs'), 'README must document diagram clean-inference guard');
+<<<<<<< HEAD
 assert(readme.includes('Diagram graph lineage enforcement'), 'README must document diagram graph lineage enforcement');
 assert(readme.includes('check-diagram-graph-lineage-enforcement.cjs'), 'README must document diagram graph lineage guard');
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(readme.includes('check-wizard-base-range-source-truth.cjs'), 'README must document wizard base-range source-truth guard');
 assert(readme.includes('Requirement-consumer closure registry'), 'README must document requirement-consumer closure registry');
 assert(readme.includes('check-requirement-consumer-closure-registry.cjs'), 'README must document requirement-consumer closure registry guard');
 assert(readme.includes('Security-policy matrix completion'), 'README must document security-policy matrix completion');
 assert(readme.includes('check-security-policy-matrix-completion.cjs'), 'README must document security-policy matrix completion guard');
+<<<<<<< HEAD
 assert(readme.includes('Security policy / NAT review classification'), 'README must document security policy / NAT review classification');
 assert(readme.includes('check-security-policy-review-classification.cjs'), 'README must document security policy review classification guard');
 assert(readme.includes('Platform/BOM and discovery state cleanup'), 'README must document Platform/BOM and discovery state cleanup');
@@ -112,10 +130,15 @@ assert(readme.includes('Wizard implementation stage gating'), 'README must docum
 assert(readme.includes('check-wizard-implementation-stage-gating.cjs'), 'README must document wizard implementation stage-gating guard');
 assert(readme.includes('Implementation execution gates'), 'README must document implementation execution gates');
 assert(readme.includes('check-implementation-execution-gates.cjs'), 'README must document implementation execution-gates guard');
+=======
+assert(readme.includes('Wizard implementation stage gating'), 'README must document wizard implementation stage gating');
+assert(readme.includes('check-wizard-implementation-stage-gating.cjs'), 'README must document wizard implementation stage-gating guard');
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(readme.includes('Wizard design-graph lineage completion'), 'README must document wizard design-graph lineage completion');
 assert(readme.includes('check-wizard-design-graph-lineage-completion.cjs'), 'README must document wizard design-graph lineage guard');
 assert(readme.includes('Report professional compression'), 'README must document report professional compression');
 assert(readme.includes('check-report-professional-compression.cjs'), 'README must document report professional compression guard');
+<<<<<<< HEAD
 assert(readme.includes('V1 validation ledger authority'), 'README must document validation ledger authority');
 assert(readme.includes('Export validation ledger consumer'), 'README must document export validation ledger consumer');
 assert(readme.includes('check-export-validation-ledger-consumer.cjs'), 'README must document export validation ledger consumer guard');
@@ -131,5 +154,9 @@ assert(readme.includes('check-professional-report-evidence-boundary.cjs'), 'READ
 assert(readme.includes('check-omitted-evidence-decision-summary.cjs'), 'README must document omitted evidence decision-summary guard');
 assert(readme.includes('check-requirement-closure-blocker-proof.cjs',
   'scripts/check-ipam-authority-state.cjs'), 'README must document requirement closure blocker-proof guard');
+=======
+assert(readme.includes('check-wizard-candidate-review-root-cause.cjs'), 'README must document wizard candidate/review root-cause guard');
+assert(readme.includes('Wizard candidate/review root-cause classification'), 'README must document wizard candidate/review root-cause classification');
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 console.log('[regression-kill-switches] ok');

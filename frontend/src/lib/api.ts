@@ -1,7 +1,38 @@
 const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
 function cleanBase(value: string) {
+<<<<<<< HEAD
   return value.replace(/\/+$/, "");
+=======
+  return value.replace(/\/$/, "");
+}
+
+function inferHostedApiBase() {
+  const { protocol, hostname, port } = window.location;
+  const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1";
+
+  if (isLocalDev && (port === "5173" || port === "4173" || port === "3000")) {
+    return "http://localhost:4000/api";
+  }
+
+  if (/\.onrender\.com$/i.test(hostname)) {
+    if (hostname.includes("-frontend")) {
+      return `${protocol}//${hostname.replace("-frontend", "-backend")}/api`;
+    }
+    if (hostname.includes("frontend")) {
+      return `${protocol}//${hostname.replace("frontend", "backend")}/api`;
+    }
+  }
+
+  return null;
+}
+
+function defaultApiBase() {
+  if (configuredApiBaseUrl) return cleanBase(configuredApiBaseUrl);
+  const inferredHostedBase = inferHostedApiBase();
+  if (inferredHostedBase) return cleanBase(inferredHostedBase);
+  return "/api";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function resolveApiBase() {
@@ -92,6 +123,20 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+<<<<<<< HEAD
+=======
+async function parseBlobError(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const errorBody = await response.json().catch(() => ({ message: "Request failed" }));
+    return errorBody.message || "Request failed";
+  }
+
+  const text = await response.text().catch(() => "");
+  return text.trim().slice(0, 300) || `Request failed with status ${response.status}`;
+}
+
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   const headers = new Headers(init?.headers || {});
   if (init?.body && !headers.has("Content-Type")) {
@@ -112,9 +157,18 @@ export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({ message: "Request failed" }));
-    throw new Error(errorBody.message || "Request failed");
+    throw new Error(await parseBlobError(response));
   }
 
-  return response.blob();
+  const blob = await response.blob();
+  const contentType = response.headers.get("content-type") || blob.type || "";
+  if (blob.size === 0) {
+    throw new Error("Export failed because the backend returned an empty file.");
+  }
+  if (contentType.includes("application/json") || contentType.includes("text/html")) {
+    const text = await blob.text().catch(() => "");
+    throw new Error(text.trim().slice(0, 300) || "Export failed because the backend did not return a downloadable file.");
+  }
+
+  return blob;
 }

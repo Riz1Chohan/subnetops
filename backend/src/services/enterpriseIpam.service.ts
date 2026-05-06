@@ -773,8 +773,13 @@ export async function createBrownfieldConflictResolution(projectId: string, user
   return prisma.$transaction(async (tx: any) => {
     let supersededAllocationId: string | null = null;
     if (decision === "SUPERSEDE_PROPOSED" && data.applySupersede) {
+<<<<<<< HEAD
       if (!(["candidate allocation", "approved allocation"].includes(currentConflict.existingObjectType)) || !currentConflict.existingObjectId) {
         throw new ApiError(400, "Only allocation conflicts can supersede an allocation automatically.");
+=======
+      if (currentConflict.existingObjectType !== "durable allocation" || !currentConflict.existingObjectId) {
+        throw new ApiError(400, "Only durable-allocation conflicts can supersede an allocation automatically.");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       }
       const allocation = await tx.designIpAllocation.findFirst({ where: { id: currentConflict.existingObjectId, projectId } });
       if (!allocation) throw new ApiError(404, "The allocation tied to this conflict no longer exists.");
@@ -959,7 +964,11 @@ export async function createAllocationFromPlan(projectId: string, userId: string
       },
     });
     await writeLedger(projectId, record.id, "CREATED", `Materialized allocator plan row: ${record.cidr}`, actorLabel, allocatorPosture.currentInputHash, tx);
+<<<<<<< HEAD
     await addChangeLog(projectId, `Engine 2 plan row materialized as candidate allocation: ${record.cidr}`, actorLabel, tx);
+=======
+    await addChangeLog(projectId, `Engine 2 plan row materialized as durable allocation: ${record.cidr}`, actorLabel, tx);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     return record;
   });
 }

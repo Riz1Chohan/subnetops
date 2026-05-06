@@ -19,7 +19,10 @@ import {
   type Ipv6UsedRange,
   type ParsedIpv6Cidr,
 } from '../addressing/ipv6.js';
+<<<<<<< HEAD
 import { isApprovedIpamAllocationStatus, isCandidateIpamAllocationStatus } from './authority-state.js';
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export type AddressFamily = 'ipv4' | 'ipv6';
 export type AllocationSourceState = 'configured' | 'proposed' | 'import-required' | 'unsupported';
@@ -184,9 +187,12 @@ export interface EnterpriseAllocatorPosture {
   brownfieldEvidenceState: AllocationSourceState;
   durablePoolCount: number;
   durableAllocationCount: number;
+<<<<<<< HEAD
   candidateAllocationCount: number;
   approvedAllocationCount: number;
   conflictAllocationCount: number;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   durableBrownfieldNetworkCount: number;
   allocationApprovalCount: number;
   allocationLedgerEntryCount: number;
@@ -418,7 +424,11 @@ function evaluateBrownfieldDiff(rows: EnterpriseAllocatorInputRow[], source: Ent
   let conflictCount = 0;
   const proposedNetworks = [
     ...rows.flatMap((row) => [row.subnetCidr, row.proposedSubnetCidr].filter(Boolean).map((cidr) => ({ cidr: cidr as string, family: cidr!.includes(':') ? 'ipv6' as const : 'ipv4' as const, label: `${row.siteName} VLAN ${row.vlanId}`, routeDomainKey: 'default' }))),
+<<<<<<< HEAD
     ...(source.ipAllocations ?? []).map((allocation) => ({ cidr: allocation.cidr, family: normalizeFamily(allocation.addressFamily), label: isApprovedIpamAllocationStatus(allocation.status) ? `approved allocation ${allocation.id}` : `candidate allocation ${allocation.id}`, routeDomainKey: routeDomainKeyForId(source, allocation.routeDomainId) })),
+=======
+    ...(source.ipAllocations ?? []).map((allocation) => ({ cidr: allocation.cidr, family: normalizeFamily(allocation.addressFamily), label: `durable allocation ${allocation.id}`, routeDomainKey: routeDomainKeyForId(source, allocation.routeDomainId) })),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     ...planRows.filter((row) => row.proposedCidr).map((row) => ({ cidr: row.proposedCidr!, family: row.family, label: row.target, routeDomainKey: row.routeDomainKey })),
   ];
 
@@ -448,6 +458,15 @@ function evaluateBrownfieldDiff(rows: EnterpriseAllocatorInputRow[], source: Ent
   return conflictCount;
 }
 
+<<<<<<< HEAD
+=======
+function isGatewayReservation(reservation: EnterpriseReservationRecord, scope: EnterpriseDhcpScopeRecord) {
+  if (!scope.defaultGateway || reservation.ipAddress !== scope.defaultGateway) return false;
+  const owner = String(reservation.ownerLabel ?? reservation.hostname ?? '').toLowerCase();
+  return owner.includes('gateway') || owner.includes('svi') || owner.includes('router') || owner.includes('default-gateway');
+}
+
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 function evaluateDhcpAndReservations(rows: EnterpriseAllocatorInputRow[], source: EnterpriseAllocatorSource, findings: EnterpriseReviewFinding[]) {
   let dhcpFindings = 0;
   const scopes = source.dhcpScopes ?? [];
@@ -459,8 +478,13 @@ function evaluateDhcpAndReservations(rows: EnterpriseAllocatorInputRow[], source
     addFinding(findings, {
       code: 'DHCP_BOOLEAN_WITHOUT_SCOPE',
       severity: 'review',
+<<<<<<< HEAD
       title: 'DHCP enabled without Engine 2 scope modeling',
       detail: `${dhcpEnabledRows} VLAN row(s) have DHCP enabled, but no Engine 2 DHCP scope objects exist yet. A+ requires scope CIDR, gateway, DNS, exclusions, relay/options, and reservations.`,
+=======
+      title: 'DHCP enabled without durable scope modeling',
+      detail: `${dhcpEnabledRows} VLAN row(s) have DHCP enabled, but no durable DHCP scope objects exist yet. A+ requires scope CIDR, gateway, DNS, exclusions, relay/options, and reservations.`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     });
   }
 
@@ -494,9 +518,15 @@ function evaluateDhcpAndReservations(rows: EnterpriseAllocatorInputRow[], source
             dhcpFindings += 1;
             addFinding(findings, { code: 'DHCP_RESERVATION_OUTSIDE_SCOPE', severity: 'blocked', title: 'Reservation outside DHCP scope', detail: `${reservation.ipAddress} is outside DHCP scope ${scope.scopeCidr}.` });
           }
+<<<<<<< HEAD
           if (scope.defaultGateway && reservation.ipAddress === scope.defaultGateway) {
             dhcpFindings += 1;
             addFinding(findings, { code: 'DHCP_RESERVATION_GATEWAY_CONFLICT', severity: 'blocked', title: 'Reservation conflicts with gateway', detail: `${reservation.ipAddress} is both a reservation and the default gateway.` });
+=======
+          if (scope.defaultGateway && reservation.ipAddress === scope.defaultGateway && !isGatewayReservation(reservation, scope)) {
+            dhcpFindings += 1;
+            addFinding(findings, { code: 'DHCP_RESERVATION_GATEWAY_CONFLICT', severity: 'blocked', title: 'Reservation conflicts with gateway', detail: `${reservation.ipAddress} is both a client reservation and the default gateway.` });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           }
         }
       } else {
@@ -576,7 +606,11 @@ function evaluateApprovalLedger(source: EnterpriseAllocatorSource, currentInputH
     }
     const approvalRecords = approvalsByAllocation.get(allocation.id) ?? [];
     if ((status === 'APPROVED' || status === 'IMPLEMENTED') && approvalRecords.length === 0) {
+<<<<<<< HEAD
       addFinding(findings, { code: 'ALLOCATION_APPROVAL_MISSING_LEDGER', severity: 'review', title: 'Approved allocation lacks approval record', detail: `${allocation.cidr} has status ${status}, but no approval record was found.` });
+=======
+      addFinding(findings, { code: 'ALLOCATION_APPROVAL_MISSING_LEDGER', severity: 'review', title: 'Approved allocation lacks approval record', detail: `${allocation.cidr} has status ${status}, but no durable approval record was found.` });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     }
     for (const approval of approvalRecords) {
       if (String(approval.decision ?? '').toUpperCase() === 'APPROVED' && !approval.designInputHash) {
@@ -654,7 +688,11 @@ function existingDhcpScopeMatchesRow(row: EnterpriseAllocatorInputRow, source: E
  * V1_WIZARD_GENERATED_IPAM_CANDIDATE_AUTHORITY
  *
  * Requirements-wizard greenfield output must not stop at Engine 1 math rows.
+<<<<<<< HEAD
  * When no Engine 2 IPAM records exist yet, the backend now creates deterministic
+=======
+ * When no durable IPAM records exist yet, the backend now creates deterministic
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
  * Engine 2 candidate evidence in the design-core source view: default route
  * domain, per-site candidate pools, per-VLAN candidate allocations, DHCP scope
  * candidates, gateway reservations, and ledger entries. These are not approvals
@@ -828,9 +866,12 @@ export function buildEnterpriseAllocatorPosture(rows: EnterpriseAllocatorInputRo
   const routeDomainCount = source.routeDomains?.length ?? 0;
   const durablePoolCount = source.ipPools?.length ?? 0;
   const durableAllocationCount = source.ipAllocations?.length ?? 0;
+<<<<<<< HEAD
   const candidateAllocationCount = (source.ipAllocations ?? []).filter((allocation) => isCandidateIpamAllocationStatus(allocation.status)).length;
   const approvedAllocationCount = (source.ipAllocations ?? []).filter((allocation) => isApprovedIpamAllocationStatus(allocation.status)).length;
   const conflictAllocationCount = (source.ipAllocations ?? []).filter((allocation) => ['REJECTED', 'SUPERSEDED'].includes(String(allocation.status ?? '').toUpperCase())).length;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const durableBrownfieldNetworkCount = source.brownfieldNetworks?.length ?? 0;
   const dhcpScopeCount = source.dhcpScopes?.length ?? 0;
   const reservationPolicyCount = source.ipReservations?.length ?? 0;
@@ -838,7 +879,11 @@ export function buildEnterpriseAllocatorPosture(rows: EnterpriseAllocatorInputRo
   const allocationLedgerEntryCount = source.allocationLedger?.length ?? 0;
 
   if (durablePoolCount === 0) {
+<<<<<<< HEAD
     addFinding(findings, { code: 'SOT_POOLS_MISSING', severity: 'review', title: 'No Engine 2 IP pools exist', detail: 'V1 IPAM models exist, but this project has no Engine 2 IPv4/IPv6 pool records yet.' });
+=======
+    addFinding(findings, { code: 'SOT_POOLS_MISSING', severity: 'review', title: 'No durable IP pools exist', detail: 'V1 source-of-truth models exist, but this project has no durable IPv4/IPv6 pool records yet.' });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   }
   if (routeDomainCount === 0) {
     addFinding(findings, { code: 'VRF_MODEL_MISSING', severity: 'review', title: 'No route domains exist', detail: 'No durable VRF/route-domain objects exist. The allocator is using a default domain only.' });
@@ -847,24 +892,40 @@ export function buildEnterpriseAllocatorPosture(rows: EnterpriseAllocatorInputRo
     addFinding(findings, { code: 'BROWNFIELD_IMPORT_MISSING', severity: 'review', title: 'No brownfield import evidence', detail: 'No imported current-state networks exist. Brownfield conflict proof is incomplete.' });
   }
   if (allocationApprovalCount === 0 && durableAllocationCount > 0) {
+<<<<<<< HEAD
     addFinding(findings, { code: 'APPROVAL_WORKFLOW_UNUSED', severity: 'review', title: 'Allocations have no approvals', detail: 'Candidate/approved allocations exist but no approval records exist yet.' });
+=======
+    addFinding(findings, { code: 'APPROVAL_WORKFLOW_UNUSED', severity: 'review', title: 'Allocations have no approvals', detail: 'Durable allocations exist but no approval records exist yet.' });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   }
 
   for (const finding of findings) {
     if (finding.severity !== 'info') reviewQueue.push(`${finding.title}: ${finding.detail}`);
   }
 
+<<<<<<< HEAD
   const sourceOfTruthReadiness: EnterpriseReadiness = durablePoolCount > 0 && approvedAllocationCount > 0 && staleAllocationCount === 0 && conflictAllocationCount === 0 ? 'ready' : 'review';
+=======
+  const sourceOfTruthReadiness: EnterpriseReadiness = durablePoolCount > 0 && durableAllocationCount > 0 ? 'ready' : 'review';
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const dualStackReadiness: EnterpriseReadiness = ipv6AllocationCount > 0 && ipv6ReviewFindingCount === 0 ? 'ready' : 'review';
   const vrfReadiness: EnterpriseReadiness = vrfOverlapFindingCount > 0 ? findings.filter((f) => f.code.startsWith('VRF_')).reduce((state, f) => worse(state, severityToReadiness(f.severity)), 'ready' as EnterpriseReadiness) : (routeDomainCount > 0 ? 'ready' : 'review');
   const brownfieldReadiness: EnterpriseReadiness = brownfieldConflictCount > 0 ? findings.filter((f) => f.code.startsWith('BROWNFIELD_')).reduce((state, f) => worse(state, severityToReadiness(f.severity)), 'ready' as EnterpriseReadiness) : (durableBrownfieldNetworkCount > 0 ? 'ready' : 'review');
   const dhcpReadiness: EnterpriseReadiness = dhcpFindingCount > 0 ? findings.filter((f) => f.code.startsWith('DHCP')).reduce((state, f) => worse(state, severityToReadiness(f.severity)), 'ready' as EnterpriseReadiness) : (dhcpScopeCount > 0 || rows.every((row) => !row.dhcpEnabled) ? 'ready' : 'review');
   const reservePolicyReadiness: EnterpriseReadiness = reservePolicyFindingCount > 0 ? findings.filter((f) => f.code.startsWith('RESERVE_')).reduce((state, f) => worse(state, severityToReadiness(f.severity)), 'ready' as EnterpriseReadiness) : (durablePoolCount > 0 ? 'ready' : 'review');
+<<<<<<< HEAD
   const approvalReadiness: EnterpriseReadiness = staleAllocationCount > 0 ? 'blocked' : (approvedAllocationCount === 0 || allocationApprovalCount === 0 ? 'review' : 'ready');
 
   notes.push('V1 source-of-truth objects are now first-class: route domains, pools, allocations, DHCP scopes, reservations, brownfield imports, approvals, and ledger entries.');
   notes.push('V1 dual-stack allocation uses Engine 2 pools when they exist; it does not fake IPv6 allocations from VLAN text alone.');
   notes.push('V1 brownfield diff compares proposed, candidate, and approved allocations against imported current-state networks.');
+=======
+  const approvalReadiness: EnterpriseReadiness = staleAllocationCount > 0 ? 'blocked' : (durableAllocationCount === 0 || allocationApprovalCount === 0 ? 'review' : 'ready');
+
+  notes.push('V1 source-of-truth objects are now first-class: route domains, pools, allocations, DHCP scopes, reservations, brownfield imports, approvals, and ledger entries.');
+  notes.push('V1 dual-stack allocation uses durable pools when they exist; it does not fake IPv6 allocations from VLAN text alone.');
+  notes.push('V1 brownfield diff compares proposed/durable allocations against imported current-state networks.');
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes.push('V1 DHCP/reservation truth validates scopes, DNS evidence, gateway placement, duplicate reservations, and scope membership.');
   notes.push('V1 approval ledger detects approved allocations that are stale against the current Engine 2 input hash.');
   notes.push('V1 moves critical Engine 2 controls to write time: pool overlap, allocation overlap, reserve, brownfield, DHCP exclusion, reservation duplicate, and approval-hash enforcement.');
@@ -886,9 +947,12 @@ export function buildEnterpriseAllocatorPosture(rows: EnterpriseAllocatorInputRo
     brownfieldEvidenceState: durableBrownfieldNetworkCount > 0 ? 'configured' : 'import-required',
     durablePoolCount,
     durableAllocationCount,
+<<<<<<< HEAD
     candidateAllocationCount,
     approvedAllocationCount,
     conflictAllocationCount,
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     durableBrownfieldNetworkCount,
     allocationApprovalCount,
     allocationLedgerEntryCount,

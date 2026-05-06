@@ -9,7 +9,10 @@ import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
 import { userFacingStatusLabel } from "../lib/userFacingCopy";
+<<<<<<< HEAD
 import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -40,7 +43,10 @@ export function ProjectImplementationPage() {
   const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const V1ImplementationPlanning = designCore?.V1ImplementationPlanning;
   const V1ImplementationTemplates = designCore?.V1ImplementationTemplates;
+<<<<<<< HEAD
   const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading implementation plan" message="Preparing rollout steps, rollback triggers, validation tests, and cutover guidance." />;
@@ -84,7 +90,10 @@ export function ProjectImplementationPage() {
       />
 
       <DesignAuthorityBanner authority={authority} />
+<<<<<<< HEAD
       <BackendEvidenceTruthCards evidenceView={reportEvidenceView} compact />
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -93,10 +102,17 @@ export function ProjectImplementationPage() {
           <span className="badge-soft">Rollback triggers {synthesized.rollbackPlan.length}</span>
           <span className="badge-soft">Validation tests {synthesized.validationPlan.length}</span>
           <span className="badge-soft">Risks {criticalRisks} critical / {warningRisks} warning</span>
+<<<<<<< HEAD
           {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Implementation candidate queue displayed</span> : <span className="badge badge-warning">Implementation plan unavailable</span>}
         </div>
         <p className="muted" style={{ margin: 0 }}>
           A real design package should separate execution-ready steps from planning candidates. This page renders implementation posture with dependencies, blockers, evidence, blast radius, and rollback posture.
+=======
+          {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Verified implementation plan displayed</span> : <span className="badge badge-warning">Implementation plan unavailable</span>}
+        </div>
+        <p className="muted" style={{ margin: 0 }}>
+          A real design package should not stop at topology and addressing. This page renders the verified implementation model when available, including dependencies, blockers, evidence, blast radius, and rollback posture.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         </p>
       </div>
 
@@ -119,9 +135,15 @@ export function ProjectImplementationPage() {
         </div>
         {V1ImplementationPlanning ? (<>
           <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+<<<<<<< HEAD
             {summaryCard("Execution-ready", reportEvidenceView ? reportEvidenceView.implementation.executableSteps : V1ImplementationPlanning.executionReadyStepCount, "Steps with authority, verification, rollback, lineage, and safety gates.")}
             {summaryCard("Planning candidates", reportEvidenceView ? reportEvidenceView.implementation.planningCandidateSteps : V1ImplementationPlanning.planningCandidateStepCount, "Useful planning steps that are not executable yet.")}
             {summaryCard("Review / blocked", reportEvidenceView ? reportEvidenceView.implementation.reviewSteps + reportEvidenceView.implementation.blockedSteps : V1ImplementationPlanning.reviewStepGateCount + V1ImplementationPlanning.structuralBlockedStepCount, reportEvidenceView ? `${reportEvidenceView.implementation.reviewSteps} review / ${reportEvidenceView.implementation.blockedSteps} structural` : `${V1ImplementationPlanning.reviewStepGateCount} review / ${V1ImplementationPlanning.structuralBlockedStepCount} structural`)}
+=======
+            {summaryCard("Step gates", V1ImplementationPlanning.stepGateCount, `${V1ImplementationPlanning.blockedStepGateCount} blocked / ${V1ImplementationPlanning.reviewStepGateCount} review`)}
+            {summaryCard("Step readiness", V1ImplementationPlanning.stageGateCount, "Readiness derived from implementation checks.")}
+            {summaryCard("Requirement gaps", V1ImplementationPlanning.requirementLineageGapCount, "No fake execution when lineage is missing.")}
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             {summaryCard("Rollback gates", V1ImplementationPlanning.rollbackGateCount, "Rollback evidence required per step.")}
           </div>
         </>) : (<p className="muted" style={{ margin: 0 }}>Implementation checks are unavailable; treat generated implementation text as advisory only.</p>)}

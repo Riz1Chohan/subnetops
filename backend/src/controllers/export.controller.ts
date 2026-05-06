@@ -19,7 +19,11 @@ import {
   ShadingType,
   TableLayoutType,
 } from "docx";
+<<<<<<< HEAD
 import { composeProfessionalReportForProject, getCsvRows, getJsonExport, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
+=======
+import { composeProfessionalReportForProject, getCsvRows, type ProfessionalReport, type ReportTable } from "../services/export.service.js";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import { recordSecurityAuditEvent } from "../services/securityAudit.service.js";
 
 function parseReportMode(value: unknown): "professional" | "technical" | "full-proof" {
@@ -27,6 +31,123 @@ function parseReportMode(value: unknown): "professional" | "technical" | "full-p
   return mode === "technical" || mode === "full-proof" ? mode : "professional";
 }
 
+const INTERACTIVE_EXPORT_ROW_LIMITS: Record<"pdf" | "docx", { maxRowsPerTable: number; maxCellChars: number; maxTotalRows: number; maxTables: number; maxParagraphsPerSection: number }> = {
+  pdf: { maxRowsPerTable: 45, maxCellChars: 360, maxTotalRows: 520, maxTables: 32, maxParagraphsPerSection: 18 },
+  docx: { maxRowsPerTable: 55, maxCellChars: 480, maxTotalRows: 620, maxTables: 36, maxParagraphsPerSection: 22 },
+};
+
+const EXPORT_LEASE_TTL_MS = 3 * 60 * 1000;
+const EXPORT_HEAP_GUARD_BYTES = 420 * 1024 * 1024;
+const activeInteractiveExports = new Map<string, { startedAt: number; format: "pdf" | "docx" | "csv" }>();
+
+function acquireExportLease(userId: string, projectId: string, format: "pdf" | "docx" | "csv") {
+  const key = `${userId}:${projectId}`;
+  const now = Date.now();
+  const existing = activeInteractiveExports.get(key);
+  if (existing && now - existing.startedAt < EXPORT_LEASE_TTL_MS) {
+    throw new ApiError(409, `Another ${existing.format.toUpperCase()} export for this project is still running. Wait for it to finish before starting another export.`);
+  }
+
+  activeInteractiveExports.set(key, { startedAt: now, format });
+  return () => {
+    const current = activeInteractiveExports.get(key);
+    if (current?.startedAt === now) activeInteractiveExports.delete(key);
+  };
+}
+
+function assertExportMemoryAvailable() {
+  const heapUsed = process.memoryUsage().heapUsed;
+  if (heapUsed > EXPORT_HEAP_GUARD_BYTES) {
+    throw new ApiError(503, "Export service is under memory pressure. Try CSV first, then retry DOCX/PDF after the backend recovers.");
+  }
+}
+
+function controlledExportFailure(error: unknown, format: "pdf" | "docx" | "csv") {
+  if (error instanceof ApiError) return error;
+  console.error(`Controlled ${format.toUpperCase()} export failure`, error);
+  return new ApiError(503, `${format.toUpperCase()} export failed safely before a file could be created. The project workspace remains available; try CSV or retry after refreshing.`);
+}
+
+function compactExportCell(value: string, maxCellChars: number) {
+  const text = String(value ?? "");
+  if (text.length <= maxCellChars) return text;
+  return `${text.slice(0, Math.max(0, maxCellChars - 34)).trim()}… [truncated for export stability]`;
+}
+
+function stabilizeReportForInteractiveExport(report: ProfessionalReport, format: "pdf" | "docx", reportMode: "professional" | "technical" | "full-proof") {
+  // Interactive DOCX/PDF generation must not be able to take the API process down.
+  // Full proof/CSV evidence remains machine-readable elsewhere; browser-click exports
+  // are deliberately bounded so one large report cannot exhaust Render memory or leave
+  // the workspace APIs returning Failed to fetch.
+  if (reportMode === "full-proof") return report;
+
+  const limits = INTERACTIVE_EXPORT_ROW_LIMITS[format];
+  let trimmedTableCount = 0;
+  let trimmedRowCount = 0;
+  let renderedTableCount = 0;
+  let renderedRowBudget = limits.maxTotalRows;
+  const sections = [...report.sections, ...(report.appendices ?? [])];
+
+  for (const section of sections) {
+    if (Array.isArray(section.paragraphs) && section.paragraphs.length > limits.maxParagraphsPerSection) {
+      const omittedParagraphs = section.paragraphs.length - limits.maxParagraphsPerSection;
+      section.paragraphs = [
+        ...section.paragraphs.slice(0, limits.maxParagraphsPerSection),
+        `${omittedParagraphs} additional paragraph(s) were omitted from this interactive ${format.toUpperCase()} export for backend stability. Full evidence remains available in CSV/full-proof exports.`,
+      ];
+    }
+
+    if (!Array.isArray(section.tables)) continue;
+    for (const table of section.tables) {
+      renderedTableCount += 1;
+      const originalRows = Array.isArray(table.rows) ? table.rows : [];
+      const headers = Array.isArray(table.headers) && table.headers.length ? table.headers : ["Evidence", "Status"];
+      table.headers = headers;
+
+      if (renderedTableCount > limits.maxTables || renderedRowBudget <= 0) {
+        const omitted = originalRows.length;
+        table.rows = [headers.map((_, index) => index === 0 ? `${omitted} row(s) omitted from this interactive ${format.toUpperCase()} export` : (index === 1 ? "Use CSV/full-proof export for complete evidence." : "—"))];
+        trimmedTableCount += 1;
+        trimmedRowCount += omitted;
+        continue;
+      }
+
+      const allowedRows = Math.max(1, Math.min(limits.maxRowsPerTable, renderedRowBudget));
+      if (originalRows.length > allowedRows) {
+        const omitted = originalRows.length - allowedRows;
+        table.rows = [
+          ...originalRows.slice(0, allowedRows),
+          headers.map((_, index) => index === 0 ? `${omitted} additional row(s) omitted from this interactive ${format.toUpperCase()} export` : (index === 1 ? "Use CSV or full-proof export for complete row-level evidence." : "—")),
+        ];
+        trimmedTableCount += 1;
+        trimmedRowCount += omitted;
+      } else {
+        table.rows = originalRows;
+      }
+
+      renderedRowBudget -= Math.min(originalRows.length, allowedRows);
+      table.rows = table.rows.map((row) => row.map((cell) => compactExportCell(cell, limits.maxCellChars)));
+    }
+  }
+
+  if (trimmedRowCount > 0) {
+    report.executiveSummary = [
+      ...report.executiveSummary,
+      `Export stability note: ${trimmedRowCount} appendix/detail row(s) across ${trimmedTableCount} table(s) were omitted from this interactive ${format.toUpperCase()} file. Full evidence remains available through CSV/full-proof exports and saved project evidence.`,
+    ];
+    report.appendices = report.appendices ?? [];
+    report.appendices.push({
+      title: "Export Stability Appendix",
+      paragraphs: [
+        `This interactive ${format.toUpperCase()} export was bounded so repeated export attempts cannot exhaust backend memory or break the project workspace API.`,
+        `Omitted row count: ${trimmedRowCount}. Omitted table count: ${trimmedTableCount}.`,
+        "Use the CSV export or full-proof evidence export for complete machine-readable row-level detail.",
+      ],
+    });
+  }
+
+  return report;
+}
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
 
@@ -122,6 +243,15 @@ async function tryEmbedRemoteLogo(pdf: PDFDocument, logoUrl?: string | null) {
   }
 }
 
+<<<<<<< HEAD
+=======
+function setExportResponseHeaders(res: Response, format: "pdf" | "docx" | "csv") {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-SubnetOps-Export", format);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+}
+
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 function requireAuthenticatedUserId(req: Request) {
   if (!req.user?.id) {
     throw new ApiError(401, "Unauthorized");
@@ -264,6 +394,10 @@ function drawMetricCards(
 async function buildPdf(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
   const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
+<<<<<<< HEAD
+=======
+  stabilizeReportForInteractiveExport(report, "pdf", reportMode);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
   const environmentType = project.environmentType ?? "Custom";
@@ -365,6 +499,10 @@ function cellParagraph(text: string, bold = false) {
 async function buildDocx(projectId: string, reportMode: "professional" | "technical" | "full-proof" = "professional") {
   const { project, report } = await composeProfessionalReportForProject(projectId, reportMode);
   if (!project || !report) return null;
+<<<<<<< HEAD
+=======
+  stabilizeReportForInteractiveExport(report, "docx", reportMode);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const projectName = project.name ?? "SubnetOps Project";
   const organizationName = project.organizationName ?? "To be confirmed";
   const environmentType = project.environmentType ?? "Custom";
@@ -514,19 +652,37 @@ export async function exportJson(req: Request, res: Response) {
 
 export async function exportCsv(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
+<<<<<<< HEAD
   await ensureCanExportProject(req, projectId);
 
   await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "csv" } });
   const rows = await getCsvRows(projectId);
   const csv = toCsv(rows);
+=======
+  const userId = requireAuthenticatedUserId(req);
+  await ensureCanViewProject(userId, projectId);
+  const releaseLease = acquireExportLease(userId, projectId, "csv");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", 'attachment; filename="subnetops-export.csv"');
-  res.send(csv);
+  try {
+    const rows = await getCsvRows(projectId);
+    const csv = toCsv(rows);
+    await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "csv" } });
+
+    setExportResponseHeaders(res, "csv");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="subnetops-export.csv"');
+    return res.send(csv);
+  } catch (error) {
+    throw controlledExportFailure(error, "csv");
+  } finally {
+    releaseLease();
+  }
 }
 
 export async function exportPdf(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
+<<<<<<< HEAD
   await ensureCanExportProject(req, projectId);
 
   await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "pdf", reportMode: parseReportMode(req.query.reportMode) } });
@@ -534,14 +690,35 @@ export async function exportPdf(req: Request, res: Response) {
   if (!pdfBytes) {
     return res.status(404).json({ message: "Project not found" });
   }
+=======
+  const userId = requireAuthenticatedUserId(req);
+  await ensureCanViewProject(userId, projectId);
+  const reportMode = parseReportMode(req.query.reportMode);
+  const releaseLease = acquireExportLease(userId, projectId, "pdf");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.pdf"');
-  return res.send(Buffer.from(pdfBytes));
+  try {
+    assertExportMemoryAvailable();
+    const pdfBytes = await buildPdf(projectId, reportMode);
+    if (!pdfBytes) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+    await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "pdf", reportMode } });
+
+    setExportResponseHeaders(res, "pdf");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.pdf"');
+    return res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    throw controlledExportFailure(error, "pdf");
+  } finally {
+    releaseLease();
+  }
 }
 
 export async function exportDocx(req: Request, res: Response) {
   const projectId = requireParam(req, "projectId");
+<<<<<<< HEAD
   await ensureCanExportProject(req, projectId);
 
   await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "docx", reportMode: parseReportMode(req.query.reportMode) } });
@@ -549,8 +726,28 @@ export async function exportDocx(req: Request, res: Response) {
   if (!docxBytes) {
     return res.status(404).json({ message: "Project not found" });
   }
+=======
+  const userId = requireAuthenticatedUserId(req);
+  await ensureCanViewProject(userId, projectId);
+  const reportMode = parseReportMode(req.query.reportMode);
+  const releaseLease = acquireExportLease(userId, projectId, "docx");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-  res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.docx"');
-  return res.send(Buffer.from(docxBytes));
+  try {
+    assertExportMemoryAvailable();
+    const docxBytes = await buildDocx(projectId, reportMode);
+    if (!docxBytes) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+    await recordSecurityAuditEvent({ action: "report.export", outcome: "created", actorUserId: req.user?.id || null, projectId, targetType: "report", targetId: projectId, detail: { format: "docx", reportMode } });
+
+    setExportResponseHeaders(res, "docx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", 'attachment; filename="subnetops-professional-report.docx"');
+    return res.send(Buffer.from(docxBytes));
+  } catch (error) {
+    throw controlledExportFailure(error, "docx");
+  } finally {
+    releaseLease();
+  }
 }

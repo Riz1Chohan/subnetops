@@ -115,7 +115,11 @@ const proposalOnly = buildV1EnterpriseIpamTruthControl({
   V1CidrAddressingTruth,
   V1RequirementsClosure,
 });
+<<<<<<< HEAD
 assert(proposalOnly.reconciliationRows[0].reconciliationState === "ENGINE1_PLANNED_ONLY", "Engine 1 plan without Engine 2 approved allocation must stay planned-only");
+=======
+assert(proposalOnly.reconciliationRows[0].reconciliationState === "ENGINE1_PROPOSAL_ONLY", "Engine 1 plan without Engine 2 durable allocation must stay proposal-only");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(proposalOnly.overallReadiness === "REVIEW_REQUIRED", "Proposal-only rows must require review");
 
 const stale = buildV1EnterpriseIpamTruthControl({
@@ -125,7 +129,11 @@ const stale = buildV1EnterpriseIpamTruthControl({
   V1CidrAddressingTruth,
   V1RequirementsClosure,
 });
+<<<<<<< HEAD
 assert(stale.reconciliationRows[0].reconciliationState === "ENGINE2_STALE_APPROVAL", "Stale approved allocation hash must block V1");
+=======
+assert(stale.reconciliationRows[0].reconciliationState === "ENGINE2_STALE_ALLOCATION_REVIEW", "Stale approved allocation hash must block V1");
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(stale.overallReadiness === "BLOCKING", "Stale approved allocation should be blocking");
 
 console.log("V1 Enterprise IPAM selftest passed");

@@ -18,7 +18,10 @@ import {
 } from "../domain/addressing/cidr.js";
 import { buildDesignCoreSnapshot } from "./designCore.service.js";
 import { ensureRequirementsMaterializedForRead } from "./requirementsMaterialization.service.js";
+<<<<<<< HEAD
 import { buildValidationLedgerFields, severityForValidationLedger, type ValidationLedgerFindingClass, type ValidationLedgerReadinessCategory } from "../domain/validation/ledger.js";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function normalizeValidationSegmentRole(value?: string | null): SegmentRole | null {
   if (!value) return null;
@@ -335,8 +338,282 @@ function composeValidationMessage(narrative: ValidationNarrative) {
   return `Issue: ${narrative.issue} Impact: ${narrative.impact} Recommendation: ${narrative.recommendation}`;
 }
 
+interface ValidationNarrative {
+  issue: string;
+  impact: string;
+  recommendation: string;
+}
+
+
+function severityForV1ValidationFinding(finding: { category?: string; findingClass?: string }): ValidationSeverity {
+  if (finding.category === "BLOCKING" && finding.findingClass === "ROOT_BLOCKER") return "ERROR";
+  if (finding.category === "BLOCKING" && !finding.findingClass) return "ERROR";
+  return "WARNING";
+}
+
+function ruleCodeForV1ValidationFinding(finding: { category?: string; findingClass?: string }): string {
+  if (finding.category === "BLOCKING" && finding.findingClass === "ROOT_BLOCKER") return "V1_STRICT_READINESS_ROOT_BLOCKER";
+  if (finding.findingClass === "PROPAGATED_BLOCKER") return "V1_STRICT_READINESS_PROPAGATED_BLOCKER";
+  if (finding.findingClass === "DERIVED_IMPACT") return "V1_STRICT_READINESS_DERIVED_IMPACT";
+  if (finding.category === "REVIEW_REQUIRED") return "V1_STRICT_READINESS_REVIEW_REQUIRED";
+  return "V1_STRICT_READINESS_WARNING";
+}
+
+function downstreamSurfaceSeverity(surface: "implementation" | "template" | "report" | "diagram" | "platform" | "discovery" | "ai" | "finalProof", severity: string): ValidationSeverity {
+  // These surfaces are consumers of upstream truth. A generated greenfield plan may keep them blocked/review-gated,
+  // but they should not become extra root ERROR rows unless the upstream authority has already emitted a root blocker.
+  return severity === "INFO" || severity === "PASSED" ? "INFO" : "WARNING";
+}
+
+const validationGuidanceByRuleCode: Record<string, Partial<ValidationNarrative>> = {
+  REQ_SITE_COUNT_NOT_MATERIALIZED: {
+    impact: "The requirements stage captured site scope, but the engineering model has no site objects, so addressing, WAN, diagram, and report outputs are not trustworthy.",
+    recommendation: "Run the requirements materializer from the save path and confirm the selected site count creates durable Site rows.",
+  },
+  REQ_SITE_COUNT_UNDER_MATERIALIZED: {
+    impact: "The generated design covers fewer sites than the requirement, which under-scopes addressing, topology, routing, and implementation planning.",
+    recommendation: "Fix materialization so the saved site count and generated Site rows match, then rerun validation.",
+  },
+  REQ_NO_SEGMENTS_MATERIALIZED: {
+    impact: "A network plan without VLAN or segment rows cannot be sized, routed, secured, diagrammed, or exported honestly.",
+    recommendation: "Materialize requirement-driven access, guest, management, services, and specialty segments before validation can pass.",
+  },
+  REQ_USER_SEGMENT_MISSING: {
+    impact: "User population has no subnet or gateway consequence, so capacity calculations are not connected to requirements.",
+    recommendation: "Create user access segments from usersPerSite and feed them through the authoritative allocator.",
+  },
+  REQ_GUEST_SEGMENT_MISSING: {
+    impact: "Guest access without a guest segment cannot enforce isolation or internet-only behavior.",
+    recommendation: "Create guest VLAN/zone/policy evidence when guest Wi-Fi is selected.",
+  },
+  REQ_MANAGEMENT_SEGMENT_MISSING: {
+    impact: "Management-plane access cannot be scoped or protected without a dedicated management segment.",
+    recommendation: "Create a management VLAN/zone and admin-plane policy evidence when management is selected.",
+  },
+  REQ_PRINTER_SEGMENT_MISSING: {
+    impact: "Shared devices may be incorrectly blended into user access, weakening segmentation and policy clarity.",
+    recommendation: "Create a printer or shared-device segment when printer requirements are selected.",
+  },
+  REQ_IOT_SEGMENT_MISSING: {
+    impact: "IoT devices are high-risk shared devices; missing segment evidence undermines security posture.",
+    recommendation: "Create an IoT/specialty segment or explicitly mark IoT as not applicable when count and selection are zero.",
+  },
+  REQ_CAMERA_SEGMENT_MISSING: {
+    impact: "Camera/security systems need explicit placement and restrictions; missing segment evidence hides implementation risk.",
+    recommendation: "Create camera/security-device segment evidence when cameras are selected or counted.",
+  },
+  REQ_VOICE_SEGMENT_MISSING: {
+    impact: "Voice requirements have no VLAN/QoS consequence, so access-edge and service-quality planning are incomplete.",
+    recommendation: "Create a voice segment only when voice is selected or phone count is positive, then map QoS review evidence.",
+  },
+  REQ_WIRELESS_SEGMENT_MAPPING_MISSING: {
+    impact: "SSID planning without access segments cannot be mapped to VLANs, trust zones, or policies.",
+    recommendation: "Map wireless requirements to staff/user and guest segments before diagram and report outputs are trusted.",
+  },
+  REQ_ADDRESS_ROWS_MISSING: {
+    impact: "Segments exist without authoritative CIDR/gateway rows, so Engine 1 is not driving implementation evidence.",
+    recommendation: "Ensure saved VLANs are consumed by design-core addressing rows and rerun validation.",
+  },
+  REQ_TOPOLOGY_OBJECTS_MISSING: {
+    impact: "Sites without devices/interfaces cannot produce a usable diagram, routing model, or implementation handoff.",
+    recommendation: "Generate at least planned topology objects from materialized sites and segments.",
+  },
+  REQ_MULTISITE_LINKS_MISSING: {
+    impact: "A multi-site design without WAN/site links is not a network topology.",
+    recommendation: "Create planned site-to-site/WAN link evidence when the requirement scope is multi-site.",
+  },
+  REQ_MULTISITE_ROUTING_MISSING: {
+    impact: "Inter-site reachability cannot be reviewed when no route intent exists.",
+    recommendation: "Generate connected/default/summary route intent for materialized multi-site designs.",
+  },
+  REQ_REMOTE_ACCESS_CONSEQUENCE_MISSING: {
+    impact: "Remote access remains unsecured report text instead of a reviewable boundary or policy consequence.",
+    recommendation: "Create VPN/remote-access edge policy and zone evidence from remote access requirements.",
+  },
+  REQ_CLOUD_BOUNDARY_MISSING: {
+    impact: "Cloud/hybrid scope has no network boundary, route, or policy evidence, so hybrid design claims are unsupported.",
+    recommendation: "Create cloud edge, site-to-cloud routing, and policy review evidence from cloud requirements.",
+  },
+  REQ_SECURITY_FLOWS_MISSING: {
+    impact: "Security/segmentation selections produced no flow requirements, which makes the security design hollow.",
+    recommendation: "Generate vendor-neutral allow/deny/review flow requirements for guest, management, remote, cloud, and shared-device boundaries.",
+  },
+  REQ_OPERATIONS_EVIDENCE_MISSING: {
+    impact: "Monitoring, logging, backup, or ownership requirements are visible in the form but weak in engineering outputs.",
+    recommendation: "Expose operations-plane review evidence in policy, implementation, and report sections.",
+  },
+  REQ_SCENARIO_PROOF_ZERO_PASS: {
+    impact: "The requirement scenario proof layer says the selected design drivers failed, so validation cannot honestly call the project clean.",
+    recommendation: "Fix the missing materialized objects and rerun scenario proof until at least the relevant selected drivers pass or produce targeted blockers.",
+  },
+  SITE_SUMMARY_MISSING: {
+    impact: "Routing summaries, growth planning, and implementation review become weaker when the site boundary is not explicitly confirmed.",
+    recommendation: "Add or confirm the site's parent address block before using the design package for implementation planning.",
+  },
+  SITE_SUMMARY_REVIEW: {
+    impact: "A weak or oversized site summary can create route sprawl, wasted address space, or unclear site ownership.",
+    recommendation: "Review the site summary against the actual VLAN list, expected growth, and WAN routing plan.",
+  },
+  ROUTING_SUMMARIZATION_BLOCKED: {
+    impact: "Blocked summarization can make WAN routing harder to operate and can hide addressing mistakes until implementation.",
+    recommendation: "Correct the site block or subnet boundary issues before treating route summaries as review-ready.",
+  },
+  INVALID_SITE_BLOCK: {
+    impact: "Invalid site blocks prevent reliable subnet containment checks and can break downstream addressing recommendations.",
+    recommendation: "Replace the site block with valid CIDR notation such as 10.10.0.0/20.",
+  },
+  INVALID_CIDR: {
+    impact: "Invalid subnet notation prevents capacity, gateway, overlap, and routing checks from being trusted.",
+    recommendation: "Enter a valid CIDR block using the true network address and prefix length.",
+  },
+  INVALID_GATEWAY_IP: {
+    impact: "A bad gateway value can cause failed client onboarding, broken routing, and misleading implementation documents.",
+    recommendation: "Replace the gateway with a valid IPv4 address inside the VLAN subnet.",
+  },
+  NONCANONICAL_CIDR: {
+    impact: "Non-canonical subnet notation confuses engineers and can cause wrong summaries or duplicate-looking networks.",
+    recommendation: "Store the subnet using the true network address for the selected prefix.",
+  },
+  SUBNET_OUTSIDE_SITE_BLOCK: {
+    impact: "A subnet outside its parent site block breaks summarization and makes site ownership unclear.",
+    recommendation: "Move the subnet into the site's assigned block or adjust the site block after review.",
+  },
+  SLASH31_NONTRANSIT: {
+    impact: "A /31 is normally a point-to-point transit pattern; using it for access segments can leave no room for normal hosts.",
+    recommendation: "Use /31 only for WAN transit or mark the segment correctly; otherwise choose a larger access subnet.",
+  },
+  SLASH32_NONLOOPBACK: {
+    impact: "A /32 is normally a loopback or host route, not a usable VLAN segment for clients.",
+    recommendation: "Use /32 only for loopbacks or host routes; otherwise assign a subnet with usable host capacity.",
+  },
+  GATEWAY_OUTSIDE_SUBNET: {
+    impact: "Devices in the subnet will not be able to use a gateway that lives outside their Layer 3 segment.",
+    recommendation: "Choose a gateway address inside the subnet's usable host range.",
+  },
+  GATEWAY_IS_NETWORK_ADDRESS: {
+    impact: "The network address identifies the subnet itself and cannot be used as a normal gateway on LAN segments.",
+    recommendation: "Use a usable host address, commonly the first usable or last usable address.",
+  },
+  GATEWAY_IS_BROADCAST_ADDRESS: {
+    impact: "The broadcast address is reserved for the subnet and cannot be used as a normal gateway.",
+    recommendation: "Use a usable host address, commonly the first usable or last usable address.",
+  },
+  INSUFFICIENT_HOST_CAPACITY: {
+    impact: "Host demand exceeds subnet capacity, which can cause address exhaustion and failed device onboarding.",
+    recommendation: "Increase the subnet size or reduce the declared host count before implementation review.",
+  },
+  HOST_CAPACITY_NEAR_LIMIT: {
+    impact: "The subnet may work on day one but has limited growth room and can fail during onboarding or expansion.",
+    recommendation: "Review the growth buffer and consider a larger prefix before finalizing the addressing plan.",
+  },
+  RIGHTSIZE_RECOMMENDATION: {
+    impact: "Overly large subnets can waste address space and make route summarization less clean.",
+    recommendation: "Consider a tighter prefix if the segment is unlikely to grow significantly.",
+  },
+  NONSTANDARD_GATEWAY_PATTERN: {
+    impact: "A custom gateway convention can slow troubleshooting if it is not intentional and documented.",
+    recommendation: "Standardize on a project-wide gateway convention or document why this segment is different.",
+  },
+  GATEWAY_CONVENTION_REVIEW: {
+    impact: "Inconsistent gateway placement can make operations and troubleshooting harder over time.",
+    recommendation: "Confirm whether the project should use a first-usable, last-usable, or documented custom gateway pattern.",
+  },
+  OVERLAPPING_SUBNETS: {
+    impact: "Overlapping subnets can break routing, firewall policy, DHCP scopes, and site-to-site reachability.",
+    recommendation: "Assign non-overlapping subnet ranges and rerun validation.",
+  },
+  IPAM_DURABLE_AUTHORITY_BLOCKED: {
+    impact: "Engine 1 planned addressing is not safe to implement while Engine 2 durable IPAM reports a blocker such as brownfield overlap, stale approval, reserved pool breach, DHCP conflict, or reservation conflict.",
+    recommendation: "Resolve the Engine 2 IPAM blocker, update the durable allocation/approval/ledger state, and rerun validation before implementation handoff.",
+  },
+  IPAM_DURABLE_AUTHORITY_REVIEW_REQUIRED: {
+    impact: "The subnet may be mathematically valid, but it is not durable IPAM authority yet. Treating it as ready would create split-brain addressing risk.",
+    recommendation: "Materialize the Engine 1 plan row into Engine 2, record approval or review state, and clear any DHCP/reservation/brownfield review notes.",
+  },
+  IPAM_REQUIREMENT_PROPAGATION_GAP: {
+    impact: "A requirement-driven address need exists, but Engine 2 has not proven durable pool/allocation ownership or has recorded review gaps.",
+    recommendation: "Use the V1 requirement-to-IPAM matrix to materialize, approve, or explicitly review the affected IPAM objects.",
+  },
+
+  DESIGN_CORE_ORCHESTRATOR_SECTION_MISSING: {
+    impact: "A required design-core snapshot section is missing, so a downstream page, report, or diagram could be tempted to invent engineering truth.",
+    recommendation: "Restore the V1 orchestrator section and rerun validation before trusting frontend/report/diagram consumers.",
+  },
+  DESIGN_CORE_ORCHESTRATOR_SECTION_BLOCKED: {
+    impact: "The design-core coordinator is exposing an upstream blocker that must remain visible across UI, reports, diagrams, and readiness gates.",
+    recommendation: "Resolve the upstream section blocker instead of hiding it in downstream consumers.",
+  },
+  DESIGN_CORE_ORCHESTRATOR_SECTION_REVIEW_REQUIRED: {
+    impact: "The design-core section is present but review-gated; downstream consumers must preserve the review label.",
+    recommendation: "Review the affected snapshot section and clear or explicitly accept the upstream review condition.",
+  },
+  V1_STRICT_READINESS_BLOCKING: {
+    impact: "The V1 validation authority found a blocking readiness issue across requirements, addressing, IPAM, standards, routing, security, implementation, report, or diagram truth.",
+    recommendation: "Open the V1 validation readiness ledger, resolve the upstream blocker, and rerun validation before claiming implementation readiness.",
+  },
+  V1_STRICT_READINESS_REVIEW_REQUIRED: {
+    impact: "The design may contain mathematically valid or visible output, but at least one upstream truth chain is still review-gated.",
+    recommendation: "Clear the review-required source or keep the output labelled review-required in UI, report, and diagram consumers.",
+  },
+  V1_NETWORK_OBJECT_MODEL_BLOCKING: {
+    impact: "The network object model is missing truth metadata or has fake-authority risk, so generated topology cannot be trusted as implementation evidence.",
+    recommendation: "Fix V1 object lineage/readiness metadata before frontend, reports, exports, or diagrams consume those objects as engineering truth.",
+  },
+  V1_NETWORK_OBJECT_MODEL_REVIEW_REQUIRED: {
+    impact: "The network object model is visible but contains review-only, draft-only, or incomplete requirement-to-object lineage.",
+    recommendation: "Keep affected objects labelled review-required and either materialize missing consequences or document an explicit no-op/review reason.",
+  },
+  V1_STRICT_READINESS_WARNING: {
+    impact: "A non-blocking validation warning remains and must be preserved in engineering deliverables.",
+    recommendation: "Review the warning and either resolve it or document the accepted limitation before final handoff.",
+  },
+  VALIDATION_PASSED: {
+    impact: "No current blocker was detected by the saved validation checks, but this is not a live-network discovery result.",
+    recommendation: "Continue engineer review against live inventory, business policy, and vendor implementation requirements.",
+  },
+};
+
+function normalizeValidationText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function stripStructuredPrefixes(message: string) {
+  return message
+    .replace(/^Issue:\s*/i, "")
+    .replace(/\s+Impact:\s+.*$/i, "")
+    .replace(/\s+Recommendation:\s+.*$/i, "")
+    .trim();
+}
+
+function fallbackImpact(severity: ValidationSeverity) {
+  if (severity === "ERROR") return "This can create an implementation blocker or cause the generated design package to mislead reviewers.";
+  if (severity === "WARNING") return "This may not stop the design, but it creates review debt that should be resolved or accepted explicitly.";
+  return "This does not appear fatal, but it is still useful context for engineering review.";
+}
+
+function fallbackRecommendation(severity: ValidationSeverity) {
+  if (severity === "ERROR") return "Correct the input, rerun validation, and confirm the finding clears before implementation handoff.";
+  if (severity === "WARNING") return "Review the item, document the decision, and adjust the design if the warning is not intentional.";
+  return "Review and document the item if it affects the final design basis.";
+}
+
+function buildValidationNarrative(item: ValidationItem): ValidationNarrative {
+  const guidance = validationGuidanceByRuleCode[item.ruleCode] ?? {};
+  const rawIssue = (guidance.issue ?? stripStructuredPrefixes(item.message)) || item.title;
+  return {
+    issue: normalizeValidationText(rawIssue),
+    impact: normalizeValidationText(guidance.impact ?? fallbackImpact(item.severity)),
+    recommendation: normalizeValidationText(guidance.recommendation ?? fallbackRecommendation(item.severity)),
+  };
+}
+
+function composeValidationMessage(narrative: ValidationNarrative) {
+  return `Issue: ${narrative.issue} Impact: ${narrative.impact} Recommendation: ${narrative.recommendation}`;
+}
+
 function makeItem(item: ValidationItem): ValidationItem {
   const narrative = buildValidationNarrative(item);
+<<<<<<< HEAD
   const message = composeValidationMessage(narrative);
   const ledger = buildValidationLedgerFields({
     ...item,
@@ -347,6 +624,11 @@ function makeItem(item: ValidationItem): ValidationItem {
     ...item,
     ...ledger,
     message,
+=======
+  return {
+    ...item,
+    message: composeValidationMessage(narrative),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
@@ -1165,6 +1447,7 @@ export async function runValidation(projectId: string) {
       results.push(makeItem({
         projectId,
         severity,
+<<<<<<< HEAD
         readinessCategory: finding.category,
         findingClass: finding.findingClass ?? (finding.category === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM"),
         sourceEngine: finding.sourceEngine,
@@ -1176,6 +1459,8 @@ export async function runValidation(projectId: string) {
         affectedRequirements: finding.affectedRequirementKeys,
         affectedObjects: finding.affectedObjectIds,
         evidence: finding.evidence,
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ruleCode: ruleCodeForV1ValidationFinding(finding),
         title: finding.title,
         message: `${finding.detail} Source: ${finding.sourceEngine}. Class: ${finding.findingClass ?? "UNCLASSIFIED"}. ${finding.deEscalationReason ? `Classification note: ${finding.deEscalationReason}. ` : ""}Remediation: ${finding.remediation}`,

@@ -12,7 +12,10 @@ import type {
   RequirementsScenarioProofSignal,
   RequirementsScenarioProofSummary,
 } from "../designCore.types.js";
+<<<<<<< HEAD
 import { evaluateRequirementClosureBlockerProof } from "../../domain/requirements/closure-proof.js";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import { requirementConsumerRegistryFor, V1_REQUIREMENT_CONSUMER_REGISTRY_VERSION } from "./designCore.requirementConsumerRegistry.js";
 
 export const V1_REQUIREMENTS_CLOSURE_CONTRACT_VERSION = "V1_REQUIREMENTS_IMPACT_CLOSURE_SCENARIO_PROOF" as const;
@@ -53,8 +56,11 @@ export interface V1RequirementClosureMatrixRow {
   consumerCoverage: V1RequirementConsumerCoverage;
   evidence: string[];
   reviewReason?: string;
+<<<<<<< HEAD
   blockedReason?: string;
   lifecycleProofStatus: "PROVEN" | "REVIEW_REQUIRED" | "EXPLICIT_NO_OP" | "NOT_ACTIVE";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 export interface V1GoldenScenarioClosure {
@@ -104,6 +110,10 @@ type V1Input = {
 };
 
 const REVIEW_ONLY_MATERIALIZATION_STATUSES = new Set(["review-required", "validation-blocker"]);
+<<<<<<< HEAD
+=======
+const WIZARD_REVIEW_CONSUMER_GAPS = new Set(["ProjectOverviewPage.V1Closure", "report/export.requirementEvidence", "diagramTruth.requirementImpact", "designCore.requirementsScenarioProof"]);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 const NON_ACTIVE_MATERIALIZATION_STATUSES = new Set(["explicit-no-op", "unsupported", "policy-missing"]);
 
 function includesText(values: string[], fragments: string[]) {
@@ -221,6 +231,7 @@ function hasImplementationEvidence(outcome: RequirementMaterializationOutcome, c
   return Boolean(closure?.visibleIn.some((item) => /implementation|handoff|review/i.test(item)));
 }
 
+<<<<<<< HEAD
 function requirementClosureText(outcome: RequirementMaterializationOutcome) {
   return [
     outcome.key,
@@ -274,10 +285,13 @@ function lifecycleProofStatusFor(args: {
   return "REVIEW_REQUIRED" as const;
 }
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 function lifecycleFor(args: {
   outcome: RequirementMaterializationOutcome;
   coverage: V1RequirementConsumerCoverage;
   missingConsumers: string[];
+<<<<<<< HEAD
   active: boolean;
   blockingProof?: string;
 }) {
@@ -289,6 +303,16 @@ function lifecycleFor(args: {
   if (outcome.materializationStatus === "validation-blocker") return "REVIEW_REQUIRED" as const;
   if (outcome.materializationStatus === "review-required") return "REVIEW_REQUIRED" as const;
   if (!active) return coverage.materialized ? "EXPLICIT_NO_OP" as const : "NOT_CAPTURED" as const;
+=======
+}) {
+  const { outcome, coverage, missingConsumers } = args;
+  if (!coverage.captured) return "NOT_CAPTURED" as const;
+  if (outcome.materializationStatus === "unsupported") return "UNSUPPORTED" as const;
+  if (outcome.materializationStatus === "validation-blocker") {
+    return missingConsumers.some((consumer) => !WIZARD_REVIEW_CONSUMER_GAPS.has(consumer)) ? "BLOCKED" as const : "REVIEW_REQUIRED" as const;
+  }
+  if (outcome.materializationStatus === "review-required") return "REVIEW_REQUIRED" as const;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   if (!coverage.normalized && !coverage.materialized && !coverage.backendConsumed) return "CAPTURED_ONLY" as const;
   if (coverage.materialized && missingConsumers.length > 0 && missingConsumers.every((item) => item.includes("report") || item.includes("diagram") || item.includes("ProjectOverview"))) return "PARTIALLY_PROPAGATED" as const;
   if (coverage.materialized && missingConsumers.length > 0) return "PARTIALLY_PROPAGATED" as const;
@@ -298,6 +322,7 @@ function lifecycleFor(args: {
   return "CAPTURED_ONLY" as const;
 }
 
+<<<<<<< HEAD
 function readinessFor(lifecycleStatus: RequirementPropagationLifecycleStatus, active: boolean) {
   if (!active && lifecycleStatus !== "UNSUPPORTED") return "PASSED" as const;
   if (lifecycleStatus === "FULLY_PROPAGATED") return "PASSED" as const;
@@ -307,6 +332,16 @@ function readinessFor(lifecycleStatus: RequirementPropagationLifecycleStatus, ac
   if (lifecycleStatus === "REVIEW_REQUIRED") return "REVIEW_REQUIRED" as const;
   if (lifecycleStatus === "PARTIALLY_PROPAGATED" || lifecycleStatus === "MATERIALIZED") return "WARNING" as const;
   return "BLOCKING" as const;
+=======
+function readinessFor(lifecycleStatus: RequirementPropagationLifecycleStatus, active: boolean, missingConsumers: string[] = []) {
+  if (!active && lifecycleStatus !== "UNSUPPORTED") return "PASSED" as const;
+  if (lifecycleStatus === "FULLY_PROPAGATED") return "PASSED" as const;
+  if (lifecycleStatus === "UNSUPPORTED") return "UNSUPPORTED" as const;
+  if (lifecycleStatus === "BLOCKED") return missingConsumers.length > 0 && missingConsumers.every((consumer) => WIZARD_REVIEW_CONSUMER_GAPS.has(consumer)) ? "REVIEW_REQUIRED" as const : "BLOCKING" as const;
+  if (lifecycleStatus === "REVIEW_REQUIRED") return "REVIEW_REQUIRED" as const;
+  if (lifecycleStatus === "PARTIALLY_PROPAGATED" || lifecycleStatus === "MATERIALIZED") return "WARNING" as const;
+  return "REVIEW_REQUIRED" as const;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function buildCoverage(args: {
@@ -401,6 +436,7 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
   const missingConsumers = active
     ? expectedAffectedEngines.filter((expected) => !actualAffectedEngines.includes(expected))
     : [];
+<<<<<<< HEAD
   const blockedReason = blockingProofFor({ outcome, coverage, missingConsumers, active });
   const lifecycleStatus = lifecycleFor({ outcome, coverage, missingConsumers, active, blockingProof: blockedReason });
   const lifecycleProofStatus = lifecycleProofStatusFor({ outcome, active, blockingProof: blockedReason });
@@ -410,6 +446,13 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
     ?? blockedReason
     ?? (missingConsumers.length ? `Missing consumer proof: ${missingConsumers.join(", ")}` : undefined)
     ?? (outcome.materializationStatus === "validation-blocker" ? "Validation-blocker materialization state is review-required until a mandatory missing consumer, missing source object, or engine contradiction is proven." : undefined);
+=======
+  const lifecycleStatus = lifecycleFor({ outcome, coverage, missingConsumers });
+  const readinessImpact = readinessFor(lifecycleStatus, active, missingConsumers);
+  const reviewReason = outcome.reviewReason
+    ?? (closure?.missingEvidence.length ? closure.missingEvidence.join(" ") : undefined)
+    ?? (missingConsumers.length ? `Missing consumer proof: ${missingConsumers.join(", ")}` : undefined);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   return {
     requirementId: `req:${outcome.key}`,
@@ -428,17 +471,28 @@ function buildClosureRow(input: V1Input, outcome: RequirementMaterializationOutc
     consumerCoverage: coverage,
     evidence: evidenceFor({ outcome, closure, traceabilityItems, scenarioSignals, coverage }),
     reviewReason,
+<<<<<<< HEAD
     blockedReason,
     lifecycleProofStatus,
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
 function rowIsBlocking(row: V1RequirementClosureMatrixRow) {
+<<<<<<< HEAD
   return row.lifecycleStatus === "BLOCKED" && Boolean(row.blockedReason);
 }
 
 function rowNeedsReview(row: V1RequirementClosureMatrixRow) {
   return row.readinessImpact === "REVIEW_REQUIRED" || row.lifecycleStatus === "PARTIALLY_PROPAGATED" || row.lifecycleStatus === "MATERIALIZED" || row.lifecycleProofStatus === "REVIEW_REQUIRED";
+=======
+  return row.readinessImpact === "BLOCKING" || row.lifecycleStatus === "BLOCKED";
+}
+
+function rowNeedsReview(row: V1RequirementClosureMatrixRow) {
+  return row.readinessImpact === "REVIEW_REQUIRED" || row.lifecycleStatus === "PARTIALLY_PROPAGATED" || row.lifecycleStatus === "MATERIALIZED";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 function scenarioRelevant(matrixByKey: Map<string, V1RequirementClosureMatrixRow>, keys: string[]) {
@@ -515,7 +569,11 @@ export function buildV1RequirementsClosureControl(input: V1Input): V1Requirement
     materializedOnlyCount: closureMatrix.filter((row) => row.lifecycleStatus === "MATERIALIZED").length,
     capturedOnlyCount: closureMatrix.filter((row) => row.lifecycleStatus === "CAPTURED_ONLY").length,
     reviewRequiredCount: closureMatrix.filter((row) => row.lifecycleStatus === "REVIEW_REQUIRED").length,
+<<<<<<< HEAD
     blockedCount: closureMatrix.filter((row) => row.lifecycleStatus === "BLOCKED" && Boolean(row.blockedReason)).length,
+=======
+    blockedCount: closureMatrix.filter((row) => row.lifecycleStatus === "BLOCKED").length,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     unsupportedCount: closureMatrix.filter((row) => row.lifecycleStatus === "UNSUPPORTED").length,
     notCapturedCount: closureMatrix.filter((row) => row.lifecycleStatus === "NOT_CAPTURED").length,
     missingConsumerCount,
@@ -528,7 +586,10 @@ export function buildV1RequirementsClosureControl(input: V1Input): V1Requirement
       `Consumer registry: ${V1_REQUIREMENT_CONSUMER_REGISTRY_VERSION}.`,
       "V1 is the nothing-got-lost checker: captured requirements must prove normalization, materialization/review state, backend consumption, readiness impact, frontend visibility, report/export evidence, diagram impact when relevant, and scenario proof only when the registry says the requirement is a scenario driver.",
       "The closure matrix does not invent missing downstream facts. It separates mandatory consumers, review-only consumers, and explicit no-op consumers so wizard-generated internal keys do not create fake root blockers.",
+<<<<<<< HEAD
       "A requirement may be BLOCKED only when a mandatory consumer gap, missing required source object, or explicit engine contradiction is recorded in blockedReason. Validation-blocker without root proof is review-required, not a root blocker.",
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       "Golden scenario closures are derived from the same backend evidence and keep small office, multi-site, guest Wi-Fi, voice, cloud/hybrid, remote access, dual ISP, security-sensitive, and brownfield cases visible.",
     ],
   };

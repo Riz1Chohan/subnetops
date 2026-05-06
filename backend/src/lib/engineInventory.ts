@@ -282,7 +282,11 @@ export const V1_ENGINE_INVENTORY: V1EngineInventoryRow[] = [
       "backend/prisma/schema.prisma",
     ],
     inputs: ["DesignRouteDomain", "DesignIpPool", "DesignIpAllocation", "DesignDhcpScope", "DesignIpReservation", "brownfield imports", "Engine 1 planned rows"],
+<<<<<<< HEAD
     outputs: ["route domain truth", "pool truth", "candidate/approved allocations", "DHCP scopes", "reservations", "brownfield conflicts", "approvals", "ledger", "V1EnterpriseIpamTruth"],
+=======
+    outputs: ["route domain truth", "pool truth", "durable allocations", "DHCP scopes", "reservations", "brownfield conflicts", "approvals", "ledger", "V1EnterpriseIpamTruth"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     consumers: ["design-core enterpriseAllocatorPosture", "validation", "ProjectEnterpriseIpamPage", "report/export", "implementation planning"],
     sourceOfTruthLevel: "durable-ipam-authority",
     requirementFieldsConsumed: ["addressHierarchyModel", "siteBlockStrategy", "reservedRangePolicy", "managementIpPolicy", "dualIsp", "cloudConnected", "siteCount", "usersPerSite"],
@@ -524,15 +528,24 @@ export const V1_ENGINE_INVENTORY: V1EngineInventoryRow[] = [
     engineName: "Platform/BOM foundation",
     primarySourceFiles: ["backend/src/services/designCore/designCore.platformBomFoundationControl.ts", "backend/src/lib/platformBomFoundation.selftest.ts", "frontend/src/lib/platformBomFoundation.ts", "frontend/src/pages/ProjectPlatformBomPage.tsx"],
     inputs: ["requirements", "platformProfileJson", "networkObjectModel", "V1 diagram truth", "topology assumptions", "physical/device counts", "growth/redundancy signals"],
+<<<<<<< HEAD
     outputs: ["V1PlatformBomFoundation", "switch/AP/firewall/WAN estimates", "PoE/port assumptions", "licensing placeholders", "confidence notes", "platformProfileState", "procurementReadinessReason", "requirement-driven BOM rows", "manual review gates"],
+=======
+    outputs: ["V1PlatformBomFoundation", "switch/AP/firewall/WAN estimates", "PoE/port assumptions", "licensing placeholders", "confidence notes", "requirement-driven BOM rows", "manual review gates"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     consumers: ["ProjectPlatformBomPage", "validation", "PDF/DOCX report", "CSV export", "future procurement workflow"],
     sourceOfTruthLevel: "backend-computed-review-gated",
     requirementFieldsConsumed: ["wireless", "guestWifi", "voice", "printers", "iot", "cameras", "usersPerSite", "siteCount", "dualIsp", "remoteAccess", "cloudHybrid", "cloudConnected", "securityPosture", "complianceProfile", "printerCount", "phoneCount", "apCount", "cameraCount", "serverCount", "iotDeviceCount", "buildingCount", "floorCount", "growthMarginPercent"],
     frontendPagesUsingIt: ["ProjectPlatformBomPage", "ProjectOverviewPage", "ProjectReportPage"],
     reportExportSectionsUsingIt: ["V1 Platform/BOM Foundation", "Platform Profile and Bill of Materials Foundation", "Assumptions and limitations", "CSV Platform/BOM rows"],
     diagramSectionsUsingIt: ["Physical topology only as advisory sizing context; V1 diagram truth must remain backend-authored"],
+<<<<<<< HEAD
     validationReadinessImpact: "BOM rows now carry backend source requirements, source objects where available, calculation basis, confidence, manual review notes, and explicit advisory-only procurement authority, platformProfileState, and procurementReadinessReason. Final SKUs/prices remain blocked until a future catalog/discovery stage.",
     testsSelftestsProvingIt: ["backend/src/lib/platformBomFoundation.selftest.ts", "scripts/check-platform-bom-discovery-state-cleanup.cjs", "scripts/check-v1-release.cjs"],
+=======
+    validationReadinessImpact: "BOM rows now carry backend source requirements, source objects where available, calculation basis, confidence, manual review notes, and explicit advisory-only procurement authority. Final SKUs/prices remain blocked until a future catalog/discovery stage.",
+    testsSelftestsProvingIt: ["backend/src/lib/platformBomFoundation.selftest.ts", "scripts/check-v1-release.cjs", "scripts/check-v1-release.cjs"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     propagationContract: REQUIRED_CONTRACT,
     currentV1Verdict: "CONTROLLED",
   },
@@ -541,15 +554,24 @@ export const V1_ENGINE_INVENTORY: V1EngineInventoryRow[] = [
     engineName: "Discovery/current-state",
     primarySourceFiles: ["backend/src/services/designCore/designCore.discoveryCurrentStateControl.ts", "backend/src/lib/discoveryCurrentState.selftest.ts", "frontend/src/lib/discoveryFoundation.ts", "frontend/src/pages/ProjectDiscoveryPage.tsx", "backend/prisma/schema.prisma"],
     inputs: ["discoveryJson", "manual discovery fields", "future imported current-state artifacts", "brownfield requirements", "currentStateBoundary", "brownfieldReadiness", "discoveredStateImportPlan", "networkObjectModel"],
+<<<<<<< HEAD
     outputs: ["V1DiscoveryCurrentState", "manual discovery plan", "current-state boundary", "structured import targets", "requirement-created discovery tasks", "conflict/review states", "manual/imported/validated distinction", "discoveryState", "discoveryReadinessReason", "no-live-discovery proof boundary"],
+=======
+    outputs: ["V1DiscoveryCurrentState", "manual discovery plan", "current-state boundary", "structured import targets", "requirement-created discovery tasks", "conflict/review states", "manual/imported/validated distinction", "no-live-discovery proof boundary"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     consumers: ["ProjectDiscoveryPage", "brownfield readiness", "validation", "PDF/DOCX report", "CSV export", "future reconciliation/importer workflow"],
     sourceOfTruthLevel: "manual-discovery-boundary",
     requirementFieldsConsumed: ["brownfield", "migration", "planningFor", "projectStage", "siteCount", "multiSite", "dualIsp", "cloudHybrid", "cloudConnected", "guestAccess", "guestWifi", "remoteAccess", "management", "voice", "wireless", "interSiteTrafficModel"],
     frontendPagesUsingIt: ["ProjectDiscoveryPage", "ProjectEnterpriseIpamPage", "ProjectValidationPage", "ProjectReportPage"],
     reportExportSectionsUsingIt: ["V1 Discovery/Current-State", "Discovery/current-state", "Assumptions and limitations", "Review-required items", "CSV Discovery rows"],
     diagramSectionsUsingIt: ["Imported/discovered overlays only after import validation exists; no frontend-invented live topology"],
+<<<<<<< HEAD
     validationReadinessImpact: "V1_DISCOVERY_CURRENT_STATE_CONTRACT requires discovery to distinguish not captured, manual notes only, imported review-required, verified current state, conflicting evidence, and review required. Brownfield/current-state requirements create discovery tasks and review gates instead of fake live-discovery authority.",
     testsSelftestsProvingIt: ["backend/src/lib/discoveryCurrentState.selftest.ts", "scripts/check-platform-bom-discovery-state-cleanup.cjs", "scripts/check-v1-release.cjs"],
+=======
+    validationReadinessImpact: "V1_DISCOVERY_CURRENT_STATE_CONTRACT requires discovery to distinguish not provided, manually entered, imported, validated, conflicting, and review required. Brownfield/current-state requirements create discovery tasks and blockers instead of fake live-discovery authority.",
+    testsSelftestsProvingIt: ["backend/src/lib/discoveryCurrentState.selftest.ts", "scripts/check-v1-release.cjs", "scripts/check-v1-release.cjs"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     propagationContract: REQUIRED_CONTRACT,
     currentV1Verdict: "CONTROLLED",
   },

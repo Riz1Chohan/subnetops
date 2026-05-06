@@ -167,12 +167,15 @@ export function buildV1DiagramTruthControl(params: {
   const edgesWithoutRelatedObjects = edgeCoverage.filter((row) => !row.hasBackendIdentity).length;
   const renderNodesMissingTruthEvidence = renderModel.nodes.filter((node) => !node.truthStateV1 || !node.readinessImpact || !node.sourceRefs?.length || !node.validationRefs?.length);
   const renderEdgesMissingTruthEvidence = renderModel.edges.filter((edge) => !edge.truthState || !edge.truthStateV1 || !edge.readinessImpact || !edge.sourceRefs?.length || !edge.validationRefs?.length);
+<<<<<<< HEAD
   const renderNodesMissingGraphLineage = renderModel.nodes.filter((node) => node.lineageStatus === "BLOCKED_LINEAGE");
   const renderEdgesMissingGraphLineage = renderModel.edges.filter((edge) => edge.lineageStatus === "BLOCKED_LINEAGE");
   const visualOnlyImplementationEvidence = [
     ...renderModel.nodes.filter((node) => node.lineageStatus === "VISUAL_ONLY_NON_EVIDENCE" && node.implementationEvidence),
     ...renderModel.edges.filter((edge) => edge.lineageStatus === "VISUAL_ONLY_NON_EVIDENCE" && edge.implementationEvidence),
   ];
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const cleanAssumedNodes = renderModel.nodes.filter((node) => (node.truthStateV1 === "ASSUMED" || node.truthState === "inferred" || node.truthState === "proposed" || node.truthState === "planned") && node.readinessImpact === "NONE");
   const cleanAssumedEdges = renderModel.edges.filter((edge) => (edge.truthStateV1 === "ASSUMED" || edge.truthState === "inferred" || edge.truthState === "proposed" || edge.truthState === "planned") && edge.readinessImpact === "NONE");
   const omittedWarningMissing = (renderModel.summary.omittedEvidenceHasBlockers || renderModel.summary.omittedEvidenceHasReviewRequired) && !renderModel.omittedEvidenceSummaries?.some((row) => row.omittedCount > 0 && (row.omittedHasBlockers || row.omittedHasReviewRequired));
@@ -228,6 +231,7 @@ export function buildV1DiagramTruthControl(params: {
     });
   }
 
+<<<<<<< HEAD
   if (renderNodesMissingGraphLineage.length || renderEdgesMissingGraphLineage.length) {
     addFinding(findings, {
       severity: "BLOCKING",
@@ -252,6 +256,8 @@ export function buildV1DiagramTruthControl(params: {
     });
   }
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   if (cleanAssumedNodes.length || cleanAssumedEdges.length) {
     addFinding(findings, {
       severity: "BLOCKING",
@@ -349,13 +355,22 @@ export function buildV1DiagramTruthControl(params: {
     findings,
     proofBoundary: [
       "Requirement-driven visual elements must originate from backend requirement/object/graph/routing/security/implementation truth.",
+<<<<<<< HEAD
       "Every render node must carry backend objectId, sourceEngine, readiness, truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, readinessImpact, and graph-lineage status.",
       "Every render edge must carry relatedObjectIds or a design graph relationship plus truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, readinessImpact, and graph-lineage status.",
+=======
+      "Every render node must carry backend objectId, sourceEngine, readiness, truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, and readinessImpact.",
+      "Every render edge must carry relatedObjectIds or a design graph relationship plus truthState, truthStateV1, sourceRefs, validationRefs, warningBadges, and readinessImpact.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       "Physical, logical, WAN/cloud, security, per-site, and implementation modes have separate declared purposes and allowed layers.",
       "Frontend canvas may lay out backend renderModel data, but it may not create engineering facts.",
     ],
     notes: [
+<<<<<<< HEAD
       "V1 diagram output is evidence-first: visual polish cannot override graph lineage, readiness, or review labels.",
+=======
+      "V1 is about diagram truth, not prettier trash.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       "This control intentionally keeps review-required and inferred evidence visible instead of hiding weak proof behind polished layout.",
     ],
   };

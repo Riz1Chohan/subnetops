@@ -1,8 +1,13 @@
 // V1_DISCOVERY_CURRENT_STATE_CONTRACT report wiring
 // V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT: professional report exposes diagram mode contracts.
 import type { ProfessionalReport } from "./export.types.js";
+<<<<<<< HEAD
 import { buildOmittedEvidenceDecisionSummary, buildOmittedEvidenceSummary, mergeOmittedEvidenceSummaries } from "../domain/evidence/index.js";
 import { applyProfessionalReportEvidenceBoundary, buildReportEvidenceDocument, buildReportEvidenceView, buildRuntimeExportConsistencyProof, findOverclaimRisks, reportCanClaimReady, rewriteForbiddenReportClaim } from "../domain/reporting/index.js";
+=======
+import { buildOmittedEvidenceSummary, mergeOmittedEvidenceSummaries } from "../domain/evidence/index.js";
+import { buildReportEvidenceDocument, findOverclaimRisks, reportCanClaimReady, rewriteForbiddenReportClaim } from "../domain/reporting/index.js";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 // V1_ENGINE1_CIDR_ADDRESSING_TRUTH
 // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW
 // V1_DESIGN_CORE_ORCHESTRATOR_CONTRACT
@@ -59,10 +64,13 @@ function sanitizeProfessionalReportText(value: string) {
     .replace(/\bbackend design-core\b/gi, "authoritative design model")
     .replace(/\bdesign model design-core\b/gi, "authoritative design model")
     .replace(/\bbackend\b/gi, "design model")
+<<<<<<< HEAD
     .replace(/\bmachine-readable\b/gi, "detailed")
     .replace(/\bdebug\b/gi, "diagnostic")
     .replace(/\bdeveloper\b/gi, "engineering")
     .replace(/\bcontract\b/gi, "control")
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     .replace(/\breportTruth\b/g, "report readiness evidence")
     .replace(/\bdiagramTruth\b/g, "diagram readiness evidence")
     .replace(/\bimplementationPlan\b/g, "implementation plan")
@@ -216,6 +224,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   const V1ImplementationPlanning = designCore.V1ImplementationPlanning && typeof designCore.V1ImplementationPlanning === "object" ? designCore.V1ImplementationPlanning : null;
   const V1ReadinessLadder = designCore.V1ReadinessLadder && typeof designCore.V1ReadinessLadder === "object" ? designCore.V1ReadinessLadder : null;
   const V1RoutingSegmentation = designCore.V1RoutingSegmentation && typeof designCore.V1RoutingSegmentation === "object" ? designCore.V1RoutingSegmentation : null;
+<<<<<<< HEAD
   const reportEvidenceView = V1ReportExportTruth?.evidenceView ?? buildReportEvidenceView({
     designCore,
     V1ValidationReadiness,
@@ -230,6 +239,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     networkObjectModel,
   });
   const exportConsistencyProof = V1ReportExportTruth?.exportConsistencyProof ?? buildRuntimeExportConsistencyProof({ designCore, evidenceView: reportEvidenceView });
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const generatedAt = authority?.generatedAt ? new Date(authority.generatedAt).toLocaleString() : asString(designCore.generatedAt, "unknown time");
   const backendBlockedFindings = asArray(reportTruth?.blockedFindings);
   const backendReviewFindings = asArray(reportTruth?.reviewFindings);
@@ -281,7 +292,10 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     buildOmittedEvidenceSummary({ collection: "vendor-neutral templates", surface: "Report.VendorNeutralTemplates", items: asArray(vendorNeutralTemplates?.templates), shownCount: Math.min(35, asArray(vendorNeutralTemplates?.templates).length) }),
   ];
   const reportOmittedEvidenceRollup = mergeOmittedEvidenceSummaries(reportOmittedEvidenceSummaries);
+<<<<<<< HEAD
   const reportOmittedEvidenceDecisionSummary = buildOmittedEvidenceDecisionSummary(reportOmittedEvidenceSummaries);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   if (V1TruthBlocked || reportExportNotReady || reportOmittedEvidenceRollup.omittedHasBlockers) {
     report.metadata = report.metadata ?? {
@@ -352,9 +366,12 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           ["Overclaim risks", reportOverclaimRisks.length ? "review" : "ready", joinText(reportOverclaimRisks.slice(0, 6), "No overclaim risks recorded")],
           ["Readiness ladder", readinessLadderState, `Implementation output allowed: ${readinessLadderAllowsImplementation ? "yes" : "no"}`],
           ["Clean readiness claims", cleanReportClaimsAllowed ? "allowed" : "blocked", cleanReportClaimsAllowed ? "Backend report/export proof and readiness ladder allow implementation-ready language." : "Forbidden claims remain blocked; report must use blocked/review/planning wording."],
+<<<<<<< HEAD
           ["Authoritative evidence view", reportEvidenceView.contract === "V1_REPORT_EVIDENCE_VIEW_CONTRACT" ? "present" : "missing", `Validation root blockers ${reportEvidenceView.validation.rootBlockerCount}; IPAM candidates ${reportEvidenceView.ipam.candidateAllocations}; approved allocations ${reportEvidenceView.ipam.approvedAllocations}; executable steps ${reportEvidenceView.implementation.executableSteps}.`],
           ["Export consistency proof", exportConsistencyProof.killSwitchPassed ? "passed" : "review", `JSON/CSV/PDF/DOCX/frontend root-blocker count ${exportConsistencyProof.canonicalRootBlockerCount}; candidate IPAM approved-label violations ${exportConsistencyProof.candidateIpamRowsLabelledApprovedAuthority}; blocked requirements without proof ${exportConsistencyProof.blockedRequirementRowsWithoutProof}.`],
           ["Omitted evidence decision", reportOmittedEvidenceDecisionSummary.decisionImpact, `${reportOmittedEvidenceDecisionSummary.totalOmittedRows} omitted row(s); blocker surfaces ${reportOmittedEvidenceDecisionSummary.blockingSurfaces.length}; review surfaces ${reportOmittedEvidenceDecisionSummary.reviewSurfaces.length}.`],
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           ["Full evidence appendix", V1ReportExportTruth?.fullMachineReadableAppendix?.machineReadable ? "present" : "missing", `Formats: ${joinText(asArray(V1ReportExportTruth?.fullMachineReadableAppendix?.exportFormats), "none")}`],
         ],
       },
@@ -371,6 +388,7 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     ],
     tables: [
       {
+<<<<<<< HEAD
         title: "Omitted Evidence Decision Summary",
         headers: ["Decision", "Omitted Rows", "Blocker Surfaces", "Review Surfaces", "Report", "Diagram", "Implementation"],
         rows: [[
@@ -392,6 +410,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         ],
       },
       {
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         title: "Omitted Evidence Summary",
         headers: ["Collection", "Surface", "Shown", "Total", "Omitted", "Omitted Blockers", "Omitted Review", "Severity Summary", "Readiness Impact", "Export Impact"],
         rows: omittedEvidenceRows(reportOmittedEvidenceSummaries),
@@ -655,7 +675,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         .map((row: any) => [
           `${asString(row.siteName, "Site")} VLAN ${row.vlanId ?? "—"}`,
           asString(row.engine1PlannedCidr, "—"),
+<<<<<<< HEAD
           asString(row.engine2AllocationCidr, "planned-only"),
+=======
+          asString(row.engine2AllocationCidr, "proposal-only"),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           asString(row.reconciliationState, "review"),
           joinText([...asArray(row.blockers), ...asArray(row.reviewReasons)].slice(0, 3), joinText(asArray(row.evidence).slice(0, 2), "—")),
         ]);
@@ -666,22 +690,39 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         .map((item: any) => [
           asString(item.requirementKey, "requirement"),
           asString(item.readinessImpact, "review"),
+<<<<<<< HEAD
           `${item.approvedAllocationCount ?? 0} approved / ${item.candidateAllocationCount ?? item.durableCandidateCount ?? 0} candidate / ${item.engine1ProposalOnlyCount ?? 0} planned-only`,
+=======
+          `${item.approvedAllocationCount ?? 0} approved / ${item.durableCandidateCount ?? 0} candidate / ${item.engine1ProposalOnlyCount ?? 0} proposal-only`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           joinText(asArray(item.materializedIpamEvidence).slice(0, 2), joinText(asArray(item.missingIpamEvidence).slice(0, 2), "—")),
         ]);
 
       addressingSection.tables.push({
+<<<<<<< HEAD
         title: "V1 Enterprise IPAM Authority",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
           ["Addressing/IPAM relationship", asString(V1EnterpriseIpamTruth.overallReadiness, "review"), "Addressing plans are reconciled against Engine 2 IPAM authority so planned-only, candidate, conflict, and approval states stay visible."],
           ["Engine 2 objects", `${V1EnterpriseIpamTruth.durablePoolCount ?? 0} pools / ${V1EnterpriseIpamTruth.candidateAllocationCount ?? V1EnterpriseIpamTruth.durableCandidateCount ?? 0} candidate / ${V1EnterpriseIpamTruth.approvedAllocationCount ?? 0} approved`, `${V1EnterpriseIpamTruth.dhcpScopeCount ?? 0} DHCP scopes; ${V1EnterpriseIpamTruth.reservationCount ?? 0} reservations; ${V1EnterpriseIpamTruth.brownfieldNetworkCount ?? 0} brownfield networks.`],
           ["Review gates", `${V1EnterpriseIpamTruth.conflictBlockerCount ?? 0} blockers / ${V1EnterpriseIpamTruth.reviewRequiredCount ?? 0} review`, `${V1EnterpriseIpamTruth.engine1ProposalOnlyCount ?? 0} planned-only addressing row(s); ${V1EnterpriseIpamTruth.staleAllocationCount ?? 0} stale allocation(s).`],
+=======
+        title: "V1 Enterprise IPAM Durable Authority",
+        headers: ["Gate", "Status", "Evidence"],
+        rows: [
+          ["Addressing/IPAM relationship", asString(V1EnterpriseIpamTruth.overallReadiness, "review"), "Addressing plans are reconciled against durable IPAM authority so proposal-only, conflict, and approval states stay visible."],
+          ["Durable objects", `${V1EnterpriseIpamTruth.durablePoolCount ?? 0} pools / ${V1EnterpriseIpamTruth.durableAllocationCount ?? 0} allocations`, `${V1EnterpriseIpamTruth.dhcpScopeCount ?? 0} DHCP scopes; ${V1EnterpriseIpamTruth.reservationCount ?? 0} reservations; ${V1EnterpriseIpamTruth.brownfieldNetworkCount ?? 0} brownfield networks.`],
+          ["Review gates", `${V1EnterpriseIpamTruth.conflictBlockerCount ?? 0} blockers / ${V1EnterpriseIpamTruth.reviewRequiredCount ?? 0} review`, `${V1EnterpriseIpamTruth.engine1ProposalOnlyCount ?? 0} proposal-only addressing row(s); ${V1EnterpriseIpamTruth.staleAllocationCount ?? 0} stale allocation(s).`],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ],
       });
       addressingSection.tables.push({
         title: "V1 Addressing / IPAM Reconciliation",
+<<<<<<< HEAD
         headers: ["VLAN", "Planned CIDR", "Engine 2 IPAM CIDR", "State", "Proof / Review"],
+=======
+        headers: ["VLAN", "Planned CIDR", "Durable IPAM CIDR", "State", "Proof / Review"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         rows: compactRows(V1ReconciliationRows, [["No V1 reconciliation rows", "—", "—", "—", "—"]]),
       });
       addressingSection.tables.push({
@@ -855,7 +896,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
 
       report.sections.push({
         title: "V1 Validation / Readiness Authority",
+<<<<<<< HEAD
         paragraphs: ["Validation is the strict readiness authority across requirements, addressing, Engine 2 IPAM, standards, routing, security, implementation, report truth, and diagram truth. It must block or review-gate unresolved upstream truth instead of letting UI, reports, or diagrams overclaim readiness."],
+=======
+        paragraphs: ["Validation is the strict readiness authority across requirements, addressing, durable IPAM, standards, routing, security, implementation, report truth, and diagram truth. It must block or review-gate unresolved upstream truth instead of letting UI, reports, or diagrams overclaim readiness."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         tables: [
           {
             title: "V1 Validation Summary",
@@ -898,11 +943,16 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     }
 
     if (includeTechnicalEvidence && V1SecurityPolicyFlow) {
+<<<<<<< HEAD
       report.sections.push({ title: "V1 Security Policy Flow", paragraphs: ["Security policy and NAT review separates structural blockers and direct policy conflicts from planning review items. Missing policy coverage, missing NAT coverage, broad permits, shadowing, implicit-deny documentation, and logging evidence remain visible as review debt instead of implementation-ready firewall configuration."], tables: [{ title: "V1 Security Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(V1SecurityPolicyFlow.contract, "missing"), asString(V1SecurityPolicyFlow.role, "security policy flow control")], ["Overall readiness", asString(V1SecurityPolicyFlow.overallReadiness, "review"), `${V1SecurityPolicyFlow.flowConsequenceCount ?? 0} flow consequence(s); ${V1SecurityPolicyFlow.zonePolicyReviewCount ?? 0} zone policy row(s); ${V1SecurityPolicyFlow.activeRequirementSecurityGapCount ?? 0} active requirement gap(s).`], ["NAT/logging review", `${V1SecurityPolicyFlow.natReviewCount ?? 0} NAT review(s); ${V1SecurityPolicyFlow.missingNatCount ?? 0} missing NAT`, `${V1SecurityPolicyFlow.loggingReviewCount ?? 0} logging review(s); ${V1SecurityPolicyFlow.loggingGapCount ?? 0} logging gap(s).`], ["Shadowing / broad permits", `${V1SecurityPolicyFlow.shadowedRuleCount ?? 0} shadowed rule(s)`, `${V1SecurityPolicyFlow.overbroadPolicyCount ?? 0} overbroad policy row(s); ${V1SecurityPolicyFlow.reviewRequiredCount ?? 0} review-required row(s).`]] }, { title: "V1 Requirement Security Matrix", headers: ["Requirement", "Active", "Readiness", "Actual flows", "Missing categories"], rows: compactRows(asArray(V1SecurityPolicyFlow.requirementSecurityMatrix).slice(0, 30).map((row: any) => [asString(row.requirementLabel), String(Boolean(row.active)), asString(row.readinessImpact), joinText(asArray(row.actualFlowRequirementIds).slice(0, 5), "none"), joinText(asArray(row.missingSecurityCategories), "none")]), [["No V1 requirement rows", "—", "—", "—", "—"]]) }, { title: "V1 Flow Consequences", headers: ["Flow", "Source", "Destination", "Action", "State", "Reason"], rows: compactRows(asArray(V1SecurityPolicyFlow.flowConsequences).slice(0, 36).map((row: any) => [asString(row.name), asString(row.sourceZoneName), asString(row.destinationZoneName), asString(row.expectedAction), asString(row.V1PolicyState), asString(row.reviewReason, asString(row.consequenceSummary, "none"))]), [["No V1 flow rows", "—", "—", "—", "—", "—"]]) }, { title: "V1 NAT / Logging / Shadowing Findings", headers: ["Severity", "Class", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1SecurityPolicyFlow.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.reviewClass, "PLANNING_REVIEW_ITEM"), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "ADVISORY_ITEM", "V1_SECURITY_POLICY_FLOW_CONTROLLED", "READY", "No V1 findings", "Continue engineer review."]]) }] });
+=======
+      report.sections.push({ title: "V1 Security Policy Flow", paragraphs: ["V1 makes security policy review strict without pretending to be vendor firewall configuration. It surfaces zone-to-zone policy posture, business-service flow consequences, NAT review, logging review, broad permit review, shadowing review, and requirement-security propagation evidence from backend design-core truth."], tables: [{ title: "V1 Security Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(V1SecurityPolicyFlow.contract, "missing"), asString(V1SecurityPolicyFlow.role, "security policy flow control")], ["Overall readiness", asString(V1SecurityPolicyFlow.overallReadiness, "review"), `${V1SecurityPolicyFlow.flowConsequenceCount ?? 0} flow consequence(s); ${V1SecurityPolicyFlow.zonePolicyReviewCount ?? 0} zone policy row(s); ${V1SecurityPolicyFlow.activeRequirementSecurityGapCount ?? 0} active requirement gap(s).`], ["NAT/logging review", `${V1SecurityPolicyFlow.natReviewCount ?? 0} NAT review(s); ${V1SecurityPolicyFlow.missingNatCount ?? 0} missing NAT`, `${V1SecurityPolicyFlow.loggingReviewCount ?? 0} logging review(s); ${V1SecurityPolicyFlow.loggingGapCount ?? 0} logging gap(s).`], ["Shadowing / broad permits", `${V1SecurityPolicyFlow.shadowedRuleCount ?? 0} shadowed rule(s)`, `${V1SecurityPolicyFlow.overbroadPolicyCount ?? 0} overbroad policy row(s); ${V1SecurityPolicyFlow.reviewRequiredCount ?? 0} review-required row(s).`]] }, { title: "V1 Requirement Security Matrix", headers: ["Requirement", "Active", "Readiness", "Actual flows", "Missing categories"], rows: compactRows(asArray(V1SecurityPolicyFlow.requirementSecurityMatrix).slice(0, 30).map((row: any) => [asString(row.requirementLabel), String(Boolean(row.active)), asString(row.readinessImpact), joinText(asArray(row.actualFlowRequirementIds).slice(0, 5), "none"), joinText(asArray(row.missingSecurityCategories), "none")]), [["No V1 requirement rows", "—", "—", "—", "—"]]) }, { title: "V1 Flow Consequences", headers: ["Flow", "Source", "Destination", "Action", "State", "Reason"], rows: compactRows(asArray(V1SecurityPolicyFlow.flowConsequences).slice(0, 36).map((row: any) => [asString(row.name), asString(row.sourceZoneName), asString(row.destinationZoneName), asString(row.expectedAction), asString(row.V1PolicyState), asString(row.reviewReason, asString(row.consequenceSummary, "none"))]), [["No V1 flow rows", "—", "—", "—", "—", "—"]]) }, { title: "V1 NAT / Logging / Shadowing Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1SecurityPolicyFlow.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "V1_SECURITY_POLICY_FLOW_CONTROLLED", "READY", "No V1 findings", "Continue engineer review."]]) }] });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     }
 
 
     if (includeTechnicalEvidence && V1ImplementationPlanning) {
+<<<<<<< HEAD
       report.sections.push({ title: "Implementation Candidate Queue", paragraphs: ["Implementation output is separated into execution-ready steps, planning candidates, review-required steps, and structural blockers. A step is execution-ready only when source authority, requirement lineage, verification evidence, rollback posture, dependencies, and operational-safety gates are proven."], tables: [{ title: "Implementation Execution Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Overall readiness", asString(V1ImplementationPlanning.overallReadiness, "review"), `${V1ImplementationPlanning.executionReadyStepCount ?? 0} execution-ready; ${V1ImplementationPlanning.planningCandidateStepCount ?? 0} planning candidate; ${V1ImplementationPlanning.reviewStepGateCount ?? 0} review; ${V1ImplementationPlanning.structuralBlockedStepCount ?? 0} structural blocker.`], ["Evidence gates", `${V1ImplementationPlanning.verificationEvidenceGateCount ?? 0} verification / ${V1ImplementationPlanning.rollbackGateCount ?? 0} rollback`, `${V1ImplementationPlanning.requirementLineageGapCount ?? 0} requirement lineage gap(s); ${V1ImplementationPlanning.sourceObjectGapCount ?? 0} source object gap(s).`]] }, { title: "Implementation Step Gates", headers: ["Step", "Category", "Disposition", "Readiness", "Sources", "Requirements", "Rollback / review"], rows: compactRows(asArray(V1ImplementationPlanning.stepGates).slice(0, 40).map((row: any) => [asString(row.title), asString(row.category), asString(row.executionDisposition), asString(row.readinessImpact), joinText(asArray(row.sourceObjectIds).slice(0, 4), "none"), joinText(asArray(row.sourceRequirementIds).slice(0, 4), "none"), asString(row.reviewReason, asString(row.rollbackStep, "missing rollback"))]), [["No implementation step gates", "—", "—", "—", "—", "—", "—"]]) }, { title: "Implementation Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1ImplementationPlanning.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "IMPLEMENTATION_PLANNING_CONTROLLED", "READY", "No findings", "Continue engineer review."]]) }] });
     }
 
@@ -931,6 +981,16 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
       });
     }
 
+=======
+      report.sections.push({ title: "V1 Implementation Planning", paragraphs: ["V1 gates implementation planning on verified backend source objects, requirement lineage, dependencies, preconditions, verification evidence, rollback actions, risk, and readiness state. It is not vendor command generation."], tables: [{ title: "V1 Implementation Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(V1ImplementationPlanning.contract, "missing"), asString(V1ImplementationPlanning.role, "implementation planning control")], ["Overall readiness", asString(V1ImplementationPlanning.overallReadiness, "review"), `${V1ImplementationPlanning.stepGateCount ?? 0} step gate(s); ${V1ImplementationPlanning.blockedStepGateCount ?? 0} blocked; ${V1ImplementationPlanning.reviewStepGateCount ?? 0} review.`], ["Evidence gates", `${V1ImplementationPlanning.verificationEvidenceGateCount ?? 0} verification / ${V1ImplementationPlanning.rollbackGateCount ?? 0} rollback`, `${V1ImplementationPlanning.requirementLineageGapCount ?? 0} requirement lineage gap(s); ${V1ImplementationPlanning.sourceObjectGapCount ?? 0} source object gap(s).`]] }, { title: "V1 Step Gates", headers: ["Step", "Category", "Readiness", "Sources", "Requirements", "Rollback / review"], rows: compactRows(asArray(V1ImplementationPlanning.stepGates).slice(0, 40).map((row: any) => [asString(row.title), asString(row.category), asString(row.readinessImpact), joinText(asArray(row.sourceObjectIds).slice(0, 4), "none"), joinText(asArray(row.sourceRequirementIds).slice(0, 4), "none"), asString(row.reviewReason, asString(row.rollbackStep, "missing rollback"))]), [["No V1 step gates", "—", "—", "—", "—", "—"]]) }, { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1ImplementationPlanning.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "V1_IMPLEMENTATION_PLANNING_CONTROLLED", "READY", "No V1 findings", "Continue to V1 vendor-neutral templates."]]) }] });
+    }
+
+    if (includeTechnicalEvidence && V1ImplementationTemplates) {
+      report.sections.push({ title: "V1 Vendor-Neutral Implementation Templates", paragraphs: ["V1 compiles vendor-neutral templates from the backend implementation plan and V1 gates. It exposes variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command-generation boundaries without emitting vendor CLI/cloud commands."], tables: [{ title: "V1 Template Summary", headers: ["Gate", "Status", "Evidence"], rows: [["Contract", asString(V1ImplementationTemplates.contract, "missing"), asString(V1ImplementationTemplates.role, "vendor-neutral template control")], ["Overall readiness", asString(V1ImplementationTemplates.overallReadiness, "review"), `${V1ImplementationTemplates.templateCount ?? 0} template gate(s); ${V1ImplementationTemplates.blockedTemplateCount ?? 0} blocked; ${V1ImplementationTemplates.reviewTemplateCount ?? 0} review.`], ["Command generation", V1ImplementationTemplates.commandGenerationAllowed ? "enabled" : "disabled", `${V1ImplementationTemplates.vendorSpecificCommandCount ?? 0} vendor command(s); ${V1ImplementationTemplates.commandLeakCount ?? 0} command leak(s).`]] }, { title: "V1 Template Gates", headers: ["Template", "Domain", "Readiness", "Sources", "Requirements", "Evidence", "Rollback"], rows: compactRows(asArray(V1ImplementationTemplates.templateGates).slice(0, 40).map((row: any) => [asString(row.title), asString(row.domain), asString(row.readinessImpact), joinText(asArray(row.sourceObjectIds).slice(0, 4), "none"), joinText(asArray(row.sourceRequirementIds).slice(0, 4), "none"), joinText(asArray(row.evidenceRequired).slice(0, 3), "missing evidence"), asString(row.rollbackRequirement, "missing rollback")]), [["No V1 template gates", "—", "—", "—", "—", "—", "—"]]) }, { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1ImplementationTemplates.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["PASSED", "V1_VENDOR_NEUTRAL_TEMPLATES_CONTROLLED", "READY", "No V1 findings", "Continue to report/export truth without vendor command generation."]]) }] });
+    }
+
+
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     if (includeTechnicalEvidence && V1ReportExportTruth) {
       report.sections.push({
         title: "V1 Report and Export Truth",
@@ -951,7 +1011,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
             ]), [["No V1 section gates", "—", "—", "REVIEW_REQUIRED", "—", "Add report section gates"]]),
           },
           {
+<<<<<<< HEAD
             title: "Implementation Findings",
+=======
+            title: "V1 Findings",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"],
             rows: compactRows(asArray(V1ReportExportTruth.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [
               asString(finding.severity),
@@ -994,7 +1058,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
             ]), [["No mode contracts", "BLOCKED", "BLOCKED", "0", "Add backend diagram mode contracts"]]),
           },
           {
+<<<<<<< HEAD
             title: "Implementation Findings",
+=======
+            title: "V1 Findings",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"],
             rows: compactRows(asArray(V1DiagramTruth.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [
               asString(finding.severity),
@@ -1011,18 +1079,29 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     if (includeTechnicalEvidence && V1PlatformBomFoundation) {
       report.sections.push({
         title: "V1 Platform/BOM Foundation",
+<<<<<<< HEAD
         paragraphs: ["V1_PLATFORM_BOM_FOUNDATION_CONTRACT moves the Platform/BOM work from frontend-only estimates into backend-controlled advisory evidence. It now exposes platformProfileState explicitly so role-based assumptions, saved review posture, and procurement readiness cannot collapse into vague warnings.", asString(V1PlatformBomFoundation.procurementReadinessReason, "Platform/BOM is not procurement-ready until the saved platform profile and review evidence are complete.")],
+=======
+        paragraphs: ["V1_PLATFORM_BOM_FOUNDATION_CONTRACT moves the Platform/BOM work from frontend-only estimates into backend-controlled advisory evidence. It still does not generate final vendor SKUs, pricing, optics, license tiers, or PoE watt budgets."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         tables: [
           { title: "V1 BOM Contract Summary", headers: ["Gate", "Status", "Evidence"], rows: [
             ["Contract", asString(V1PlatformBomFoundation.contract, "missing"), asString(V1PlatformBomFoundation.role, "platform/BOM control")],
             ["Procurement authority", asString(V1PlatformBomFoundation.procurementAuthority, "ADVISORY_ONLY_NOT_FINAL_SKU"), asString(V1PlatformBomFoundation.sourceOfTruthLevel, "backend-computed-advisory-estimate")],
+<<<<<<< HEAD
             ["Platform profile state", asString(V1PlatformBomFoundation.platformProfileState, "NOT_STARTED"), asString(V1PlatformBomFoundation.procurementReadinessReason, "Platform/BOM profile state missing.")],
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             ["Overall readiness", asString(V1PlatformBomFoundation.overallReadiness, "REVIEW_REQUIRED"), `${V1PlatformBomFoundation.rowCount ?? 0} row(s); ${V1PlatformBomFoundation.requirementDriverCount ?? 0} requirement driver(s); ${V1PlatformBomFoundation.placeholderRowCount ?? 0} placeholder row(s).`],
             ["Demand basis", `${V1PlatformBomFoundation.siteCount ?? 0} site(s), ${V1PlatformBomFoundation.usersPerSite ?? 0} users/site`, `${V1PlatformBomFoundation.localPortDemandPerSite ?? 0} local port(s)/site; ${V1PlatformBomFoundation.poeDemandPerSite ?? 0} PoE endpoint(s)/site.`],
           ]},
           { title: "V1 BOM Rows", headers: ["Category", "Item", "Quantity", "Confidence", "Source Requirements", "Manual Review"], rows: compactRows(asArray(V1PlatformBomFoundation.rows).map((row: any) => [asString(row.category), asString(row.item), `${asString(row.quantity)} ${asString(row.unit)}`, `${asString(row.confidence)} / ${asString(row.readinessImpact)}`, joinText(asArray(row.sourceRequirementIds), "none"), asString(row.manualReviewNote, "Engineering review required.")]), [["No BOM rows", "Backend BOM rows missing", "0", "BLOCKED", "none", "Add V1 row evidence."]]) },
           { title: "V1 Requirement Drivers", headers: ["Requirement", "Value", "Readiness", "Affected Rows", "Evidence"], rows: compactRows(asArray(V1PlatformBomFoundation.requirementDrivers).map((driver: any) => [asString(driver.requirementId), asString(driver.value), asString(driver.readinessImpact), joinText(asArray(driver.affectedRows), "none"), asString(driver.evidence)]), [["No drivers", "not captured", "BLOCKED", "none", "Add requirement-to-BOM propagation evidence."]]) },
+<<<<<<< HEAD
           { title: "Implementation Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1PlatformBomFoundation.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_ADVISORY_BOM_NOT_VENDOR_CATALOG", "ADVISORY_READY", "BOM is advisory only", "Continue to V1 discovery/current-state without faking procurement precision."]]) },
+=======
+          { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1PlatformBomFoundation.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_ADVISORY_BOM_NOT_VENDOR_CATALOG", "ADVISORY_READY", "BOM is advisory only", "Continue to V1 discovery/current-state without faking procurement precision."]]) },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ],
       });
     }
@@ -1030,19 +1109,30 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     if (includeTechnicalEvidence && V1DiscoveryCurrentState) {
       report.sections.push({
         title: "V1 Discovery/Current-State",
+<<<<<<< HEAD
         paragraphs: ["V1_DISCOVERY_CURRENT_STATE_CONTRACT promotes discovery/current-state into backend-controlled evidence while refusing fake live discovery. It now exposes discoveryState explicitly so empty inventory, manual notes, imported-review evidence, and verified current state cannot blur together.", asString(V1DiscoveryCurrentState.discoveryReadinessReason, "Discovery is review-required because current-state inventory is not imported.")],
+=======
+        paragraphs: ["V1_DISCOVERY_CURRENT_STATE_CONTRACT promotes discovery/current-state into backend-controlled evidence while refusing fake live discovery. Manual notes, imported artifacts, validated imports, conflicts, and review-required states stay separated."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         tables: [
           { title: "V1 Discovery Contract Summary", headers: ["Gate", "Status", "Evidence"], rows: [
             ["Contract", asString(V1DiscoveryCurrentState.contract, "missing"), asString(V1DiscoveryCurrentState.role, "manual discovery boundary")],
             ["Current-state authority", asString(V1DiscoveryCurrentState.currentStateAuthority, "manual/imported evidence only"), asString(V1DiscoveryCurrentState.sourceOfTruthLevel, "manual-discovery-boundary")],
+<<<<<<< HEAD
             ["Discovery state", asString(V1DiscoveryCurrentState.discoveryState, "NOT_CAPTURED"), asString(V1DiscoveryCurrentState.discoveryReadinessReason, "Discovery state missing.")],
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             ["Overall readiness", asString(V1DiscoveryCurrentState.overallReadiness, "REVIEW_REQUIRED"), `${V1DiscoveryCurrentState.areaRowCount ?? 0} area(s); ${V1DiscoveryCurrentState.importTargetCount ?? 0} import target(s); ${V1DiscoveryCurrentState.openTaskCount ?? 0} open task(s).`],
             ["Evidence mix", `manual=${V1DiscoveryCurrentState.manuallyEnteredEvidenceCount ?? 0}; imported=${V1DiscoveryCurrentState.importedEvidenceCount ?? 0}; validated=${V1DiscoveryCurrentState.validatedEvidenceCount ?? 0}`, `conflicting=${V1DiscoveryCurrentState.conflictingEvidenceCount ?? 0}; review=${V1DiscoveryCurrentState.reviewRequiredCount ?? 0}`],
           ]},
           { title: "V1 Discovery Areas", headers: ["Area", "State", "Readiness", "Required For", "Review Reason"], rows: compactRows(asArray(V1DiscoveryCurrentState.areaRows).map((row: any) => [asString(row.area), asString(row.state), asString(row.readinessImpact), joinText(asArray(row.requiredFor), "none"), asString(row.reviewReason)]), [["No discovery areas", "NOT_PROVIDED", "NOT_READY", "none", "Add discovery/current-state area evidence."]]) },
           { title: "V1 Import Targets", headers: ["Target", "State", "Readiness", "Required For", "Reconciliation Need"], rows: compactRows(asArray(V1DiscoveryCurrentState.importTargets).map((target: any) => [asString(target.target), asString(target.state), asString(target.readinessImpact), joinText(asArray(target.requiredFor), "none"), asString(target.reconciliationNeed)]), [["No import targets", "NOT_PROVIDED", "NOT_READY", "none", "Add structured import targets."]]) },
           { title: "V1 Requirement-created Tasks", headers: ["Requirement", "Task", "Priority", "State", "Blockers"], rows: compactRows(asArray(V1DiscoveryCurrentState.tasks).map((task: any) => [asString(task.requirementId), asString(task.title), asString(task.priority), `${asString(task.state)} / ${asString(task.readinessImpact)}`, joinText(asArray(task.blockers), "none")]), [["No tasks", "No requirement-created discovery tasks", "LOW", "NOT_READY", "Add brownfield/migration/current-state requirements."]]) },
+<<<<<<< HEAD
           { title: "Implementation Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1DiscoveryCurrentState.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_MANUAL_DISCOVERY_BOUNDARY", "NOT_READY", "Discovery is manual/imported only", "Do not claim live discovery until importers/parsers exist."]]) },
+=======
+          { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1DiscoveryCurrentState.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_MANUAL_DISCOVERY_BOUNDARY", "NOT_READY", "Discovery is manual/imported only", "Do not claim live discovery until importers/parsers exist."]]) },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ],
       });
     }
@@ -1061,7 +1151,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           ]},
           { title: "V1 Gates", headers: ["Gate", "State", "Blocks Authority", "Consumer Impact"], rows: compactRows(asArray(V1AiDraftHelper.gateRows).map((row: any) => [asString(row.gate), asString(row.state), row.blocksAuthority ? "yes" : "no", asString(row.consumerImpact)]), [["AI draft-only authority", "ENFORCED", "yes", "AI cannot feed outputs without review."]]) },
           { title: "V1 AI-Derived Objects", headers: ["Object", "Type", "State", "Proof", "Notes"], rows: compactRows(asArray(V1AiDraftHelper.draftObjectRows).map((row: any) => [asString(row.objectLabel), asString(row.objectType), asString(row.state), asString(row.proofStatus), joinText(asArray(row.notes), "review required")]), [["No AI-derived objects", "none", "NO_AI_DRAFT", "DRAFT_ONLY", "No saved AI authority risk detected."]]) },
+<<<<<<< HEAD
           { title: "Implementation Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1AiDraftHelper.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_AI_DRAFT_ONLY_BOUNDARY", "SAFE_DRAFT_ONLY", "AI helper is draft-only", "Use deterministic engines as authority."]]) },
+=======
+          { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1AiDraftHelper.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_AI_DRAFT_ONLY_BOUNDARY", "SAFE_DRAFT_ONLY", "AI helper is draft-only", "Use deterministic engines as authority."]]) },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ],
       });
     }
@@ -1080,7 +1174,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
           { title: "V1 Release Gates", headers: ["Gate", "State", "Evidence", "Remediation"], rows: compactRows(asArray(V1FinalProofPass.releaseGates).map((gate: any) => [asString(gate.gate), asString(gate.state), joinText(asArray(gate.evidence), "no evidence"), asString(gate.remediation)]), [["No release gates", "BLOCKED", "Final proof gate missing", "Restore V1 release gates."]]) },
           { title: "V1 Cross-Engine Scenarios", headers: ["Scenario", "Readiness", "Requirements Covered", "Missing Evidence"], rows: compactRows(asArray(V1FinalProofPass.scenarioRows).map((row: any) => [asString(row.scenarioName), asString(row.readinessImpact), joinText(asArray(row.requirementsCovered), "none"), joinText(asArray(row.missingEvidence), "none")]), [["No scenarios", "BLOCKED", "none", "Add V1 scenario proof rows."]]) },
           { title: "V1 Engine Proof Rows", headers: ["Stage", "Engine", "Status", "Focus", "Blockers"], rows: compactRows(asArray(V1FinalProofPass.engineProofRows).map((row: any) => [`Stage ${asString(row.stage)}`, asString(row.engineKey), `${asString(row.status)} / ${asString(row.readinessImpact)}`, asString(row.proofFocus), joinText(asArray(row.blockers), "none")]), [["No engine rows", "missing", "BLOCKED", "Final proof missing", "Restore V1 engine proof rows."]]) },
+<<<<<<< HEAD
           { title: "Implementation Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1FinalProofPass.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_RELEASE_TARGET_BOUNDARY", "REVIEW_REQUIRED", "A-/A planning platform, not A+", "Keep release claims honest."]]) },
+=======
+          { title: "V1 Findings", headers: ["Severity", "Code", "Readiness", "Finding", "Remediation"], rows: compactRows(asArray(V1FinalProofPass.findings).filter((finding: any) => asString(finding.severity) !== "PASSED").slice(0, 30).map((finding: any) => [asString(finding.severity), asString(finding.code), asString(finding.readinessImpact), asString(finding.title), asString(finding.remediation)]), [["INFO", "V1_RELEASE_TARGET_BOUNDARY", "REVIEW_REQUIRED", "A-/A planning platform, not A+", "Keep release claims honest."]]) },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         ],
       });
     }
@@ -1090,7 +1188,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         title: "Enterprise Address Allocator Readiness",
         headers: ["Gate", "Status", "Evidence"],
         rows: [
+<<<<<<< HEAD
           ["Source-of-truth model", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), `${enterpriseAllocatorPosture.durablePoolCount ?? 0} pool(s); ${enterpriseAllocatorPosture.candidateAllocationCount ?? 0} candidate allocation(s); ${enterpriseAllocatorPosture.approvedAllocationCount ?? 0} approved allocation(s); ${enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0} ledger entrie(s)`],
+=======
+          ["Source-of-truth model", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), `${enterpriseAllocatorPosture.durablePoolCount ?? 0} pool(s); ${enterpriseAllocatorPosture.durableAllocationCount ?? 0} durable allocation(s); ${enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0} ledger entrie(s)`],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           ["Dual-stack IPv6", asString(enterpriseAllocatorPosture.dualStackReadiness, "review"), `${enterpriseAllocatorPosture.ipv6ConfiguredPrefixCount ?? 0} IPv6 prefix(es); ${enterpriseAllocatorPosture.ipv6AllocationCount ?? 0} IPv6 allocation/proposal(s); ${enterpriseAllocatorPosture.ipv6ReviewFindingCount ?? 0} IPv6 finding(s)`],
           ["VRF / route-domain allocation", asString(enterpriseAllocatorPosture.vrfReadiness, "review"), `${enterpriseAllocatorPosture.vrfDomainCount ?? 0} route domain(s); ${enterpriseAllocatorPosture.vrfOverlapFindingCount ?? 0} overlap finding(s)`],
           ["Brownfield/IPAM import", asString(enterpriseAllocatorPosture.brownfieldReadiness, "review"), `${asString(enterpriseAllocatorPosture.brownfieldEvidenceState, "import-required")}; ${enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0} imported network(s); ${enterpriseAllocatorPosture.brownfieldConflictCount ?? 0} conflict(s)`],
@@ -1169,7 +1271,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         title: "IP Address Management Review Summary",
         headers: ["Review Area", "Status", "Evidence"],
         rows: [
+<<<<<<< HEAD
           ["IPAM authority", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), String(enterpriseAllocatorPosture.durablePoolCount ?? 0) + " pool(s), " + String(enterpriseAllocatorPosture.candidateAllocationCount ?? 0) + " candidate allocation(s), " + String(enterpriseAllocatorPosture.approvedAllocationCount ?? 0) + " approved allocation(s), " + String(enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0) + " ledger entrie(s)."],
+=======
+          ["Source-of-truth IPAM", asString(enterpriseAllocatorPosture.sourceOfTruthReadiness, "review"), String(enterpriseAllocatorPosture.durablePoolCount ?? 0) + " pool(s), " + String(enterpriseAllocatorPosture.durableAllocationCount ?? 0) + " durable allocation(s), " + String(enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0) + " ledger entrie(s)."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           ["DHCP evidence", asString(enterpriseAllocatorPosture.dhcpReadiness, "review"), String(enterpriseAllocatorPosture.dhcpScopeCount ?? 0) + " DHCP scope(s), " + String(enterpriseAllocatorPosture.dhcpFindingCount ?? 0) + " review finding(s)."],
           ["Brownfield/IPAM import", asString(enterpriseAllocatorPosture.brownfieldReadiness, "review"), asString(enterpriseAllocatorPosture.brownfieldEvidenceState, "import required") + "; " + String(enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0) + " imported network(s), " + String(enterpriseAllocatorPosture.brownfieldConflictCount ?? 0) + " conflict(s)."],
           ["Approval workflow", asString(enterpriseAllocatorPosture.approvalReadiness, "review"), String(enterpriseAllocatorPosture.allocationApprovalCount ?? 0) + " approval(s), " + String(enterpriseAllocatorPosture.staleAllocationCount ?? 0) + " stale allocation(s)."],
@@ -1531,7 +1637,11 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     if (securityPolicyFlow) {
       routingSection.tables.push({
         title: "V1 Security Policy and Flow Summary",
+<<<<<<< HEAD
         headers: ["Flows", "Satisfied", "Missing Policy Review", "Conflicts", "Missing NAT Review", "True Blockers"],
+=======
+        headers: ["Flows", "Satisfied", "Missing Policy", "Conflicts", "Missing NAT", "Blocking Findings"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         rows: [[
           String(securityPolicyFlow.summary?.flowRequirementCount ?? securityFlowRequirements.length),
           String(securityPolicyFlow.summary?.satisfiedFlowCount ?? "0"),
@@ -1575,10 +1685,16 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     if (securityPolicyFindings.length > 0) {
       routingSection.tables.push({
         title: "V1 Security Policy Findings",
+<<<<<<< HEAD
         headers: ["Severity", "Class", "Finding", "Detail", "Remediation"],
         rows: securityPolicyFindings.slice(0, 25).map((finding: any) => [
           asString(finding.severity, "review"),
           asString(finding.reviewClass, "PLANNING_REVIEW_ITEM"),
+=======
+        headers: ["Severity", "Finding", "Detail", "Remediation"],
+        rows: securityPolicyFindings.slice(0, 25).map((finding: any) => [
+          asString(finding.severity, "review"),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           asString(finding.title, "Security policy finding"),
           asString(finding.detail, "Review the security flow model."),
           asString(finding.remediation, "Correct this before implementation planning."),
@@ -1862,11 +1978,16 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
     title: "V1 Omitted Evidence Summary",
     paragraphs: [
       "Displayed tables are intentionally windowed for readability. This section prevents hidden blockers or review-required rows from disappearing behind slice limits.",
+<<<<<<< HEAD
       `Omitted evidence decision: ${reportOmittedEvidenceDecisionSummary.decisionImpact}; ${reportOmittedEvidenceDecisionSummary.totalOmittedRows} omitted row(s); ${reportOmittedEvidenceDecisionSummary.blockingSurfaces.length} blocker surface(s); ${reportOmittedEvidenceDecisionSummary.reviewSurfaces.length} review surface(s).`,
+=======
+      `Omitted evidence rollup: ${reportOmittedEvidenceRollup.totalOmittedCount} omitted row(s) across ${reportOmittedEvidenceRollup.surfaceCount} surface(s); hidden blockers=${reportOmittedEvidenceRollup.omittedHasBlockers ? "yes" : "no"}; hidden review-required=${reportOmittedEvidenceRollup.omittedHasReviewRequired ? "yes" : "no"}.`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       "If hidden blockers or review-required rows exist, the export must remain blocked or review-required even when the visible summary looks clean.",
     ],
     tables: [
       {
+<<<<<<< HEAD
         title: "Omitted Evidence Decision Summary",
         headers: ["Decision", "Omitted Rows", "Blocker Surfaces", "Review Surfaces", "Report", "Diagram", "Implementation"],
         rows: [[
@@ -1888,6 +2009,8 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
         ],
       },
       {
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         title: "Omitted Evidence Counters",
         headers: ["Collection", "Surface", "Shown", "Total", "Omitted", "Hidden blockers", "Hidden review", "Hidden severity summary", "Readiness impact", "Export impact"],
         rows: omittedEvidenceRows(reportOmittedEvidenceSummaries),
@@ -2010,9 +2133,13 @@ export function applyBackendDesignCoreToReport(report: ProfessionalReport, desig
   if (reportMode === "full-proof") report.sections.push(V1ExportTruthSection, V1VendorNeutralTemplatesSection);
 
   applyReportOverclaimGuard(report, cleanReportClaimsAllowed);
+<<<<<<< HEAD
   if (reportMode === "professional") {
     applyProfessionalReportEvidenceBoundary(report);
     return professionalizeReportForAudience(report);
   }
   return report;
+=======
+  return reportMode === "professional" ? professionalizeReportForAudience(report) : report;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }

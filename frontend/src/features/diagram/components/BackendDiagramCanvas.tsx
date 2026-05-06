@@ -288,12 +288,16 @@ function createLocalInternetNode(site: BackendDiagramRenderNode, template?: Back
     readinessImpact: template?.readinessImpact ?? "REVIEW",
     sourceRefs: template?.sourceRefs ?? [`frontend-presentation:${site.objectId}`],
     validationRefs: template?.validationRefs ?? ["presentation-only:local-internet-breakout"],
+<<<<<<< HEAD
     warningBadges: template?.warningBadges ?? ["PRESENTATION_ONLY", "REVIEW_REQUIRED", "VISUAL_ONLY_NON_EVIDENCE"],
     lineageStatus: template?.lineageStatus ?? "VISUAL_ONLY_NON_EVIDENCE",
     graphNodeId: template?.graphNodeId,
     graphEdgeIds: template?.graphEdgeIds ?? [],
     implementationEvidence: false,
     lineageRefs: template?.lineageRefs ?? [`visual-only-non-evidence:V1-local-internet-${siteTopologyKey(site)}`],
+=======
+    warningBadges: template?.warningBadges ?? ["PRESENTATION_ONLY", "REVIEW_REQUIRED"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     notes: [
       "Local ISP or Internet breakout for this site. This is underlay transport only; VPN overlay tunnels are drawn separately between site edge devices.",
       ...(template?.notes ?? []).slice(0, 1),
@@ -515,11 +519,15 @@ function addV1VpnFabric(nodes: BackendDiagramRenderNode[], mode: DiagramMode, sc
     readinessImpact: "REVIEW",
     sourceRefs: ["frontend-presentation:wan-cloud-vpn-fabric"],
     validationRefs: ["presentation-only:vpn-fabric-summary"],
+<<<<<<< HEAD
     warningBadges: ["PRESENTATION_ONLY", "ASSUMED_OR_INFERRED", "REVIEW_REQUIRED", "VISUAL_ONLY_NON_EVIDENCE"],
     lineageStatus: "VISUAL_ONLY_NON_EVIDENCE",
     graphEdgeIds: [],
     implementationEvidence: false,
     lineageRefs: ["visual-only-non-evidence:wan-cloud-vpn-fabric"],
+=======
+    warningBadges: ["PRESENTATION_ONLY", "ASSUMED_OR_INFERRED", "REVIEW_REQUIRED"],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     notes: [
       "V1 enterprise-scale WAN summary: branch tunnels collapse into a shared VPN fabric rail so 7+ site diagrams do not turn into unreadable tunnel spaghetti.",
       "Traffic meaning is still hub-and-spoke: local ISP underlay stays per site; secure VPN overlay terminates on the security/VPN edge when present.",
@@ -692,12 +700,17 @@ function presentationEdge(id: string, source: BackendDiagramRenderNode, target: 
     relatedObjectIds: [source.objectId, target.objectId].filter(Boolean),
     sourceRefs: [source.objectId, target.objectId].filter(Boolean).map((objectId) => `presentation-edge:${objectId}`),
     validationRefs: [`presentation-edge-readiness:${readiness}`],
+<<<<<<< HEAD
     warningBadges: readiness === "ready" ? ["PRESENTATION_ONLY", "VISUAL_ONLY_NON_EVIDENCE"] : ["PRESENTATION_ONLY", "REVIEW_REQUIRED", "VISUAL_ONLY_NON_EVIDENCE"],
     lineageStatus: "VISUAL_ONLY_NON_EVIDENCE",
     graphEdgeIds: [],
     implementationEvidence: false,
     lineageRefs: [`visual-only-non-evidence:${id}`],
     notes: ["Professional topology connector: transport handoff, secure tunnel, and internal handoff are rendered as separate network meanings rather than raw database relationships. It is visual context only, not implementation evidence."],
+=======
+    warningBadges: readiness === "ready" ? ["PRESENTATION_ONLY"] : ["PRESENTATION_ONLY", "REVIEW_REQUIRED"],
+    notes: ["Professional topology connector: transport handoff, secure tunnel, and internal handoff are rendered as separate network meanings rather than raw database relationships."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
@@ -1726,7 +1739,10 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
               <div>
                 <strong>Design evidence</strong>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>{selectedNode.truthState} / {selectedNode.truthStateV1}</p>
+<<<<<<< HEAD
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>Lineage: {selectedNode.lineageStatus.replace(/_/g, " ")}{selectedNode.implementationEvidence ? " / implementation evidence" : " / not implementation evidence"}</p>
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
                 {selectedNode.warningBadges.length ? (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                     {selectedNode.warningBadges.slice(0, 4).map((badge) => <span key={badge} className="badge-soft danger">{badge.replace(/_/g, " ")}</span>)}
@@ -1748,7 +1764,10 @@ export function BackendDiagramCanvas({ renderModel, mode, scope, focusedSiteId, 
                 </p>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>Source refs: {selectedNode.sourceRefs.slice(0, 3).join(", ") || "—"}</p>
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>Validation refs: {selectedNode.validationRefs.slice(0, 3).join(", ") || "—"}</p>
+<<<<<<< HEAD
                 <p className="muted" style={{ margin: "6px 0 0 0" }}>Lineage refs: {selectedNode.lineageRefs.slice(0, 3).join(", ") || "—"}</p>
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </div>
               <div>
                 <strong>Notes</strong>

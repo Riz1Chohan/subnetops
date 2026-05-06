@@ -296,7 +296,11 @@ export function ProjectSecurityPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Security policy model</h2>
           <p className="muted" style={{ margin: 0 }}>
+<<<<<<< HEAD
             These rows come from the security policy model. Missing policy coverage, missing NAT coverage, broad permits, implicit-deny documentation, shadowing, and logging gaps stay as review items unless there is a missing referenced zone or a direct modeled policy contradiction.
+=======
+            These rows come from the backend security policy model. The frontend is only rendering the matrix, rule-order review, and NAT review; it is not creating firewall policy.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           </p>
         </div>
         {backendSecurityFlow ? (
@@ -310,16 +314,25 @@ export function ProjectSecurityPage() {
               {V1SecurityPolicy ? <span className={V1SecurityPolicy.overallReadiness === "BLOCKED" ? "badge badge-error" : V1SecurityPolicy.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge badge-info"}>{userFacingStatusLabel(V1SecurityPolicy.overallReadiness)}</span> : null}
               {V1SecurityPolicy ? <span className="badge-soft">flow consequences {V1SecurityPolicy.flowConsequenceCount}</span> : null}
               {V1SecurityPolicy ? <span className="badge-soft">requirement gaps {V1SecurityPolicy.activeRequirementSecurityGapCount}</span> : null}
+<<<<<<< HEAD
               {V1SecurityPolicy ? <span className="badge-soft">true blockers {V1SecurityPolicy.blockingFindingCount}</span> : null}
               {V1SecurityPolicy ? <span className="badge-soft">review findings {V1SecurityPolicy.reviewFindingCount}</span> : null}
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             </div>
 
             {V1SecurityPolicy ? (
               <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 12 }}>
+<<<<<<< HEAD
                 <div><h3 style={{ marginTop: 0, marginBottom: 6 }}>Security policy flow checks</h3><p className="muted" style={{ margin: 0 }}>This checks the zone-to-zone matrix, service dependencies, NAT, logging, broad permits, shadowing, and explicit requirement-to-flow consequences. It separates true blockers from planning review debt and does not generate firewall commands.</p></div>
                 <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing</th></tr></thead><tbody>{V1SecurityPolicy.requirementSecurityMatrix.slice(0, 10).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{userFacingStatusLabel(row.readinessImpact)}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
                 <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">State</th><th align="left">Review reason</th></tr></thead><tbody>{V1SecurityPolicy.flowConsequences.slice(0, 12).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{userFacingStatusLabel(row.V1PolicyState)}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
                 <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Finding</th><th align="left">Class</th><th align="left">Readiness</th><th align="left">Remediation</th></tr></thead><tbody>{V1SecurityPolicy.findings.filter((finding) => finding.severity !== "PASSED").slice(0, 10).map((finding) => (<tr key={`${finding.code}-${finding.title}`}><td>{finding.title}<br /><span className="muted">{finding.code}</span></td><td>{finding.reviewClass || "PLANNING_REVIEW_ITEM"}</td><td>{userFacingStatusLabel(finding.readinessImpact)}</td><td>{finding.remediation}</td></tr>))}</tbody></table></div>
+=======
+                <div><h3 style={{ marginTop: 0, marginBottom: 6 }}>Security policy flow checks</h3><p className="muted" style={{ margin: 0 }}>This checks the zone-to-zone matrix, service dependencies, NAT, logging, broad permits, shadowing, and explicit requirement-to-flow consequences. It is not firewall command generation.</p></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing</th></tr></thead><tbody>{V1SecurityPolicy.requirementSecurityMatrix.slice(0, 10).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{userFacingStatusLabel(row.readinessImpact)}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+                <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">State</th><th align="left">Review reason</th></tr></thead><tbody>{V1SecurityPolicy.flowConsequences.slice(0, 12).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{userFacingStatusLabel(row.V1PolicyState)}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               </div>
             ) : null}
 

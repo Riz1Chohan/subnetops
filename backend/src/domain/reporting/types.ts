@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import type { OmittedEvidenceDecisionSummary, OmittedEvidenceSummary } from "../evidence/index.js";
+=======
+import type { OmittedEvidenceSummary } from "../evidence/index.js";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export type ReportExportReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type DesignTruthReadiness = "ready" | "review" | "blocked" | "unknown" | string;
 
@@ -76,6 +80,7 @@ export interface V1ReportFullEvidenceAppendix {
   exportFormats: Array<"PDF" | "DOCX" | "CSV" | "JSON">;
 }
 
+<<<<<<< HEAD
 
 export interface V1ReportEvidenceView {
   contract: "V1_REPORT_EVIDENCE_VIEW_CONTRACT";
@@ -93,6 +98,8 @@ export type V1ExportConsistencySurface = "JSON" | "CSV" | "PDF" | "DOCX" | "FRON
 export interface V1ExportConsistencySurfaceRow { surface: V1ExportConsistencySurface; sourcePath: string; rootBlockerCount: number; consumesEvidenceView: boolean; }
 export interface V1ExportConsistencyProof { contract: "V1_RUNTIME_EXPORT_CONSISTENCY_KILL_SWITCH_CONTRACT"; sourceInvariant: "JSON_CSV_PDF_DOCX_FRONTEND_COUNTS_DERIVE_FROM_V1_REPORT_EVIDENCE_VIEW"; canonicalRootBlockerCount: number; countsAgree: boolean; surfaces: V1ExportConsistencySurfaceRow[]; candidateIpamRowsLabelledApprovedAuthority: number; implementationReadyClaimAllowed: boolean; implementationBlockedButExecutableClaimed: boolean; blockedRequirementRowsWithoutProof: number; blockedRequirementProofFailures: string[]; killSwitchPassed: boolean; failures: string[]; }
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1ReportExportTruthControlSummary {
   contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT";
   role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE";
@@ -118,11 +125,16 @@ export interface V1ReportExportTruthControlSummary {
   findings: V1ReportExportTruthFinding[];
   proofBoundary: string[];
   omittedEvidenceSummaries: OmittedEvidenceSummary[];
+<<<<<<< HEAD
   omittedEvidenceDecisionSummary: OmittedEvidenceDecisionSummary;
   fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[];
   antiOverclaimRules: V1ReportAntiOverclaimRule[];
   evidenceView: V1ReportEvidenceView;
   exportConsistencyProof: V1ExportConsistencyProof;
+=======
+  fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[];
+  antiOverclaimRules: V1ReportAntiOverclaimRule[];
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes: string[];
 }
 
@@ -157,7 +169,10 @@ export interface ReportExportEvidenceDocument {
   findings: V1ReportExportTruthFinding[];
   proofBoundary: string[];
   omittedEvidenceSummaries: OmittedEvidenceSummary[];
+<<<<<<< HEAD
   omittedEvidenceDecisionSummary: OmittedEvidenceDecisionSummary;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[];
   antiOverclaimRules: V1ReportAntiOverclaimRule[];
   canClaimImplementationReady: boolean;

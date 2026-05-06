@@ -6,8 +6,11 @@ assert.equal(result.contract, V1_PLATFORM_BOM_FOUNDATION_CONTRACT);
 assert.equal(result.role, "BACKEND_CONTROLLED_ADVISORY_BOM_NO_FAKE_SKUS");
 assert.equal(result.procurementAuthority, "ADVISORY_ONLY_NOT_FINAL_SKU");
 assert.equal(result.sourceOfTruthLevel, "backend-computed-advisory-estimate");
+<<<<<<< HEAD
 assert.equal(result.platformProfileState, "SAVED_REVIEW_REQUIRED");
 assert(result.procurementReadinessReason.includes("procurement remains review-required"));
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert.equal(result.siteCount, 3);
 assert(result.rowCount >= 8);
 assert(result.rows.some((row) => row.category === "Switching" && row.sourceRequirementIds.includes("requirements:usersPerSite")));
@@ -17,7 +20,10 @@ assert(result.rows.some((row) => row.confidence === "placeholder" && row.readine
 assert(result.requirementDrivers.some((driver) => driver.requirementId === "requirements:dualIsp" && driver.affectedRows.length > 0));
 assert(result.proofBoundary.some((line) => line.includes("No vendor model, SKU, price")));
 assert(result.findings.some((finding) => finding.code === "V1_ADVISORY_BOM_NOT_VENDOR_CATALOG"));
+<<<<<<< HEAD
 const unsavedResult = buildV1PlatformBomFoundationControl({ project: { requirementsJson: JSON.stringify({ siteCount: 1, usersPerSite: 20 }), platformProfileJson: null, sites: [{ id: "site-1", name: "Site 1" }] }, networkObjectModel, V1DiagramTruth: { overallReadiness: "REVIEW_REQUIRED" } as any });
 assert.equal(unsavedResult.platformProfileState, "ROLE_BASED_ASSUMPTIONS");
 assert(unsavedResult.procurementReadinessReason.includes("no saved platform profile exists"));
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 console.log("[V1] Platform/BOM foundation selftest passed");

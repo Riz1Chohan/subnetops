@@ -3,7 +3,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const nodeEnv = process.env.NODE_ENV || "development";
+<<<<<<< HEAD
 const isProduction = nodeEnv === "production";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 const weakJwtSecrets = new Set([
   "change-this-in-development",
   "change-this-in-production",
@@ -23,6 +26,7 @@ function required(name: string, fallback?: string) {
   return value;
 }
 
+<<<<<<< HEAD
 function requiredInProduction(name: string, fallback?: string) {
   const value = process.env[name]?.trim();
   if (isProduction && !value) {
@@ -35,6 +39,12 @@ function getJwtSecret() {
   const value = process.env.JWT_SECRET?.trim();
 
   if (isProduction) {
+=======
+function getJwtSecret() {
+  const value = process.env.JWT_SECRET?.trim();
+
+  if (nodeEnv === "production") {
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     if (!value) throw new Error("Missing required environment variable: JWT_SECRET");
     if (weakJwtSecrets.has(value) || value.length < 32) {
       throw new Error("JWT_SECRET must be a non-default value with at least 32 characters in production.");
@@ -59,6 +69,7 @@ function toList(value: string | undefined, fallback: string[]) {
   const source = value && value.trim().length ? value : fallback.join(",");
   return source
     .split(",")
+<<<<<<< HEAD
     .map((item) => item.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 }
@@ -75,6 +86,21 @@ export const env = {
   port: toNumber(process.env.PORT, 4000),
   databaseUrl: required("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/subnetops?schema=public"),
   corsOrigins: toList(configuredCorsOrigins, developmentCorsOrigins),
+=======
+    .map((item) => item.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
+export const env = {
+  port: toNumber(process.env.PORT, 4000),
+  databaseUrl: required("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/subnetops?schema=public"),
+  corsOrigins: toList(process.env.CORS_ORIGIN, [
+    "http://localhost:4173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://subnetops-frontend.onrender.com",
+  ]),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   jwtSecret: getJwtSecret(),
   nodeEnv,
   smtpHost: process.env.SMTP_HOST || "",
@@ -83,8 +109,12 @@ export const env = {
   smtpPass: process.env.SMTP_PASS || "",
   smtpFrom: process.env.SMTP_FROM || "no-reply@subnetops.local",
   sendRealEmails: toBool(process.env.SEND_REAL_EMAILS, false),
+<<<<<<< HEAD
   frontendAppUrl: configuredFrontendAppUrl.replace(/\/+$/, ""),
   deploymentConfigReady: !isProduction || Boolean(configuredCorsOrigins && configuredFrontendAppUrl),
+=======
+  frontendAppUrl: (process.env.FRONTEND_APP_URL || "http://localhost:5173").replace(/\/$/, ""),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   automationSweepEnabled: toBool(process.env.AUTOMATION_SWEEP_ENABLED, false),
   automationSweepIntervalMs: toNumber(process.env.AUTOMATION_SWEEP_INTERVAL_MS, 300000),
   dbPushOnBoot: toBool(process.env.DB_PUSH_ON_BOOT, false),

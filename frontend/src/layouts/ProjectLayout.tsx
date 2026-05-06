@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
@@ -66,6 +67,7 @@ function metricPill(label: string, value: number | string) {
 
 export function ProjectLayout() {
   const { projectId = "" } = useParams();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
@@ -211,11 +213,26 @@ export function ProjectLayout() {
   }
 
   if (projectQuery.isError) {
+    const message = projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this project right now.";
     return (
       <ErrorState
         title="Unable to load project workspace"
-        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load this project right now."}
-        action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
+        message={`${message}. If this happened after an export attempt, the backend may still be recovering; retry the workspace instead of stacking more export clicks.`}
+        action={
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                void queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+                void projectQuery.refetch();
+              }}
+            >
+              Retry workspace
+            </button>
+            <Link to="/dashboard" className="link-button">Back to Dashboard</Link>
+          </div>
+        }
       />
     );
   }

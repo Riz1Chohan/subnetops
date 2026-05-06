@@ -1,5 +1,8 @@
 import { buildOmittedEvidenceSummary, mergeOmittedEvidenceSummaries } from '../evidence/index.js';
+<<<<<<< HEAD
 import { applyDiagramGraphLineage } from './lineage.js';
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import { enforceTruthStateReadiness, normalizeDiagramReadiness, readinessFromFindingSeverity, rollupDiagramReadiness } from './readiness.js';
 import type {
   BuildDiagramRenderModelInput,
@@ -19,8 +22,13 @@ type FindingRef = { id: string; severity: 'ERROR' | 'WARNING' | 'INFO'; affected
 type SiteSummary = { siteId: string; siteName: string; siteCode?: string | null; deviceIds: string[] };
 type Point = { x: number; y: number };
 
+<<<<<<< HEAD
 type DiagramRenderNodeDraft = Omit<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges' | 'lineageStatus' | 'graphNodeId' | 'graphEdgeIds' | 'implementationEvidence' | 'lineageRefs'> & Partial<Pick<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges' | 'lineageStatus' | 'graphNodeId' | 'graphEdgeIds' | 'implementationEvidence' | 'lineageRefs'>>;
 type DiagramRenderEdgeDraft = Omit<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges' | 'lineageStatus' | 'graphEdgeIds' | 'implementationEvidence' | 'lineageRefs'> & Partial<Pick<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges' | 'lineageStatus' | 'graphEdgeIds' | 'implementationEvidence' | 'lineageRefs'>>;
+=======
+type DiagramRenderNodeDraft = Omit<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'> & Partial<Pick<DiagramRenderNode, 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'>>;
+type DiagramRenderEdgeDraft = Omit<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'> & Partial<Pick<DiagramRenderEdge, 'truthState' | 'truthStateV1' | 'readinessImpact' | 'sourceRefs' | 'validationRefs' | 'warningBadges'>>;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function readinessImpactFromDiagramReadiness(readiness: 'ready' | 'review' | 'blocked' | 'unknown') {
   if (readiness === 'blocked') return 'BLOCKING' as const;
@@ -75,11 +83,14 @@ function decorateRenderNode(node: DiagramRenderNodeDraft): DiagramRenderNode {
     sourceRefs,
     validationRefs,
     warningBadges: node.warningBadges?.length ? node.warningBadges : warningBadgesForDiagramEvidence({ readiness, truthState: node.truthState, truthStateV1, notes: node.notes }),
+<<<<<<< HEAD
     lineageStatus: node.lineageStatus ?? 'BLOCKED_LINEAGE',
     graphNodeId: node.graphNodeId,
     graphEdgeIds: node.graphEdgeIds ?? [],
     implementationEvidence: node.implementationEvidence ?? false,
     lineageRefs: node.lineageRefs ?? [],
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
@@ -98,10 +109,13 @@ function decorateRenderEdge(edge: DiagramRenderEdgeDraft): DiagramRenderEdge {
     sourceRefs,
     validationRefs,
     warningBadges: edge.warningBadges?.length ? edge.warningBadges : warningBadgesForDiagramEvidence({ readiness, truthState, truthStateV1, notes: edge.notes }),
+<<<<<<< HEAD
     lineageStatus: edge.lineageStatus ?? 'BLOCKED_LINEAGE',
     graphEdgeIds: edge.graphEdgeIds ?? [],
     implementationEvidence: edge.implementationEvidence ?? false,
     lineageRefs: edge.lineageRefs ?? [],
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
@@ -305,7 +319,11 @@ function addSiteNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRender
       const dhcpNodeId = `render-dhcp-summary-${site.siteId}`;
       addNode(nodes, {
         id: dhcpNodeId,
+<<<<<<< HEAD
         objectId: siteDhcpPools.length === 1 ? siteDhcpPools[0].id : `dhcp-summary-${site.siteId}`,
+=======
+        objectId: `dhcp-summary-${site.siteId}`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         objectType: 'dhcp-pool',
         label: `${siteDiagramCode(site)} DHCP (${siteDhcpPools.length})`,
         groupId: `site:${site.siteId}`,
@@ -317,7 +335,10 @@ function addSiteNodes(params: { nodes: DiagramRenderNode[]; edges: DiagramRender
         y: point.y + 95,
         sourceEngine: 'object-model',
         relatedFindingIds: [],
+<<<<<<< HEAD
         sourceRefs: siteDhcpPools.map((pool) => `dhcp-pool:${pool.id}`),
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         notes: [`Collapsed ${siteDhcpPools.length} backend DHCP scope record(s) for this site.`],
       });
       addEdge(edges, {
@@ -691,32 +712,52 @@ export function buildDiagramRenderModel(input: BuildDiagramRenderModelInput): Di
   addDeviceNodes({ nodes, edges, sites, branchSites, primarySite, sitePoints, routeDomain, wanZone, networkObjectModel, findingRefs });
   addSecurityNodes({ nodes, edges, routeDomain, networkObjectModel, findingRefs });
 
+<<<<<<< HEAD
   const lineage = applyDiagramGraphLineage({ nodes, edges, designGraph: networkObjectModel.designGraph });
   const lineagedNodes = lineage.nodes;
   const lineagedEdges = lineage.edges;
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const visibleZones = networkObjectModel.securityZones
     .filter((zone) => zone.zoneRole !== 'wan')
     .filter((zone) => !/voice/i.test(zone.name) || zone.subnetCidrs.length > 0 || zone.vlanIds.length > 0)
     .sort((left, right) => left.zoneRole.localeCompare(right.zoneRole) || left.name.localeCompare(right.name))
     .slice(0, 8);
+<<<<<<< HEAD
   const groups = buildGroups({ nodes: lineagedNodes, sites, routeDomain, visibleZones, networkObjectModel, findingRefs });
   const overlays = buildOverlays({ nodes: lineagedNodes, edges: lineagedEdges, overlaySummaries, hotspots });
+=======
+  const groups = buildGroups({ nodes, sites, routeDomain, visibleZones, networkObjectModel, findingRefs });
+  const overlays = buildOverlays({ nodes, edges, overlaySummaries, hotspots });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const omittedEvidenceSummaries = [
     buildOmittedEvidenceSummary({ collection: 'diagram security zones', surface: 'DiagramRenderModel.securityZones', items: networkObjectModel.securityZones.filter((zone) => zone.zoneRole !== 'wan'), shownCount: visibleZones.length, exportImpact: 'Diagram hides extra zones only with an omitted counter; hidden blocked/review zones keep the diagram review-gated.' }),
     buildOmittedEvidenceSummary({ collection: 'diagram policy rules', surface: 'DiagramRenderModel.policyRules', items: networkObjectModel.policyRules.filter((policy) => policy.action === 'deny' || /guest|management|dmz|wan/i.test(policy.name)), shownCount: Math.min(10, networkObjectModel.policyRules.filter((policy) => policy.action === 'deny' || /guest|management|dmz|wan/i.test(policy.name)).length), exportImpact: 'Policy nodes are windowed visually; hidden policy blockers/review states must remain visible in summary/report evidence.' }),
     buildOmittedEvidenceSummary({ collection: 'diagram hotspots', surface: 'DiagramRenderModel.overlays.hotspotIndexes', items: hotspots, shownCount: Math.min(6, hotspots.length), exportImpact: 'Overlay hotspots are windowed visually; hidden hotspots require counters so warnings do not disappear.' }),
+<<<<<<< HEAD
     buildOmittedEvidenceSummary({ collection: 'dangling diagram edges', surface: 'DiagramRenderModel.emptyState.requiredInputs', items: validateRenderGraph(lineagedNodes, lineagedEdges)?.requiredInputs ?? [], shownCount: Math.min(8, validateRenderGraph(lineagedNodes, lineagedEdges)?.requiredInputs?.length ?? 0), exportImpact: 'Dangling-edge repair prompts are windowed but any omitted repair prompt keeps diagram output review-gated.' }),
   ];
   const omittedEvidenceRollup = mergeOmittedEvidenceSummaries(omittedEvidenceSummaries);
 
   const routeLinkCount = lineagedEdges.filter((edge) => edge.overlayKeys.includes('routing')).length;
+=======
+    buildOmittedEvidenceSummary({ collection: 'dangling diagram edges', surface: 'DiagramRenderModel.emptyState.requiredInputs', items: validateRenderGraph(nodes, edges)?.requiredInputs ?? [], shownCount: Math.min(8, validateRenderGraph(nodes, edges)?.requiredInputs?.length ?? 0), exportImpact: 'Dangling-edge repair prompts are windowed but any omitted repair prompt keeps diagram output review-gated.' }),
+  ];
+  const omittedEvidenceRollup = mergeOmittedEvidenceSummaries(omittedEvidenceSummaries);
+
+  const routeLinkCount = edges.filter((edge) => edge.overlayKeys.includes('routing')).length;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const missingRenderInputs = [
     sites.length <= 0 ? 'materialized site topology groups' : null,
     networkObjectModel.devices.length <= 0 ? 'modeled network devices' : null,
     routeLinkCount <= 0 ? 'WAN or routing relationships' : null,
   ].filter(Boolean) as string[];
+<<<<<<< HEAD
   const danglingState = validateRenderGraph(lineagedNodes, lineagedEdges);
+=======
+  const danglingState = validateRenderGraph(nodes, edges);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const emptyState = danglingState ?? (missingRenderInputs.length > 0
     ? {
         reason: `Authoritative topology canvas is blocked because these inputs are missing: ${missingRenderInputs.join(', ')}.`,
@@ -726,8 +767,13 @@ export function buildDiagramRenderModel(input: BuildDiagramRenderModelInput): Di
 
   return {
     summary: {
+<<<<<<< HEAD
       nodeCount: lineagedNodes.length,
       edgeCount: lineagedEdges.length,
+=======
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       groupCount: groups.length,
       overlayCount: overlays.length,
       backendAuthored: true,
@@ -740,8 +786,13 @@ export function buildDiagramRenderModel(input: BuildDiagramRenderModelInput): Di
       omittedEvidenceHasBlockers: omittedEvidenceRollup.omittedHasBlockers,
       omittedEvidenceHasReviewRequired: omittedEvidenceRollup.omittedHasReviewRequired,
     },
+<<<<<<< HEAD
     nodes: lineagedNodes,
     edges: lineagedEdges,
+=======
+    nodes,
+    edges,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     groups,
     overlays,
     emptyState,
@@ -753,17 +804,24 @@ export function assertBackendDiagramRenderModel(model: DiagramRenderModel) {
   const nodeIds = new Set(model.nodes.map((node) => node.id));
   const nodesWithoutObjectIds = model.nodes.filter((node) => !node.objectId);
   const edgesWithoutRelatedObjects = model.edges.filter((edge) => edge.relatedObjectIds.length === 0 && !edge.relationship);
+<<<<<<< HEAD
   const nodesWithoutGraphLineage = model.nodes.filter((node) => node.lineageStatus === 'BLOCKED_LINEAGE');
   const edgesWithoutGraphLineage = model.edges.filter((edge) => edge.lineageStatus === 'BLOCKED_LINEAGE');
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const danglingEdges = model.edges.filter((edge) => !nodeIds.has(edge.sourceNodeId) || !nodeIds.has(edge.targetNodeId));
   return {
     backendAuthored: model.summary.backendAuthored === true && model.summary.truthContract === 'backend-only-render-model',
     nodesWithoutObjectIds,
     edgesWithoutRelatedObjects,
     danglingEdges,
+<<<<<<< HEAD
     nodesWithoutGraphLineage,
     edgesWithoutGraphLineage,
     ready: model.summary.backendAuthored === true && nodesWithoutObjectIds.length === 0 && edgesWithoutRelatedObjects.length === 0 && nodesWithoutGraphLineage.length === 0 && edgesWithoutGraphLineage.length === 0 && danglingEdges.length === 0,
+=======
+    ready: model.summary.backendAuthored === true && nodesWithoutObjectIds.length === 0 && edgesWithoutRelatedObjects.length === 0 && danglingEdges.length === 0,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 

@@ -1484,7 +1484,11 @@ export function buildDesignCoreSnapshot(project: ProjectWithDesignData): DesignC
     V1RequirementsClosure,
   });
 
+<<<<<<< HEAD
   // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW: Engine 2 IPAM authority reconciliation surface.
+=======
+  // V1_ENGINE2_ENTERPRISE_IPAM_DURABLE_ALLOCATION_WORKFLOW: Engine 2 durable IPAM authority reconciliation surface.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   const V1EnterpriseIpamTruth = buildV1EnterpriseIpamTruthControl({
     addressingRows,
     enterpriseAllocatorPosture,

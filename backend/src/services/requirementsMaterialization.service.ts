@@ -146,7 +146,11 @@ async function upsertRequirementDhcpScope(
   });
 
   const scopeNotes = joinNotes([
+<<<<<<< HEAD
     `Requirement-derived Engine 2 DHCP scope for VLAN ${vlanRecord.vlanId} ${segment.vlanName}.`,
+=======
+    `Requirement-derived durable DHCP scope for VLAN ${vlanRecord.vlanId} ${segment.vlanName}.`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     `Required by: ${segment.requiredBy.join(", ")}.`,
     `Scope CIDR: ${vlanRecord.subnetCidr}.`,
     vlanRecord.gatewayIp

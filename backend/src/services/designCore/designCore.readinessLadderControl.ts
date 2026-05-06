@@ -58,7 +58,11 @@ export function buildV1ReadinessLadderControl(params: {
 
   const unvalidatedGeneratedObjectCount =
     numberValue((params.networkObjectModel as any)?.summary?.V1MetadataGapCount)
+<<<<<<< HEAD
     + numberValue((params.networkObjectModel as any)?.summary?.implementationReviewObjectCount)
+=======
+    + numberValue((params.networkObjectModel as any)?.summary?.implementationBlockedObjectCount)
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     + numberValue((params.V1ValidationReadiness as any)?.warningFindingCount && params.V1ValidationReadiness.validationGateAllowsImplementation ? 0 : 0);
 
   const summary = deriveReadinessLadder({
@@ -73,11 +77,15 @@ export function buildV1ReadinessLadderControl(params: {
     omittedHasReviewRequired: omittedHas(reportOmitted, 'omittedHasReviewRequired') || omittedHas(diagramOmitted, 'omittedHasReviewRequired'),
     unvalidatedGeneratedObjectCount,
     blockingFindingCount:
+<<<<<<< HEAD
       numberValue(params.V1ValidationReadiness.blockingFindingCount)
       + numberValue(params.V1ReportExportTruth.blockedFindingCount)
       + numberValue((params.V1DiagramTruth as any)?.blockedFindingCount)
       + numberValue(params.V1ImplementationPlanning.blockedFindingCount)
       + numberValue(params.V1ImplementationTemplates.blockedFindingCount),
+=======
+      numberValue((params.V1ValidationReadiness as any).rootBlockerCount ?? params.V1ValidationReadiness.blockingFindingCount),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     reviewRequiredFindingCount:
       numberValue(params.V1ValidationReadiness.reviewRequiredFindingCount)
       + numberValue(params.V1ReportExportTruth.reviewFindingCount)

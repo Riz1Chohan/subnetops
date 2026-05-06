@@ -172,8 +172,12 @@ export function ProjectPlatformBomPage() {
         </div>
         {V1PlatformBomFoundation ? (
           <>
+<<<<<<< HEAD
             <div className="grid-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
               {summaryCard("Profile state", V1PlatformBomFoundation.platformProfileState, V1PlatformBomFoundation.procurementReadinessReason)}
+=======
+            <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               {summaryCard("BOM rows", V1PlatformBomFoundation.rowCount, V1PlatformBomFoundation.procurementAuthority)}
               {summaryCard("Requirement drivers", V1PlatformBomFoundation.requirementDriverCount, "Every BOM effect keeps source requirement evidence.")}
               {summaryCard("Local ports/site", V1PlatformBomFoundation.localPortDemandPerSite, `${V1PlatformBomFoundation.growthMarginPercent}% growth margin included.`)}

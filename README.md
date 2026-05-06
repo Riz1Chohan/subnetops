@@ -295,7 +295,11 @@ The IPAM domain now owns pure helpers for:
 - building durable allocator posture from addressing rows and IPAM source data
 - deterministic IPv4 and IPv6 allocation proposal rows from durable pools
 - same-route-domain overlap detection
+<<<<<<< HEAD
 - brownfield overlap review across imported networks, candidate/approved allocations, DHCP scopes, pools, and allocator plan rows
+=======
+- brownfield overlap review across imported networks, durable allocations, DHCP scopes, pools, and allocator plan rows
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 - DHCP and reservation posture checks
 - reserve policy posture checks
 - stale approval and ledger posture checks
@@ -714,7 +718,11 @@ Export/report wording cleanup performed in this update:
 
 - removed old pre-V1 report-version wording from blocked report metadata
 - replaced visible Engine 1 / Engine 2 report labels with Addressing / IPAM wording
+<<<<<<< HEAD
 - replaced raw Engine 2 report truth labels with candidate/approved IPAM evidence labels
+=======
+- replaced raw Engine 2 report truth labels with durable IPAM evidence labels
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 - made the report page display user-friendly evidence labels instead of raw internal enum names
 - removed unprofessional report-page wording around polished but unsupported outputs
 
@@ -1836,12 +1844,15 @@ Required guards:
 | `scripts/check-service-validation-coverage.cjs` | Manual or generated service writes bypassing shared addressing validation. |
 | `scripts/check-requirement-materialization-source-truth.cjs` | Missing capacity becoming fake user intent or implementation-ready DHCP/addressing truth. |
 | `scripts/check-security-policy-matrix-completion.cjs` | Wizard/security-policy matrix output missing explicit default-deny policy evidence for high-risk zone pairs. |
+<<<<<<< HEAD
 | `scripts/check-security-policy-review-classification.cjs` | Security policy/NAT planning gaps inflating true blockers instead of review debt unless a referenced object is missing or a modeled policy directly contradicts the expected action. |
 | `scripts/check-platform-bom-discovery-state-cleanup.cjs` | Platform/BOM and discovery warnings staying vague instead of using explicit backend state and readiness reasons. |
 | `scripts/check-deployment-api-stability.cjs` | Production frontend API base being guessed from hostnames, silently falling back to `/api`, or building without explicit backend API/CORS configuration. |
 | `scripts/check-runtime-export-consistency-kill-switches.cjs` | JSON/CSV/PDF/DOCX/frontend root-blocker counts drifting from the canonical evidence view, candidate IPAM being overclaimed, implementation readiness leaking, or blocked requirements missing proof. |
 | `scripts/check-frontend-evidence-view-alignment.cjs` | Project Overview, Report, Diagram, Enterprise IPAM, or Implementation pages recalculating truth cards instead of consuming `V1ReportExportTruth.evidenceView`. |
 | `scripts/check-final-readme-only-cleanup-pass.cjs` | README-only documentation, professional-report boundaries, generated build-output exclusion, generated deliverable exclusion, and final guard wiring discipline being weakened. |
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 | `scripts/check-no-silent-read-repair.cjs` | Read paths mutating project state without authorization, audit evidence, and surfaced repair evidence. |
 | `scripts/check-final-proof-scenario-execution.cjs` | Final proof passing from static expected summaries instead of executed scenario results. |
 | `scripts/check-omitted-evidence-counters.cjs` | Sliced evidence hiding omitted blockers or review-required items. |
@@ -1852,9 +1863,12 @@ Required guards:
 | `scripts/check-no-report-overclaim.cjs` | Reports/exports claiming production-ready, implementation-ready, complete, validated, or best-practice-compliant without backend proof. |
 | `scripts/check-api-service-database-integration-proof.cjs` | Trust proof sliding back to isolated helper tests instead of product-like API/service/database flow coverage. |
 | `scripts/check-regression-kill-switches.cjs` | Any required kill switch being deleted or removed from `check:quality`. |
+<<<<<<< HEAD
 | `scripts/check-clinic-golden-fixture.cjs` | The uploaded clinic export contradiction disappearing from test coverage, or professional-report boundaries being undocumented. |
 | `scripts/check-root-blocker-taxonomy-authority.cjs` | Root blockers being created from severity, wording, downstream impacts, or candidate/review authority instead of explicit source-object proof. |
 | `scripts/check-requirement-closure-blocker-proof.cjs` | Requirements being marked `BLOCKED` without mandatory missing consumer proof, missing source-object proof, or engine contradiction proof. |
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 Run all static kill switches with:
 
@@ -1882,12 +1896,16 @@ Permanent rules:
 
 - Frontend code may display, filter, sort, expand, collapse, and visualize backend evidence, but it must not calculate final subnets, VLANs, gateways, routing, security policy, or implementation readiness.
 - Reports and exports must not claim `production-ready`, `implementation-ready`, `ready for deployment`, `validated`, `complete`, or `best practice compliant` unless backend proof and the readiness ladder allow the claim.
+<<<<<<< HEAD
 - Professional reports are engineer-facing deliverables only: no developer commentary, code snippets, repair notes, chat commentary, or debug language may appear in the report body. Developer proof belongs in tests and this README, not customer/engineer reports.
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 - Diagrams must not render assumed, inferred, proposed, imported, or review-required objects as clean production truth.
 - Read paths must not mutate state silently. No silent mutation. Any read-repair must be authorized, audited, and surfaced as evidence.
 - Missing user input must become review-required or blocked evidence, not fake defaults that pretend the user selected a value.
 - README-only documentation remains mandatory. New notes go into this README, not separate Markdown files.
 
+<<<<<<< HEAD
 
 ### Professional report boundary
 
@@ -1916,6 +1934,8 @@ node scripts/check-clinic-golden-fixture.cjs
 npm --prefix backend run selftest:clinic-golden-export
 ```
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 ### Requirement Propagation Contract
 
 Every requirement must follow this evidence chain:
@@ -2117,7 +2137,11 @@ requirements wizard input
 
 Rules:
 
+<<<<<<< HEAD
 - Engine 1 subnet math must be converted into Engine 2 candidate IPAM evidence when Engine 2 IPAM objects do not already exist.
+=======
+- Engine 1 subnet math must be converted into Engine 2 candidate IPAM evidence when durable IPAM objects do not already exist.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 - Wizard-generated site/VLAN/subnet rows must create candidate pools, candidate allocations, DHCP scope evidence when DHCP is enabled, gateway reservation evidence, and candidate ledger entries.
 - Candidate IPAM evidence is not approval and is not implementation-ready. It is review-required authority evidence that prevents `ENGINE1_PROPOSAL_ONLY` spam in greenfield generated plans.
 - Explicit default-deny guardrails must be generated for high-risk zone pairs, including Guest → Voice, Voice → Management, and WAN → Voice.
@@ -2154,6 +2178,7 @@ Rules:
 
 Regression guard: `scripts/check-security-policy-matrix-completion.cjs`.
 
+<<<<<<< HEAD
 ### Security policy / NAT review classification
 
 Security policy and NAT readiness now separates true blockers from planning review debt. Missing explicit policy coverage, missing NAT coverage, NAT intent with no covered flow, implicit-deny documentation gaps, broad permit review, shadowed-rule review, and logging evidence gaps stay review-required during planning. They remain visible in validation, report/export, and the security page, but they do not inflate true blocker counts by severity alone.
@@ -2269,6 +2294,8 @@ The final cleanup guard checks the repository itself, not a promise written in p
 
 Regression guard: `node scripts/check-final-readme-only-cleanup-pass.cjs`.
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 ### CI proof commands
 
 Root commands:
@@ -2376,6 +2403,7 @@ Missing WAN/provider confirmation, missing allow/NAT confirmation, and missing l
 
 Regression guard: `node scripts/check-wizard-implementation-stage-gating.cjs`.
 
+<<<<<<< HEAD
 ### Implementation execution gates
 
 Implementation output is now split into execution-ready steps, planning candidates, review-required steps, and structural blockers. A step can be execution-ready only when source authority, requirement lineage, verification evidence, rollback posture, dependencies, and operational-safety gates are proven.
@@ -2386,6 +2414,8 @@ High-risk steps require an operational-safety dependency before they can become 
 
 Regression guard: `node scripts/check-implementation-execution-gates.cjs`.
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 ### Wizard design-graph lineage completion
 
@@ -2401,6 +2431,7 @@ The full row-level evidence remains in the appendix and machine-readable export,
 
 Regression guard: `node scripts/check-report-professional-compression.cjs`.
 
+<<<<<<< HEAD
 ### V1 validation ledger authority
 
 Validation results now carry the authoritative V1 evidence fields required by report/export, frontend, diagram, and implementation consumers. The validation ledger records readiness category, finding class, source engine, source snapshot path, root-cause key/title, de-escalation reason, remediation, affected requirements, affected objects, and evidence references on persisted `ValidationResult` rows.
@@ -2518,3 +2549,14 @@ Required behavior:
 - Professional reports remain engineer-facing; graph-lineage proof details stay in appendices, exports, tests, and README.
 
 Regression guard: `node scripts/check-diagram-graph-lineage-enforcement.cjs`.
+=======
+### Wizard candidate/review root-cause classification
+
+Wizard-generated greenfield output must not treat candidate IPAM authority, DHCP review, system addressing policy evidence, diagram-only consumer gaps, or downstream propagated report/implementation echoes as backend root blockers. The root cause pass keeps mathematically invalid addressing, contradictory objects, stale approved allocations, and true missing backend graph nodes as blockers, while candidate/review evidence remains review-required. Guard: `node scripts/check-wizard-candidate-review-root-cause.cjs`.
+
+### Export failure recovery guard
+
+Interactive PDF/DOCX exports must never leave the report page stuck after a backend timeout or oversized evidence set. The export path now enforces bounded interactive tables, validates returned blobs, exposes a cancel/timeout recovery path, and keeps full row-level evidence available through CSV/full-proof exports. `npm run check:export-recovery` fails if these guards are removed.
+
+The export path also has an API survival contract: one oversized or repeated export attempt must not make `/api/projects`, `/api/design-core`, or workspace reloads fall into browser-level `Failed to fetch`. Backend export handlers now use a per-user/project export lease, memory-pressure guard, bounded total row/table budgets, controlled JSON error responses, and frontend workspace retry recovery. If a project page becomes unavailable after an export attempt, the UI must offer a retry path instead of forcing the user back into stacked export clicks.
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8

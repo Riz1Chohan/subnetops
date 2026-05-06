@@ -2,7 +2,10 @@ import type { OmittedEvidenceSummary } from "../evidence/index.js";
 export type DiagramReadiness = 'ready' | 'review' | 'blocked' | 'unknown';
 export type DiagramReadinessImpact = 'NONE' | 'REVIEW' | 'BLOCKING';
 export type DiagramV1TruthState = 'USER_PROVIDED' | 'DERIVED' | 'ASSUMED' | 'IMPORTED' | 'REVIEW_REQUIRED' | 'BLOCKED';
+<<<<<<< HEAD
 export type DiagramLineageStatus = 'GRAPH_BACKED' | 'GRAPH_RELATIONSHIP_BACKED' | 'AGGREGATED_BACKEND_EVIDENCE' | 'VISUAL_ONLY_NON_EVIDENCE' | 'BLOCKED_LINEAGE';
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export type DiagramTruthState =
   | 'configured'
@@ -99,11 +102,14 @@ export interface DiagramRenderNode {
   sourceRefs: string[];
   validationRefs: string[];
   warningBadges: string[];
+<<<<<<< HEAD
   lineageStatus: DiagramLineageStatus;
   graphNodeId?: string;
   graphEdgeIds: string[];
   implementationEvidence: boolean;
   lineageRefs: string[];
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes: string[];
 }
 
@@ -122,10 +128,13 @@ export interface DiagramRenderEdge {
   sourceRefs: string[];
   validationRefs: string[];
   warningBadges: string[];
+<<<<<<< HEAD
   lineageStatus: DiagramLineageStatus;
   graphEdgeIds: string[];
   implementationEvidence: boolean;
   lineageRefs: string[];
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes: string[];
 }
 
@@ -336,10 +345,13 @@ export interface DiagramCoverageRow {
   hasReadiness: boolean;
   sourceEngine: string;
   relatedFindingIds: string[];
+<<<<<<< HEAD
   lineageStatus?: DiagramLineageStatus;
   graphNodeId?: string;
   graphEdgeIds?: string[];
   implementationEvidence?: boolean;
   hasGraphLineage?: boolean;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   modeImpacts: Array<'physical' | 'logical' | 'wan-cloud' | 'security' | 'per-site' | 'implementation'>;
 }

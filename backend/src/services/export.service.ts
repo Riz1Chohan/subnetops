@@ -11,6 +11,7 @@ import { runValidation } from "./validation.service.js";
 import { applyBackendDesignCoreToReport, type ProfessionalReportMode } from "./exportDesignCoreReport.service.js";
 import type { ProfessionalReport, ReportMetadata, ReportSection, ReportTable, ReportVisualSnapshot } from "./export.types.js";
 import { resolveProjectBaseRangeForRequirements } from "../domain/requirements/apply.js";
+<<<<<<< HEAD
 import { buildReportEvidenceView, buildRuntimeExportConsistencyProof } from "../domain/reporting/index.js";
 
 type JsonMap = Record<string, unknown>;
@@ -37,6 +38,12 @@ type ValidationItem = {
   evidenceJson?: string | null;
   createdAt?: Date | string | null;
 };
+=======
+
+type JsonMap = Record<string, unknown>;
+type SiteWithVlans = { name: string; location?: string | null; siteCode?: string | null; defaultAddressBlock?: string | null; vlans: Array<{ vlanId: number; vlanName: string; purpose?: string | null; subnetCidr: string; gatewayIp: string; dhcpEnabled: boolean; estimatedHosts?: number | null }> };
+type ValidationItem = { severity: string; title: string; message: string; issue?: string | null; impact?: string | null; recommendation?: string | null; entityType?: string | null; ruleCode?: string | null; createdAt?: Date | string | null };
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function parseJson<T = JsonMap>(value?: string | null): T | null {
   if (!value) return null;
@@ -209,6 +216,7 @@ function validationNarrative(item: ValidationItem) {
   return { issue, impact, recommendation };
 }
 
+<<<<<<< HEAD
 function hasValidationLedgerTaxonomy(item: ValidationItem) {
   return Boolean(asString(item.readinessCategory) && asString(item.findingClass));
 }
@@ -251,6 +259,18 @@ function validationBucket(item: ValidationItem) {
 
   const text = `${item.ruleCode ?? ""} ${item.title ?? ""} ${item.message ?? ""} ${item.sourceEngine ?? ""}`;
   if (/Engine 2|IPAM|ENGINE1_PLANNED_ONLY|candidate allocation|approved allocation|candidate pool/i.test(text)) {
+=======
+function validationBucket(item: ValidationItem) {
+  const text = `${item.ruleCode ?? ""} ${item.title ?? ""} ${item.message ?? ""}`;
+  if (item.severity === "ERROR" || /ROOT_BLOCKER|invalid CIDR|noncanonical|overlap|cannot be resolved|no dependency edge|missing graph nodes/i.test(text)) {
+    return {
+      severity: "ERROR",
+      category: "Root blocker",
+      action: "Fix the generated source object or engine lineage before treating the plan as clean.",
+    };
+  }
+  if (/Engine 2|IPAM|ENGINE1_PROPOSAL_ONLY|durable allocation|candidate allocation|candidate pool/i.test(text)) {
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     return {
       severity: "REVIEW",
       category: "Enterprise IPAM authority",
@@ -307,9 +327,15 @@ function validationBucket(item: ValidationItem) {
     };
   }
   return {
+<<<<<<< HEAD
     severity: item.readinessCategory === "WARNING" ? "WARNING" : "REVIEW",
     category: "General engineering review",
     action: asString(item.remediation, "Review the finding, document the decision, and rerun validation after changes."),
+=======
+    severity: item.severity === "WARNING" ? "WARNING" : "REVIEW",
+    category: "General engineering review",
+    action: "Review the finding, document the decision, and rerun validation after changes.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   };
 }
 
@@ -532,9 +558,15 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     exportContext.outputTruthBlocked
       ? `Requirement-output truth is blocked: ${exportContext.requirementOutputGaps.slice(0, 4).join(" ")}${exportContext.requirementOutputGaps.length > 4 ? " Additional gaps are listed in the Requirement Output Truth Lock section." : ""}`
       : exportContext.errors.length > 0
+<<<<<<< HEAD
         ? `The present validation posture includes ${exportContext.errors.length} root blocker${exportContext.errors.length === 1 ? "" : "s"} and ${exportContext.warnings.length} review/warning item${exportContext.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
         : exportContext.warnings.length > 0
           ? `The current design contains ${exportContext.warnings.length} review/warning item${exportContext.warnings.length === 1 ? "" : "s"} but no active root blockers. The package can be reviewed professionally now, although the review items should still be addressed during technical sign-off.`
+=======
+        ? `The present validation posture includes ${exportContext.errors.length} error-level blocker${exportContext.errors.length === 1 ? "" : "s"} and ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"}. Those items should be resolved or explicitly accepted before the package is used as an implementation approval document.`
+        : exportContext.warnings.length > 0
+          ? `The current design contains ${exportContext.warnings.length} warning${exportContext.warnings.length === 1 ? "" : "s"} but no active error-level blockers. The package can be reviewed professionally now, although the warning items should still be addressed during technical sign-off.`
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           : "The current design has no saved validation blockers and no detected requirement-output truth gaps in this export cycle.",
     `At this stage, the package is best used for design review, addressing confirmation, security and routing discussion, implementation planning, and stakeholder handoff. Procurement, platform-specific engineering, and migration approval should still be tied to the remaining assumptions and open review items documented later in the report.`,
   ];
@@ -726,7 +758,11 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
         : "Because the current validation posture does not contain active root blockers, the package can move into planning review once candidate IPAM, security, routing, discovery, and approval items are reviewed.",
     ],
     bullets: [
+<<<<<<< HEAD
       `Root blockers: ${exportContext.errors.length}`,
+=======
+      `Root blocker groups: ${exportContext.errors.length}`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       `Review / warning items: ${exportContext.warnings.length}`,
       `Information items: ${exportContext.infos.length}`,
       exportContext.warnings.length > 0 ? "Review-level findings should be cleared, approved, or explicitly accepted before final handoff." : null,
@@ -855,7 +891,11 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
     organizationName: asString(exportContext.project.organizationName, "To be confirmed"),
     environment: projectEnvironment,
     reportVersion: "Version 1 truth-locked",
+<<<<<<< HEAD
     revisionStatus: exportContext.outputTruthBlocked ? "Blocked - requirement outputs missing" : exportContext.errors.length > 0 ? "Blocked - root blockers present" : exportContext.warnings.length > 0 ? "Planning review required" : "Planning-ready draft",
+=======
+    revisionStatus: exportContext.outputTruthBlocked ? "Blocked - requirement outputs missing" : exportContext.errors.length > 0 ? "Blocked - root blocker groups present" : exportContext.warnings.length > 0 ? "Planning review required" : "Planning-ready draft",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     documentOwner: asString(exportContext.project.ownerName, "SubnetOps project owner"),
     approvalStatus: exportContext.outputTruthBlocked || exportContext.errors.length > 0 ? "Not ready for approval" : "Ready for planning review",
     projectStage: asString(exportContext.requirements.projectStage, "To be confirmed"),
@@ -871,7 +911,11 @@ export function composeProfessionalReport(project: Awaited<ReturnType<typeof get
       ["Addressing rows", String(exportContext.vlanCount)],
       ["Requirement-output gaps", String(exportContext.requirementOutputGaps.length)],
       ["Security zones", String(exportContext.securityZones.length)],
+<<<<<<< HEAD
       ["Root blockers", String(exportContext.errors.length)],
+=======
+      ["Root blocker groups", String(exportContext.errors.length)],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       ["Validation warnings", String(exportContext.warnings.length)],
       ["Base range", exportContext.baseRangeLabel],
     ],
@@ -908,7 +952,10 @@ export async function getCsvRows(projectId: string) {
   const exportContext = buildExportContext(project);
   if (!exportContext) return [];
   const designCore = await getDesignCoreSnapshotForExport(projectId);
+<<<<<<< HEAD
   const reportEvidenceView = designCore?.V1ReportExportTruth?.evidenceView ?? buildReportEvidenceView({ designCore });
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const rows: Array<Record<string, unknown>> = [];
   rows.push({
@@ -1086,6 +1133,7 @@ export async function getCsvRows(projectId: string) {
           Notes: finding.remediation,
         });
       }
+<<<<<<< HEAD
       if (designCore.V1ReportExportTruth.omittedEvidenceDecisionSummary) {
         const decision = designCore.V1ReportExportTruth.omittedEvidenceDecisionSummary;
         rows.push({
@@ -1097,6 +1145,8 @@ export async function getCsvRows(projectId: string) {
           Notes: `Report ${decision.reportAffected ? "affected" : "not affected"} | Diagram ${decision.diagramAffected ? "affected" : "not affected"} | Implementation ${decision.implementationAffected ? "affected" : "not affected"}`,
         });
       }
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       for (const summary of designCore.V1ReportExportTruth.omittedEvidenceSummaries ?? []) {
         rows.push({
           Section: "V1 Report Omitted Evidence",
@@ -1181,7 +1231,11 @@ export async function getCsvRows(projectId: string) {
 
 
     if (designCore.V1PlatformBomFoundation) {
+<<<<<<< HEAD
       rows.push({ Section: "V1 Platform/BOM Foundation", Scope: "Project", Name: designCore.projectName, Key: designCore.V1PlatformBomFoundation.overallReadiness, Value: `${designCore.V1PlatformBomFoundation.rowCount} BOM row(s) / ${designCore.V1PlatformBomFoundation.requirementDriverCount} requirement driver(s)`, Notes: `Contract ${designCore.V1PlatformBomFoundation.contract} | State ${designCore.V1PlatformBomFoundation.platformProfileState} | Authority ${designCore.V1PlatformBomFoundation.procurementAuthority} | Source ${designCore.V1PlatformBomFoundation.sourceOfTruthLevel} | ${designCore.V1PlatformBomFoundation.procurementReadinessReason} | Placeholder rows ${designCore.V1PlatformBomFoundation.placeholderRowCount}` });
+=======
+      rows.push({ Section: "V1 Platform/BOM Foundation", Scope: "Project", Name: designCore.projectName, Key: designCore.V1PlatformBomFoundation.overallReadiness, Value: `${designCore.V1PlatformBomFoundation.rowCount} BOM row(s) / ${designCore.V1PlatformBomFoundation.requirementDriverCount} requirement driver(s)`, Notes: `Contract ${designCore.V1PlatformBomFoundation.contract} | Authority ${designCore.V1PlatformBomFoundation.procurementAuthority} | Source ${designCore.V1PlatformBomFoundation.sourceOfTruthLevel} | Placeholder rows ${designCore.V1PlatformBomFoundation.placeholderRowCount}` });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       for (const bomRow of designCore.V1PlatformBomFoundation.rows) rows.push({ Section: "V1 BOM Rows", Scope: bomRow.category, Name: bomRow.item, Key: `${bomRow.confidence} | ${bomRow.readinessImpact}`, Value: `${bomRow.quantity} ${bomRow.unit}`, Notes: `Basis: ${bomRow.calculationBasis} | Requirements: ${joinCsvList(bomRow.sourceRequirementIds, "none")} | Review: ${bomRow.manualReviewNote}` });
       for (const driver of designCore.V1PlatformBomFoundation.requirementDrivers) rows.push({ Section: "V1 BOM Requirement Drivers", Scope: driver.requirementId, Name: driver.requirementId, Key: driver.readinessImpact, Value: driver.value, Notes: `${driver.evidence} Rows: ${joinCsvList(driver.affectedRows, "none")}` });
       for (const finding of designCore.V1PlatformBomFoundation.findings) rows.push({ Section: "V1 BOM Findings", Scope: joinCsvList(finding.affectedRows, "project"), Name: finding.title, Key: `${finding.severity} | ${finding.code}`, Value: finding.detail, Notes: finding.remediation });
@@ -1189,7 +1243,11 @@ export async function getCsvRows(projectId: string) {
 
     // V1_DISCOVERY_CURRENT_STATE_CONTRACT: CSV export distinguishes manual, imported, validated, conflicting, and review-required current-state evidence.
     if (designCore.V1DiscoveryCurrentState) {
+<<<<<<< HEAD
       rows.push({ Section: "V1 Discovery/Current-State", Scope: "Project", Name: designCore.projectName, Key: designCore.V1DiscoveryCurrentState.overallReadiness, Value: `${designCore.V1DiscoveryCurrentState.areaRowCount} discovery area(s) / ${designCore.V1DiscoveryCurrentState.importTargetCount} import target(s) / ${designCore.V1DiscoveryCurrentState.taskCount} task(s)`, Notes: `Contract ${designCore.V1DiscoveryCurrentState.contract} | State ${designCore.V1DiscoveryCurrentState.discoveryState} | Authority ${designCore.V1DiscoveryCurrentState.currentStateAuthority} | ${designCore.V1DiscoveryCurrentState.discoveryReadinessReason} | Role ${designCore.V1DiscoveryCurrentState.role}` });
+=======
+      rows.push({ Section: "V1 Discovery/Current-State", Scope: "Project", Name: designCore.projectName, Key: designCore.V1DiscoveryCurrentState.overallReadiness, Value: `${designCore.V1DiscoveryCurrentState.areaRowCount} discovery area(s) / ${designCore.V1DiscoveryCurrentState.importTargetCount} import target(s) / ${designCore.V1DiscoveryCurrentState.taskCount} task(s)`, Notes: `Contract ${designCore.V1DiscoveryCurrentState.contract} | Authority ${designCore.V1DiscoveryCurrentState.currentStateAuthority} | Role ${designCore.V1DiscoveryCurrentState.role}` });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       for (const area of designCore.V1DiscoveryCurrentState.areaRows) rows.push({ Section: "V1 Discovery Areas", Scope: area.area, Name: area.area, Key: `${area.state} | ${area.readinessImpact}`, Value: `${area.evidenceCount} evidence line(s)`, Notes: `Required for: ${joinCsvList(area.requiredFor, "none")} | Requirements: ${joinCsvList(area.sourceRequirementIds, "none")} | Review: ${area.reviewReason}` });
       for (const target of designCore.V1DiscoveryCurrentState.importTargets) rows.push({ Section: "V1 Discovery Import Targets", Scope: target.target, Name: target.target, Key: `${target.state} | ${target.readinessImpact}`, Value: joinCsvList(target.sourceExamples, "examples not listed"), Notes: `Required for: ${joinCsvList(target.requiredFor, "none")} | Reconciliation: ${target.reconciliationNeed}` });
       for (const task of designCore.V1DiscoveryCurrentState.tasks) rows.push({ Section: "V1 Discovery Tasks", Scope: task.requirementId, Name: task.title, Key: `${task.priority} | ${task.state} | ${task.readinessImpact}`, Value: task.detail, Notes: `Targets: ${joinCsvList(task.linkedTargets, "none")} | Blockers: ${joinCsvList(task.blockers, "none")}` });
@@ -1384,11 +1442,19 @@ export async function getCsvRows(projectId: string) {
     if (designCore.V1EnterpriseIpamTruth) {
       const V1 = designCore.V1EnterpriseIpamTruth;
       rows.push({
+<<<<<<< HEAD
         Section: "V1 Enterprise IPAM Authority",
         Scope: "Project",
         Name: designCore.projectName,
         Key: V1.contractVersion,
         Value: `${V1.overallReadiness} | ${V1.durablePoolCount} pools / ${V1.candidateAllocationCount ?? V1.durableCandidateCount} candidate / ${V1.approvedAllocationCount} approved`,
+=======
+        Section: "V1 Enterprise IPAM Durable Authority",
+        Scope: "Project",
+        Name: designCore.projectName,
+        Key: V1.contractVersion,
+        Value: `${V1.overallReadiness} | ${V1.durablePoolCount} pools / ${V1.durableAllocationCount} allocations / ${V1.approvedAllocationCount} approved`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         Notes: `Proposal-only ${V1.engine1ProposalOnlyCount}; blockers ${V1.conflictBlockerCount}; review ${V1.reviewRequiredCount}; stale ${V1.staleAllocationCount}; hash ${V1.currentInputHash}`,
       });
 
@@ -1398,7 +1464,11 @@ export async function getCsvRows(projectId: string) {
           Scope: row.siteName,
           Name: `VLAN ${row.vlanId} ${row.vlanName}`,
           Key: row.reconciliationState,
+<<<<<<< HEAD
           Value: `${row.engine1PlannedCidr} -> ${row.engine2AllocationCidr || "planned-only"}`,
+=======
+          Value: `${row.engine1PlannedCidr} -> ${row.engine2AllocationCidr || "proposal-only"}`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           Notes: `Readiness ${row.readinessImpact}; pool ${row.engine2PoolName || "none"}; route domain ${row.routeDomainKey}; blockers ${joinCsvList(row.blockers, "none")}; review ${joinCsvList(row.reviewReasons, "none")}`,
         });
       }
@@ -1408,7 +1478,11 @@ export async function getCsvRows(projectId: string) {
           Section: "V1 Requirement-to-IPAM Matrix",
           Scope: item.readinessImpact,
           Name: item.requirementKey,
+<<<<<<< HEAD
           Key: `${item.approvedAllocationCount} approved / ${item.candidateAllocationCount ?? item.durableCandidateCount} candidate / ${item.engine1ProposalOnlyCount} planned-only`,
+=======
+          Key: `${item.approvedAllocationCount} approved / ${item.durableCandidateCount} candidate / ${item.engine1ProposalOnlyCount} proposal-only`,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
           Value: joinCsvList(item.materializedIpamEvidence, "No IPAM evidence recorded"),
           Notes: `Missing ${joinCsvList(item.missingIpamEvidence, "none")} | Expected ${item.expectedIpamImpact}`,
         });
@@ -1698,6 +1772,7 @@ export async function getCsvRows(projectId: string) {
 
   return rows;
 }
+<<<<<<< HEAD
 export async function getJsonExport(projectId: string) {
   const project = await getProjectExportData(projectId);
   const designCore = await getDesignCoreSnapshotForExport(projectId);
@@ -1712,4 +1787,6 @@ export async function getJsonExport(projectId: string) {
   };
 }
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export type { ProfessionalReport, ReportMetadata, ReportSection, ReportTable, ReportVisualSnapshot } from "./export.types.js";

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
+=======
+import { useEffect, useMemo, useRef, useState } from "react";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -20,7 +24,10 @@ import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
 import { buildReportTruthModel, truthBadgeClass } from "../lib/reportDiagramTruth";
+<<<<<<< HEAD
 import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -59,13 +66,26 @@ const EXPORT_STAGES = [
   "Finalizing downloadable file",
 ];
 
+<<<<<<< HEAD
+=======
+const EXPORT_TIMEOUT_MS = 150_000;
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 function exportKindLabel(kind: ExportKind) {
   if (kind === "pdf") return "professional PDF report";
   if (kind === "docx") return "professional DOCX report";
   return "Excel-friendly CSV export";
 }
 
+<<<<<<< HEAD
 function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCancelNote: () => void }) {
+=======
+function ExportProgressModal({ run, onCancelNote, onCancelExport }: { run: ExportRunState; onCancelNote: () => void; onCancelExport: () => void }) {
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   if (!run) return null;
   const stage = EXPORT_STAGES[Math.min(run.stageIndex, EXPORT_STAGES.length - 1)] ?? EXPORT_STAGES[0];
   const longRunning = run.elapsedSeconds >= 60;
@@ -89,9 +109,16 @@ function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCan
             <span>Elapsed: {run.elapsedSeconds}s</span>
             <span>{longRunning ? "Still working — do not click export again." : "Request is active."}</span>
           </div>
+<<<<<<< HEAD
           <button type="button" className="link-button" onClick={onCancelNote}>
             Keep working note
           </button>
+=======
+          <div className="form-actions" style={{ marginTop: 2 }}>
+            <button type="button" className="link-button" onClick={onCancelNote}>Keep working note</button>
+            <button type="button" className="link-button" onClick={onCancelExport}>Cancel export request</button>
+          </div>
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         </div>
       </div>
     </div>
@@ -125,9 +152,13 @@ function reportTruthLabel(label: string) {
     USER_PROVIDED: "User provided",
     REQUIREMENT_MATERIALIZED: "Applied requirement",
     BACKEND_COMPUTED: "System calculated",
+<<<<<<< HEAD
     DURABLE_IPAM: "IPAM evidence",
     CANDIDATE_IPAM: "Candidate IPAM",
     APPROVED_IPAM: "Approved IPAM",
+=======
+    DURABLE_IPAM: "Durable IPAM",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     INFERRED: "Inferred / needs review",
     ESTIMATED: "Estimate",
     REVIEW_REQUIRED: "Needs review",
@@ -179,6 +210,10 @@ export function ProjectReportPage() {
   const validationQuery = useValidationResults(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeExport, setActiveExport] = useState<ExportRunState>(null);
+<<<<<<< HEAD
+=======
+  const exportAbortRef = useRef<AbortController | null>(null);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   useEffect(() => {
     if (!activeExport) return;
@@ -197,6 +232,23 @@ export function ProjectReportPage() {
 
     return () => window.clearInterval(timer);
   }, [activeExport?.startedAt]);
+<<<<<<< HEAD
+=======
+
+  useEffect(() => {
+    return () => {
+      exportAbortRef.current?.abort();
+      exportAbortRef.current = null;
+    };
+  }, []);
+
+  const cancelActiveExport = () => {
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = null;
+    setActiveExport(null);
+    setExportMessage("Export request cancelled. You can start a new export now.");
+  };
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
@@ -209,7 +261,10 @@ export function ProjectReportPage() {
   const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const reportTruth = useMemo(() => buildReportTruthModel(designCore), [designCore]);
   const V1ReportExportTruth = designCore?.V1ReportExportTruth;
+<<<<<<< HEAD
   const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -295,17 +350,35 @@ export function ProjectReportPage() {
 
   const downloadExport = async (kind: ExportKind) => {
     if (activeExport) {
+<<<<<<< HEAD
       setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish before starting another export.`);
+=======
+      setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish, cancel it, or reload the report page before starting another export.`);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       return;
     }
 
     const startedAt = Date.now();
+<<<<<<< HEAD
     setActiveExport({ kind, startedAt, elapsedSeconds: 0, stageIndex: 0 });
     setExportMessage(`Generating ${exportKindLabel(kind)}. This may take 1–4 minutes for large designs.`);
+=======
+    const controller = new AbortController();
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), EXPORT_TIMEOUT_MS);
+
+    setActiveExport({ kind, startedAt, elapsedSeconds: 0, stageIndex: 0 });
+    setExportMessage(`Generating ${exportKindLabel(kind)}. Large reports are bounded for export stability; full row-level detail remains available through CSV/full-proof evidence.`);
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
     try {
       const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
         method: "POST",
+<<<<<<< HEAD
+=======
+        signal: controller.signal,
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       });
       saveBlob(
         blob,
@@ -318,8 +391,21 @@ export function ProjectReportPage() {
       const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
       setExportMessage(`${exportKindLabel(kind)} generated in ${elapsedSeconds}s.`);
     } catch (error) {
+<<<<<<< HEAD
       setExportMessage(error instanceof Error ? error.message : "Export failed. The backend did not return a downloadable file.");
     } finally {
+=======
+      setExportMessage(
+        isAbortError(error)
+          ? "Export timed out or was cancelled before a file was returned. The request was cleared, so you can try again; use CSV first for very large evidence sets."
+          : error instanceof Error
+            ? error.message
+            : "Export failed. The backend did not return a downloadable file.",
+      );
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       setActiveExport(null);
     }
   };
@@ -344,7 +430,11 @@ export function ProjectReportPage() {
   if (!selectedSection) {
     return (
       <section style={{ display: "grid", gap: 18 }}>
+<<<<<<< HEAD
         <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
+=======
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} onCancelExport={cancelActiveExport} />
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <div className="panel workspace-selection-blank report-landing-shell">
           <p className="workspace-detail-kicker">Deliver</p>
           <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
@@ -397,7 +487,11 @@ export function ProjectReportPage() {
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
+<<<<<<< HEAD
         <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
+=======
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} onCancelExport={cancelActiveExport} />
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       {isFocusedSectionView ? (
         <>
         <div className="panel workspace-detail-toolbar">
@@ -410,7 +504,10 @@ export function ProjectReportPage() {
           </div>
         </div>
         <WorkspaceIssueBanner notice={issueNotice} />
+<<<<<<< HEAD
       <BackendEvidenceTruthCards evidenceView={reportEvidenceView} />
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <DesignAuthorityBanner authority={authority} compact />
         </>
       ) : (
@@ -446,7 +543,10 @@ export function ProjectReportPage() {
 
       {!isFocusedSectionView ? <>
         <WorkspaceIssueBanner notice={issueNotice} />
+<<<<<<< HEAD
       <BackendEvidenceTruthCards evidenceView={reportEvidenceView} />
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
         <DesignAuthorityBanner authority={authority} compact />
       </> : null}
 
@@ -926,6 +1026,7 @@ export function ProjectReportPage() {
               {summaryCard("Missing consumers", V1ReportExportTruth.missingTraceabilityConsumerCount)}
             </div>
 
+<<<<<<< HEAD
             {reportEvidenceView ? (
               <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
                 {summaryCard("Design readiness", reportEvidenceView.readiness.designReview)}
@@ -942,6 +1043,8 @@ export function ProjectReportPage() {
               </div>
             ) : null}
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             <div>
               <h3 style={{ marginTop: 0, marginBottom: 8 }}>Required report sections</h3>
               <div className="table-wrap"><table><thead><tr><th>Section</th><th>Report section</th><th>Frontend location</th><th>Readiness</th><th>Evidence labels</th></tr></thead><tbody>

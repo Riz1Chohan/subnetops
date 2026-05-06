@@ -224,14 +224,20 @@ export function ProjectDiscoveryPage() {
           <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <span className={V1DiscoveryCurrentState.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1DiscoveryCurrentState.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>Readiness {userFacingStatusLabel(V1DiscoveryCurrentState.overallReadiness)}</span>
+<<<<<<< HEAD
               <span className="badge-soft">State {userFacingStatusLabel(V1DiscoveryCurrentState.discoveryState)}</span>
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
               <span className="badge-soft">Source {userFacingStatusLabel(V1DiscoveryCurrentState.currentStateAuthority)}</span>
               <span className="badge-soft">Areas {V1DiscoveryCurrentState.areaRowCount}</span>
               <span className="badge-soft">Import targets {V1DiscoveryCurrentState.importTargetCount}</span>
               <span className="badge-soft">Open tasks {V1DiscoveryCurrentState.openTaskCount}</span>
               <span className="badge-soft">Conflicts {V1DiscoveryCurrentState.conflictingEvidenceCount}</span>
             </div>
+<<<<<<< HEAD
             <div className="trust-note"><strong>Discovery state:</strong> {userFacingStatusLabel(V1DiscoveryCurrentState.discoveryState)} — {V1DiscoveryCurrentState.discoveryReadinessReason}</div>
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
             <div className="grid-2" style={{ alignItems: "start" }}>
               <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
                 <strong>Discovery areas</strong>

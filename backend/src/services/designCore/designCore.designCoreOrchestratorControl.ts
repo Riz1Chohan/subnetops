@@ -306,7 +306,11 @@ function buildSectionRows(input: V1SectionInput): V1OrchestratorSectionRow[] {
     },
     {
       sectionKey: "enterpriseIpamTruth",
+<<<<<<< HEAD
       label: "Engine 2 Enterprise IPAM approved truth",
+=======
+      label: "Engine 2 Enterprise IPAM durable truth",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       snapshotPath: "V1EnterpriseIpamTruth / enterpriseAllocatorPosture",
       ownerEngine: "Engine 2 enterprise IPAM",
       sourceType: "ENGINE2_DURABLE_AUTHORITY",
@@ -315,9 +319,15 @@ function buildSectionRows(input: V1SectionInput): V1OrchestratorSectionRow[] {
       downstreamConsumers: ["validation", "implementation", "report", "diagram labels", "readiness"],
       requirementContextRequired: true,
       requirementContextEvidence: ["V1EnterpriseIpamTruth.requirementIpamMatrix", "V1CidrAddressingTruth.requirementAddressingMatrix"],
+<<<<<<< HEAD
       reportImpact: "Report must distinguish planned-only planned subnets from approved IPAM allocations.",
       diagramImpact: "Address labels must not imply approval when Engine 2 says planned-only/review/blocked.",
       validationReadinessImpact: "IPAM blockers and planned-only rows prevent false implementation readiness.",
+=======
+      reportImpact: "Report must distinguish proposal-only planned subnets from durable approved allocations.",
+      diagramImpact: "Address labels must not imply approval when Engine 2 says proposal-only/review/blocked.",
+      validationReadinessImpact: "IPAM blockers and proposal-only rows prevent false implementation readiness.",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       proofGates: ["check:V1-enterprise-ipam", "engine:selftest:V1-enterprise-ipam", "check:V1-design-core-orchestrator"],
       present: Boolean(input.V1EnterpriseIpamTruth.contractVersion),
       itemCount: input.V1EnterpriseIpamTruth.reconciliationRows.length,
@@ -422,6 +432,7 @@ function buildSectionRows(input: V1SectionInput): V1OrchestratorSectionRow[] {
       requirementContextEvidence: ["V1RequirementsClosure.closureMatrix", "securityPolicyFlow.summary"],
       reportImpact: "Security review must expose missing/overbroad/review-required policy states.",
       diagramImpact: "Security flow diagrams must render backend flow requirements only.",
+<<<<<<< HEAD
       validationReadinessImpact: "Security/NAT review debt stays visible, while only structural defects or direct policy contradictions count as blockers.",
       proofGates: ["V1 security policy selftest", "check:V1-design-core-orchestrator"],
       present: securitySummary.flowRequirementCount > 0 || securitySummary.policyMatrixRowCount > 0,
@@ -429,6 +440,15 @@ function buildSectionRows(input: V1SectionInput): V1OrchestratorSectionRow[] {
       reviewCount: securitySummary.findingCount - securitySummary.blockingFindingCount + securitySummary.missingNatCount,
       blockerCount: securitySummary.blockingFindingCount,
       notes: ["Security policy/NAT context separates true blockers from planning review debt before validation, reports, diagrams, or implementation consume it."],
+=======
+      validationReadinessImpact: "Missing policies, NAT gaps, broad policy review, and blockers remain readiness gates.",
+      proofGates: ["V1 security policy selftest", "check:V1-design-core-orchestrator"],
+      present: securitySummary.flowRequirementCount > 0 || securitySummary.policyMatrixRowCount > 0,
+      itemCount: securitySummary.flowRequirementCount + securitySummary.policyMatrixRowCount + securitySummary.serviceObjectCount,
+      reviewCount: securitySummary.findingCount - securitySummary.blockingFindingCount,
+      blockerCount: securitySummary.blockingFindingCount + securitySummary.missingNatCount,
+      notes: ["V1 coordinates security context only; V1 will harden policy consequences deeper."],
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     },
     {
       sectionKey: "implementationTruth",
@@ -533,8 +553,13 @@ function buildDependencyEdges(rows: V1OrchestratorSectionRow[]): V1OrchestratorD
   return [
     edge("V1-source-to-materialization", "sourceInputs", "materializedObjects", "requirements normalize into materialization outcomes", ["V1 lineage feeds V1 policy outcomes."]),
     edge("V1-materialization-to-addressing", "materializedObjects", "addressingTruth", "materialized segment demand feeds Engine 1", ["V1/3 requirement rows feed V1 addressing matrix."]),
+<<<<<<< HEAD
     edge("V1-addressing-to-ipam", "addressingTruth", "enterpriseIpamTruth", "Engine 1 planned rows reconcile with Engine 2 Engine 2 IPAM", ["V1 reconciliation rows map planned CIDRs to candidate/approved allocation states."]),
     edge("V1-ipam-to-object-model", "enterpriseIpamTruth", "objectModelTruth", "Engine 2 IPAM state gates object/model implementation confidence", ["Object labels must not overclaim when IPAM says planned-only/review/blocked."]),
+=======
+    edge("V1-addressing-to-ipam", "addressingTruth", "enterpriseIpamTruth", "Engine 1 planned rows reconcile with Engine 2 durable IPAM", ["V1 reconciliation rows map planned CIDRs to durable allocation states."]),
+    edge("V1-ipam-to-object-model", "enterpriseIpamTruth", "objectModelTruth", "durable IPAM state gates object/model implementation confidence", ["Object labels must not overclaim when IPAM says proposal-only/review/blocked."]),
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
     edge("V1-object-model-to-graph", "objectModelTruth", "graphTruth", "backend objects become dependency graph nodes/edges", ["Design graph summarizes object relationships and blockers."]),
     edge("V1-graph-to-routing", "graphTruth", "routingTruth", "graph/object relationships support routing/segmentation review", ["Routing context consumes route domains, links, interfaces, and segmentation expectations."]),
     edge("V1-routing-to-security", "routingTruth", "securityTruth", "routing/segmentation context supports policy-flow review", ["Security flow expectations are meaningful only with zones and routing context."]),

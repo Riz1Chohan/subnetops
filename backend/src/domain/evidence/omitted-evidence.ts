@@ -1,5 +1,6 @@
 export type OmittedEvidenceSeverity = "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED" | "UNKNOWN";
 
+<<<<<<< HEAD
 
 export interface OmittedEvidenceDecisionSummary {
   totalSurfaces: number;
@@ -12,6 +13,8 @@ export interface OmittedEvidenceDecisionSummary {
   decisionImpact: "NONE" | "REVIEW" | "BLOCKING";
 }
 
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface OmittedEvidenceSummary {
   collection: string;
   surface: string;
@@ -138,6 +141,7 @@ export function mergeOmittedEvidenceSummaries(summaries: OmittedEvidenceSummary[
     reviewSurfaceCount: summaries.filter((row) => row.readinessImpact === "REVIEW").length,
   };
 }
+<<<<<<< HEAD
 
 
 export function buildOmittedEvidenceDecisionSummary(summaries: OmittedEvidenceSummary[]): OmittedEvidenceDecisionSummary {
@@ -165,3 +169,5 @@ export function buildOmittedEvidenceDecisionSummary(summaries: OmittedEvidenceSu
     decisionImpact,
   };
 }
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8

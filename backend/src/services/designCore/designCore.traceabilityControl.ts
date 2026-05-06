@@ -24,7 +24,11 @@ export const V1_TRUTH_SOURCE_TYPE_POLICIES: Array<{ sourceType: DesignTruthSourc
   { sourceType: "USER_PROVIDED", rule: "Saved by the user as an explicit input; still needs downstream evidence before it becomes engineering authority." },
   { sourceType: "REQUIREMENT_MATERIALIZED", rule: "Created or strengthened by the backend requirement materializer from a captured requirement signal." },
   { sourceType: "BACKEND_COMPUTED", rule: "Computed inside backend design-core or engine code from source objects and validated inputs." },
+<<<<<<< HEAD
   { sourceType: "DURABLE_IPAM", rule: "Owned by the Engine 2 IPAM workflow, approvals, conflicts, and ledger." },
+=======
+  { sourceType: "DURABLE_IPAM", rule: "Owned by the durable enterprise IPAM workflow, approvals, conflicts, and ledger." },
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   { sourceType: "INFERRED", rule: "Inferred by backend logic and must be visibly labelled; never implementation authority by itself." },
   { sourceType: "ESTIMATED", rule: "Estimate or sizing assumption; must expose calculation basis and review reason." },
   { sourceType: "IMPORTED", rule: "Imported/manual current-state evidence; must not be treated as validated discovery until reconciled." },

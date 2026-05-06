@@ -16,7 +16,11 @@ const planning = read('backend/src/services/designCore/designCore.implementation
 for (const token of ['V1ImplementationExecutionDisposition', 'executionDisposition', 'PLANNING_CANDIDATE', 'STRUCTURAL_BLOCKER', 'structuralBlocker', 'planningCandidateStepCount', 'structuralBlockedStepCount', 'V1_PLANNING_CANDIDATE_STEPS_PRESENT', 'V1_STRUCTURAL_BLOCKED_STEPS_PRESENT']) {
   assert(planning.includes(token), `implementation planning control must include ${token}`);
 }
+<<<<<<< HEAD
 assert(planning.includes('evaluateImplementationExecutionGate') && planning.includes('executionGateReviewReasons'), 'non-structural blocked source steps must de-escalate through execution-gate review reasons in V1 gates');
+=======
+assert(planning.includes('readiness === "BLOCKED" ? "REVIEW_REQUIRED"'), 'non-structural blocked source steps must de-escalate to review-required in V1 gates');
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 const templates = read('backend/src/services/designCore/designCore.implementationTemplatesControl.ts');
 for (const token of ['hasStructuralTemplateDefect', 'stepGate?.structuralBlocker', 'stepGate?.executionDisposition === "PLANNING_CANDIDATE"', 'V1_STRUCTURAL_BLOCKED_TEMPLATES_PRESENT']) {

@@ -44,7 +44,11 @@ app.use(csrfProtection);
 app.get("/api/health", async (_req, res) => {
   try {
     await checkDatabaseHealth();
+<<<<<<< HEAD
     res.json({ ok: true, service: "subnetops-backend", db: "ok", deploymentConfig: env.deploymentConfigReady ? "ok" : "review", release: REQUIREMENTS_RUNTIME_RELEASE });
+=======
+    res.json({ ok: true, service: "subnetops-backend", db: "ok", release: REQUIREMENTS_RUNTIME_RELEASE });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   } catch {
     res.status(503).json({ ok: false, service: "subnetops-backend", db: "unavailable" });
   }
@@ -57,7 +61,11 @@ app.get("/api/health/live", (_req, res) => {
 app.get("/api/health/ready", async (_req, res) => {
   try {
     await checkDatabaseHealth();
+<<<<<<< HEAD
     res.json({ ok: true, ready: true, checks: { database: "ok", deploymentConfig: "ok" }, release: REQUIREMENTS_RUNTIME_RELEASE });
+=======
+    res.json({ ok: true, ready: true, release: REQUIREMENTS_RUNTIME_RELEASE });
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   } catch {
     res.status(503).json({ ok: false, ready: false, checks: { database: "unavailable", deploymentConfig: env.deploymentConfigReady ? "ok" : "review" } });
   }

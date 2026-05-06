@@ -90,7 +90,11 @@ const V1EnterpriseIpamTruth = {
       siteName: "HQ",
       vlanId: 20,
       vlanName: "Guest",
+<<<<<<< HEAD
       reconciliationState: "ENGINE2_CONFLICT_BLOCKED",
+=======
+      reconciliationState: "ENGINE2_CONFLICT_REVIEW_BLOCKER",
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
       readinessImpact: "BLOCKING",
       blockers: ["Brownfield overlap exists."],
       reviewReasons: [],

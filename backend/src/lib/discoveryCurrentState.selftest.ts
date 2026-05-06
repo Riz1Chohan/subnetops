@@ -67,8 +67,11 @@ const result = buildV1DiscoveryCurrentStateControl({
 assert.equal(result.contract, V1_DISCOVERY_CURRENT_STATE_CONTRACT);
 assert.equal(result.role, "MANUAL_DISCOVERY_BOUNDARY_NO_LIVE_DISCOVERY_CLAIMS");
 assert.equal(result.currentStateAuthority, "MANUAL_OR_IMPORTED_EVIDENCE_ONLY_NOT_LIVE_DISCOVERY");
+<<<<<<< HEAD
 assert.equal(result.discoveryState, "IMPORTED_REVIEW_REQUIRED");
 assert(result.discoveryReadinessReason.includes("reconciliation/review"));
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(result.areaRows.some((row) => row.area === "Addressing and VLAN baseline" && row.state === "CONFLICTING"));
 assert(result.importTargets.some((target) => target.target === "Routing tables" && ["IMPORTED", "CONFLICTING"].includes(target.state)));
 assert(result.importTargets.some((target) => target.target === "Cloud VPC/VNet data" && ["IMPORTED", "CONFLICTING"].includes(target.state)));
@@ -90,7 +93,10 @@ const emptyResult = buildV1DiscoveryCurrentStateControl({
   discoveredStateImportPlan: { readiness: "not-ready", suggestedSources: [], requiredNormalizations: [], notes: [] },
 });
 
+<<<<<<< HEAD
 assert.equal(emptyResult.discoveryState, "NOT_CAPTURED");
 assert(emptyResult.discoveryReadinessReason.includes("current-state inventory is not imported"));
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 assert(emptyResult.findings.some((finding) => finding.code === "V1_MANUAL_DISCOVERY_EMPTY_STATE"));
 console.log("[V1] Discovery/current-state selftest passed");

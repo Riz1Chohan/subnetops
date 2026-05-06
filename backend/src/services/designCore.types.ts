@@ -126,8 +126,11 @@ export type DesignTruthSourceType =
   | "REQUIREMENT_MATERIALIZED"
   | "BACKEND_COMPUTED"
   | "DURABLE_IPAM"
+<<<<<<< HEAD
   | "CANDIDATE_IPAM"
   | "APPROVED_IPAM"
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   | "INFERRED"
   | "ESTIMATED"
   | "IMPORTED"
@@ -145,7 +148,10 @@ export type DesignProofStatus =
 export type RequirementPropagationLifecycleStatus =
   | "NOT_CAPTURED"
   | "CAPTURED_ONLY"
+<<<<<<< HEAD
   | "EXPLICIT_NO_OP"
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   | "MATERIALIZED"
   | "PARTIALLY_PROPAGATED"
   | "FULLY_PROPAGATED"
@@ -778,8 +784,11 @@ export interface V1RequirementClosureMatrixRow {
   consumerCoverage: V1RequirementConsumerCoverage;
   evidence: string[];
   reviewReason?: string;
+<<<<<<< HEAD
   blockedReason?: string;
   lifecycleProofStatus: "PROVEN" | "REVIEW_REQUIRED" | "EXPLICIT_NO_OP" | "NOT_ACTIVE";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 }
 
 export interface V1GoldenScenarioClosure {
@@ -886,6 +895,7 @@ export interface V1CidrAddressingTruthControlSummary {
 
 export type V1IpamReadinessImpact = "PASSED" | "WARNING" | "REVIEW_REQUIRED" | "BLOCKING" | "NOT_APPLICABLE";
 export type V1IpamReconciliationState =
+<<<<<<< HEAD
   | "ENGINE1_PLANNED_ONLY"
   | "ENGINE2_CANDIDATE_ALLOCATION"
   | "ENGINE2_APPROVED_ALLOCATION"
@@ -893,6 +903,14 @@ export type V1IpamReconciliationState =
   | "ENGINE2_STALE_APPROVAL"
   | "ENGINE2_CONFLICT_BLOCKED"
   | "ENGINE2_IMPORTED_BROWNFIELD_CONFLICT"
+=======
+  | "ENGINE1_PROPOSAL_ONLY"
+  | "ENGINE2_DURABLE_CANDIDATE"
+  | "ENGINE2_APPROVED_ALLOCATION"
+  | "ENGINE2_APPROVED_WITH_REVIEW_NOTES"
+  | "ENGINE2_CONFLICT_REVIEW_BLOCKER"
+  | "ENGINE2_STALE_ALLOCATION_REVIEW"
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   | "ENGINE2_POOL_BLOCKED"
   | "ENGINE2_DHCP_CONFLICT_REVIEW"
   | "ENGINE2_RESERVATION_CONFLICT_REVIEW";
@@ -918,7 +936,11 @@ export interface V1EnterpriseIpamReconciliationRow {
   engine2PoolId?: string;
   engine2PoolName?: string;
   routeDomainKey: string;
+<<<<<<< HEAD
   sourceTruth: "ENGINE1_PLANNED" | "CANDIDATE_IPAM" | "APPROVED_IPAM";
+=======
+  sourceTruth: "ENGINE1_PLANNED" | "DURABLE_IPAM";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   reconciliationState: V1IpamReconciliationState;
   readinessImpact: V1IpamReadinessImpact;
   approvedHashMatches: boolean;
@@ -938,7 +960,10 @@ export interface V1EnterpriseIpamRequirementMatrixRow {
   plannedNeedCount: number;
   engine1ProposalOnlyCount: number;
   durableCandidateCount: number;
+<<<<<<< HEAD
   candidateAllocationCount: number;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   approvedAllocationCount: number;
   conflictOrReviewBlockerCount: number;
   materializedIpamEvidence: string[];
@@ -962,9 +987,12 @@ export interface V1EnterpriseIpamTruthControlSummary {
   routeDomainCount: number;
   durablePoolCount: number;
   durableAllocationCount: number;
+<<<<<<< HEAD
   candidateAllocationCount: number;
   approvedAllocationCount: number;
   conflictAllocationCount: number;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   dhcpScopeCount: number;
   reservationCount: number;
   brownfieldNetworkCount: number;
@@ -974,6 +1002,10 @@ export interface V1EnterpriseIpamTruthControlSummary {
   overallReadiness: V1IpamReadinessImpact;
   engine1ProposalOnlyCount: number;
   durableCandidateCount: number;
+<<<<<<< HEAD
+=======
+  approvedAllocationCount: number;
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   staleAllocationCount: number;
   conflictBlockerCount: number;
   reviewRequiredCount: number;
@@ -1502,7 +1534,10 @@ export interface V1RouteDomainReviewRow { routeDomainId: string; routeDomainName
 export interface V1RoutingFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: V1RoutingSegmentationReadiness; remediation: string; }
 export interface V1RoutingSegmentationControlSummary { contract: "V1_ROUTING_SEGMENTATION_PROTOCOL_AWARE_PLANNING_CONTRACT"; role: "ROUTING_INTENT_REVIEW_NOT_PACKET_SIMULATION"; overallReadiness: V1RoutingSegmentationReadiness; routeDomainCount: number; routeIntentCount: number; protocolIntentCount: number; connectedRouteIntentCount: number; staticRouteIntentCount: number; summaryRouteIntentCount: number; defaultRouteIntentCount: number; ospfReviewCount: number; bgpReviewCount: number; routeLeakingReviewCount: number; ecmpReviewCount: number; redistributionReviewCount: number; cloudRouteTableReviewCount: number; wanPostureReviewCount: number; segmentationReachabilityReviewCount: number; asymmetricRoutingReviewCount: number; requirementRoutingMatrixCount: number; activeRequirementRoutingGapCount: number; blockedProtocolIntentCount: number; reviewProtocolIntentCount: number; simulationUnavailableCount: number; findingCount: number; blockingFindingCount: number; reviewFindingCount: number; routingReadiness: "ready" | "review" | "blocked"; segmentationReadiness: "ready" | "review" | "blocked"; routeDomainReviews: V1RouteDomainReviewRow[]; protocolIntents: V1ProtocolIntentRow[]; requirementRoutingMatrix: V1RequirementRoutingMatrixRow[]; siteReachabilityChecks: SiteToSiteReachabilityCheck[]; findings: V1RoutingFinding[]; notes: string[]; }
 
+<<<<<<< HEAD
 export type SecurityPolicyReviewClass = "STRUCTURAL_BLOCKER" | "DIRECT_POLICY_CONFLICT_BLOCKER" | "PLANNING_REVIEW_ITEM" | "ADVISORY_ITEM";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export type V1SecurityPolicyReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1SecurityPolicyState = "REQUIRED" | "RECOMMENDED" | "BLOCKED" | "MISSING" | "OVERBROAD" | "SHADOWED" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
 export type V1SecurityControlCategory = "zone-matrix" | "business-service" | "default-deny" | "guest-isolation" | "management-plane" | "dmz-exposure" | "remote-access" | "cloud-hybrid" | "nat" | "logging" | "broad-permit" | "shadowing" | "policy-consequence" | "voice" | "iot-printer-camera";
@@ -1512,7 +1547,11 @@ export interface V1FlowConsequenceRow { id: string; flowRequirementId: string; n
 export interface V1NatReviewRow { id: string; natReviewId: string; natRuleId: string; natRuleName: string; sourceZoneName: string; destinationZoneName?: string; status: SecurityNatReview["status"]; coveredFlowRequirementIds: string[]; missingFlowRequirementIds: string[]; V1PolicyState: V1SecurityPolicyState; readinessImpact: V1SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
 export interface V1LoggingReviewRow { id: string; flowRequirementId: string; flowName: string; required: boolean; matchedPolicyRuleIds: string[]; V1PolicyState: V1SecurityPolicyState; readinessImpact: V1SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
 export interface V1ShadowingReviewRow { id: string; ruleId: string; ruleName: string; sequence: number; action: PolicyRule["action"]; broadMatch: boolean; shadowsRuleIds: string[]; shadowedByRuleIds: string[]; V1PolicyState: V1SecurityPolicyState; readinessImpact: V1SecurityPolicyReadiness; evidence: string[]; reviewReason?: string; notes: string[]; }
+<<<<<<< HEAD
 export interface V1SecurityPolicyFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; reviewClass?: SecurityPolicyReviewClass; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: V1SecurityPolicyReadiness; remediation: string; }
+=======
+export interface V1SecurityPolicyFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedObjectIds: string[]; readinessImpact: V1SecurityPolicyReadiness; remediation: string; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1SecurityPolicyFlowControlSummary { contract: "V1_SECURITY_POLICY_FLOW_CONTRACT"; role: "ZONE_SERVICE_NAT_LOGGING_POLICY_REVIEW_NOT_FIREWALL_CONFIG"; overallReadiness: V1SecurityPolicyReadiness; serviceObjectCount: number; serviceGroupCount: number; zonePolicyReviewCount: number; flowConsequenceCount: number; requirementSecurityMatrixCount: number; activeRequirementSecurityGapCount: number; requiredFlowCount: number; missingFlowCount: number; blockedFlowCount: number; overbroadPolicyCount: number; shadowedRuleCount: number; loggingReviewCount: number; loggingGapCount: number; natReviewCount: number; missingNatCount: number; reviewRequiredCount: number; findingCount: number; blockingFindingCount: number; reviewFindingCount: number; policyReadiness: "ready" | "review" | "blocked"; natReadiness: "ready" | "review" | "blocked"; requirementSecurityMatrix: V1RequirementSecurityMatrixRow[]; zonePolicyReviews: V1ZonePolicyReviewRow[]; flowConsequences: V1FlowConsequenceRow[]; natReviews: V1NatReviewRow[]; loggingReviews: V1LoggingReviewRow[]; shadowingReviews: V1ShadowingReviewRow[]; findings: V1SecurityPolicyFinding[]; notes: string[]; }
 
 export interface RouteIntent {
@@ -1766,7 +1805,10 @@ export interface SecurityNatReview {
 
 export interface SecurityPolicyFinding {
   severity: "ERROR" | "WARNING" | "INFO";
+<<<<<<< HEAD
   reviewClass?: SecurityPolicyReviewClass;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   code: string;
   title: string;
   detail: string;
@@ -1995,7 +2037,11 @@ export type V1ImplementationReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1ImplementationState = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "DRAFT_ONLY" | "UNSUPPORTED";
 export type V1ImplementationExecutionDisposition = "EXECUTION_READY" | "PLANNING_CANDIDATE" | "REVIEW_REQUIRED" | "STRUCTURAL_BLOCKER";
 export interface V1ImplementationStageGateRow { stageId: string; stageName: string; stageType: ImplementationPlanStageType; sequence: number; stepIds: string[]; readyStepIds: string[]; reviewStepIds: string[]; blockedStepIds: string[]; exitCriteria: string[]; readinessImpact: V1ImplementationReadiness; blockers: string[]; evidence: string[]; notes: string[]; }
+<<<<<<< HEAD
 export interface V1ImplementationStepGateRow { stepId: string; title: string; stageId: string; category: ImplementationPlanStepCategory; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; sourceObjectIds: string[]; sourceRequirementIds: string[]; sourceTruthState?: NetworkObjectTruthState; preconditions: string[]; operatorAction: string; verificationEvidence: string[]; rollbackStep: string; riskLevel: ImplementationPlanStep["riskLevel"]; dependencyStepIds: string[]; blockingDependencyIds: string[]; readinessState: V1ImplementationState; readinessImpact: V1ImplementationReadiness; executionDisposition: V1ImplementationExecutionDisposition; structuralBlocker: boolean; executionGateFailures: string[]; executionGateReviewReasons: string[]; operationalSafetyGateRequired: boolean; operationalSafetyGatePresent: boolean; evidence: string[]; reviewReason?: string; notes: string[]; }
+=======
+export interface V1ImplementationStepGateRow { stepId: string; title: string; stageId: string; category: ImplementationPlanStepCategory; targetObjectType: ImplementationPlanTargetObjectType; targetObjectId?: string; sourceObjectIds: string[]; sourceRequirementIds: string[]; sourceTruthState?: NetworkObjectTruthState; preconditions: string[]; operatorAction: string; verificationEvidence: string[]; rollbackStep: string; riskLevel: ImplementationPlanStep["riskLevel"]; dependencyStepIds: string[]; blockingDependencyIds: string[]; readinessState: V1ImplementationState; readinessImpact: V1ImplementationReadiness; executionDisposition: V1ImplementationExecutionDisposition; structuralBlocker: boolean; evidence: string[]; reviewReason?: string; notes: string[]; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1ImplementationDependencyGateRow { dependencyId: string; sourceStepId?: string; targetStepId?: string; sourceObjectId?: string; targetObjectId?: string; relationship: ImplementationDependencyGraphEdge["relationship"]; required: boolean; readinessImpact: V1ImplementationReadiness; evidence: string[]; notes: string[]; }
 export interface V1ImplementationFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedStepIds: string[]; readinessImpact: V1ImplementationReadiness; remediation: string; }
 export interface V1ImplementationPlanningControlSummary { contract: "V1_IMPLEMENTATION_PLANNING_CONTRACT"; role: "VERIFIED_SOURCE_OBJECT_GATED_IMPLEMENTATION_PLAN_NOT_VENDOR_CONFIG"; overallReadiness: V1ImplementationReadiness; stageGateCount: number; stepGateCount: number; readyStepGateCount: number; reviewStepGateCount: number; blockedStepGateCount: number; planningCandidateStepCount: number; executionReadyStepCount: number; structuralBlockedStepCount: number; highRiskStepCount: number; highRiskStepWithSafetyGateCount: number; dependencyGateCount: number; graphBackedDependencyCount: number; verificationEvidenceGateCount: number; rollbackGateCount: number; requirementLineageGapCount: number; sourceObjectGapCount: number; blockedFindingCount: number; reviewFindingCount: number; findingCount: number; implementationReadiness: ImplementationPlanSummary["implementationReadiness"]; stageGates: V1ImplementationStageGateRow[]; stepGates: V1ImplementationStepGateRow[]; dependencyGates: V1ImplementationDependencyGateRow[]; findings: V1ImplementationFinding[]; notes: string[]; }
@@ -2128,6 +2174,7 @@ export interface V1ReadinessLadderControlSummary {
 
 
 export interface OmittedEvidenceSummary { collection: string; surface: string; shownCount: number; totalCount: number; omittedCount: number; omittedHasBlockers: boolean; omittedHasReviewRequired: boolean; omittedSeveritySummary: Record<string, number>; readinessImpact: "NONE" | "REVIEW" | "BLOCKING"; exportImpact: string; }
+<<<<<<< HEAD
 export interface OmittedEvidenceDecisionSummary { totalSurfaces: number; totalOmittedRows: number; blockingSurfaces: string[]; reviewSurfaces: string[]; implementationAffected: boolean; reportAffected: boolean; diagramAffected: boolean; decisionImpact: "NONE" | "REVIEW" | "BLOCKING"; }
 
 export type V1ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
@@ -2135,22 +2182,34 @@ export type V1ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKE
 export interface V1ReportEvidenceView { contract: "V1_REPORT_EVIDENCE_VIEW_CONTRACT"; role: "CANONICAL_EXPORT_EVIDENCE_VIEW_FOR_DOCX_PDF_CSV_JSON_FRONTEND"; readiness: { designReview: V1ReportExportTruthReadiness; implementation: V1ReportExportTruthReadiness; reportExport: V1ReportExportTruthReadiness; diagram: V1ReportExportTruthReadiness }; validation: { rootBlockerCount: number; propagatedBlockerCount: number; derivedImpactCount: number; reviewItemCount: number; warningCount: number }; requirements: { materializedCount: number; blockedCount: number; reviewRequiredCount: number; missingMandatoryConsumerCount: number }; ipam: { plannedRows: number; candidateAllocations: number; approvedAllocations: number; staleAllocations: number; conflictBlockers: number }; implementation: { executableSteps: number; planningCandidateSteps: number; blockedSteps: number; reviewSteps: number }; omittedEvidence: { hiddenBlockerSurfaces: number; hiddenReviewSurfaces: number; omittedRows: number; blockingSurfaces: string[]; reviewSurfaces: string[]; implementationAffected: boolean; reportAffected: boolean; diagramAffected: boolean; decisionImpact: "NONE" | "REVIEW" | "BLOCKING" }; sourceInvariant: "ALL_EXPORT_FORMATS_CONSUME_THIS_VIEW_NO_RECOMPUTED_COUNTS"; }
 
 export type V1ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "DURABLE_IPAM" | "CANDIDATE_IPAM" | "APPROVED_IPAM" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
+=======
+
+export type V1ReportExportTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
+export type V1ReportTruthLabel = "USER_PROVIDED" | "REQUIREMENT_MATERIALIZED" | "BACKEND_COMPUTED" | "DURABLE_IPAM" | "INFERRED" | "ESTIMATED" | "REVIEW_REQUIRED" | "BLOCKED" | "UNSUPPORTED";
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1ReportSectionGateRow { sectionKey: string; title: string; required: boolean; readinessImpact: V1ReportExportTruthReadiness; reportSection: string; frontendLocation: string; truthLabels: V1ReportTruthLabel[]; evidence: string[]; blockers: string[]; }
 export interface V1ReportTraceabilityMatrixRow { requirementKey: string; requirementLabel: string; designConsequence: string; enginesAffected: string[]; frontendLocation: string; reportSection: string; diagramImpact: string; readinessStatus: V1ReportExportTruthReadiness; missingConsumers: string[]; sourceObjectIds: string[]; }
 export interface V1ReportTruthLabelRow { truthLabel: V1ReportTruthLabel; count: number; reportUsage: string; readinessImpact: V1ReportExportTruthReadiness; evidence: string[]; }
 export interface V1ReportExportTruthFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedSectionKeys: string[]; readinessImpact: V1ReportExportTruthReadiness; remediation: string; }
 export interface V1ReportAntiOverclaimRule { phrase: string; allowedOnlyWhen: "IMPLEMENTATION_READY" | "BACKEND_PROOF_SUPPORTS"; claimAllowed: boolean; replacement: string; evidence: string[]; }
 export interface V1ReportFullEvidenceAppendix { machineReadable: true; generatedFrom: "V1ReportExportTruth"; includesRequirementTraceability: boolean; includesSectionGates: boolean; includesTruthLabels: boolean; includesFindings: boolean; includesOmittedEvidenceSummaries: boolean; includesFullEvidenceInventory: boolean; exportFormats: Array<"PDF" | "DOCX" | "CSV" | "JSON">; }
+<<<<<<< HEAD
 
 export type V1ExportConsistencySurface = "JSON" | "CSV" | "PDF" | "DOCX" | "FRONTEND";
 export interface V1ExportConsistencySurfaceRow { surface: V1ExportConsistencySurface; sourcePath: string; rootBlockerCount: number; consumesEvidenceView: boolean; }
 export interface V1ExportConsistencyProof { contract: "V1_RUNTIME_EXPORT_CONSISTENCY_KILL_SWITCH_CONTRACT"; sourceInvariant: "JSON_CSV_PDF_DOCX_FRONTEND_COUNTS_DERIVE_FROM_V1_REPORT_EVIDENCE_VIEW"; canonicalRootBlockerCount: number; countsAgree: boolean; surfaces: V1ExportConsistencySurfaceRow[]; candidateIpamRowsLabelledApprovedAuthority: number; implementationReadyClaimAllowed: boolean; implementationBlockedButExecutableClaimed: boolean; blockedRequirementRowsWithoutProof: number; blockedRequirementProofFailures: string[]; killSwitchPassed: boolean; failures: string[]; }
 export interface V1ReportExportTruthControlSummary { contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT"; role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE"; overallReadiness: V1ReportExportTruthReadiness; requiredSectionCount: number; readySectionCount: number; reviewSectionCount: number; blockedSectionCount: number; traceabilityRowCount: number; missingTraceabilityConsumerCount: number; truthLabelRowCount: number; blockedTruthLabelCount: number; pdfDocxCsvCovered: boolean; fullMachineReadableAppendix: V1ReportFullEvidenceAppendix; implementationReadyClaimAllowed: boolean; productionReadyClaimAllowed: boolean; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; sectionGates: V1ReportSectionGateRow[]; traceabilityMatrix: V1ReportTraceabilityMatrixRow[]; truthLabelRows: V1ReportTruthLabelRow[]; findings: V1ReportExportTruthFinding[]; proofBoundary: string[]; omittedEvidenceSummaries: OmittedEvidenceSummary[]; omittedEvidenceDecisionSummary: OmittedEvidenceDecisionSummary; fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[]; antiOverclaimRules: V1ReportAntiOverclaimRule[]; evidenceView: V1ReportEvidenceView; exportConsistencyProof: V1ExportConsistencyProof; notes: string[]; }
+=======
+export interface V1ReportExportTruthControlSummary { contract: "V1_REPORT_EXPORT_TRUTH_CONTRACT"; role: "REPORT_EXPORT_BACKEND_TRUTH_REQUIREMENT_TRACEABILITY_DELIVERABLE_GATE"; overallReadiness: V1ReportExportTruthReadiness; requiredSectionCount: number; readySectionCount: number; reviewSectionCount: number; blockedSectionCount: number; traceabilityRowCount: number; missingTraceabilityConsumerCount: number; truthLabelRowCount: number; blockedTruthLabelCount: number; pdfDocxCsvCovered: boolean; fullMachineReadableAppendix: V1ReportFullEvidenceAppendix; implementationReadyClaimAllowed: boolean; productionReadyClaimAllowed: boolean; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; sectionGates: V1ReportSectionGateRow[]; traceabilityMatrix: V1ReportTraceabilityMatrixRow[]; truthLabelRows: V1ReportTruthLabelRow[]; findings: V1ReportExportTruthFinding[]; proofBoundary: string[]; omittedEvidenceSummaries: OmittedEvidenceSummary[]; fullEvidenceInventory: { collection: string; totalCount: number; surfacedCount: number; omittedCount: number; readinessImpact: string }[]; antiOverclaimRules: V1ReportAntiOverclaimRule[]; notes: string[]; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export type DesignTruthReadiness = "ready" | "review" | "blocked" | "unknown";
 export type BackendDiagramReadinessImpact = "NONE" | "REVIEW" | "BLOCKING";
 export type BackendDiagramV1TruthState = "USER_PROVIDED" | "DERIVED" | "ASSUMED" | "IMPORTED" | "REVIEW_REQUIRED" | "BLOCKED";
+<<<<<<< HEAD
 export type BackendDiagramLineageStatus = "GRAPH_BACKED" | "GRAPH_RELATIONSHIP_BACKED" | "AGGREGATED_BACKEND_EVIDENCE" | "VISUAL_ONLY_NON_EVIDENCE" | "BLOCKED_LINEAGE";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export interface BackendTruthFinding { title: string; detail: string; severity: "ERROR" | "WARNING" | "INFO"; source: "design-graph" | "routing" | "security" | "implementation" | "validation"; }
 export interface BackendReportTruthVerificationSummary { checkType: string; totalCount: number; blockedCount: number; reviewCount: number; readyCount: number; }
@@ -2192,11 +2251,14 @@ export interface BackendDiagramRenderNode {
   sourceRefs: string[];
   validationRefs: string[];
   warningBadges: string[];
+<<<<<<< HEAD
   lineageStatus: BackendDiagramLineageStatus;
   graphNodeId?: string;
   graphEdgeIds: string[];
   implementationEvidence: boolean;
   lineageRefs: string[];
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes: string[];
 }
 export interface BackendDiagramRenderEdge {
@@ -2214,10 +2276,13 @@ export interface BackendDiagramRenderEdge {
   sourceRefs: string[];
   validationRefs: string[];
   warningBadges: string[];
+<<<<<<< HEAD
   lineageStatus: BackendDiagramLineageStatus;
   graphEdgeIds: string[];
   implementationEvidence: boolean;
   lineageRefs: string[];
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   notes: string[];
 }
 export interface BackendDiagramRenderGroup {
@@ -2287,29 +2352,47 @@ export interface BackendDiagramTruthModel {
 export type V1DiagramTruthReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1DiagramModeKey = "physical" | "logical" | "wan-cloud" | "security" | "per-site" | "implementation";
 export interface V1DiagramModeContractRow { contract: "V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT"; mode: V1DiagramModeKey; purpose: string; allowedRenderLayers: BackendDiagramRenderLayer[]; requiredBackendEvidence: string[]; forbiddenFrontendBehavior: string[]; status: "AVAILABLE" | "REVIEW_REQUIRED" | "BLOCKED"; readinessImpact: V1DiagramTruthReadiness; evidenceCount: number; notes: string[]; }
+<<<<<<< HEAD
 export interface V1DiagramRenderCoverageRow { rowType: "node" | "edge"; renderId: string; backendObjectId: string; objectType?: DesignGraphNodeObjectType; relationship?: string; truthState?: NetworkObjectTruthState; readiness: DesignTruthReadiness; hasBackendIdentity: boolean; hasTruthState: boolean; hasReadiness: boolean; sourceEngine: string; relatedFindingIds: string[]; lineageStatus?: BackendDiagramLineageStatus; graphNodeId?: string; graphEdgeIds?: string[]; implementationEvidence?: boolean; hasGraphLineage?: boolean; modeImpacts: V1DiagramModeKey[]; }
+=======
+export interface V1DiagramRenderCoverageRow { rowType: "node" | "edge"; renderId: string; backendObjectId: string; objectType?: DesignGraphNodeObjectType; relationship?: string; truthState?: NetworkObjectTruthState; readiness: DesignTruthReadiness; hasBackendIdentity: boolean; hasTruthState: boolean; hasReadiness: boolean; sourceEngine: string; relatedFindingIds: string[]; modeImpacts: V1DiagramModeKey[]; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1DiagramTruthFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedRenderIds: string[]; readinessImpact: V1DiagramTruthReadiness; remediation: string; }
 export interface V1DiagramTruthControlSummary { contract: "V1_DIAGRAM_TRUTH_RENDERER_LAYOUT_CONTRACT"; role: "BACKEND_ONLY_DIAGRAM_RENDERER_NO_PRETTY_GARBAGE"; overallReadiness: V1DiagramTruthReadiness; backendAuthored: boolean; renderNodeCount: number; renderEdgeCount: number; modeContractCount: number; blockedModeCount: number; reviewModeCount: number; nodesWithoutBackendObjectId: number; edgesWithoutRelatedObjects: number; inferredOrReviewVisibleCount: number; findingCount: number; blockedFindingCount: number; reviewFindingCount: number; modeContracts: V1DiagramModeContractRow[]; renderCoverage: V1DiagramRenderCoverageRow[]; findings: V1DiagramTruthFinding[]; proofBoundary: string[]; notes: string[]; }
 
 
 export type V1PlatformBomReadiness = "ADVISORY_READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1PlatformBomConfidence = "estimated" | "review" | "placeholder";
+<<<<<<< HEAD
 export type V1PlatformProfileState = "NOT_STARTED" | "ROLE_BASED_ASSUMPTIONS" | "SAVED_REVIEW_REQUIRED" | "PROCUREMENT_READY";
 export interface V1PlatformBomRow { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; category: string; item: string; quantity: number | string; unit: string; scope: string; calculationBasis: string; sourceRequirementIds: string[]; sourceObjectIds: string[]; confidence: V1PlatformBomConfidence; readinessImpact: V1PlatformBomReadiness; manualReviewNote: string; notes: string[]; }
 export interface V1PlatformBomRequirementDriver { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; requirementId: string; value: string; affectedRows: string[]; evidence: string; readinessImpact: V1PlatformBomReadiness; }
 export interface V1PlatformBomFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedRows: string[]; readinessImpact: V1PlatformBomReadiness; remediation: string; }
 export interface V1PlatformBomFoundationControlSummary { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; role: "BACKEND_CONTROLLED_ADVISORY_BOM_NO_FAKE_SKUS"; sourceOfTruthLevel: "backend-computed-advisory-estimate"; procurementAuthority: "ADVISORY_ONLY_NOT_FINAL_SKU"; platformProfileState: V1PlatformProfileState; procurementReadinessReason: string; overallReadiness: V1PlatformBomReadiness; siteCount: number; usersPerSite: number; totalEstimatedUsers: number; growthMarginPercent: number; localPortDemandPerSite: number; poeDemandPerSite: number; modeledDeviceCount: number; modeledInterfaceCount: number; rowCount: number; estimatedRowCount: number; reviewRowCount: number; placeholderRowCount: number; requirementDriverCount: number; rows: V1PlatformBomRow[]; requirementDrivers: V1PlatformBomRequirementDriver[]; assumptions: string[]; licensingPlaceholders: string[]; reviewItems: string[]; findings: V1PlatformBomFinding[]; totals: { lineItems: number; hardwareCategories: number; reviewItems: number; placeholderItems: number; }; proofBoundary: string[]; notes: string[]; }
+=======
+export interface V1PlatformBomRow { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; category: string; item: string; quantity: number | string; unit: string; scope: string; calculationBasis: string; sourceRequirementIds: string[]; sourceObjectIds: string[]; confidence: V1PlatformBomConfidence; readinessImpact: V1PlatformBomReadiness; manualReviewNote: string; notes: string[]; }
+export interface V1PlatformBomRequirementDriver { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; requirementId: string; value: string; affectedRows: string[]; evidence: string; readinessImpact: V1PlatformBomReadiness; }
+export interface V1PlatformBomFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedRows: string[]; readinessImpact: V1PlatformBomReadiness; remediation: string; }
+export interface V1PlatformBomFoundationControlSummary { contract: "V1_PLATFORM_BOM_FOUNDATION_CONTRACT"; role: "BACKEND_CONTROLLED_ADVISORY_BOM_NO_FAKE_SKUS"; sourceOfTruthLevel: "backend-computed-advisory-estimate"; procurementAuthority: "ADVISORY_ONLY_NOT_FINAL_SKU"; overallReadiness: V1PlatformBomReadiness; siteCount: number; usersPerSite: number; totalEstimatedUsers: number; growthMarginPercent: number; localPortDemandPerSite: number; poeDemandPerSite: number; modeledDeviceCount: number; modeledInterfaceCount: number; rowCount: number; estimatedRowCount: number; reviewRowCount: number; placeholderRowCount: number; requirementDriverCount: number; rows: V1PlatformBomRow[]; requirementDrivers: V1PlatformBomRequirementDriver[]; assumptions: string[]; licensingPlaceholders: string[]; reviewItems: string[]; findings: V1PlatformBomFinding[]; totals: { lineItems: number; hardwareCategories: number; reviewItems: number; placeholderItems: number; }; proofBoundary: string[]; notes: string[]; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 
 export type V1DiscoveryReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "NOT_READY";
 export type V1DiscoveryState = "NOT_PROVIDED" | "MANUALLY_ENTERED" | "IMPORTED" | "VALIDATED" | "CONFLICTING" | "REVIEW_REQUIRED";
+<<<<<<< HEAD
 export type V1DiscoveryCurrentStateState = "NOT_CAPTURED" | "MANUAL_NOTES_ONLY" | "IMPORTED_REVIEW_REQUIRED" | "VERIFIED_CURRENT_STATE";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export interface V1DiscoveryAreaRow { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; areaKey: string; area: string; state: V1DiscoveryState; sourceType: string; requiredFor: string[]; evidenceCount: number; sourceRequirementIds: string[]; sourceObjectIds: string[]; readinessImpact: V1DiscoveryReadiness; reviewReason: string; notes: string[]; }
 export interface V1DiscoveryImportTargetRow { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; targetKey: string; target: string; state: V1DiscoveryState; sourceExamples: string[]; requiredFor: string[]; sourceRequirementIds: string[]; readinessImpact: V1DiscoveryReadiness; reconciliationNeed: string; notes: string[]; }
 export interface V1DiscoveryTask { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; taskId: string; requirementId: string; title: string; detail: string; linkedTargets: string[]; priority: "HIGH" | "MEDIUM" | "LOW"; state: "OPEN" | "REVIEW_READY" | "COMPLETE"; readinessImpact: V1DiscoveryReadiness; blockers: string[]; }
 export interface V1DiscoveryRequirementDriver { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; requirementId: string; value: string; affectedAreas: string[]; affectedImportTargets: string[]; generatedTaskIds: string[]; evidence: string; readinessImpact: V1DiscoveryReadiness; }
 export interface V1DiscoveryFinding { severity: "BLOCKING" | "REVIEW_REQUIRED" | "WARNING" | "INFO" | "PASSED"; code: string; title: string; detail: string; affectedAreas: string[]; affectedImportTargets: string[]; readinessImpact: V1DiscoveryReadiness; remediation: string; }
+<<<<<<< HEAD
 export interface V1DiscoveryCurrentStateControlSummary { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; role: "MANUAL_DISCOVERY_BOUNDARY_NO_LIVE_DISCOVERY_CLAIMS"; sourceOfTruthLevel: "manual-discovery-boundary"; currentStateAuthority: "MANUAL_OR_IMPORTED_EVIDENCE_ONLY_NOT_LIVE_DISCOVERY"; discoveryState: V1DiscoveryCurrentStateState; discoveryReadinessReason: string; overallReadiness: V1DiscoveryReadiness; brownfieldMode: string; importReadiness: string; siteCount: number; savedSiteCount: number; modeledDeviceCount: number; modeledInterfaceCount: number; configuredObjectCount: number; discoveredObjectCount: number; persistedIpamObjectCount: number; areaRowCount: number; importTargetCount: number; taskCount: number; openTaskCount: number; requirementDriverCount: number; manuallyEnteredEvidenceCount: number; importedEvidenceCount: number; validatedEvidenceCount: number; conflictingEvidenceCount: number; reviewRequiredCount: number; stateCounts: Record<V1DiscoveryState, number>; areaRows: V1DiscoveryAreaRow[]; importTargets: V1DiscoveryImportTargetRow[]; tasks: V1DiscoveryTask[]; requirementDrivers: V1DiscoveryRequirementDriver[]; findings: V1DiscoveryFinding[]; proofBoundary: string[]; notes: string[]; }
+=======
+export interface V1DiscoveryCurrentStateControlSummary { contract: "V1_DISCOVERY_CURRENT_STATE_CONTRACT"; role: "MANUAL_DISCOVERY_BOUNDARY_NO_LIVE_DISCOVERY_CLAIMS"; sourceOfTruthLevel: "manual-discovery-boundary"; currentStateAuthority: "MANUAL_OR_IMPORTED_EVIDENCE_ONLY_NOT_LIVE_DISCOVERY"; overallReadiness: V1DiscoveryReadiness; brownfieldMode: string; importReadiness: string; siteCount: number; savedSiteCount: number; modeledDeviceCount: number; modeledInterfaceCount: number; configuredObjectCount: number; discoveredObjectCount: number; persistedIpamObjectCount: number; areaRowCount: number; importTargetCount: number; taskCount: number; openTaskCount: number; requirementDriverCount: number; manuallyEnteredEvidenceCount: number; importedEvidenceCount: number; validatedEvidenceCount: number; conflictingEvidenceCount: number; reviewRequiredCount: number; stateCounts: Record<V1DiscoveryState, number>; areaRows: V1DiscoveryAreaRow[]; importTargets: V1DiscoveryImportTargetRow[]; tasks: V1DiscoveryTask[]; requirementDrivers: V1DiscoveryRequirementDriver[]; findings: V1DiscoveryFinding[]; proofBoundary: string[]; notes: string[]; }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 
 export type V1AiDraftReadiness = "SAFE_DRAFT_ONLY" | "REVIEW_REQUIRED" | "BLOCKED";
@@ -2541,9 +2624,12 @@ export interface EnterpriseAllocatorPostureSummary {
   brownfieldEvidenceState: "configured" | "proposed" | "import-required" | "unsupported";
   durablePoolCount: number;
   durableAllocationCount: number;
+<<<<<<< HEAD
   candidateAllocationCount: number;
   approvedAllocationCount: number;
   conflictAllocationCount: number;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   durableBrownfieldNetworkCount: number;
   allocationApprovalCount: number;
   allocationLedgerEntryCount: number;

@@ -22,7 +22,10 @@ import { parseRequirementsProfile } from "../lib/requirementsProfile";
 import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { DesignAuthorityBanner } from "../lib/designAuthority";
 import { buildDiagramTruthModel, truthBadgeClass } from "../lib/reportDiagramTruth";
+<<<<<<< HEAD
 import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 export function ProjectDiagramPage() {
   const { projectId = "" } = useParams();
@@ -77,7 +80,10 @@ export function ProjectDiagramPage() {
   const { synthesized, authority, designCore } = useAuthoritativeDesign(projectId, seedProject ?? project, baseSites, baseVlans, requirementsProfile);
   const diagramTruth = useMemo(() => buildDiagramTruthModel(designCore), [designCore]);
   const V1DiagramTruth = designCore?.V1DiagramTruth;
+<<<<<<< HEAD
   const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
   const sites = baseSites.length > 0
     ? baseSites
@@ -287,7 +293,10 @@ export function ProjectDiagramPage() {
   return (
     <section className="diagram-workspace-shell diagram-workspace-shell-professional diagram-workspace-shell-streamlined">
       <DesignAuthorityBanner authority={authority} compact />
+<<<<<<< HEAD
       <BackendEvidenceTruthCards evidenceView={reportEvidenceView} compact />
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
       <div className={`diagram-two-pane-workspace diagram-two-pane-workspace-professional diagram-two-pane-workspace-streamlined${isCanvasFocused ? " diagram-two-pane-workspace-canvas-focus" : ""}`}>
         <aside className={`panel diagram-control-pane diagram-control-pane-professional diagram-control-pane-streamlined${isCanvasFocused ? " diagram-control-pane-hidden" : ""}`}>

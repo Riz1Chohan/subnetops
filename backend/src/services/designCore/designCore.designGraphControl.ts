@@ -24,7 +24,16 @@ function uniqueStrings(values: Array<string | null | undefined>) {
 }
 function nodeKey(node: DesignGraphNode) { return `${node.objectType}:${node.objectId}`; }
 function readinessFromFindings(findings: V1DesignGraphFinding[]): V1DesignGraphReadiness { if (findings.some((finding) => finding.severity === "BLOCKING")) return "BLOCKED"; if (findings.some((finding) => finding.severity === "REVIEW_REQUIRED" || finding.severity === "WARNING")) return "REVIEW_REQUIRED"; return "READY"; }
+<<<<<<< HEAD
 function readinessForRequirement(params: { lifecycleStatus: RequirementPropagationLifecycleStatus; missingGraphNodeIds: string[]; missingConsumerSurfaces: string[]; missingRelationshipTypes: string[]; }): V1DesignGraphReadiness { if (params.lifecycleStatus === "BLOCKED" || params.missingGraphNodeIds.length > 0) return "BLOCKED"; if (params.lifecycleStatus !== "FULLY_PROPAGATED" || params.missingConsumerSurfaces.length > 0 || params.missingRelationshipTypes.length > 0) return "REVIEW_REQUIRED"; return "READY"; }
+=======
+function readinessForRequirement(params: { lifecycleStatus: RequirementPropagationLifecycleStatus; missingGraphNodeIds: string[]; missingConsumerSurfaces: string[]; missingRelationshipTypes: string[]; }): V1DesignGraphReadiness {
+  if (params.missingGraphNodeIds.length > 0) return "BLOCKED";
+  if (params.lifecycleStatus === "BLOCKED") return "REVIEW_REQUIRED";
+  if (params.lifecycleStatus !== "FULLY_PROPAGATED" || params.missingConsumerSurfaces.length > 0 || params.missingRelationshipTypes.length > 0) return "REVIEW_REQUIRED";
+  return "READY";
+}
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 
 function graphLookup(graph: DesignGraph) {
   const nodesByObjectId = new Map<string, DesignGraphNode[]>();
@@ -93,9 +102,18 @@ function buildFindings(params: { graph: DesignGraph; networkObjectModel: Network
   const diagramObjectIds = new Set((params.diagramTruth?.renderModel?.nodes ?? []).map((node) => node.objectId));
   const graphObjectIds = new Set(params.graph.nodes.map((node) => node.objectId));
   const diagramOnlyObjects = Array.from(diagramObjectIds).filter((objectId) => !graphObjectIds.has(objectId));
+<<<<<<< HEAD
   if (diagramOnlyObjects.length > 0) addFinding(findings, { severity: "BLOCKING", code: "V1_DIAGRAM_NODE_WITHOUT_BACKEND_GRAPH_OBJECT", title: "Diagram render model contains nodes without backend graph objects", detail: `${diagramOnlyObjects.length} diagram node(s) cannot be resolved to the DesignGraph. Diagram evidence without backend graph lineage is invalid implementation evidence.`, affectedObjectIds: diagramOnlyObjects.slice(0, 30), readinessImpact: "BLOCKED", remediation: "Remove frontend-invented diagram nodes or materialize the missing backend graph objects first." });
   const requirementGaps = params.requirementPaths.filter((path) => path.readinessImpact !== "READY");
   if (requirementGaps.length > 0) addFinding(findings, { severity: requirementGaps.some((path) => path.readinessImpact === "BLOCKED") ? "BLOCKING" : "REVIEW_REQUIRED", code: "V1_REQUIREMENT_DEPENDENCY_PATH_GAP", title: "Requirement dependency paths are incomplete", detail: `${requirementGaps.length} requirement path(s) are missing graph nodes, dependency edges, or consumer surfaces.`, affectedObjectIds: requirementGaps.slice(0, 30).map((path) => path.requirementId), readinessImpact: requirementGaps.some((path) => path.readinessImpact === "BLOCKED") ? "BLOCKED" : "REVIEW_REQUIRED", remediation: "For each captured requirement, prove the path from requirement signal to object, object dependency, validation impact, frontend display, report/export section, and diagram impact." });
+=======
+  if (diagramOnlyObjects.length > 0) addFinding(findings, { severity: "REVIEW_REQUIRED", code: "V1_DIAGRAM_NODE_WITHOUT_BACKEND_GRAPH_OBJECT", title: "Diagram render model contains nodes without backend graph objects", detail: `${diagramOnlyObjects.length} diagram node(s) cannot be resolved to the DesignGraph. Diagram rendering is a later consumer issue and must stay review-gated, not inflate backend root blockers.`, affectedObjectIds: diagramOnlyObjects.slice(0, 30), readinessImpact: "REVIEW_REQUIRED", remediation: "Remove frontend-invented diagram nodes or materialize the missing backend graph objects before clean diagram truth is claimed." });
+  const requirementGaps = params.requirementPaths.filter((path) => path.readinessImpact !== "READY");
+  if (requirementGaps.length > 0) {
+    const backendGraphGaps = requirementGaps.filter((path) => path.missingGraphNodeIds.length > 0);
+    addFinding(findings, { severity: backendGraphGaps.length > 0 ? "BLOCKING" : "REVIEW_REQUIRED", code: "V1_REQUIREMENT_DEPENDENCY_PATH_GAP", title: "Requirement dependency paths are incomplete", detail: `${requirementGaps.length} requirement path(s) are missing graph nodes, dependency edges, or consumer surfaces; ${backendGraphGaps.length} contain backend graph-node gaps.`, affectedObjectIds: requirementGaps.slice(0, 30).map((path) => path.requirementId), readinessImpact: backendGraphGaps.length > 0 ? "BLOCKED" : "REVIEW_REQUIRED", remediation: "Fix backend graph-node gaps as root defects. Frontend/report/diagram consumer gaps remain review-required until those surfaces are repaired." });
+  }
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   if (findings.length === 0) findings.push({ severity: "PASSED", code: "V1_DESIGN_GRAPH_DEPENDENCIES_COMPLETE", title: "Design graph dependency integrity passed", detail: "Every V1 object has graph coverage, dependency edges, and consumer impact evidence; no orphan or diagram-only objects were detected.", affectedObjectIds: [], readinessImpact: "READY", remediation: "Continue engineer review and keep graph checks in release gates." });
   return findings;
 }

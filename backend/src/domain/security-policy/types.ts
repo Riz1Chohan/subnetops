@@ -70,7 +70,10 @@ export interface RoutingSegmentationModel {
   [key: string]: unknown;
 }
 
+<<<<<<< HEAD
 export type SecurityPolicyReviewClass = "STRUCTURAL_BLOCKER" | "DIRECT_POLICY_CONFLICT_BLOCKER" | "PLANNING_REVIEW_ITEM" | "ADVISORY_ITEM";
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
 export type V1SecurityPolicyReadiness = "READY" | "REVIEW_REQUIRED" | "BLOCKED";
 export type V1SecurityPolicyState = "REQUIRED" | "RECOMMENDED" | "BLOCKED" | "MISSING" | "OVERBROAD" | "SHADOWED" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
 
@@ -182,7 +185,10 @@ export interface SecurityNatReview {
 
 export interface SecurityPolicyFinding {
   severity: "ERROR" | "WARNING" | "INFO";
+<<<<<<< HEAD
   reviewClass?: SecurityPolicyReviewClass;
+=======
+>>>>>>> 620cdbb100bc3a54420d680ba278e3b8cad06da8
   code: string;
   title: string;
   detail: string;
