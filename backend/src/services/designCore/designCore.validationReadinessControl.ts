@@ -1,0 +1,607 @@
+import type {
+  BackendDiagramTruthModel,
+  BackendReportTruthModel,
+  DesignCoreIssue,
+  NetworkObjectModel,
+  V1RequirementsClosureControlSummary,
+  V1CidrAddressingTruthControlSummary,
+  V1EnterpriseIpamTruthControlSummary,
+  V1DesignCoreOrchestratorControlSummary,
+  V1StandardsAlignmentRulebookControlSummary,
+  V1ValidationCoverageRow,
+  V1ValidationFinding,
+  V1ValidationReadinessCategory,
+  V1ValidationReadinessControlSummary,
+  V1ValidationRequirementGateRow,
+} from "../designCore.types.js";
+
+import {
+  LEGACY_VALIDATION_CATEGORIES,
+  buildValidationFindingId,
+  countLegacyFindingCategories,
+  legacyReadinessFromCounts,
+  normalizeLegacyReadinessCategory,
+} from "../../domain/validation/index.js";
+import { classifyV1RootBlockerTaxonomy } from "../../domain/validation/root-blocker-taxonomy.js";
+
+export const V1_VALIDATION_READINESS_AUTHORITY_CONTRACT = "V1_VALIDATION_READINESS_AUTHORITY_CONTRACT" as const;
+// V1ValidationReadiness snapshot field is the strict validation/readiness gate surface.
+
+const VALIDATION_CATEGORIES = [...LEGACY_VALIDATION_CATEGORIES] as V1ValidationReadinessCategory[];
+
+type TaxonomyInput = Omit<V1ValidationFinding, "id">;
+
+function classifyValidationFinding(input: TaxonomyInput): TaxonomyInput {
+  const classification = classifyV1RootBlockerTaxonomy({
+    category: input.category,
+    ruleCode: input.ruleCode,
+    title: input.title,
+    sourceEngine: input.sourceEngine,
+    sourceSnapshotPath: input.sourceSnapshotPath,
+    explicitFindingClass: input.findingClass,
+    rootProof: input.findingClass === "ROOT_BLOCKER",
+    propagatedProof: input.findingClass === "PROPAGATED_BLOCKER",
+    reviewOnlyProof: input.findingClass === "REVIEW_ITEM",
+    rootCauseKey: input.rootCauseKey,
+    rootCauseTitle: input.rootCauseTitle,
+  });
+
+  return {
+    ...input,
+    category: classification.category,
+    originalCategory: classification.originalCategory,
+    findingClass: classification.findingClass,
+    rootCauseKey: classification.rootCauseKey,
+    rootCauseTitle: classification.rootCauseTitle,
+    deEscalationReason: input.deEscalationReason ?? classification.deEscalationReason,
+  };
+}
+
+function countFindingClasses(findings: V1ValidationFinding[]) {
+  return {
+    rootBlockerCount: findings.filter((finding) => finding.findingClass === "ROOT_BLOCKER").length,
+    propagatedBlockerCount: findings.filter((finding) => finding.findingClass === "PROPAGATED_BLOCKER").length,
+    derivedImpactCount: findings.filter((finding) => finding.findingClass === "DERIVED_IMPACT").length,
+    reviewItemCount: findings.filter((finding) => finding.findingClass === "REVIEW_ITEM").length,
+  };
+}
+
+type V1Input = {
+  projectId: string;
+  V1RequirementsClosure: V1RequirementsClosureControlSummary;
+  V1CidrAddressingTruth: V1CidrAddressingTruthControlSummary;
+  V1EnterpriseIpamTruth: V1EnterpriseIpamTruthControlSummary;
+  V1DesignCoreOrchestrator: V1DesignCoreOrchestratorControlSummary;
+  V1StandardsRulebookControl: V1StandardsAlignmentRulebookControlSummary;
+  networkObjectModel: NetworkObjectModel;
+  reportTruth: BackendReportTruthModel;
+  diagramTruth: BackendDiagramTruthModel;
+  issues: DesignCoreIssue[];
+};
+
+function toCategory(value: unknown): V1ValidationReadinessCategory {
+  return normalizeLegacyReadinessCategory(value) as V1ValidationReadinessCategory;
+}
+
+function readinessFromCounts(blockingCount: number, reviewRequiredCount: number, warningCount: number): V1ValidationReadinessCategory {
+  return legacyReadinessFromCounts(blockingCount, reviewRequiredCount, warningCount) as V1ValidationReadinessCategory;
+}
+
+function countByCategory(findings: V1ValidationFinding[]) {
+  return countLegacyFindingCategories(findings);
+}
+
+function makeFinding(input: Omit<V1ValidationFinding, "id">): V1ValidationFinding {
+  const classified = classifyValidationFinding(input);
+  return {
+    id: buildValidationFindingId({
+      ruleCode: classified.ruleCode,
+      severity: classified.category,
+      status: classified.category === "PASSED" ? "resolved" : "open",
+      category: "Validation",
+      title: classified.title,
+      detail: classified.detail,
+      sourcePath: classified.sourceSnapshotPath,
+      affectedObjects: [...classified.affectedRequirementIds, ...classified.affectedRequirementKeys, ...classified.affectedObjectIds],
+      evidence: classified.evidence.map((detail) => ({ source: classified.sourceEngine, path: classified.sourceSnapshotPath, detail })),
+    }),
+    ...classified,
+  };
+}
+
+function pushFinding(findings: V1ValidationFinding[], input: Omit<V1ValidationFinding, "id">) {
+  findings.push(makeFinding(input));
+}
+
+function summarizeCoverage(domain: string, sourceSnapshotPath: string, findingFilter: (finding: V1ValidationFinding) => boolean, findings: V1ValidationFinding[], evidence: string[]): V1ValidationCoverageRow {
+  const domainFindings = findings.filter(findingFilter);
+  const counts = countByCategory(domainFindings);
+  const readiness = readinessFromCounts(counts.blockingCount, counts.reviewRequiredCount, counts.warningCount);
+  return {
+    domain,
+    sourceSnapshotPath,
+    blockerCount: counts.blockingCount,
+    reviewRequiredCount: counts.reviewRequiredCount,
+    warningCount: counts.warningCount,
+    infoCount: counts.infoCount,
+    passedCount: counts.passedCount,
+    readiness,
+    evidence,
+  };
+}
+
+function buildRequirementGateRows(input: V1Input, findings: V1ValidationFinding[]): V1ValidationRequirementGateRow[] {
+  return input.V1RequirementsClosure.closureMatrix
+    .filter((row) => row.active)
+    .map((row) => {
+      const missingConsumers = Array.isArray(row.missingConsumers) ? row.missingConsumers : [];
+      const validationRuleCodes = findings
+        .filter((finding) => finding.affectedRequirementIds.includes(row.requirementId) || finding.affectedRequirementKeys.includes(row.key))
+        .map((finding) => finding.ruleCode);
+      const category = toCategory(row.readinessImpact);
+      return {
+        requirementId: row.requirementId,
+        requirementKey: row.key,
+        lifecycleStatus: row.lifecycleStatus,
+        expectedAffectedEngines: row.expectedAffectedEngines,
+        missingConsumers,
+        validationRuleCodes: Array.from(new Set(validationRuleCodes)),
+        readinessImpact: category,
+        evidence: row.evidence.length > 0 ? row.evidence : [`Lifecycle status: ${row.lifecycleStatus}`],
+      };
+    });
+}
+
+function addV1RequirementClosureFindings(input: V1Input, findings: V1ValidationFinding[]) {
+  for (const row of input.V1RequirementsClosure.closureMatrix) {
+    if (!row.active) continue;
+    const category = toCategory(row.readinessImpact);
+    if (category === "PASSED" || category === "INFO") continue;
+    const missingConsumers = Array.isArray(row.missingConsumers) ? row.missingConsumers : [];
+    const blockedReason = typeof row.blockedReason === "string" && row.blockedReason.trim() ? row.blockedReason.trim() : undefined;
+    const hasRootProof = category === "BLOCKING" && row.lifecycleStatus === "BLOCKED" && Boolean(blockedReason);
+    pushFinding(findings, {
+      category: hasRootProof ? category : category === "BLOCKING" ? "REVIEW_REQUIRED" : category,
+      findingClass: hasRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      deEscalationReason: hasRootProof ? undefined : "The requirement is not fully clean, but no mandatory missing consumer, missing source object, or engine contradiction was recorded. Keep it review-required until requirement closure proves the exact blocker.",
+      ruleCode: "VALIDATION_REQUIREMENT_PROPAGATION_GAP",
+      title: `Requirement propagation is incomplete for ${row.label}`,
+      detail: `${row.key} is ${row.lifecycleStatus}; missing consumers: ${missingConsumers.join(", ") || "none recorded"}; blocker proof: ${blockedReason || "not proven"}.`,
+      sourceEngine: "V1 requirements closure",
+      sourceSnapshotPath: "V1RequirementsClosure.closureMatrix",
+      affectedRequirementIds: [row.requirementId],
+      affectedRequirementKeys: [row.key],
+      affectedObjectIds: [],
+      frontendImpact: row.consumerCoverage.frontendVisible ? "Frontend visible" : "Frontend evidence missing or weak",
+      reportImpact: row.consumerCoverage.reportVisible ? "Report visible" : "Report evidence missing or weak",
+      diagramImpact: row.consumerCoverage.diagramVisible ? "Diagram visible when relevant" : "Diagram evidence missing or not applicable",
+      remediation: "Complete the requirement chain from captured input to materialized object, engine output, validation, frontend, report, and diagram evidence where relevant. Do not mark the requirement blocked unless blocker proof is recorded.",
+      evidence: blockedReason ? [...row.evidence, `Blocker proof: ${blockedReason}`] : row.evidence,
+    });
+  }
+
+  for (const scenario of input.V1RequirementsClosure.goldenScenarioClosures) {
+    if (!scenario.relevant || scenario.lifecycleStatus === "passed" || scenario.lifecycleStatus === "not-applicable") continue;
+    const scenarioCategory = scenario.lifecycleStatus === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
+    const hasScenarioRootProof = scenarioCategory === "BLOCKING" && (scenario.missingRequirementKeys.length > 0 || scenario.blockingRequirementKeys.length > 0);
+    pushFinding(findings, {
+      category: scenarioCategory,
+      findingClass: hasScenarioRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_GOLDEN_SCENARIO_CLOSURE_GAP",
+      title: `Golden scenario requires ${scenario.lifecycleStatus} review: ${scenario.label}`,
+      detail: `Missing requirements: ${scenario.missingRequirementKeys.join(", ") || "none"}; blocking requirements: ${scenario.blockingRequirementKeys.join(", ") || "none"}; review requirements: ${scenario.reviewRequirementKeys.join(", ") || "none"}.`,
+      sourceEngine: "V1 requirements scenario proof",
+      sourceSnapshotPath: "V1RequirementsClosure.goldenScenarioClosures",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [...scenario.requiredRequirementKeys],
+      affectedObjectIds: [],
+      frontendImpact: "Project Overview and Validation must show scenario closure status.",
+      reportImpact: "Report must not claim scenario completeness while blockers/review items remain.",
+      diagramImpact: "Diagram must not claim visual completeness for missing scenario elements.",
+      remediation: "Clear the golden-scenario blockers or mark the scenario explicitly not applicable with evidence.",
+      evidence: scenario.evidence,
+    });
+  }
+}
+
+function addV1CidrAddressingFindings(input: V1Input, findings: V1ValidationFinding[]) {
+  for (const proof of input.V1CidrAddressingTruth.edgeCaseProofs) {
+    if (proof.status === "passed") continue;
+    const proofCategory = proof.status === "blocked" ? "BLOCKING" : "WARNING";
+    pushFinding(findings, {
+      category: proofCategory,
+      findingClass: proofCategory === "BLOCKING" ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      ruleCode: proof.status === "blocked" ? "VALIDATION_CIDR_EDGE_CASE_BLOCKER" : "VALIDATION_CIDR_EDGE_CASE_WARNING",
+      title: `CIDR edge-case proof ${proof.label} is ${proof.status}`,
+      detail: proof.evidence.join(" ") || "CIDR edge-case evidence is incomplete.",
+      sourceEngine: "Engine 1 CIDR/addressing",
+      sourceSnapshotPath: "V1CidrAddressingTruth.edgeCaseProofs",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [proof.id],
+      frontendImpact: "Addressing and Validation views must show CIDR proof state.",
+      reportImpact: "Report addressing section must preserve CIDR proof warnings/blockers.",
+      diagramImpact: "Diagram labels must not hide invalid or review-gated address objects.",
+      remediation: "Fix the CIDR edge case or keep the affected addressing object review-gated.",
+      evidence: proof.evidence,
+    });
+  }
+
+  for (const row of input.V1CidrAddressingTruth.addressingTruthRows) {
+    const category = toCategory(row.readinessImpact);
+    if (category === "PASSED" || category === "INFO") continue;
+    const hasAddressingRootProof = category === "BLOCKING" && row.blockers.length > 0;
+    pushFinding(findings, {
+      category,
+      findingClass: hasAddressingRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      deEscalationReason: hasAddressingRootProof ? undefined : "The addressing row is not clean, but the source did not prove a blocking CIDR/object defect. Treat it as review-required planning evidence.",
+      ruleCode: "VALIDATION_CIDR_ADDRESSING_READINESS_GAP",
+      title: `Addressing readiness gap on ${row.siteName} VLAN ${row.vlanId}`,
+      detail: `${row.vlanName} is ${row.readinessImpact}: ${row.blockers.join(" ") || row.evidence.join(" ")}`,
+      sourceEngine: "Engine 1 CIDR/addressing",
+      sourceSnapshotPath: "V1CidrAddressingTruth.addressingTruthRows",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [row.rowId],
+      frontendImpact: "Addressing and Validation views must show this as not clean.",
+      reportImpact: "Report addressing table must not present this row as implementation-ready.",
+      diagramImpact: "Diagram subnet labels must preserve invalid/review state.",
+      remediation: "Resolve invalid CIDR, capacity, gateway, site-block, or overlap evidence before implementation handoff.",
+      evidence: row.evidence,
+    });
+  }
+
+  for (const row of input.V1CidrAddressingTruth.requirementAddressingMatrix) {
+    const category = toCategory(row.readinessImpact);
+    if (!row.active || category === "PASSED" || category === "INFO") continue;
+    const hasRequirementAddressingRootProof = category === "BLOCKING" && row.missingAddressingEvidence.length > 0;
+    pushFinding(findings, {
+      category,
+      findingClass: hasRequirementAddressingRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_REQUIREMENT_ADDRESSING_GAP",
+      title: `Requirement ${row.requirementKey} has unresolved addressing impact`,
+      detail: `${row.expectedAddressingImpact}. Missing: ${row.missingAddressingEvidence.join(" ") || "none recorded"}.`,
+      sourceEngine: "Engine 1 CIDR/addressing",
+      sourceSnapshotPath: "V1CidrAddressingTruth.requirementAddressingMatrix",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [row.requirementKey],
+      affectedObjectIds: [],
+      frontendImpact: "Overview and Addressing pages must show requirement-to-addressing gap.",
+      reportImpact: "Report requirement traceability and addressing sections must show the gap.",
+      diagramImpact: "Diagram must not invent a segment/address label for an unmaterialized requirement.",
+      remediation: "Materialize the segment/addressing object or record explicit review/no-op evidence.",
+      evidence: row.materializedAddressingEvidence,
+    });
+  }
+}
+
+function addV1EnterpriseIpamFindings(input: V1Input, findings: V1ValidationFinding[]) {
+  for (const row of input.V1EnterpriseIpamTruth.reconciliationRows) {
+    const category = toCategory(row.readinessImpact);
+    if (category === "PASSED" || category === "INFO") continue;
+    const hasIpamRootProof = category === "BLOCKING" && row.blockers.length > 0;
+    pushFinding(findings, {
+      category,
+      findingClass: hasIpamRootProof ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      deEscalationReason: hasIpamRootProof ? undefined : "The IPAM row is candidate/review authority, not an approved source-of-truth blocker.",
+      ruleCode: "VALIDATION_IPAM_DURABLE_AUTHORITY_GAP",
+      title: `Engine 2 IPAM authority is unresolved for ${row.siteName} VLAN ${row.vlanId}`,
+      detail: `${row.reconciliationState}. ${[...row.blockers, ...row.reviewReasons].join(" ") || "Durable authority is not clean."}`,
+      sourceEngine: "Engine 2 enterprise IPAM",
+      sourceSnapshotPath: "V1EnterpriseIpamTruth.reconciliationRows",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [row.rowId, row.engine2AllocationId, row.engine2PoolId].filter((item): item is string => Boolean(item)),
+      frontendImpact: "Enterprise IPAM and Validation pages must show durable authority state.",
+      reportImpact: "Report must separate Engine 1 proposal from Engine 2 approval/conflict.",
+      diagramImpact: "Diagram address labels must not imply approval when IPAM is blocked or review-gated.",
+      remediation: "Resolve allocation approval, stale hash, pool conflict, DHCP/reservation conflict, or brownfield overlap before readiness is allowed.",
+      evidence: row.evidence,
+    });
+  }
+
+  for (const row of input.V1EnterpriseIpamTruth.requirementIpamMatrix) {
+    const category = toCategory(row.readinessImpact);
+    if (!row.active || category === "PASSED" || category === "INFO") continue;
+    pushFinding(findings, {
+      category,
+      findingClass: "REVIEW_ITEM",
+      ruleCode: "VALIDATION_REQUIREMENT_IPAM_GAP",
+      title: `Requirement ${row.requirementKey} has unresolved Engine 2 IPAM impact`,
+      detail: `${row.expectedIpamImpact}. Missing: ${row.missingIpamEvidence.join(" ") || "none recorded"}.`,
+      sourceEngine: "Engine 2 enterprise IPAM",
+      sourceSnapshotPath: "V1EnterpriseIpamTruth.requirementIpamMatrix",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [row.requirementKey],
+      affectedObjectIds: [],
+      frontendImpact: "Enterprise IPAM and Overview pages must show requirement-to-IPAM state.",
+      reportImpact: "Report must show whether the requirement is only planned or durable/approved.",
+      diagramImpact: "Diagram must not turn planned-only addressing into approved approved truth.",
+      remediation: "Create, approve, or review the Engine 2 IPAM object tied to this requirement.",
+      evidence: row.materializedIpamEvidence,
+    });
+  }
+}
+
+function addV1And7Findings(input: V1Input, findings: V1ValidationFinding[]) {
+  for (const finding of input.V1DesignCoreOrchestrator.boundaryFindings) {
+    pushFinding(findings, {
+      category: toCategory(finding.readinessImpact),
+      findingClass: "PROPAGATED_BLOCKER",
+      ruleCode: "VALIDATION_ORCHESTRATOR_BOUNDARY_GAP",
+      title: finding.title,
+      detail: finding.detail,
+      sourceEngine: "Design-core orchestrator",
+      sourceSnapshotPath: finding.affectedSnapshotPath,
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Frontend consumers must preserve design-core boundary state instead of recomputing truth.",
+      reportImpact: "Report sections must cite backend snapshot sections and not invent facts.",
+      diagramImpact: "Diagram must render backend-truth objects only.",
+      remediation: "Restore the missing/review-gated snapshot section or keep the downstream consumer blocked/review-gated.",
+      evidence: [finding.code, finding.affectedSnapshotPath],
+    });
+  }
+
+  for (const finding of input.V1StandardsRulebookControl.findings) {
+    const standardsCategory = toCategory(finding.severity);
+    pushFinding(findings, {
+      category: standardsCategory,
+      findingClass: standardsCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_STANDARDS_RULE_GAP",
+      title: finding.title,
+      detail: finding.detail,
+      sourceEngine: "Standards alignment / rulebook",
+      sourceSnapshotPath: "V1StandardsRulebookControl.findings",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: finding.affectedObjectIds,
+      frontendImpact: "Standards and Validation pages must expose active rule state.",
+      reportImpact: "Report must include standards blockers/review items and remediation.",
+      diagramImpact: "Diagram warnings may be shown where the affected object is visual.",
+      remediation: finding.remediationGuidance,
+      evidence: [finding.affectedEngine, finding.ruleId],
+    });
+  }
+}
+
+function addDesignReadinessFindings(input: V1Input, findings: V1ValidationFinding[]) {
+  const routing = input.networkObjectModel.routingSegmentation.summary;
+  if (routing.routingReadiness !== "ready" || routing.segmentationReadiness !== "ready") {
+    const routingCategory = routing.routingReadiness === "blocked" || routing.segmentationReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
+    pushFinding(findings, {
+      category: routingCategory,
+      findingClass: routingCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_ROUTING_SEGMENTATION_READINESS_GAP",
+      title: "Routing/segmentation readiness is not clean",
+      detail: `Routing ${routing.routingReadiness}; segmentation ${routing.segmentationReadiness}; ${routing.blockingFindingCount} blocking finding(s), ${routing.reachabilityFindingCount} reachability finding(s).`,
+      sourceEngine: "Routing/segmentation",
+      sourceSnapshotPath: "networkObjectModel.routingSegmentation.summary",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Routing and Validation pages must keep routing readiness review-gated.",
+      reportImpact: "Report routing review must not claim protocol-ready implementation.",
+      diagramImpact: "WAN/routing diagram overlays must preserve missing/review path state.",
+      remediation: "Resolve missing routes, route-domain gaps, reachability blockers, or segmentation conflicts before implementation readiness.",
+      evidence: routing.notes,
+    });
+  }
+
+  const security = input.networkObjectModel.securityPolicyFlow.summary;
+  if (security.policyReadiness !== "ready" || security.natReadiness !== "ready") {
+    const securityCategory = security.policyReadiness === "blocked" || security.natReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED";
+    pushFinding(findings, {
+      category: securityCategory,
+      findingClass: securityCategory === "BLOCKING" ? "DERIVED_IMPACT" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_SECURITY_POLICY_READINESS_GAP",
+      title: "Security policy / NAT readiness is not clean",
+      detail: `Policy ${security.policyReadiness}; NAT ${security.natReadiness}; ${security.blockingFindingCount} blocking finding(s), ${security.missingPolicyCount} missing policy item(s), ${security.missingNatCount} missing NAT item(s).`,
+      sourceEngine: "Security policy flow",
+      sourceSnapshotPath: "networkObjectModel.securityPolicyFlow.summary",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Security and Validation pages must show unresolved flow/NAT state.",
+      reportImpact: "Report security section must show missing, overbroad, NAT, and logging review items.",
+      diagramImpact: "Security-zone/flow diagrams must not hide missing or conflicted flows.",
+      remediation: "Resolve required flow, NAT, broad-permit, shadowing, and logging findings before readiness is allowed.",
+      evidence: security.notes,
+    });
+  }
+
+  const implementation = input.networkObjectModel.implementationPlan.summary;
+  if (implementation.implementationReadiness !== "ready") {
+    pushFinding(findings, {
+      category: implementation.implementationReadiness === "blocked" ? "BLOCKING" : "REVIEW_REQUIRED",
+      findingClass: "PROPAGATED_BLOCKER",
+      ruleCode: "VALIDATION_IMPLEMENTATION_READINESS_GAP",
+      title: "Implementation plan is not execution-ready",
+      detail: `${implementation.blockedStepCount} blocked step(s), ${implementation.reviewStepCount} review step(s), ${implementation.blockingFindingCount} blocking finding(s).`,
+      sourceEngine: "Implementation planning",
+      sourceSnapshotPath: "networkObjectModel.implementationPlan.summary",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Implementation and Validation pages must show gated steps.",
+      reportImpact: "Report implementation plan must keep blocked/review states visible.",
+      diagramImpact: "Implementation-view diagram must only show verified upstream objects or review gates.",
+      remediation: "Resolve upstream object, policy, routing, verification, and rollback blockers before execution readiness.",
+      evidence: implementation.notes,
+    });
+  }
+
+  if (input.reportTruth.overallReadiness !== "ready") {
+    pushFinding(findings, {
+      category: input.reportTruth.overallReadiness === "blocked" ? "BLOCKING" : "WARNING",
+      findingClass: "PROPAGATED_BLOCKER",
+      ruleCode: "VALIDATION_REPORT_TRUTH_WARNING",
+      title: "Report truth is not fully clean",
+      detail: `${input.reportTruth.overallReadinessLabel}; blocked findings ${input.reportTruth.blockedFindings.length}, review findings ${input.reportTruth.reviewFindings.length}.`,
+      sourceEngine: "Report/export truth",
+      sourceSnapshotPath: "reportTruth",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Project Report page must preserve report-truth readiness.",
+      reportImpact: "Export must not overclaim authoritative readiness.",
+      diagramImpact: "Diagram evidence referenced by report must remain backend-truth labeled.",
+      remediation: "Clear backend report-truth blockers/review items or label them explicitly in the export.",
+      evidence: input.reportTruth.limitations,
+    });
+  }
+
+  if (input.diagramTruth.overallReadiness !== "ready") {
+    pushFinding(findings, {
+      category: input.diagramTruth.overallReadiness === "blocked" ? "BLOCKING" : "WARNING",
+      findingClass: "PROPAGATED_BLOCKER",
+      ruleCode: "VALIDATION_DIAGRAM_TRUTH_WARNING",
+      title: "Diagram truth is not fully clean",
+      detail: `${input.diagramTruth.overallReadiness}; ${input.diagramTruth.hotspots.length} hotspot(s), modeled topology: ${input.diagramTruth.hasModeledTopology ? "yes" : "no"}.`,
+      sourceEngine: "Diagram truth",
+      sourceSnapshotPath: "diagramTruth",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Diagram page must show backend-truth readiness and empty-state reason.",
+      reportImpact: "Report diagram section must not use pretty topology as proof if backend truth is weak.",
+      diagramImpact: "Diagram itself must show backend object and readiness labels.",
+      remediation: "Resolve missing backend objects/edges or keep diagram in review/empty-state.",
+      evidence: input.diagramTruth.hotspots.map((item) => item.detail),
+    });
+  }
+}
+
+function addDesignCoreIssueFindings(input: V1Input, findings: V1ValidationFinding[]) {
+  const hiddenCodes = new Set(["STANDARDS_REQUIRED_RULE_BLOCKER"]);
+  for (const issue of input.issues) {
+    if (hiddenCodes.has(issue.code)) continue;
+    if (issue.severity === "INFO") continue;
+    const issueCategory = issue.severity === "ERROR" ? "BLOCKING" : "WARNING";
+    pushFinding(findings, {
+      category: issueCategory,
+      findingClass: issueCategory === "BLOCKING" ? "ROOT_BLOCKER" : "REVIEW_ITEM",
+      ruleCode: "VALIDATION_DESIGN_CORE_ISSUE",
+      title: issue.title,
+      detail: issue.detail,
+      sourceEngine: "Design-core validation issue",
+      sourceSnapshotPath: "issues",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [issue.entityId].filter((item): item is string => Boolean(item)),
+      frontendImpact: "Validation and affected design pages must show the issue.",
+      reportImpact: "Report validation findings must show the issue without burying it.",
+      diagramImpact: issue.entityType === "VLAN" || issue.entityType === "SITE" ? "Diagram labels/empty states must not hide the issue." : "No direct diagram impact unless tied to a visual object.",
+      remediation: "Resolve the upstream design-core issue or keep the affected output review-gated.",
+      evidence: [issue.code, issue.entityType],
+    });
+  }
+}
+
+export function buildV1ValidationReadinessControl(input: V1Input): V1ValidationReadinessControlSummary {
+  const findings: V1ValidationFinding[] = [];
+
+  addV1RequirementClosureFindings(input, findings);
+  addV1CidrAddressingFindings(input, findings);
+  addV1EnterpriseIpamFindings(input, findings);
+  addV1And7Findings(input, findings);
+  addDesignReadinessFindings(input, findings);
+  addDesignCoreIssueFindings(input, findings);
+
+  if (findings.length === 0) {
+    pushFinding(findings, {
+      category: "PASSED",
+      ruleCode: "VALIDATION_PASSED_STRICT_READINESS_GATE",
+      title: "Strict validation readiness gate passed",
+      detail: "No V1 blocking, review-required, or warning findings were produced by the current backend control surfaces.",
+      sourceEngine: "Validation/readiness",
+      sourceSnapshotPath: "V1ValidationReadiness",
+      affectedRequirementIds: [],
+      affectedRequirementKeys: [],
+      affectedObjectIds: [],
+      frontendImpact: "Validation pages may show passed state.",
+      reportImpact: "Report may show passed validation state while preserving limitations.",
+      diagramImpact: "Diagram may render backend truth without V1 warnings.",
+      remediation: "Continue engineer review against live inventory and vendor implementation specifics.",
+      evidence: ["No generated V1 findings."],
+    });
+  }
+
+  const counts = countByCategory(findings);
+  const classCounts = countFindingClasses(findings);
+  const overallReadiness = readinessFromCounts(counts.blockingCount, counts.reviewRequiredCount, counts.warningCount);
+  const validationGateAllowsImplementation = counts.blockingCount === 0 && counts.reviewRequiredCount === 0;
+  const requirementGateRows = buildRequirementGateRows(input, findings);
+
+  const coverageRows: V1ValidationCoverageRow[] = [
+    summarizeCoverage("Requirements propagation", "V1RequirementsClosure", (finding) => finding.sourceSnapshotPath.startsWith("V1RequirementsClosure"), findings, [
+      `${input.V1RequirementsClosure.fullPropagatedCount}/${input.V1RequirementsClosure.activeRequirementCount} active requirement(s) fully propagated.`,
+      `${input.V1RequirementsClosure.missingConsumerCount} missing consumer gap(s).`,
+    ]),
+    summarizeCoverage("CIDR/addressing", "V1CidrAddressingTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1CidrAddressingTruth"), findings, [
+      `${input.V1CidrAddressingTruth.validSubnetCount}/${input.V1CidrAddressingTruth.totalAddressRowCount} valid subnet row(s).`,
+      `${input.V1CidrAddressingTruth.requirementAddressingGapCount} requirement-to-addressing gap(s).`,
+    ]),
+    summarizeCoverage("Enterprise IPAM", "V1EnterpriseIpamTruth", (finding) => finding.sourceSnapshotPath.startsWith("V1EnterpriseIpamTruth"), findings, [
+      `${input.V1EnterpriseIpamTruth.approvedAllocationCount} approved allocation(s); ${input.V1EnterpriseIpamTruth.conflictBlockerCount} conflict blocker(s).`,
+      `Overall Engine 2 readiness: ${input.V1EnterpriseIpamTruth.overallReadiness}.`,
+    ]),
+    summarizeCoverage("Design-core orchestrator", "V1DesignCoreOrchestrator", (finding) => finding.sourceEngine === "Design-core orchestrator", findings, [
+      `${input.V1DesignCoreOrchestrator.presentSnapshotSectionCount}/${input.V1DesignCoreOrchestrator.requiredSnapshotSectionCount} snapshot section(s) present.`,
+      `${input.V1DesignCoreOrchestrator.boundaryFindings.length} boundary finding(s).`,
+    ]),
+    summarizeCoverage("Standards rulebook", "V1StandardsRulebookControl", (finding) => finding.sourceEngine === "Standards alignment / rulebook", findings, [
+      `${input.V1StandardsRulebookControl.passRuleCount} pass; ${input.V1StandardsRulebookControl.blockingRuleCount} block; ${input.V1StandardsRulebookControl.reviewRuleCount} review.`,
+    ]),
+    summarizeCoverage("Routing and segmentation", "networkObjectModel.routingSegmentation", (finding) => finding.sourceEngine === "Routing/segmentation", findings, [
+      `Routing ${input.networkObjectModel.routingSegmentation.summary.routingReadiness}; segmentation ${input.networkObjectModel.routingSegmentation.summary.segmentationReadiness}.`,
+    ]),
+    summarizeCoverage("Security policy flow", "networkObjectModel.securityPolicyFlow", (finding) => finding.sourceEngine === "Security policy flow", findings, [
+      `Policy ${input.networkObjectModel.securityPolicyFlow.summary.policyReadiness}; NAT ${input.networkObjectModel.securityPolicyFlow.summary.natReadiness}.`,
+    ]),
+    summarizeCoverage("Implementation planning", "networkObjectModel.implementationPlan", (finding) => finding.sourceEngine === "Implementation planning", findings, [
+      `Implementation readiness ${input.networkObjectModel.implementationPlan.summary.implementationReadiness}.`,
+    ]),
+    summarizeCoverage("Report/export truth", "reportTruth", (finding) => finding.sourceEngine === "Report/export truth", findings, [
+      `Report truth ${input.reportTruth.overallReadiness}.`,
+    ]),
+    summarizeCoverage("Diagram truth", "diagramTruth", (finding) => finding.sourceEngine === "Diagram truth", findings, [
+      `Diagram truth ${input.diagramTruth.overallReadiness}.`,
+    ]),
+  ];
+
+  return {
+    contractVersion: V1_VALIDATION_READINESS_AUTHORITY_CONTRACT,
+    validationRole: "STRICT_READINESS_AUTHORITY_NOT_ADVISORY_SUMMARY",
+    validationCategories: VALIDATION_CATEGORIES,
+    overallReadiness,
+    validationGateAllowsImplementation,
+    findingCount: findings.length,
+    blockingFindingCount: counts.blockingCount,
+    rootBlockerCount: classCounts.rootBlockerCount,
+    propagatedBlockerCount: classCounts.propagatedBlockerCount,
+    derivedImpactCount: classCounts.derivedImpactCount,
+    reviewItemCount: classCounts.reviewItemCount,
+    reviewRequiredFindingCount: counts.reviewRequiredCount,
+    warningFindingCount: counts.warningCount,
+    infoFindingCount: counts.infoCount,
+    passedFindingCount: counts.passedCount,
+    requirementGateCount: requirementGateRows.length,
+    blockedRequirementGateCount: requirementGateRows.filter((row) => row.readinessImpact === "BLOCKING").length,
+    reviewRequirementGateCount: requirementGateRows.filter((row) => row.readinessImpact === "REVIEW_REQUIRED").length,
+    coverageRows,
+    requirementGateRows,
+    findings,
+    blockerTaxonomyNotes: [
+      `${classCounts.rootBlockerCount} root blocker(s), ${classCounts.propagatedBlockerCount} propagated blocker(s), ${classCounts.derivedImpactCount} derived impact(s), and ${classCounts.reviewItemCount} review item(s) are classified separately.`,
+      "Wizard-generated missing approvals/imports/candidate authority must be review-required unless an invalid, contradictory, or unlinked engineering object is proven.",
+      "Downstream report/diagram/implementation failures are visible impacts, not additional root blockers.",
+    ],
+    notes: [
+      "V1 is a readiness gate, not a feature engine.",
+      "A design is not implementation-ready while blocking or review-required validation findings remain.",
+      "Report and diagram warnings are surfaced as validation evidence so exports and visuals cannot overclaim backend truth.",
+    ],
+  };
+}
