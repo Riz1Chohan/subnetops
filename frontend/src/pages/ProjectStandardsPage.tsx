@@ -1,12 +1,12 @@
 import { Link, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { buildNamingPreviewExamples, parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 
 function kpiCard(label: string, value: number | string, note?: string) {
   return (
@@ -28,10 +28,7 @@ export function ProjectStandardsPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const namingPreview = buildNamingPreviewExamples(requirementsProfile, synthesized.siteSummaries.map((site) => ({ name: site.name, siteCode: site.siteCode, location: site.location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirementsProfile.closetModel })) );
 
   if (projectQuery.isLoading) {
@@ -105,6 +102,41 @@ export function ProjectStandardsPage() {
           </table>
         </div>
       </div>
+
+
+
+      {designCore?.V1StandardsRulebookControl ? (
+        <div className="panel" style={{ display: "grid", gap: 12 }}>
+          <div className="summary-grid">
+            {kpiCard("Rulebook readiness", designCore.V1StandardsRulebookControl.overallReadiness, "Backend-evaluated standards state.")}
+            {kpiCard("Applicable rules", `${designCore.V1StandardsRulebookControl.applicableRuleCount}/${designCore.V1StandardsRulebookControl.ruleCount}`, "Rules with active applicability.")}
+            {kpiCard("Standards blockers", designCore.V1StandardsRulebookControl.blockingRuleCount, "Must block false readiness.")}
+            {kpiCard("Requirement-linked", designCore.V1StandardsRulebookControl.requirementActivatedRuleCount, "Rules activated by saved requirements.")}
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Rule</th>
+                  <th align="left">State</th>
+                  <th align="left">Applicability</th>
+                  <th align="left">Remediation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {designCore.V1StandardsRulebookControl.ruleRows.slice(0, 12).map((row) => (
+                  <tr key={row.ruleId}>
+                    <td>{row.ruleId}<br /><span className="muted">{row.title}</span></td>
+                    <td>{row.enforcementState}<br /><span className="muted">{row.severity}</span></td>
+                    <td>{row.applicabilityCondition}</td>
+                    <td>{row.remediationGuidance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
         {kpiCard("Standards", synthesized.configurationStandards.length, "Core rules engineers should follow across the environment.")}

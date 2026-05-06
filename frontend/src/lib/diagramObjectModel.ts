@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 
 export interface DiagramDomainObject {
   id: string;
@@ -230,7 +230,7 @@ export function buildDiagramObjectModelPack(design: SynthesizedLogicalDesign): D
         id,
         severity: inferred.length >= 3 ? "warning" as const : "info" as const,
         title: "Diagram still depends on inferred route domains",
-        detail: `${inferred.length} route domain${inferred.length === 1 ? " is" : "s are"} still inferred, so some topology rendering is not yet fully authoritative.`,
+        detail: `${inferred.length} route domain${inferred.length === 1 ? " is" : "s are"} still inferred, so some topology rendering is still preview-level.`,
         linkedObjects: inferred.map((route) => route.siteName),
       };
     }

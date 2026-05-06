@@ -24,7 +24,7 @@ services:
       db:
         condition: service_healthy
     env_file:
-      - ./backend/.env.production.example
+      - ./backend/.env.production
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health/ready || exit 1"]
       interval: 10s

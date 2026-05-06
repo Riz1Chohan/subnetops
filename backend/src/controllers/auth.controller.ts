@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { ApiError } from "../utils/apiError.js";
+import { csrfTokenHandler as issueCsrfTokenHandler } from "../middleware/csrf.js";
 import {
   changePasswordSchema,
   loginSchema,
@@ -9,12 +10,13 @@ import {
 } from "../validators/auth.schemas.js";
 import {
   changePassword,
+  createAuthSessionForUser,
   createPasswordResetRequest,
   getSafeUser,
   loginUser,
   registerUser,
   resetPassword,
-  signToken,
+  revokeAuthSession,
 } from "../services/auth.service.js";
 
 function authCookieOptions() {
@@ -28,6 +30,15 @@ function authCookieOptions() {
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   };
+}
+
+function requestIp(req: Request) {
+  return req.ip || req.socket.remoteAddress || null;
+}
+
+function requestUserAgent(req: Request) {
+  const value = req.headers["user-agent"];
+  return Array.isArray(value) ? value.join(" ") : value || null;
 }
 
 function setAuthCookie(res: Response, token: string) {
@@ -44,8 +55,13 @@ function clearAuthCookie(res: Response) {
 export async function register(req: Request, res: Response) {
   const data = registerSchema.parse(req.body);
   const user = await registerUser(data);
-  const token = signToken({ sub: user.id, email: user.email, planTier: user.planTier });
-  setAuthCookie(res, token);
+  const session = await createAuthSessionForUser({
+    user,
+    ipAddress: requestIp(req),
+    userAgent: requestUserAgent(req),
+    audit: { action: "auth.register", detail: { source: "register" } },
+  });
+  setAuthCookie(res, session.token);
 
   const safeUser = await getSafeUser(user.id);
   res.status(201).json({ user: safeUser });
@@ -58,14 +74,23 @@ export async function login(req: Request, res: Response) {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  const token = signToken({ sub: user.id, email: user.email, planTier: user.planTier });
-  setAuthCookie(res, token);
+  const session = await createAuthSessionForUser({
+    user,
+    ipAddress: requestIp(req),
+    userAgent: requestUserAgent(req),
+    audit: { action: "auth.login", detail: { source: "login" } },
+  });
+  setAuthCookie(res, session.token);
 
   const safeUser = await getSafeUser(user.id);
   res.json({ user: safeUser });
 }
 
-export async function logout(_req: Request, res: Response) {
+export async function logout(req: Request, res: Response) {
+  const token = req.cookies?.subnetops_token;
+  if (token) {
+    await revokeAuthSession({ token, ipAddress: requestIp(req), userAgent: requestUserAgent(req) });
+  }
   clearAuthCookie(res);
   res.status(204).send();
 }
@@ -109,3 +134,5 @@ export async function resetPasswordHandler(req: Request, res: Response) {
   clearAuthCookie(res);
   res.json({ message: "Password reset successfully. Please sign in with your new password." });
 }
+
+export const csrfTokenHandler = issueCsrfTokenHandler;

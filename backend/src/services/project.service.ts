@@ -2,9 +2,121 @@ import type { PlanTier } from "../lib/domainTypes.js";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { addChangeLog } from "./changeLog.service.js";
+import { ensureRequirementsMaterializedForRead, materializeRequirementsForProject } from "./requirementsMaterialization.service.js";
+import { assertRequirementsRuntimeProofPass, buildRequirementsRuntimeProof, REQUIREMENTS_RUNTIME_RELEASE } from "./requirementsRuntimeProof.service.js";
+import { REQUIREMENT_FIELD_KEYS } from "./requirementsImpactRegistry.js";
 import { canEditProject, ensureCanEditProject, ensureCanViewProject, ensureOrganizationAssignable } from "./access.service.js";
+import { recordSecurityAuditEvent } from "./securityAudit.service.js";
+import { assertGeneratedProjectBasePrivateRangeWritable, assertGeneratedSiteAddressingWritable, assertGeneratedVlanAddressingWritable, buildProjectWriteCandidate } from "./engineeringWritePaths.js";
 
 type TemplateKey = "small-office" | "branch-office" | "clinic-starter";
+
+type RequirementsFieldCoverage = {
+  expectedFields: number;
+  capturedFields: number;
+  capturedFieldKeys: string[];
+  missingFields: string[];
+  unexpectedFields: string[];
+  status: "complete" | "incomplete";
+};
+
+function buildRequirementsFieldCoverage(requirementsJson: string): RequirementsFieldCoverage {
+  const expected = new Set(REQUIREMENT_FIELD_KEYS);
+  const captured = new Set<string>();
+
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const key of Object.keys(parsed)) {
+        captured.add(key);
+      }
+    }
+  } catch {
+    return {
+      expectedFields: REQUIREMENT_FIELD_KEYS.length,
+      capturedFields: 0,
+      capturedFieldKeys: [],
+      missingFields: [...REQUIREMENT_FIELD_KEYS].sort(),
+      unexpectedFields: [],
+      status: "incomplete",
+    };
+  }
+
+  const capturedFieldKeys = [...captured].filter((key) => expected.has(key)).sort();
+  const missingFields = [...expected].filter((key) => !captured.has(key)).sort();
+  const unexpectedFields = [...captured].filter((key) => !expected.has(key)).sort();
+
+  return {
+    expectedFields: REQUIREMENT_FIELD_KEYS.length,
+    capturedFields: capturedFieldKeys.length,
+    capturedFieldKeys,
+    missingFields,
+    unexpectedFields,
+    status: missingFields.length === 0 ? "complete" : "incomplete",
+  };
+}
+
+
+function parseSavedRequirementsForPersistenceContract(requirementsJson: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(requirementsJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function numberRequirement(value: unknown, fallback = 0) {
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function booleanRequirement(value: unknown) {
+  return value === true || String(value).toLowerCase() === "true";
+}
+
+function hasRequirementText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 && !value.toLowerCase().includes("not applicable");
+}
+
+function expectedRequirementSegmentFamilies(requirements: Record<string, unknown>) {
+  const expected = new Set<string>();
+  expected.add("USERS");
+  if (numberRequirement(requirements.serverCount) > 0 || hasRequirementText(requirements.serverPlacement) || hasRequirementText(requirements.criticalServicesModel)) expected.add("SERVICES");
+  if (booleanRequirement(requirements.guestWifi)) expected.add("GUEST");
+  if (booleanRequirement(requirements.wireless) || numberRequirement(requirements.apCount) > 0) expected.add("STAFF-WIFI");
+  if (booleanRequirement(requirements.voice) || numberRequirement(requirements.phoneCount) > 0) expected.add("VOICE");
+  if (booleanRequirement(requirements.printers) || numberRequirement(requirements.printerCount) > 0) expected.add("PRINTERS");
+  if (booleanRequirement(requirements.iot) || numberRequirement(requirements.iotDeviceCount) > 0) expected.add("IOT");
+  if (booleanRequirement(requirements.cameras) || numberRequirement(requirements.cameraCount) > 0) expected.add("CAMERAS");
+  if (booleanRequirement(requirements.management) || hasRequirementText(requirements.managementIpPolicy) || hasRequirementText(requirements.managementAccess)) expected.add("MANAGEMENT");
+  if (booleanRequirement(requirements.remoteAccess)) expected.add("REMOTE-ACCESS");
+  const environmentType = String(requirements.environmentType ?? "").toLowerCase();
+  if (booleanRequirement(requirements.cloudConnected) || environmentType.includes("cloud") || environmentType.includes("hybrid")) expected.add("CLOUD-EDGE");
+  const selectedSites = Math.max(1, numberRequirement(requirements.siteCount, 1));
+  const internetModel = String(requirements.internetModel ?? "internet at each site").toLowerCase();
+  if (selectedSites > 1 || !internetModel.includes("each site") || booleanRequirement(requirements.dualIsp)) expected.add("WAN-TRANSIT");
+  if (hasRequirementText(requirements.monitoringModel) || hasRequirementText(requirements.loggingModel) || hasRequirementText(requirements.backupPolicy)) expected.add("OPERATIONS");
+  return [...expected];
+}
+
+async function assertRequirementsPersistenceContract(tx: any, projectId: string, requirementsJson: string) {
+  const requirements = parseSavedRequirementsForPersistenceContract(requirementsJson);
+  const selectedSiteCount = Math.max(1, numberRequirement(requirements.siteCount, 1));
+  const expectedSegments = expectedRequirementSegmentFamilies(requirements);
+  const siteCount = await tx.site.count({ where: { projectId } });
+  const vlanCount = await tx.vlan.count({ where: { site: { projectId } } });
+
+  if (siteCount < selectedSiteCount) {
+    throw new ApiError(500, `Requirements materialization failed: selected ${selectedSiteCount} site(s), but only ${siteCount} durable Site row(s) exist after save.`);
+  }
+
+  if (expectedSegments.length > 0 && vlanCount < selectedSiteCount * expectedSegments.length) {
+    throw new ApiError(500, `Requirements materialization failed: expected at least ${selectedSiteCount * expectedSegments.length} durable VLAN/segment row(s) from ${expectedSegments.length} segment family/families across ${selectedSiteCount} site(s), but only ${vlanCount} exist after save.`);
+  }
+
+  return { siteCount, vlanCount, selectedSiteCount, expectedSegmentFamilies: expectedSegments };
+}
 
 async function enforceProjectLimit(userId: string, planTier: PlanTier) {
   if (planTier === "FREE") {
@@ -13,6 +125,19 @@ async function enforceProjectLimit(userId: string, planTier: PlanTier) {
       throw new ApiError(403, "Free plan limit reached: up to 2 projects allowed.");
     }
   }
+}
+
+
+function normalizeProjectDataForWrite(existing: { basePrivateRange?: unknown }, patch: Record<string, unknown>) {
+  const candidate = buildProjectWriteCandidate(existing, patch);
+  const normalized: Record<string, unknown> = { ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, "basePrivateRange")) {
+    normalized.basePrivateRange = candidate.basePrivateRange;
+  }
+  for (const key of Object.keys(normalized)) {
+    if (typeof normalized[key] === "undefined") delete normalized[key];
+  }
+  return normalized;
 }
 
 export async function listProjects(userId: string) {
@@ -46,7 +171,7 @@ export async function createProject(
     organizationName?: string;
     organizationId?: string;
     environmentType?: string;
-    basePrivateRange?: string;
+    basePrivateRange?: string | null;
     logoUrl?: string;
     reportHeader?: string;
     reportFooter?: string;
@@ -60,13 +185,26 @@ export async function createProject(
 ) {
   await enforceProjectLimit(userId, planTier);
   const organizationId = await ensureOrganizationAssignable(userId, data.organizationId || null);
+  const normalizedProjectData = normalizeProjectDataForWrite({}, data as Record<string, unknown>);
 
-  const project = await prisma.project.create({
-    data: { userId, ...data, organizationId: organizationId || undefined },
+  return prisma.$transaction(async (tx: any) => {
+    const project = await tx.project.create({
+      data: { userId, ...normalizedProjectData, organizationId: organizationId || undefined },
+    });
+
+    const requirementsMaterialization = data.requirementsJson
+      ? await materializeRequirementsForProject(tx, project.id, actorLabel, { requirementsJson: data.requirementsJson })
+      : null;
+    let requirementsRuntimeProof: Awaited<ReturnType<typeof buildRequirementsRuntimeProof>> | null = null;
+    if (data.requirementsJson) {
+      await assertRequirementsPersistenceContract(tx, project.id, data.requirementsJson);
+      requirementsRuntimeProof = await buildRequirementsRuntimeProof(tx, project.id, data.requirementsJson, "create-project-after-materialization");
+      assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
+    }
+    await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel, tx);
+    await recordSecurityAuditEvent({ action: "project.create", outcome: "created", actorUserId: userId, organizationId: project.organizationId, projectId: project.id, targetType: "project", targetId: project.id }, tx);
+    return { ...project, requirementsMaterialization, requirementsRuntimeProof };
   });
-
-  await addChangeLog(project.id, `Project created: ${project.name}`, actorLabel);
-  return project;
 }
 
 export async function createProjectFromTemplate(
@@ -105,24 +243,36 @@ export async function createProjectFromTemplate(
 
   const template = templateMap[templateKey];
   if (!template) throw new ApiError(404, "Template not found");
-
-  const project = await prisma.project.create({
-    data: {
-      userId,
-      name: customName?.trim() || template.name,
-      description: template.description,
-      organizationName: template.organizationName,
-      environmentType: template.environmentType,
-      basePrivateRange: template.basePrivateRange,
-    },
-  });
+  assertGeneratedProjectBasePrivateRangeWritable({ basePrivateRange: template.basePrivateRange }, "Project template");
 
   for (const siteTemplate of template.sites) {
-    const site = await prisma.site.create({ data: { projectId: project.id, name: siteTemplate.name, location: siteTemplate.location, siteCode: siteTemplate.siteCode, defaultAddressBlock: siteTemplate.defaultAddressBlock } });
-    await prisma.vlan.createMany({ data: siteTemplate.vlans.map((vlan: any) => ({ siteId: site.id, ...vlan })) });
+    assertGeneratedSiteAddressingWritable(siteTemplate, "Project template");
+    for (const vlanTemplate of siteTemplate.vlans) {
+      assertGeneratedVlanAddressingWritable(vlanTemplate, "Project template");
+    }
   }
 
-  await addChangeLog(project.id, `Project created from template: ${template.name}`, actorLabel);
+  const project = await prisma.$transaction(async (tx: any) => {
+    const createdProject = await tx.project.create({
+      data: {
+        userId,
+        name: customName?.trim() || template.name,
+        description: template.description,
+        organizationName: template.organizationName,
+        environmentType: template.environmentType,
+        basePrivateRange: template.basePrivateRange,
+      },
+    });
+
+    for (const siteTemplate of template.sites) {
+      const site = await tx.site.create({ data: { projectId: createdProject.id, name: siteTemplate.name, location: siteTemplate.location, siteCode: siteTemplate.siteCode, defaultAddressBlock: siteTemplate.defaultAddressBlock } });
+      await tx.vlan.createMany({ data: siteTemplate.vlans.map((vlan: any) => ({ siteId: site.id, ...vlan })) });
+    }
+
+    await addChangeLog(createdProject.id, `Project created from template: ${template.name}`, actorLabel, tx);
+    return createdProject;
+  });
+
   return getProject(project.id, userId);
 }
 
@@ -137,52 +287,70 @@ export async function duplicateProject(userId: string, planTier: PlanTier, sourc
     include: { sites: { include: { vlans: true } } },
   });
   if (!source) throw new ApiError(404, "Source project not found");
-
-  const newProject = await prisma.project.create({
-    data: {
-      userId,
-      organizationId: source.organizationId,
-      name: `${source.name} Copy`,
-      description: source.description,
-      organizationName: source.organizationName,
-      environmentType: source.environmentType,
-      basePrivateRange: source.basePrivateRange,
-      logoUrl: source.logoUrl,
-      reportHeader: source.reportHeader,
-      reportFooter: source.reportFooter,
-      approvalStatus: source.approvalStatus,
-      reviewerNotes: source.reviewerNotes,
-      requirementsJson: source.requirementsJson,
-      discoveryJson: source.discoveryJson,
-      platformProfileJson: source.platformProfileJson,
-    },
-  });
+  const sourceProjectForCopy = source as any;
+  assertGeneratedProjectBasePrivateRangeWritable({ basePrivateRange: sourceProjectForCopy.basePrivateRange }, "Project duplication");
 
   for (const sourceSite of source.sites) {
-    const newSite = await prisma.site.create({
-      data: {
-        projectId: newProject.id,
-        name: sourceSite.name,
-        location: sourceSite.location,
-        siteCode: sourceSite.siteCode,
-        notes: sourceSite.notes,
-        defaultAddressBlock: sourceSite.defaultAddressBlock,
-      },
-    });
-
-    if (sourceSite.vlans.length > 0) {
-      await prisma.vlan.createMany({
-        data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
-      });
+    assertGeneratedSiteAddressingWritable(sourceSite, "Project duplication");
+    for (const sourceVlan of sourceSite.vlans) {
+      assertGeneratedVlanAddressingWritable(sourceVlan, "Project duplication");
     }
   }
 
-  await addChangeLog(newProject.id, `Project duplicated from ${source.name}`, actorLabel);
+  const newProject = await prisma.$transaction(async (tx: any) => {
+    const createdProject = await tx.project.create({
+      data: {
+        userId,
+        organizationId: sourceProjectForCopy.organizationId,
+        name: `${sourceProjectForCopy.name} Copy`,
+        description: sourceProjectForCopy.description,
+        organizationName: sourceProjectForCopy.organizationName,
+        environmentType: sourceProjectForCopy.environmentType,
+        basePrivateRange: sourceProjectForCopy.basePrivateRange,
+        logoUrl: sourceProjectForCopy.logoUrl,
+        reportHeader: sourceProjectForCopy.reportHeader,
+        reportFooter: sourceProjectForCopy.reportFooter,
+        approvalStatus: sourceProjectForCopy.approvalStatus,
+        reviewerNotes: sourceProjectForCopy.reviewerNotes,
+        requirementsJson: sourceProjectForCopy.requirementsJson,
+        discoveryJson: sourceProjectForCopy.discoveryJson,
+        platformProfileJson: sourceProjectForCopy.platformProfileJson,
+      },
+    });
+
+    for (const sourceSite of source.sites) {
+      const newSite = await tx.site.create({
+        data: {
+          projectId: createdProject.id,
+          name: sourceSite.name,
+          location: sourceSite.location,
+          siteCode: sourceSite.siteCode,
+          notes: sourceSite.notes,
+          defaultAddressBlock: sourceSite.defaultAddressBlock,
+        },
+      });
+
+      if (sourceSite.vlans.length > 0) {
+        await tx.vlan.createMany({
+          data: sourceSite.vlans.map((vlan: any) => ({ siteId: newSite.id, vlanId: vlan.vlanId, vlanName: vlan.vlanName, purpose: vlan.purpose, segmentRole: vlan.segmentRole, subnetCidr: vlan.subnetCidr, gatewayIp: vlan.gatewayIp, dhcpEnabled: vlan.dhcpEnabled, estimatedHosts: vlan.estimatedHosts, department: vlan.department, notes: vlan.notes })),
+        });
+      }
+    }
+
+    await addChangeLog(createdProject.id, `Project duplicated from ${sourceProjectForCopy.name}`, actorLabel, tx);
+    return createdProject;
+  });
+
   return getProject(newProject.id, userId);
 }
 
 export async function getProject(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  const requirementsReadRepair = await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "project-read", {
+    operation: "project-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["project-response", "change-log", "security-audit"],
+  });
   const project = await prisma.project.findFirst({
     where: { id: projectId },
     include: {
@@ -191,17 +359,27 @@ export async function getProject(projectId: string, userId: string) {
     },
   });
   if (!project) return null;
-  return { ...project, canEdit: await canEditProject(userId, projectId) };
+  return { ...project, canEdit: await canEditProject(userId, projectId), requirementsReadRepair };
 }
 
 export async function getProjectSites(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "sites-read", {
+    operation: "sites-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["sites-response", "change-log", "security-audit"],
+  });
   const project = await prisma.project.findFirst({ where: { id: projectId }, select: { sites: { orderBy: { createdAt: "asc" } } } });
   return project?.sites ?? [];
 }
 
 export async function getProjectVlans(projectId: string, userId: string) {
   await ensureCanViewProject(userId, projectId);
+  await ensureRequirementsMaterializedForRead(projectId, "SubnetOps project read", "vlans-read", {
+    operation: "vlans-read",
+    authorization: { permission: "upstream-view-check", userId, checkedBy: "ensureCanViewProject" },
+    surfacedTo: ["vlans-response", "change-log", "security-audit"],
+  });
   return prisma.vlan.findMany({
     where: { site: { projectId } },
     include: { site: { select: { id: true, name: true, siteCode: true } } },
@@ -212,13 +390,81 @@ export async function getProjectVlans(projectId: string, userId: string) {
 export async function updateProject(projectId: string, userId: string, data: Record<string, unknown>, actorLabel?: string) {
   const project = await ensureCanEditProject(userId, projectId);
   const organizationId = await ensureOrganizationAssignable(userId, (data.organizationId as string | undefined) || project.organizationId || null);
-  const normalizedData = { ...data, organizationId: organizationId || undefined };
-  const result = await prisma.project.updateMany({ where: { id: projectId }, data: normalizedData });
-  await addChangeLog(projectId, `Project settings updated`, actorLabel);
-  return result;
+  const normalizedData: Record<string, unknown> = normalizeProjectDataForWrite({ basePrivateRange: (project as any).basePrivateRange }, { ...data, organizationId: organizationId || undefined });
+  return prisma.$transaction(async (tx: any) => {
+    const result = await tx.project.update({ where: { id: projectId }, data: normalizedData });
+    const requirementsMaterialization = typeof normalizedData["requirementsJson"] === "string"
+      ? await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: normalizedData["requirementsJson"] as string })
+      : null;
+    let requirementsRuntimeProof: Awaited<ReturnType<typeof buildRequirementsRuntimeProof>> | null = null;
+    if (typeof normalizedData["requirementsJson"] === "string") {
+      await assertRequirementsPersistenceContract(tx, projectId, normalizedData["requirementsJson"] as string);
+      requirementsRuntimeProof = await buildRequirementsRuntimeProof(tx, projectId, normalizedData["requirementsJson"] as string, "generic-project-update-after-materialization");
+      assertRequirementsRuntimeProofPass(requirementsRuntimeProof);
+    }
+    await addChangeLog(projectId, `Project settings updated`, actorLabel, tx);
+    await recordSecurityAuditEvent({ action: "project.update", outcome: "updated", actorUserId: userId, organizationId: result.organizationId, projectId, targetType: "project", targetId: projectId }, tx);
+    return { ...result, requirementsMaterialization, requirementsRuntimeProof };
+  });
+}
+
+export async function saveProjectRequirements(
+  projectId: string,
+  userId: string,
+  data: { requirementsJson: string; environmentType?: string; description?: string },
+  actorLabel?: string,
+) {
+  await ensureCanEditProject(userId, projectId);
+
+  const updateData: Record<string, unknown> = {
+    requirementsJson: data.requirementsJson,
+    environmentType: data.environmentType,
+    description: data.description,
+  };
+  for (const key of Object.keys(updateData)) {
+    if (typeof updateData[key] === "undefined") delete updateData[key];
+  }
+
+  return prisma.$transaction(async (tx: any) => {
+    const runtimeProofBefore = await buildRequirementsRuntimeProof(tx, projectId, data.requirementsJson, "before-project-update-and-materialization");
+
+    await tx.project.update({
+      where: { id: projectId },
+      data: updateData,
+    });
+
+    const requirementsMaterialization = await materializeRequirementsForProject(tx, projectId, actorLabel, { requirementsJson: data.requirementsJson });
+    const requirementsFieldCoverage = buildRequirementsFieldCoverage(data.requirementsJson);
+    const persistenceContract = await assertRequirementsPersistenceContract(tx, projectId, data.requirementsJson);
+    const runtimeProofAfter = await buildRequirementsRuntimeProof(tx, projectId, data.requirementsJson, "after-materialization-before-response");
+    assertRequirementsRuntimeProofPass(runtimeProofAfter);
+    const siteCount = runtimeProofAfter.counts.sites;
+    const vlanCount = runtimeProofAfter.counts.vlans;
+
+    await addChangeLog(
+      projectId,
+      `V1 requirements save materialization passed: ${siteCount} site(s), ${vlanCount} VLAN/segment row(s), ${runtimeProofAfter.counts.addressingRows} addressing row(s); captured ${requirementsFieldCoverage.capturedFields}/${requirementsFieldCoverage.expectedFields} requirement field(s).`,
+      actorLabel,
+      tx,
+    );
+
+    return {
+      message: requirementsFieldCoverage.status === "complete" ? "Requirements saved and runtime proof passed" : "Requirements saved with missing field coverage and runtime proof passed",
+      projectId,
+      release: REQUIREMENTS_RUNTIME_RELEASE,
+      requirementsMaterialization,
+      requirementsFieldCoverage,
+      persistenceContract,
+      runtimeProofBefore,
+      runtimeProofAfter,
+      outputCounts: { sites: siteCount, vlans: vlanCount, addressingRows: runtimeProofAfter.counts.addressingRows },
+    };
+  });
 }
 
 export async function deleteProject(projectId: string, userId: string) {
-  await ensureCanEditProject(userId, projectId);
-  return prisma.project.deleteMany({ where: { id: projectId } });
+  const project = await ensureCanEditProject(userId, projectId);
+  const deleted = await prisma.project.deleteMany({ where: { id: projectId } });
+  await recordSecurityAuditEvent({ action: "project.delete", outcome: "updated", actorUserId: userId, organizationId: project.organizationId, projectId, targetType: "project", targetId: projectId });
+  return deleted;
 }

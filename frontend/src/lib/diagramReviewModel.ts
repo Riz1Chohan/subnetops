@@ -1,4 +1,4 @@
-import type { SecurityBoundaryDetail, ServicePlacementItem, SitePlacementDevice, SynthesizedLogicalDesign, TopologyBlueprint, TrafficFlowPath, WanLinkPlanRow } from "./designSynthesis";
+import type { SecurityBoundaryDetail, ServicePlacementItem, SitePlacementDevice, SynthesizedLogicalDesign, TopologyBlueprint, TrafficFlowPath, WanLinkPlanRow } from "./designSynthesis.types";
 
 export interface DiagramSiteReviewCard {
   siteId: string;

@@ -7,9 +7,10 @@ import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
+import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -38,10 +39,7 @@ export function ProjectAddressingPage() {
   const vlans = vlansQuery.data ?? [];
   const validations = validationQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   const errorCount = validations.filter((item) => item.severity === "ERROR").length;
   const warningCount = validations.filter((item) => item.severity === "WARNING").length;
@@ -102,14 +100,19 @@ export function ProjectAddressingPage() {
       <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div className="trust-note">
           <p className="muted" style={{ margin: 0 }}>
+            <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+          </p>
+        </div>
+        <div className="trust-note">
+          <p className="muted" style={{ margin: 0 }}>
             <strong>{synthesized.designEngineFoundation.stageLabel}:</strong> {synthesized.designEngineFoundation.summary}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
+          <span className="badge-soft">Organization block {designCore?.organizationBlock?.canonicalCidr ?? synthesized.organizationBlock}</span>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
           <span className="badge-soft">{synthesized.siteHierarchy.length} site(s)</span>
-          <span className="badge-soft">{synthesized.addressingPlan.length} rows</span>
+          <span className="badge-soft">{designCore?.summary.vlanCount ?? synthesized.addressingPlan.length} rows</span>
           <span className="badge-soft">Validation {errorCount} errors / {warningCount} warnings</span>
           {synthesized.organizationBlockAssumed ? <span className="badge-soft">Working range assumed</span> : null}
         </div>
@@ -302,7 +305,7 @@ export function ProjectAddressingPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recommended segment model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This view shows what the design engine believes the logical segmentation should look like across the project.
+            This view shows the backend-calculated logical segmentation model for the project.
           </p>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -333,7 +336,7 @@ export function ProjectAddressingPage() {
                   <td>{segment.configuredCount}</td>
                   <td>{segment.proposedCount}</td>
                   <td>{segment.totalEstimatedHosts}</td>
-                  <td>/{segment.recommendedPrefix}</td>
+                  <td>{segment.recommendedPrefix ? `/${segment.recommendedPrefix}` : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -358,7 +361,7 @@ export function ProjectAddressingPage() {
           <h2 style={{ margin: 0 }}>Open issues and risks</h2>
           {synthesized.openIssues.length === 0 ? (
             <div className="trust-note">
-              <p className="muted" style={{ margin: 0 }}>No major addressing gaps are currently surfaced by the synthesis engine.</p>
+              <p className="muted" style={{ margin: 0 }}>No major addressing gaps are currently surfaced by design checks.</p>
             </div>
           ) : (
             <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -370,12 +373,129 @@ export function ProjectAddressingPage() {
         </div>
       </div>
 
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "table" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Enterprise allocator readiness</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            This is the enterprise IPAM gate. It separates computed allocator evidence from missing enterprise evidence: IPv6, VRF domains, brownfield imports, DHCP options/reservations, reserve policy, and approvals.
+          </p>
+        </div>
+        {designCore?.enterpriseAllocatorPosture ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div className="grid-3">
+              <div className="metric-card"><span>Source of truth</span><strong>{designCore.enterpriseAllocatorPosture.sourceOfTruthReadiness}</strong></div>
+              <div className="metric-card"><span>Dual-stack</span><strong>{designCore.enterpriseAllocatorPosture.dualStackReadiness}</strong></div>
+              <div className="metric-card"><span>VRF</span><strong>{designCore.enterpriseAllocatorPosture.vrfReadiness}</strong></div>
+              <div className="metric-card"><span>Brownfield</span><strong>{designCore.enterpriseAllocatorPosture.brownfieldReadiness}</strong></div>
+              <div className="metric-card"><span>DHCP</span><strong>{designCore.enterpriseAllocatorPosture.dhcpReadiness}</strong></div>
+              <div className="metric-card"><span>Reserve policy</span><strong>{designCore.enterpriseAllocatorPosture.reservePolicyReadiness}</strong></div>
+              <div className="metric-card"><span>Approval</span><strong>{designCore.enterpriseAllocatorPosture.approvalReadiness}</strong></div>
+            </div>
+            <div className="trust-note">
+              <p style={{ margin: 0 }}><strong>IPv4 subnets:</strong> {designCore.enterpriseAllocatorPosture.ipv4ConfiguredSubnetCount} • <strong>IPv6 prefixes:</strong> {designCore.enterpriseAllocatorPosture.ipv6ConfiguredPrefixCount} • <strong>DHCP scopes:</strong> {designCore.enterpriseAllocatorPosture.dhcpScopeCount} • <strong>Brownfield evidence:</strong> {designCore.enterpriseAllocatorPosture.brownfieldEvidenceState}</p>
+              <p style={{ margin: "6px 0 0 0" }}><strong>IPAM pools:</strong> {designCore.enterpriseAllocatorPosture.durablePoolCount ?? 0} • <strong>Candidate allocations:</strong> {designCore.enterpriseAllocatorPosture.candidateAllocationCount ?? 0} • <strong>Approved allocations:</strong> {designCore.enterpriseAllocatorPosture.approvedAllocationCount ?? 0} • <strong>Imported networks:</strong> {designCore.enterpriseAllocatorPosture.durableBrownfieldNetworkCount ?? 0} • <strong>Approvals:</strong> {designCore.enterpriseAllocatorPosture.allocationApprovalCount ?? 0} • <strong>Ledger:</strong> {designCore.enterpriseAllocatorPosture.allocationLedgerEntryCount ?? 0}</p>
+              <p style={{ margin: "6px 0 0 0" }}><strong>Conflict evidence:</strong> VRF {designCore.enterpriseAllocatorPosture.vrfOverlapFindingCount ?? 0} • Brownfield {designCore.enterpriseAllocatorPosture.brownfieldConflictCount ?? 0} • DHCP {designCore.enterpriseAllocatorPosture.dhcpFindingCount ?? 0} • Reserve {designCore.enterpriseAllocatorPosture.reservePolicyFindingCount ?? 0} • Stale approvals {designCore.enterpriseAllocatorPosture.staleAllocationCount ?? 0}</p>
+            </div>
+            {designCore.enterpriseAllocatorPosture.allocationPlanRows?.length ? (
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Family</th>
+                      <th align="left">Pool</th>
+                      <th align="left">Route domain</th>
+                      <th align="left">Target</th>
+                      <th align="left">Requested</th>
+                      <th align="left">Proposed</th>
+                      <th align="left">Status</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.enterpriseAllocatorPosture.allocationPlanRows.slice(0, 12).map((row) => (
+                      <tr key={`${row.poolId}-${row.target}-${row.family}`}>
+                        <td>{row.family}</td>
+                        <td>{row.poolName}</td>
+                        <td>{row.routeDomainKey}</td>
+                        <td>{row.target}</td>
+                        <td>/{row.requestedPrefix}</td>
+                        <td>{row.proposedCidr ?? "—"}</td>
+                        <td>{row.status}</td>
+                        <td className="muted">{row.explanation}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {designCore.enterpriseAllocatorPosture.reviewQueue.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {designCore.enterpriseAllocatorPosture.reviewQueue.slice(0, 10).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            ) : <p className="muted" style={{ margin: 0 }}>No enterprise allocator review queue items are currently present.</p>}
+          </div>
+        ) : (
+          <div className="trust-note"><p className="muted" style={{ margin: 0 }}>Enterprise allocator posture is unavailable from the design model.</p></div>
+        )}
+      </div>
+
+      <div className="panel" style={{ display: selectedSection && selectedSection !== "table" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>IPAM allocator proposal review{/* addressing proposal review: compatibility label for the V1 static release gate. */}</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Structured backend proposal rows are shown here so allocator decisions are not trapped in raw JSON. This table surfaces the proposed subnet, gateway,
+            role evidence, capacity requirement, proposed mask/range/headroom, and allocator explanation before any engineer accepts the correction.
+          </p>
+        </div>
+        {designCore?.proposedRows?.length ? (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th align="left">Site</th>
+                  <th align="left">VLAN</th>
+                  <th align="left">Role Truth</th>
+                  <th align="left">Reason</th>
+                  <th align="left">Recommended</th>
+                  <th align="left">Proposed Range</th>
+                  <th align="left">Gateway</th>
+                  <th align="left">Headroom</th>
+                  <th align="left">Allocator Explanation</th>
+                  <th align="left">Allocator Evidence</th>
+                  <th align="left">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {designCore.proposedRows.map((proposal) => (
+                  <tr key={`${proposal.siteId}-${proposal.vlanId}-${proposal.proposedSubnetCidr ?? proposal.recommendedPrefix}`}>
+                    <td>{proposal.siteName}</td>
+                    <td>{proposal.vlanId} {proposal.vlanName}</td>
+                    <td>{proposal.role} / {proposal.roleSource ?? "unknown"} / {proposal.roleConfidence ?? "low"}<br />{proposal.roleEvidence ?? "No role evidence"}</td>
+                    <td>{proposal.reason}</td>
+                    <td>{proposal.proposedSubnetCidr ?? `/${proposal.recommendedPrefix}`}<br />Required {proposal.requiredUsableHosts ?? "—"} usable host(s)</td>
+                    <td>{proposal.proposedNetworkAddress && proposal.proposedBroadcastAddress ? `${proposal.proposedNetworkAddress} → ${proposal.proposedBroadcastAddress}` : "Pending"}<br />{proposal.proposedDottedMask ? `${proposal.proposedDottedMask} / ${proposal.proposedWildcardMask ?? "—"}` : "—"}</td>
+                    <td>{proposal.proposedGatewayIp ?? "Pending"}</td>
+                    <td>{typeof proposal.proposedCapacityHeadroom === "number" ? proposal.proposedCapacityHeadroom : "—"}</td>
+                    <td>{proposal.allocatorExplanation ?? "—"}</td>
+                    <td>{proposal.allocatorParentCidr ? `${proposal.allocatorParentCidr}; used ${proposal.allocatorUsedRangeCount ?? "—"}; free ${proposal.allocatorFreeRangeCount ?? "—"}; largest ${proposal.allocatorLargestFreeRange ?? "—"}; util ${proposal.allocatorUtilizationPercent ?? "—"}%` : "—"}</td>
+                    <td>{proposal.notes?.length ? proposal.notes.join(" ") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="trust-note"><p className="muted" style={{ margin: 0 }}>No backend allocator proposal rows are currently required for this project.</p></div>
+        )}
+      </div>
+
       <div className="panel" style={{ display: selectedSection && selectedSection !== "table" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Full logical addressing plan</h2>
           <p className="muted" style={{ margin: 0 }}>
             This is the detailed table an engineer or technical PM should review before implementation. It shows where every segment lives, how it is serviced,
-            how much host space it has, and whether it is already configured or still only proposed.
+            how much buffered host space it has, which CIDR facts were computed by the backend, and whether a proposed correction exists.
           </p>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -388,15 +508,22 @@ export function ProjectAddressingPage() {
                 <th align="left">VLAN</th>
                 <th align="left">Segment</th>
                 <th align="left">Purpose</th>
-                <th align="left">Subnet</th>
-                <th align="left">Mask</th>
+                <th align="left">Configured Subnet</th>
+                <th align="left">Proposed Correction</th>
+                <th align="left">Mask / Wildcard</th>
+                <th align="left">Network → Broadcast</th>
+                <th align="left">Usable Range</th>
                 <th align="left">Gateway</th>
+                <th align="left">Gateway State</th>
                 <th align="left">DHCP Range</th>
                 <th align="left">Static Reserve</th>
                 <th align="left">Usable</th>
                 <th align="left">Estimated</th>
+                <th align="left">Required</th>
+                <th align="left">Recommended</th>
                 <th align="left">Headroom</th>
-                <th align="left">Utilization</th>
+                <th align="left">Capacity</th>
+                <th align="left">Addressing Explanation</th>
                 <th align="left">Placement</th>
                 <th align="left">Notes</th>
               </tr>
@@ -410,15 +537,22 @@ export function ProjectAddressingPage() {
                   <td>{row.vlanId ?? "—"}</td>
                   <td>{row.segmentName}</td>
                   <td>{row.purpose}</td>
-                  <td>{row.subnetCidr}</td>
-                  <td>{row.mask}</td>
+                  <td>{row.configuredSubnetCidr || row.subnetCidr}</td>
+                  <td>{row.proposedSubnetCidr ? `${row.proposedSubnetCidr}${row.proposedGatewayIp ? ` via ${row.proposedGatewayIp}` : ""}` : "—"}</td>
+                  <td>{row.mask ? `${row.mask}${row.wildcardMask ? ` / ${row.wildcardMask}` : ""}` : "—"}</td>
+                  <td>{row.networkAddress && row.broadcastAddress ? `${row.networkAddress} → ${row.broadcastAddress}` : "—"}</td>
+                  <td>{row.firstUsableIp && row.lastUsableIp ? `${row.firstUsableIp} → ${row.lastUsableIp}` : "—"}</td>
                   <td>{row.gatewayIp}</td>
+                  <td>{row.gatewayState ? `${row.gatewayState}${row.gatewayConvention ? ` / ${row.gatewayConvention}` : ""}` : "—"}</td>
                   <td>{row.dhcpRange || (row.dhcpEnabled ? "Pending" : "No DHCP")}</td>
                   <td>{row.staticReserve || "—"}</td>
                   <td>{row.usableHosts || "—"}</td>
                   <td>{row.estimatedHosts || "—"}</td>
+                  <td>{row.requiredUsableHosts || "—"}</td>
+                  <td>{row.recommendedPrefix ? `/${row.recommendedPrefix}` : "—"}</td>
                   <td>{row.usableHosts > 0 ? row.headroom : "—"}</td>
-                  <td>{row.usableHosts > 0 ? percentLabel(row.utilization) : "—"}</td>
+                  <td>{row.capacityState ? row.capacityState : row.usableHosts > 0 ? percentLabel(row.utilization) : "—"}</td>
+                  <td>{row.engine1Explanation || row.capacityBasis || row.roleEvidence || "—"}</td>
                   <td>{row.insideSiteBlock === null ? "N/A" : row.insideSiteBlock ? "Inside block" : "Outside block"}</td>
                   <td>{row.notes.length > 0 ? row.notes.join(" ") : "—"}</td>
                 </tr>

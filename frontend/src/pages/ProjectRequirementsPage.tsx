@@ -4,7 +4,8 @@ import { SectionHeader } from "../components/app/SectionHeader";
 import { LoadingState } from "../components/app/LoadingState";
 import { ErrorState } from "../components/app/ErrorState";
 import { EmptyState } from "../components/app/EmptyState";
-import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
+import { useProject, useProjectSites, useProjectVlans, useSaveProjectRequirements } from "../features/projects/hooks";
+import type { RequirementsRuntimeProof } from "../features/projects/api";
 import {
   buildNamingPreviewExamples,
   buildProjectSummaryDescription,
@@ -19,10 +20,9 @@ import {
   stringifyRequirementsProfile,
   type RequirementsProfile,
 } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
-import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingEvidenceLabel, userFacingStatusLabel } from "../lib/userFacingCopy";
 
 export function ProjectRequirementsPage() {
   const { projectId = "" } = useParams();
@@ -33,7 +33,7 @@ export function ProjectRequirementsPage() {
   const projectQuery = useProject(projectId);
   const sitesQuery = useProjectSites(projectId);
   const vlansQuery = useProjectVlans(projectId);
-  const updateMutation = useUpdateProject(projectId);
+  const saveRequirementsMutation = useSaveProjectRequirements(projectId);
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
@@ -44,6 +44,7 @@ export function ProjectRequirementsPage() {
   const [currentStepKey, setCurrentStepKey] = useState("core");
   const [draftSavedAt, setDraftSavedAt] = useState<string>("");
   const [saveConfidenceNote, setSaveConfidenceNote] = useState<string>("");
+  const [lastRuntimeProof, setLastRuntimeProof] = useState<RequirementsRuntimeProof | null>(null);
   const lastServerSaveRef = useRef(stringifyRequirementsProfile(initialProfile));
   const hasHydratedDraftRef = useRef(false);
 
@@ -83,13 +84,6 @@ export function ProjectRequirementsPage() {
   const trackStatuses = useMemo(() => planningTrackStatuses(requirements), [requirements]);
   const readinessSummary = useMemo(() => planningReadinessSummary(requirements), [requirements]);
   const namingPreview = useMemo(() => buildNamingPreviewExamples(requirements, project?.sites?.map((site) => ({ name: site.name, siteCode: (site as any).siteCode, location: (site as any).location, buildingLabel: (site as any).buildingLabel, floorLabel: (site as any).floorLabel, closetLabel: (site as any).closetLabel || requirements.closetModel })) ), [requirements, project?.sites]);
-  const synthesizedPreview = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirements), [project, sites, vlans, requirements]);
-  const recoveryPreview = useMemo(() => buildRecoveryRoadmapStatus(synthesizedPreview), [synthesizedPreview]);
-  const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recoveryPreview), [recoveryPreview]);
-  const previewDiscoveryRouteAnchors = useMemo(() => synthesizedPreview.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived").length, [synthesizedPreview]);
-  const previewPlannerRouteAnchors = useMemo(() => synthesizedPreview.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview").length, [synthesizedPreview]);
-  const previewDiscoveryBoundaryAnchors = useMemo(() => synthesizedPreview.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived").length, [synthesizedPreview]);
-  const previewPlannerBoundaryAnchors = useMemo(() => synthesizedPreview.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview").length, [synthesizedPreview]);
 
   const multiSitePlanning = Number(requirements.siteCount || "0") > 1 || requirements.internetModel !== "internet at each site";
   const wirelessPlanning = requirements.wireless || requirements.guestWifi;
@@ -98,19 +92,48 @@ export function ProjectRequirementsPage() {
   const performancePlanning = multiSitePlanning || scenario.cloud || voicePlanning || requirements.primaryGoal === "performance and user experience" || requirements.primaryGoal === "availability and redundancy";
   const advancedScenario = scenario.security || scenario.cloud || scenario.wireless || scenario.voice || scenario.resilience;
 
-  const saveRequirements = () => updateMutation.mutate({
+  const saveRequirements = () => saveRequirementsMutation.mutate({
     requirementsJson: stringifyRequirementsProfile(requirements),
     environmentType: requirements.environmentType,
     description: summaryDescription,
   }, {
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const proof = result.runtimeProofAfter ?? null;
+      setLastRuntimeProof(proof);
+
+      if (!proof || proof.release?.stage !== "V1_REQUIREMENTS_READ_REPAIR_MATERIALIZATION") {
+        setSaveConfidenceNote("Save response did not include the system check. Saved design/report output still needs review.");
+        return;
+      }
+
+      if (proof.status !== "pass") {
+        setSaveConfidenceNote(`Requirements save check blocked: ${proof.failureReasons.join(" ")}`);
+        return;
+      }
+
       lastServerSaveRef.current = stringifyRequirementsProfile(requirements);
       window.localStorage.removeItem(draftStorageKey);
       setDraftSavedAt("");
-      setSaveConfidenceNote(`Saved to project data at ${new Date().toLocaleString()}.`);
+      const materialized = result.requirementsMaterialization;
+      const createdSites = materialized?.createdSites ?? 0;
+      const updatedSites = materialized?.updatedSites ?? 0;
+      const createdVlans = materialized?.createdVlans ?? 0;
+      const updatedVlans = materialized?.updatedVlans ?? 0;
+      const coverage = result.requirementsFieldCoverage;
+      const coverageLabel = coverage
+        ? ` Captured ${coverage.capturedFields}/${coverage.expectedFields} requirement field(s) (${coverage.status}).`
+        : " Requirement field coverage was not returned by the system.";
+      const missingLabel = coverage?.missingFields?.length
+        ? ` Missing: ${coverage.missingFields.slice(0, 8).join(", ")}${coverage.missingFields.length > 8 ? ", ..." : ""}.`
+        : "";
+      setSaveConfidenceNote(
+        `Save check passed at ${new Date().toLocaleString()}: ${proof.counts.sites} site(s), ${proof.counts.vlans} VLAN/segment row(s), ${proof.counts.addressingRows} addressing row(s). Delta: +${createdSites} site(s), refreshed ${updatedSites} site(s), +${createdVlans} VLAN(s), refreshed ${updatedVlans} VLAN(s).${coverageLabel}${missingLabel}`,
+      );
     },
-    onError: () => {
-      setSaveConfidenceNote("Save failed. Your browser draft is still kept locally so you do not lose work.");
+    onError: (error) => {
+      setLastRuntimeProof(null);
+      const message = error instanceof Error ? error.message : "Unknown save failure";
+      setSaveConfidenceNote(`Save failed: ${message}. Your browser draft is still kept locally so you do not lose work.`);
     },
   });
 
@@ -190,7 +213,7 @@ export function ProjectRequirementsPage() {
             <div className="trust-note">
               <strong>Methodology note</strong>
               <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                SubnetOps is meant to behave like a planning workspace, not a generic form. The first answers should control what later stages even need to be reviewed.
+                SubnetOps is meant to behave like a planning workspace, not a generic form. The first answers should control what later steps even need to be reviewed.
               </p>
             </div>
 
@@ -221,8 +244,8 @@ export function ProjectRequirementsPage() {
                 </label>
 
                 <label>
-                  <span>Project phase</span>
-                  <select value={requirements.projectPhase} onChange={(event) => setRequirements((current) => ({ ...current, projectPhase: event.target.value }))}>
+                  <span>Project stage</span>
+                  <select value={requirements.projectStage} onChange={(event) => setRequirements((current) => ({ ...current, projectStage: event.target.value }))}>
                     <option>New network build</option>
                     <option>Redesign</option>
                     <option>Expansion</option>
@@ -1193,7 +1216,7 @@ export function ProjectRequirementsPage() {
               <label>
                 <span>Implementation timeline</span>
                 <select value={requirements.implementationTimeline} onChange={(event) => setRequirements((current) => ({ ...current, implementationTimeline: event.target.value }))}>
-                  <option>normal phased project timeline</option>
+                  <option>normal staged project timeline</option>
                   <option>fast delivery with focused scope and controlled tradeoffs</option>
                   <option>longer staged timeline with validation at each step</option>
                 <option value="Not applicable / none">N/A / none</option>
@@ -1204,7 +1227,7 @@ export function ProjectRequirementsPage() {
               <label>
                 <span>Rollout model</span>
                 <select value={requirements.rolloutModel} onChange={(event) => setRequirements((current) => ({ ...current, rolloutModel: event.target.value }))}>
-                  <option>phased rollout with validation before wider deployment</option>
+                  <option>staged rollout with validation before wider deployment</option>
                   <option>pilot site first, then broader rollout</option>
                   <option>single implementation window with strong preparation</option>
                 <option value="Not applicable / none">N/A / none</option>
@@ -1380,6 +1403,9 @@ export function ProjectRequirementsPage() {
   const currentStep = stepDefinitions[currentStepIndex] ?? stepDefinitions[0];
   const previousStep = currentStepIndex > 0 ? stepDefinitions[currentStepIndex - 1] : null;
   const nextStep = currentStepIndex < stepDefinitions.length - 1 ? stepDefinitions[currentStepIndex + 1] : null;
+  const requirementsLoadErrorMessage = projectQuery.error instanceof Error
+    ? projectQuery.error.message
+    : "SubnetOps could not load the requirements workspace right now.";
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading requirements" message="Preparing the requirements workspace for this project." />;
@@ -1389,7 +1415,7 @@ export function ProjectRequirementsPage() {
     return (
       <ErrorState
         title="Unable to load requirements"
-        message={projectQuery.error instanceof Error ? projectQuery.error.message : "SubnetOps could not load the requirements workspace right now."}
+        message={requirementsLoadErrorMessage}
         action={<Link to="/dashboard" className="link-button">Back to Dashboard</Link>}
       />
     );
@@ -1421,8 +1447,8 @@ export function ProjectRequirementsPage() {
             <p className="muted" style={{ margin: 0 }}>{currentStep.summary}</p>
           </div>
           <div className="workspace-detail-actions">
-            <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Requirements"}
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
             </button>
           </div>
         </div>
@@ -1449,11 +1475,11 @@ export function ProjectRequirementsPage() {
             )}
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save"}
+            <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
             </button>
             {nextStep ? (
-              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary">Next: {nextStep.title}</Link>
+              <Link to={`/projects/${projectId}/requirements?step=${nextStep.key}`} className="button-primary button-flow-next">Next: {nextStep.title}</Link>
             ) : (
               <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
             )}
@@ -1467,11 +1493,11 @@ export function ProjectRequirementsPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Requirements"
-        description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. This v109 workspace now uses a clearer step-by-step planner with stronger focus, fewer distractions, and more obvious next moves based on the scenario you define."
+        description="Capture the use case, environment, security direction, and operational context before detailed logical design work begins. The planner now keeps each requirement tied to downstream design impact instead of collecting disconnected form data."
         actions={
           <>
-            <button type="button" className="button-primary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save Requirements"}
+            <button type="button" className="button-primary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+              {saveRequirementsMutation.isPending ? "Saving..." : "Save Requirements"}
             </button>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button link-button-subtle">Open Logical Design</Link>
           </>
@@ -1482,7 +1508,7 @@ export function ProjectRequirementsPage() {
 
       <div className="panel save-confidence-panel">
         <div>
-          <strong style={{ display: "block", marginBottom: 6 }}>Save confidence</strong>
+          <strong style={{ display: "block", marginBottom: 6 }}>Save status</strong>
           <p className="muted" style={{ margin: 0 }}>This workspace now keeps a browser draft while you edit, warns before accidental refresh or close, and makes it clearer whether the current plan is only local or already saved to project data.</p>
         </div>
         <div className="save-confidence-grid">
@@ -1496,12 +1522,20 @@ export function ProjectRequirementsPage() {
           </div>
           <div className="save-confidence-pill">
             <strong>Shared project data</strong>
-            <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later stages."}</span>
+            <span>{saveConfidenceNote || "Use Save Requirements to write the current planner state into the project record used by later steps."}</span>
+          </div>
+          <div className={`save-confidence-pill ${lastRuntimeProof?.status === "blocker" ? "warning" : lastRuntimeProof?.status === "pass" ? "ok" : ""}`.trim()}>
+            <strong>System save check</strong>
+            <span>
+              {lastRuntimeProof
+                ? `${userFacingEvidenceLabel(lastRuntimeProof.release?.stage ?? "system check")}: ${userFacingStatusLabel(lastRuntimeProof.status)}; sites ${lastRuntimeProof.counts.sites}/${lastRuntimeProof.selectedSiteCount}; VLANs ${lastRuntimeProof.counts.vlans}/${lastRuntimeProof.expectedMinimumVlans}; addressing rows ${lastRuntimeProof.counts.addressingRows}.`
+                : "No system save check has been returned in this browser session."}
+            </span>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Saving..." : "Save to Project"}
+          <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+            {saveRequirementsMutation.isPending ? "Saving..." : "Save to Project"}
           </button>
           <button type="button" className="button-nav" onClick={clearLocalDraft} disabled={!draftSavedAt && !hasUnsavedChanges}>Restore Last Saved Version</button>
         </div>
@@ -1509,55 +1543,20 @@ export function ProjectRequirementsPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Early design-engine preview</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Verified design model required</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This preview uses your current planner answers, even before you save, to pressure the app toward explicit design objects earlier in the workflow instead of waiting for later inference-only review.
+            This page collects and saves requirements only. It no longer generates an early browser-side design preview from unsaved planner answers.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className={masterGate.status === "ready-for-master" ? "badge badge-info" : masterGate.status === "near-transition" ? "badge badge-warning" : "badge-soft"}>
-            {masterGate.status === "ready-for-master" ? "Recovery-ready preview" : masterGate.status === "near-transition" ? "Recovery close" : "Recovery still active"}
-          </span>
-          <span className="badge-soft">Site nodes {synthesizedPreview.designTruthModel.siteNodes.length}</span>
-          <span className="badge-soft">Route domains {synthesizedPreview.designTruthModel.routeDomains.length}</span>
-          <span className="badge-soft">Boundaries {synthesizedPreview.designTruthModel.boundaryDomains.length}</span>
-          <span className="badge-soft">Flows {synthesizedPreview.designTruthModel.flowContracts.length}</span>
-          <span className="badge-soft">Discovery route anchors {previewDiscoveryRouteAnchors}</span>
-          <span className="badge-soft">Planner route anchors {previewPlannerRouteAnchors}</span>
-          <span className="badge-soft">Discovery boundaries {previewDiscoveryBoundaryAnchors}</span>
-          <span className="badge-soft">Planner boundaries {previewPlannerBoundaryAnchors}</span>
-        </div>
-        <div className="grid-2" style={{ alignItems: "start" }}>
-          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>Per-site authority preview</strong>
-            <div style={{ display: "grid", gap: 10 }}>
-              {synthesizedPreview.designTruthModel.siteNodes.slice(0, 6).map((site) => (
-                <div key={site.id} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                    <strong>{site.siteName}</strong>
-                    <span className={site.authorityStatus === "ready" ? "badge badge-info" : site.authorityStatus === "partial" ? "badge badge-warning" : "badge badge-error"}>{site.authorityStatus}</span>
-                    <span className="badge-soft">services {site.serviceIds.length}</span>
-                    <span className="badge-soft">flows {site.flowIds.length}</span>
-                  </div>
-                  <p className="muted" style={{ margin: 0 }}>{site.authorityNotes[0] || "Authority is currently supported by linked route, boundary, placement, and service objects."}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>What these answers already trigger</strong>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li style={{ marginBottom: 8 }}>{masterGate.summary}</li>
-              <li style={{ marginBottom: 8 }}>Topology preview: <strong>{synthesizedPreview.topology.topologyLabel}</strong> with <strong>{synthesizedPreview.topology.internetBreakout}</strong> breakout.</li>
-              <li style={{ marginBottom: 8 }}>Required flow coverage currently shows <strong>{synthesizedPreview.flowCoverage.filter((item) => item.required && item.status === "ready").length}</strong> ready categories out of <strong>{synthesizedPreview.flowCoverage.filter((item) => item.required).length}</strong>.</li>
-              <li style={{ marginBottom: 8 }}>Authority mix: <strong>{previewDiscoveryRouteAnchors + previewDiscoveryBoundaryAnchors}</strong> discovery-backed anchor(s) and <strong>{previewPlannerRouteAnchors + previewPlannerBoundaryAnchors}</strong> planner-preview anchor(s) are already being promoted before save.</li>
-              <li style={{ marginBottom: 0 }}>Main blockers: {recoveryPreview.topBlockers.slice(0, 2).join(" • ") || "No major blockers surfaced in this preview."}</li>
-            </ul>
-          </div>
+        <div className="validation-card warning">
+          <strong>Browser planning fallback disabled</strong>
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Save requirements, then review addressing, routing, security, implementation, reports, and diagrams from the verified design model. If the system has not returned a model, those views should show an honest unavailable state instead of a fabricated browser plan.
+          </p>
         </div>
       </div>
 
-      <div className="planner-page-grid planner-page-grid-v109">
+      <div className="planner-page-grid planner-page-grid-v1">
         <aside className="planner-sidebar">
           <div className="panel planner-progress-card">
             <div className="planner-progress-card-header">
@@ -1662,20 +1661,20 @@ export function ProjectRequirementsPage() {
             </div>
           </div>
 
-          <div className="panel planner-footer-actions planner-footer-actions-v109">
+          <div className="panel planner-footer-actions planner-footer-actions-v1">
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {previousStep ? (
-                <button type="button" className="button-nav" onClick={() => setCurrentStepKey(previousStep.key)}>Back: {previousStep.title}</button>
+                <button type="button" className="button-nav button-flow-back" onClick={() => setCurrentStepKey(previousStep.key)}>Back: {previousStep.title}</button>
               ) : (
                 <span className="muted">You are at the first visible step.</span>
               )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <button type="button" className="button-secondary" onClick={saveRequirements} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save"}
+              <button type="button" className="button-secondary" onClick={saveRequirements} disabled={saveRequirementsMutation.isPending}>
+                {saveRequirementsMutation.isPending ? "Saving..." : "Save"}
               </button>
               {nextStep ? (
-                <button type="button" className="button-primary" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
+                <button type="button" className="button-primary button-flow-next" onClick={() => setCurrentStepKey(nextStep.key)}>Next: {nextStep.title}</button>
               ) : (
                 <Link to={`/projects/${projectId}/logical-design`} className="link-button">Continue to Logical Design</Link>
               )}

@@ -85,6 +85,7 @@ export interface Vlan {
   vlanId: number;
   vlanName: string;
   purpose?: string;
+  segmentRole?: string;
   subnetCidr: string;
   gatewayIp: string;
   dhcpEnabled: boolean;
@@ -110,6 +111,9 @@ export interface ValidationResult {
   ruleCode: string;
   title: string;
   message: string;
+  issue?: string;
+  impact?: string;
+  recommendation?: string;
   entityType: "PROJECT" | "SITE" | "VLAN";
   entityId?: string;
   createdAt: string;
@@ -204,6 +208,20 @@ export type CommentTaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type CommentTargetType = "PROJECT" | "SITE" | "VLAN";
 
 
+export interface V1AIDraftAuthority {
+  contract: "V1_AI_DRAFT_HELPER_CONTRACT";
+  state: "AI_DRAFT";
+  sourceType: "AI_DRAFT";
+  proofStatus: "DRAFT_ONLY";
+  reviewRequired: true;
+  notAuthoritative: true;
+  materializationRequired: true;
+  downstreamAuthority: "NOT_AUTHORITATIVE_UNTIL_REVIEWED";
+  conversionGates: string[];
+  allowedUses?: string[];
+  prohibitedUses?: string[];
+}
+
 export interface AIPlanDraft {
   project: {
     name: string;
@@ -235,6 +253,7 @@ export interface AIPlanDraft {
   assumptions: string[];
   reviewChecklist: string[];
   provider: "local" | "openai";
+  authority: V1AIDraftAuthority;
 }
 
 export interface AIValidationExplanation {
@@ -242,4 +261,5 @@ export interface AIValidationExplanation {
   whyItMatters: string;
   suggestedFixes: string[];
   provider: "local" | "openai";
+  authority?: V1AIDraftAuthority;
 }

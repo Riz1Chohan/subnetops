@@ -3,6 +3,7 @@ import type { AIPlanDraft } from "../../../lib/types";
 import { EmptyState } from "../../../components/app/EmptyState";
 import { ErrorState } from "../../../components/app/ErrorState";
 import { useGeneratePlanDraft } from "../hooks";
+import { userFacingStatusLabel } from "../../../lib/userFacingCopy";
 
 export interface AIUseDraftOptions {
   applyProjectFields: boolean;
@@ -72,16 +73,16 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
         <div>
           <h2 style={{ margin: "0 0 8px 0" }}>AI planning assistant</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Describe the network in plain English. SubnetOps will generate a first draft with sites, VLANs, subnet sizes, and gateways.
+            Describe the network in plain English. SubnetOps will generate review-required suggestions for sites, VLANs, subnet sizes, and gateways.
           </p>
         </div>
-        <span className="badge badge-info">Trust-first AI</span>
+        <span className="badge badge-info">Draft-only assistant</span>
       </div>
 
       <div className="trust-note">
         <strong>How this draft works</strong>
         <p className="muted" style={{ margin: "6px 0 0 0" }}>
-          The AI proposes a draft. You review it, choose which parts to apply, and can still edit every field before the project is saved.
+          The AI proposes a draft only. It is not approved design evidence. Selected items must become structured inputs and pass SubnetOps checks before reports, diagrams, or implementation planning can rely on them.
         </p>
       </div>
 
@@ -126,6 +127,8 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <h3 style={{ marginTop: 0, marginBottom: 8 }}>Project draft</h3>
               <span className="badge badge-info">{providerLabel(draft.provider)}</span>
+              <span className="badge badge-warning">{userFacingStatusLabel(draft.authority?.proofStatus || "DRAFT_ONLY")}</span>
+              <span className="badge badge-warning">{userFacingStatusLabel(draft.authority?.downstreamAuthority || "NOT_AUTHORITATIVE_UNTIL_REVIEWED")}</span>
             </div>
             <div className="summary-grid">
               <div className="summary-card"><div className="muted">Sites</div><div className="value">{draft.sites.length}</div></div>
@@ -159,6 +162,18 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             <h3 style={{ marginTop: 0 }}>Check before saving</h3>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {draft.reviewChecklist.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="panel" style={{ padding: 14 }}>
+            <h3 style={{ marginTop: 0 }}>Review gates</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Status: draft suggestion. AI output is not approved until reviewed, saved as structured inputs, and checked by validation, addressing, IPAM, standards, and traceability. It cannot approve readiness, routes, security policy, diagrams, reports, or implementation work.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {(draft.authority?.conversionGates || []).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
@@ -220,11 +235,11 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
             </label>
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={applySites} onChange={(event) => setApplySites(event.target.checked)} />
-              Auto-create suggested sites after project creation
+              Carry suggested sites into review after project creation
             </label>
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={applyVlans} onChange={(event) => setApplyVlans(event.target.checked)} />
-              Auto-create suggested VLANs after project creation
+              Carry suggested VLANs into review after project creation
             </label>
             <p className="muted" style={{ margin: 0 }}>
               Selected: <strong>{selectedSummary}</strong>
@@ -235,7 +250,7 @@ export function AIPlanningPanel({ onUseDraft, seedPrompt }: AIPlanningPanelProps
                 disabled={!applyProjectFields && !applySites && !applyVlans}
                 onClick={() => onUseDraft(draft, { applyProjectFields, applySites, applyVlans })}
               >
-                Apply selected parts
+                Send selected parts to review
               </button>
             </div>
           </div>

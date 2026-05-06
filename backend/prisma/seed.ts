@@ -131,7 +131,7 @@ async function main() {
         vlanId: 90,
         vlanName: "MANAGEMENT",
         purpose: "Management",
-        subnetCidr: "10.10.90.0/24",
+        subnetCidr: "10.11.0.0/24",
         gatewayIp: "10.10.90.1",
         dhcpEnabled: false,
         estimatedHosts: 20,

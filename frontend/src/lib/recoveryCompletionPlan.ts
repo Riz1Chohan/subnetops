@@ -1,4 +1,4 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import { buildDesignAuthorityLedger, type AuthorityDebtItem } from "./designAuthorityLedger";
 import { buildProjectWorkflowReview } from "./projectWorkflow";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "./recoveryRoadmap";
@@ -47,8 +47,8 @@ export function buildRecoveryCompletionPlan(projectId: string, design: Synthesiz
   const gate = buildRecoveryMasterRoadmapGate(recovery);
   const workflow = buildProjectWorkflowReview(projectId, design, validationErrorCount);
   const authorityLedger = buildDesignAuthorityLedger(projectId, design);
-  const totalPhases = Math.max(1, recovery.phases.length);
-  const percentComplete = Math.max(0, Math.min(100, Math.round(((recovery.completedCount + recovery.partialCount * 0.5) / totalPhases) * 100)));
+  const totalStages = Math.max(1, recovery.stages.length);
+  const percentComplete = Math.max(0, Math.min(100, Math.round(((recovery.completedCount + recovery.partialCount * 0.5) / totalStages) * 100)));
 
   const debtTasks = authorityLedger.debtItems.map((item) => toTask(projectId, item));
   const blockerTasks: RecoveryCompletionTask[] = recovery.topBlockers.slice(0, 3).map((item, index) => ({
@@ -83,7 +83,7 @@ export function buildRecoveryCompletionPlan(projectId: string, design: Synthesiz
   ]).slice(0, 5);
 
   const evidence = [
-    `${recovery.completedCount} recovery phase${recovery.completedCount === 1 ? " is" : "s are"} currently ready and ${recovery.partialCount} ${recovery.partialCount === 1 ? "is" : "are"} partial.`,
+    `${recovery.completedCount} recovery stage${recovery.completedCount === 1 ? " is" : "s are"} currently ready and ${recovery.partialCount} ${recovery.partialCount === 1 ? "is" : "are"} partial.`,
     `${authorityLedger.masterEvidence.explicitCoreObjects} explicit core object${authorityLedger.masterEvidence.explicitCoreObjects === 1 ? " is" : "s are"} backing the shared model, with ${authorityLedger.masterEvidence.inferredCoreObjects} still inferred.`,
     authorityLedger.masterEvidence.requiredFlowsTotal > 0
       ? `${authorityLedger.masterEvidence.requiredFlowsReady} of ${authorityLedger.masterEvidence.requiredFlowsTotal} required flow categories are fully ready.`

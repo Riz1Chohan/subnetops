@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import { requireParam } from "../utils/request.js";
-import { createProjectSchema, updateProjectSchema } from "../validators/project.schemas.js";
+import { createProjectSchema, saveProjectRequirementsSchema, updateProjectSchema } from "../validators/project.schemas.js";
 import * as projectService from "../services/project.service.js";
+import { getRequirementsRuntimeProof } from "../services/requirementsRuntimeProof.service.js";
 import { ApiError } from "../utils/apiError.js";
 
 export async function listProjects(req: Request, res: Response) {
@@ -62,6 +63,21 @@ export async function getProjectVlans(req: Request, res: Response) {
   if (!userId) throw new ApiError(401, "Unauthorized");
   const vlans = await projectService.getProjectVlans(requireParam(req, "projectId"), userId);
   res.json(vlans);
+}
+
+export async function saveProjectRequirements(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) throw new ApiError(401, "Unauthorized");
+  const data = saveProjectRequirementsSchema.parse(req.body);
+  const result = await projectService.saveProjectRequirements(requireParam(req, "projectId"), userId, data, req.user?.email);
+  res.json(result);
+}
+
+export async function getProjectRequirementsRuntimeProof(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) throw new ApiError(401, "Unauthorized");
+  const result = await getRequirementsRuntimeProof(requireParam(req, "projectId"), userId);
+  res.json(result);
 }
 
 export async function updateProject(req: Request, res: Response) {

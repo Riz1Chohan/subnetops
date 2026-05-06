@@ -14,7 +14,7 @@ const faqItems = [
     answer: "Those choices affect segmentation, addressing, topology, resilience, and the final handoff. The earlier they are captured, the more realistic the plan becomes.",
   },
   {
-    question: "Does the diagram replace the requirements and validation stages?",
+    question: "Does the diagram replace requirements and validation?",
     answer: "No. The diagram is a core output, but it should reflect the planning decisions already captured in Requirements, Logical Design, and Validation.",
   },
 ];

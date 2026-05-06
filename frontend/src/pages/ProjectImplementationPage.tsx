@@ -5,8 +5,11 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
+import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -34,13 +37,13 @@ export function ProjectImplementationPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const V1ImplementationPlanning = designCore?.V1ImplementationPlanning;
+  const V1ImplementationTemplates = designCore?.V1ImplementationTemplates;
+  const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
 
   if (projectQuery.isLoading) {
-    return <LoadingState title="Loading implementation plan" message="Preparing rollout phases, rollback triggers, validation tests, and cutover guidance." />;
+    return <LoadingState title="Loading implementation plan" message="Preparing rollout steps, rollback triggers, validation tests, and cutover guidance." />;
   }
 
   if (projectQuery.isError) {
@@ -69,7 +72,7 @@ export function ProjectImplementationPage() {
     <section style={{ display: "grid", gap: 18 }}>
       <SectionHeader
         title="Implementation & Migration"
-        description="This workspace turns the logical design into an execution package: rollout approach, phased implementation, cutover checks, rollback triggers, validation evidence, and implementation risks."
+        description="This workspace turns the logical design into an execution package: rollout approach, ordered implementation, cutover checks, rollback triggers, validation evidence, and implementation risks."
         actions={
           <>
             <Link to={`/projects/${projectId}/logical-design`} className="link-button">Logical Design</Link>
@@ -80,25 +83,72 @@ export function ProjectImplementationPage() {
         }
       />
 
+      <DesignAuthorityBanner authority={authority} />
+      <BackendEvidenceTruthCards evidenceView={reportEvidenceView} compact />
+
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span className="badge-soft">Phases {synthesized.implementationPhases.length}</span>
+          <span className="badge-soft">Steps {synthesized.implementationStages.length}</span>
           <span className="badge-soft">Checklist items {synthesized.cutoverChecklist.length}</span>
           <span className="badge-soft">Rollback triggers {synthesized.rollbackPlan.length}</span>
           <span className="badge-soft">Validation tests {synthesized.validationPlan.length}</span>
           <span className="badge-soft">Risks {criticalRisks} critical / {warningRisks} warning</span>
+          {designCore?.networkObjectModel?.implementationPlan ? <span className="badge badge-info">Implementation candidate queue displayed</span> : <span className="badge badge-warning">Implementation plan unavailable</span>}
         </div>
         <p className="muted" style={{ margin: 0 }}>
-          A real design package should not stop at topology and addressing. It should also explain how the network will be introduced safely,
-          what gets validated before and after the cutover, when rollback begins, and what risks still need explicit ownership.
+          A real design package should separate execution-ready steps from planning candidates. This page renders implementation posture with dependencies, blockers, evidence, blast radius, and rollback posture.
         </p>
       </div>
 
       <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        {summaryCard("Implementation phases", synthesized.implementationPhases.length, "Wave-by-wave execution structure for this scope.")}
+        {summaryCard("Implementation steps", synthesized.implementationStages.length, "Wave-by-wave execution structure for this scope.")}
         {summaryCard("Cutover checks", synthesized.cutoverChecklist.length, "Pre-check, cutover, and post-check controls.")}
         {summaryCard("Rollback triggers", synthesized.rollbackPlan.length, "When to stop and revert before deeper damage occurs.")}
         {summaryCard("Validation tests", synthesized.validationPlan.length, "Evidence-backed tests for acceptance and handoff.")}
+      </div>
+
+
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Implementation planning checks</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Implementation steps with source objects, requirement lineage, verification evidence, rollback, dependencies, risk, and readiness. This is not vendor command generation.</p>
+          </div>
+          {V1ImplementationPlanning ? <span className="badge badge-info">{userFacingStatusLabel(V1ImplementationPlanning.overallReadiness)}</span> : <span className="badge badge-warning">Unavailable</span>}
+        </div>
+        {V1ImplementationPlanning ? (<>
+          <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+            {summaryCard("Execution-ready", reportEvidenceView ? reportEvidenceView.implementation.executableSteps : V1ImplementationPlanning.executionReadyStepCount, "Steps with authority, verification, rollback, lineage, and safety gates.")}
+            {summaryCard("Planning candidates", reportEvidenceView ? reportEvidenceView.implementation.planningCandidateSteps : V1ImplementationPlanning.planningCandidateStepCount, "Useful planning steps that are not executable yet.")}
+            {summaryCard("Review / blocked", reportEvidenceView ? reportEvidenceView.implementation.reviewSteps + reportEvidenceView.implementation.blockedSteps : V1ImplementationPlanning.reviewStepGateCount + V1ImplementationPlanning.structuralBlockedStepCount, reportEvidenceView ? `${reportEvidenceView.implementation.reviewSteps} review / ${reportEvidenceView.implementation.blockedSteps} structural` : `${V1ImplementationPlanning.reviewStepGateCount} review / ${V1ImplementationPlanning.structuralBlockedStepCount} structural`)}
+            {summaryCard("Rollback gates", V1ImplementationPlanning.rollbackGateCount, "Rollback evidence required per step.")}
+          </div>
+        </>) : (<p className="muted" style={{ margin: 0 }}>Implementation checks are unavailable; treat generated implementation text as advisory only.</p>)}
+      </div>
+
+      <div className="panel" style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Vendor-neutral templates</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Implementation templates with variables, source objects, source requirements, missing-data blockers, neutral actions, evidence requirements, rollback requirements, and command generation disabled. This is not vendor CLI generation.</p>
+          </div>
+          {V1ImplementationTemplates ? <span className="badge badge-info">{userFacingStatusLabel(V1ImplementationTemplates.overallReadiness)}</span> : <span className="badge badge-warning">Unavailable</span>}
+        </div>
+        {V1ImplementationTemplates ? (<>
+          <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+            {summaryCard("Template gates", V1ImplementationTemplates.templateCount, `${V1ImplementationTemplates.blockedTemplateCount} blocked / ${V1ImplementationTemplates.reviewTemplateCount} review`)}
+            {summaryCard("Domains", V1ImplementationTemplates.domainCount, "Addressing, VLANs, DHCP, routing, security, NAT, WAN, validation, rollback.")}
+            {summaryCard("Lineage gaps", V1ImplementationTemplates.requirementLineageGapCount + V1ImplementationTemplates.sourceObjectGapCount, "Templates without source evidence stay gated.")}
+            {summaryCard("Vendor commands", V1ImplementationTemplates.vendorSpecificCommandCount, V1ImplementationTemplates.commandGenerationAllowed ? "Danger: command generation enabled" : "Command generation disabled by design policy.")}
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead><tr><th align="left">Template</th><th align="left">Domain</th><th align="left">Readiness</th><th align="left">Sources</th><th align="left">Requirements</th><th align="left">Rollback</th></tr></thead>
+              <tbody>{V1ImplementationTemplates.templateGates.slice(0, 24).map((template) => (<tr key={template.templateId}><td>{template.title}<br /><span className="muted">{template.templateId}</span></td><td>{template.domain}</td><td>{template.readinessImpact}</td><td>{template.sourceObjectIds.slice(0, 3).join(", ") || "none"}</td><td>{template.sourceRequirementIds.slice(0, 3).join(", ") || "none"}</td><td>{template.rollbackRequirement || "missing rollback"}</td></tr>))}</tbody>
+            </table>
+          </div>
+        </>) : (<p className="muted" style={{ margin: 0 }}>Template checks are not available. Do not treat template text as vendor command output.</p>)}
       </div>
 
       <div className="grid-2" style={{ alignItems: "start" }}>
@@ -133,28 +183,28 @@ export function ProjectImplementationPage() {
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>
         <div>
-          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Phased execution plan</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 8 }}>Execution plan</h2>
           <p className="muted" style={{ margin: 0 }}>
-            These phases are meant to guide the change sequence, not just describe it after the fact.
+            These steps are meant to guide the change sequence, not just describe it after the fact.
           </p>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
-          {synthesized.implementationPhases.map((phase) => (
-            <div key={phase.phase} className="trust-note">
-              <strong>{phase.phase}</strong>
-              <p className="muted" style={{ margin: "8px 0" }}>{phase.objective}</p>
-              <p className="muted" style={{ margin: "0 0 8px" }}><strong>Scope:</strong> {phase.scope}</p>
+          {synthesized.implementationStages.map((stage) => (
+            <div key={stage.stage} className="trust-note">
+              <strong>{stage.stage}</strong>
+              <p className="muted" style={{ margin: "8px 0" }}>{stage.objective}</p>
+              <p className="muted" style={{ margin: "0 0 8px" }}><strong>Scope:</strong> {stage.scope}</p>
               <div className="grid-2" style={{ alignItems: "start" }}>
                 <div>
                   <p style={{ marginBottom: 8 }}><strong>Dependencies</strong></p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {phase.dependencies.map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
+                    {stage.dependencies.map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
                   </ul>
                 </div>
                 <div>
                   <p style={{ marginBottom: 8 }}><strong>Success criteria</strong></p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {phase.successCriteria.map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
+                    {stage.successCriteria.map((item) => <li key={item} style={{ marginBottom: 6 }}>{item}</li>)}
                   </ul>
                 </div>
               </div>
@@ -175,7 +225,7 @@ export function ProjectImplementationPage() {
             <table>
               <thead>
                 <tr>
-                  <th align="left">Stage</th>
+                  <th align="left">Step</th>
                   <th align="left">Item</th>
                   <th align="left">Owner</th>
                   <th align="left">Why it matters</th>
@@ -236,7 +286,7 @@ export function ProjectImplementationPage() {
           <table>
             <thead>
               <tr>
-                <th align="left">Stage</th>
+                <th align="left">Step</th>
                 <th align="left">Test</th>
                 <th align="left">Expected outcome</th>
                 <th align="left">Evidence</th>

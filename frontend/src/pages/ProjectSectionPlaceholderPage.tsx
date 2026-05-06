@@ -5,7 +5,7 @@ interface ProjectSectionPlaceholderPageProps {
 
 export function ProjectSectionPlaceholderPage({
   title,
-  description = "This section is being rebuilt as part of the v37 UX redesign.",
+  description = "This section is being rebuilt as part of the v1 UX redesign.",
 }: ProjectSectionPlaceholderPageProps) {
   return (
     <section className="panel">

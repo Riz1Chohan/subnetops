@@ -25,6 +25,8 @@ import {
 } from "../lib/requirementsProfile";
 
 const AI_DRAFT_STORAGE_KEY = "subnetops.aiDraftSelection";
+const V1_AI_DRAFT_CONTRACT = "V1_AI_DRAFT_HELPER_CONTRACT";
+const V1_AI_APPLIED_MARKER = "V1_AI_DRAFT_APPLIED_REVIEW_REQUIRED";
 
 const defaultUseOptions: AIUseDraftOptions = {
   applyProjectFields: true,
@@ -42,7 +44,7 @@ const wizardSteps: WizardStep[] = [
   {
     key: "core",
     title: "Core requirements",
-    description: "Define the network type, project stage, environment, and basic scope before shaping the design.",
+    description: "Define the network type, project lifecycle, environment, and basic scope before shaping the design.",
   },
   {
     key: "priorities",
@@ -87,6 +89,43 @@ function selectedSummary(options: AIUseDraftOptions) {
   if (options.applySites) parts.push("sites");
   if (options.applyVlans) parts.push("VLANs");
   return parts.length > 0 ? parts.join(", ") : "nothing selected";
+}
+
+function appendV1AiReviewMarker(notes?: string) {
+  const marker = `${V1_AI_APPLIED_MARKER}: AI-created suggestion imported from the AI workspace. Review required; not authoritative until requirements application, validation, addressing, IPAM where relevant, standards, and traceability checks pass.`;
+  if (!notes || notes.trim().length === 0) return marker;
+  if (notes.includes(V1_AI_APPLIED_MARKER)) return notes;
+  return `${notes.trim()}\n${marker}`;
+}
+
+function buildRequirementsJsonForCreate(guided: RequirementsProfile, aiDraft: AIPlanDraft | null, options: AIUseDraftOptions) {
+  const raw = stringifyRequirementsProfile(guided);
+  let parsed: Record<string, unknown>;
+  try {
+    const value = JSON.parse(raw);
+    parsed = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  } catch {
+    parsed = {};
+  }
+
+  if (aiDraft) {
+    parsed.V1AiDraft = {
+      contract: V1_AI_DRAFT_CONTRACT,
+      state: "AI_DRAFT",
+      provider: aiDraft.provider,
+      selected: {
+        applyProjectFields: options.applyProjectFields,
+        applySites: options.applySites,
+        applyVlans: options.applyVlans,
+      },
+      reviewRequired: true,
+      notAuthoritative: true,
+      createdFrom: "AIWorkspacePage",
+      gate: aiDraft.authority?.conversionGates || [],
+    };
+  }
+
+  return JSON.stringify(parsed);
 }
 
 function trackStatusLabel(status: "READY" | "REVIEW" | "INACTIVE") {
@@ -225,11 +264,11 @@ function WizardFooter({
 }) {
   return (
     <div className="planner-footer-actions">
-      <button type="button" className="link-button" onClick={onBack} disabled={currentStep === 0}>
-        ← Back
+      <button type="button" className="link-button button-flow-back" onClick={onBack} disabled={currentStep === 0}>
+        Back
       </button>
-      <button type="button" onClick={onNext} disabled={!canProceed}>
-        {currentStep === wizardSteps.length - 1 ? "Stay on review" : "Next →"}
+      <button type="button" className="button-primary button-flow-next" onClick={onNext} disabled={!canProceed}>
+        {currentStep === wizardSteps.length - 1 ? "Stay on review" : "Next"}
       </button>
     </div>
   );
@@ -244,7 +283,7 @@ export function NewProjectPage() {
   const [generationStatus, setGenerationStatus] = useState("");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [guided, setGuided] = useState<RequirementsProfile>({ ...defaultRequirementsProfile, projectPhase: "New network build" });
+  const [guided, setGuided] = useState<RequirementsProfile>({ ...defaultRequirementsProfile, projectStage: "New network build" });
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
@@ -294,7 +333,7 @@ export function NewProjectPage() {
 
   const canProceed = useMemo(() => {
     if (currentStep === 0) {
-      return [guided.planningFor, guided.projectPhase, guided.environmentType, guided.complianceProfile, guided.siteCount, guided.usersPerSite].every((item) => item && String(item).trim().length > 0);
+      return [guided.planningFor, guided.projectStage, guided.environmentType, guided.complianceProfile, guided.siteCount, guided.usersPerSite].every((item) => item && String(item).trim().length > 0);
     }
     return true;
   }, [currentStep, guided]);
@@ -326,7 +365,7 @@ export function NewProjectPage() {
               </label>
               <label>
                 <span>Project stage</span>
-                <select value={guided.projectPhase} onChange={(event) => setGuided((current) => ({ ...current, projectPhase: event.target.value }))}>
+                <select value={guided.projectStage} onChange={(event) => setGuided((current) => ({ ...current, projectStage: event.target.value }))}>
                   <option>New network build</option>
                   <option>Existing network redesign</option>
                   <option>Network expansion</option>
@@ -1073,7 +1112,7 @@ export function NewProjectPage() {
               <label>
                 <span>Implementation timeline</span>
                 <select value={guided.implementationTimeline} onChange={(event) => setGuided((current) => ({ ...current, implementationTimeline: event.target.value }))}>
-                  <option>normal phased project timeline</option>
+                  <option>normal staged project timeline</option>
                   <option>fast delivery with focused scope and controlled tradeoffs</option>
                   <option>longer staged timeline with validation at each step</option>
                 <option value="Not applicable / none">N/A / none</option>
@@ -1083,7 +1122,7 @@ export function NewProjectPage() {
               <label>
                 <span>Rollout model</span>
                 <select value={guided.rolloutModel} onChange={(event) => setGuided((current) => ({ ...current, rolloutModel: event.target.value }))}>
-                  <option>phased rollout with validation before wider deployment</option>
+                  <option>staged rollout with validation before wider deployment</option>
                   <option>pilot site first, then broader rollout</option>
                   <option>single implementation window with strong preparation</option>
                 <option value="Not applicable / none">N/A / none</option>
@@ -1154,7 +1193,7 @@ export function NewProjectPage() {
                   <h3 style={{ marginTop: 0, marginBottom: 0 }}>Plan snapshot</h3>
                   <div className="planner-snapshot-list">
                     <div className="planner-snapshot-row"><span>Planning type</span><strong>{guided.planningFor}</strong></div>
-                    <div className="planner-snapshot-row"><span>Project stage</span><strong>{guided.projectPhase}</strong></div>
+                    <div className="planner-snapshot-row"><span>Project stage</span><strong>{guided.projectStage}</strong></div>
                     <div className="planner-snapshot-row"><span>Environment</span><strong>{guided.environmentType}</strong></div>
                     <div className="planner-snapshot-row"><span>Sites</span><strong>{guided.siteCount}</strong></div>
                     <div className="planner-snapshot-row"><span>Users per site</span><strong>{guided.usersPerSite}</strong></div>
@@ -1180,11 +1219,12 @@ export function NewProjectPage() {
 
               {aiDraft ? (
                 <div className="panel" style={{ padding: 14 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>Applied AI selections</h3>
+                  <h3 style={{ marginTop: 0, marginBottom: 8 }}>AI selections sent to review</h3>
+                  <p className="muted" style={{ marginTop: 0 }}>AI-created objects are saved as draft suggestions only. They are not approved design facts until deterministic checks accept them.</p>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     <li>Project fields: {useOptions.applyProjectFields ? "Yes" : "No"}</li>
-                    <li>Auto-create sites: {useOptions.applySites ? "Yes" : "No"}</li>
-                    <li>Auto-create VLANs: {useOptions.applyVlans ? "Yes" : "No"}</li>
+                    <li>Sites sent to review: {useOptions.applySites ? "Yes" : "No"}</li>
+                    <li>VLANs sent to review: {useOptions.applyVlans ? "Yes" : "No"}</li>
                   </ul>
                 </div>
               ) : null}
@@ -1201,7 +1241,7 @@ export function NewProjectPage() {
                   setSubmitError(null);
 
                   try {
-                    const project = await mutation.mutateAsync({ ...values, description: (values.description || guidedSummaryDescription).slice(0, 320), requirementsJson: stringifyRequirementsProfile(guided) });
+                    const project = await mutation.mutateAsync({ ...values, description: (values.description || guidedSummaryDescription).slice(0, 320), requirementsJson: buildRequirementsJsonForCreate(guided, aiDraft, useOptions) });
                     let importWarning = "";
 
                     if (aiDraft && (useOptions.applySites || useOptions.applyVlans)) {
@@ -1216,7 +1256,7 @@ export function NewProjectPage() {
                               location: siteDraft.location,
                               siteCode: siteDraft.siteCode,
                               defaultAddressBlock: siteDraft.defaultAddressBlock,
-                              notes: siteDraft.notes,
+                              notes: appendV1AiReviewMarker(siteDraft.notes),
                             });
                             createdSitesByName.set(siteDraft.name, site);
                           }
@@ -1236,7 +1276,7 @@ export function NewProjectPage() {
                               dhcpEnabled: vlanDraft.dhcpEnabled,
                               estimatedHosts: vlanDraft.estimatedHosts,
                               department: vlanDraft.department,
-                              notes: vlanDraft.notes,
+                              notes: appendV1AiReviewMarker(vlanDraft.notes),
                             });
                           }
                         }

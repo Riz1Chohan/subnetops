@@ -1,13 +1,13 @@
-import type { SynthesizedLogicalDesign } from "./designSynthesis";
+import type { SynthesizedLogicalDesign } from "./designSynthesis.types";
 import { buildDesignAuthorityLedger } from "./designAuthorityLedger";
 import { buildRecoveryFocusPlan } from "./recoveryFocus";
-import { buildRecoveryRoadmapStatus, type RecoveryPhaseStatus } from "./recoveryRoadmap";
+import { buildRecoveryRoadmapStatus, type RecoveryStageStatus } from "./recoveryRoadmap";
 
 export interface WorkflowStageReview {
   key: "discovery" | "requirements" | "design" | "validation" | "deliver";
   label: string;
   path: string;
-  status: RecoveryPhaseStatus;
+  status: RecoveryStageStatus;
   statusLabel: string;
   summary: string;
   blockers: string[];
@@ -38,11 +38,11 @@ function unique<T extends { key: string }>(items: T[]) {
   });
 }
 
-function statusLabel(status: RecoveryPhaseStatus) {
+function statusLabel(status: RecoveryStageStatus) {
   return status === "ready" ? "Ready" : status === "partial" ? "Partial" : "Needs work";
 }
 
-function combineStatus(statuses: RecoveryPhaseStatus[]): RecoveryPhaseStatus {
+function combineStatus(statuses: RecoveryStageStatus[]): RecoveryStageStatus {
   if (statuses.every((status) => status === "ready")) return "ready";
   if (statuses.some((status) => status === "partial" || status === "ready")) return "partial";
   return "pending";
@@ -57,22 +57,22 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
   const discoveryAnchors = truth.routeDomains.filter((item) => item.authoritySource === "discovery-derived").length
     + truth.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived").length;
 
-  const phaseMap = new Map(recovery.phases.map((phase) => [phase.key, phase]));
-  const phaseB = phaseMap.get("phase-b");
-  const phaseC = phaseMap.get("phase-c");
-  const phaseD = phaseMap.get("phase-d");
-  const phaseE = phaseMap.get("phase-e");
-  const phaseF = phaseMap.get("phase-f");
-  const phaseG = phaseMap.get("phase-g");
-  const phaseH = phaseMap.get("phase-h");
-  const phaseI = phaseMap.get("phase-i");
-  const phaseJ = phaseMap.get("phase-j");
+  const stageMap = new Map(recovery.stages.map((stage) => [stage.key, stage]));
+  const stageB = stageMap.get("stage-b");
+  const stageC = stageMap.get("stage-c");
+  const stageD = stageMap.get("stage-d");
+  const stageE = stageMap.get("stage-e");
+  const stageF = stageMap.get("stage-f");
+  const stageG = stageMap.get("stage-g");
+  const stageH = stageMap.get("stage-h");
+  const stageI = stageMap.get("stage-i");
+  const stageJ = stageMap.get("stage-j");
 
   const discoveryStatus = discoveryAnchors > 0 ? (requirementsGapCount > 0 ? "partial" : "ready") : "pending";
   const requirementsStatus = requirementsGapCount === 0 ? "ready" : requirementsGapCount <= 2 ? "partial" : "pending";
-  const designStatus = combineStatus([phaseB?.status || "pending", phaseC?.status || "pending", phaseD?.status || "pending", phaseE?.status || "pending", phaseF?.status || "pending"]);
+  const designStatus = combineStatus([stageB?.status || "pending", stageC?.status || "pending", stageD?.status || "pending", stageE?.status || "pending", stageF?.status || "pending"]);
   const validationStatus = validationErrorCount === 0 && ledger.debtItems.length <= 1 ? "ready" : validationErrorCount === 0 ? "partial" : "pending";
-  const deliverStatus = combineStatus([phaseG?.status || "pending", phaseH?.status || "pending", phaseI?.status || "pending", phaseJ?.status || "pending"]);
+  const deliverStatus = combineStatus([stageG?.status || "pending", stageH?.status || "pending", stageI?.status || "pending", stageJ?.status || "pending"]);
 
   const stages: WorkflowStageReview[] = [
     {
@@ -111,9 +111,9 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
       statusLabel: statusLabel(designStatus),
       summary: `The design package is currently being carried by ${ledger.confidenceLabel.toLowerCase()} with ${ledger.masterEvidence.explicitCoreObjects} explicit core object${ledger.masterEvidence.explicitCoreObjects === 1 ? "" : "s"}.`,
       blockers: [
-        ...(phaseB?.blockers.slice(0, 1) ?? []),
-        ...(phaseE?.blockers.slice(0, 1) ?? []),
-        ...(phaseF?.blockers.slice(0, 1) ?? []),
+        ...(stageB?.blockers.slice(0, 1) ?? []),
+        ...(stageE?.blockers.slice(0, 1) ?? []),
+        ...(stageF?.blockers.slice(0, 1) ?? []),
       ].slice(0, 3),
       recommendedActionLabel: focus.primaryAction.label,
       recommendedActionPath: focus.primaryAction.path,
@@ -142,9 +142,9 @@ export function buildProjectWorkflowReview(projectId: string, design: Synthesize
       statusLabel: statusLabel(deliverStatus),
       summary: `Delivery surfaces now have report, diagram, and workflow truth signals, but they still need to stay honest about remaining recovery debt.`,
       blockers: [
-        ...(phaseG?.blockers.slice(0, 1) ?? []),
-        ...(phaseJ?.blockers.slice(0, 1) ?? []),
-        ...(phaseI?.blockers.slice(0, 1) ?? []),
+        ...(stageG?.blockers.slice(0, 1) ?? []),
+        ...(stageJ?.blockers.slice(0, 1) ?? []),
+        ...(stageI?.blockers.slice(0, 1) ?? []),
       ].slice(0, 3),
       recommendedActionLabel: "Open Report",
       recommendedActionPath: `/projects/${projectId}/report?section=issues`,

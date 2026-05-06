@@ -6,7 +6,8 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 import {
   clearPlatformProfileState,
   emptyPlatformProfileState,
@@ -48,10 +49,8 @@ export function ProjectPlatformBomPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, authority, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const V1PlatformBomFoundation = designCore?.V1PlatformBomFoundation;
 
   const updateProjectMutation = useUpdateProject(projectId);
   const [state, setState] = useState<PlatformProfileState>(emptyPlatformProfileState());
@@ -131,6 +130,8 @@ export function ProjectPlatformBomPage() {
         }
       />
 
+      <DesignAuthorityBanner authority={authority} compact />
+
       <div className="panel" style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">{foundation.platformSummary.profileLabel}</span>
@@ -156,6 +157,44 @@ export function ProjectPlatformBomPage() {
         {summaryCard("Hardware categories", foundation.totals.hardwareCategories, "Switching, security, wireless, WAN, support, and physical support.")}
         {summaryCard("Review-heavy items", foundation.totals.reviewItems, "Items that still need engineering or procurement review.")}
         {summaryCard("Transit-aware design", synthesized.wanLinks.length, "WAN and edge links influencing the BOM foundation.")}
+      </div>
+
+
+      <div className="panel" style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Platform/BOM foundation</h2>
+            <p className="muted" style={{ margin: "8px 0 0" }}>
+              V1_PLATFORM_BOM_FOUNDATION_CONTRACT backend-controlled advisory BOM evidence. This panel is the hard stop against fake SKUs, fake pricing, fake PoE precision, and frontend-only procurement truth.
+            </p>
+          </div>
+          {V1PlatformBomFoundation ? <span className="badge-soft">{V1PlatformBomFoundation.overallReadiness}</span> : <span className="badge-soft">Evidence loading</span>}
+        </div>
+        {V1PlatformBomFoundation ? (
+          <>
+            <div className="grid-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+              {summaryCard("Profile state", V1PlatformBomFoundation.platformProfileState, V1PlatformBomFoundation.procurementReadinessReason)}
+              {summaryCard("BOM rows", V1PlatformBomFoundation.rowCount, V1PlatformBomFoundation.procurementAuthority)}
+              {summaryCard("Requirement drivers", V1PlatformBomFoundation.requirementDriverCount, "Every BOM effect keeps source requirement evidence.")}
+              {summaryCard("Local ports/site", V1PlatformBomFoundation.localPortDemandPerSite, `${V1PlatformBomFoundation.growthMarginPercent}% growth margin included.`)}
+              {summaryCard("PoE endpoints/site", V1PlatformBomFoundation.poeDemandPerSite, "Endpoint count only; watt budget requires device classes.")}
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead><tr><th align="left">Category</th><th align="left">Item</th><th align="left">Qty</th><th align="left">Confidence</th><th align="left">Source requirements</th><th align="left">Manual review gate</th></tr></thead>
+                <tbody>
+                  {V1PlatformBomFoundation.rows.slice(0, 9).map((item) => (
+                    <tr key={`${item.category}-${item.item}-V1`}><td>{item.category}</td><td>{item.item}</td><td>{item.quantity} {item.unit}</td><td>{item.confidence} / {item.readinessImpact}</td><td>{item.sourceRequirementIds.slice(0, 4).join(", ")}{item.sourceRequirementIds.length > 4 ? "…" : ""}</td><td>{item.manualReviewNote}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="trust-note"><strong>Evidence boundary</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{V1PlatformBomFoundation.proofBoundary.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="trust-note"><strong>Review-required items</strong><ul style={{ marginBottom: 0, paddingLeft: 18 }}>{V1PlatformBomFoundation.reviewItems.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></div>
+            </div>
+          </>
+        ) : <p className="muted" style={{ margin: 0 }}>Platform/BOM evidence is not available yet. Keep the local table advisory and do not use it for procurement approval.</p>}
       </div>
 
       <div className="panel" style={{ display: "grid", gap: 14 }}>

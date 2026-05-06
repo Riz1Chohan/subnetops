@@ -5,6 +5,7 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { useProject, useProjectSites, useProjectVlans, useUpdateProject } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import {
   analyzeDiscoveryWorkspaceState,
   clearDiscoveryWorkspaceState,
@@ -14,10 +15,10 @@ import {
   type DiscoveryWorkspaceState,
 } from "../lib/discoveryFoundation";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryMasterRoadmapGate, buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -75,13 +76,14 @@ export function ProjectDiscoveryPage() {
     [project, sites, vlans, state],
   );
   const requirementsProfile = useMemo(() => parseRequirementsProfile(project?.requirementsJson), [project?.requirementsJson]);
-  const synthesized = useMemo(() => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile), [project, sites, vlans, requirementsProfile]);
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
   const recovery = useMemo(() => buildRecoveryRoadmapStatus(synthesized), [synthesized]);
   const masterGate = useMemo(() => buildRecoveryMasterRoadmapGate(recovery), [recovery]);
   const discoveryRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "discovery-derived");
   const discoveryBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "discovery-derived");
-  const plannerRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "planner-preview");
-  const plannerBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "planner-preview");
+  const backendUnconfirmedRouteAnchors = synthesized.designTruthModel.routeDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
+  const backendUnconfirmedBoundaryAnchors = synthesized.designTruthModel.boundaryDomains.filter((item) => item.authoritySource === "backend-unconfirmed");
+  const V1DiscoveryCurrentState = designCore?.V1DiscoveryCurrentState;
 
   const updateState = (patch: Partial<DiscoveryWorkspaceState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -143,15 +145,17 @@ export function ProjectDiscoveryPage() {
 
   const focusedSectionTitle = selectedSection === "summary"
     ? "Current state summary"
-    : selectedSection === "extraction"
-      ? "Extraction preview"
-      : selectedSection === "authority"
-        ? "Authority lift"
-        : selectedSection === "inputs"
-          ? "Paste inputs"
-          : selectedSection === "coverage"
-            ? "Coverage and gaps"
-            : "Discovery";
+    : selectedSection === "contract"
+      ? "Current-state evidence"
+      : selectedSection === "extraction"
+        ? "Extraction preview"
+        : selectedSection === "authority"
+          ? "Route and boundary anchors"
+          : selectedSection === "inputs"
+            ? "Paste inputs"
+            : selectedSection === "coverage"
+              ? "Coverage and gaps"
+              : "Discovery";
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
@@ -171,7 +175,7 @@ export function ProjectDiscoveryPage() {
       ) : (
       <SectionHeader
         title="Discovery & Current State"
-        description="This workspace is the v80 foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
+        description="This workspace is the foundation for current-state ingestion. It lets you paste the observed environment, risks, and constraints so the future design can be judged against what exists today instead of only what should exist tomorrow."
         actions={(
           <div className="overview-actions-shell">
             <div className="overview-primary-actions">
@@ -190,6 +194,7 @@ export function ProjectDiscoveryPage() {
           <span className="badge-soft">Filled sections {summary.filledSections}/9</span>
           <span className="badge-soft">Migration complexity {summary.migrationComplexity}</span>
           <span className="badge-soft">Shared project persistence</span>
+          {V1DiscoveryCurrentState ? <span className="badge-soft">{userFacingStatusLabel(V1DiscoveryCurrentState.overallReadiness)}</span> : null}
         </div>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>{project.name}</h2>
@@ -208,11 +213,96 @@ export function ProjectDiscoveryPage() {
         </p>
       </div>
 
+      <div data-discovery-section="contract" className="panel" style={{ display: selectedSection && selectedSection !== "contract" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Current-state evidence contract</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Current-state evidence keeps discovery honest: manual notes, imported artifacts, validated evidence, conflicts, and review-required gaps are displayed from saved project data instead of being invented in the browser.
+          </p>
+        </div>
+        {V1DiscoveryCurrentState ? (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className={V1DiscoveryCurrentState.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1DiscoveryCurrentState.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>Readiness {userFacingStatusLabel(V1DiscoveryCurrentState.overallReadiness)}</span>
+              <span className="badge-soft">State {userFacingStatusLabel(V1DiscoveryCurrentState.discoveryState)}</span>
+              <span className="badge-soft">Source {userFacingStatusLabel(V1DiscoveryCurrentState.currentStateAuthority)}</span>
+              <span className="badge-soft">Areas {V1DiscoveryCurrentState.areaRowCount}</span>
+              <span className="badge-soft">Import targets {V1DiscoveryCurrentState.importTargetCount}</span>
+              <span className="badge-soft">Open tasks {V1DiscoveryCurrentState.openTaskCount}</span>
+              <span className="badge-soft">Conflicts {V1DiscoveryCurrentState.conflictingEvidenceCount}</span>
+            </div>
+            <div className="trust-note"><strong>Discovery state:</strong> {userFacingStatusLabel(V1DiscoveryCurrentState.discoveryState)} — {V1DiscoveryCurrentState.discoveryReadinessReason}</div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Discovery areas</strong>
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead><tr><th align="left">Area</th><th align="left">State</th><th align="left">Readiness</th><th align="left">Required for</th></tr></thead>
+                    <tbody>
+                      {V1DiscoveryCurrentState.areaRows.slice(0, 9).map((row) => (
+                        <tr key={row.areaKey}>
+                          <td>{row.area}</td>
+                          <td>{row.state}</td>
+                          <td>{row.readinessImpact}</td>
+                          <td>{row.requiredFor.join(", ") || "none"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Structured import targets</strong>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {V1DiscoveryCurrentState.importTargets.slice(0, 8).map((target) => (
+                    <div key={target.targetKey} className="trust-note">
+                      <p style={{ margin: 0 }}><strong>{target.target}</strong> — {target.state} / {target.readinessImpact}</p>
+                      <p className="muted" style={{ margin: "4px 0 0" }}>{target.reconciliationNeed}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Requirement-created discovery tasks</strong>
+                {V1DiscoveryCurrentState.tasks.length ? (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {V1DiscoveryCurrentState.tasks.slice(0, 8).map((task) => <li key={task.taskId} style={{ marginBottom: 8 }}><strong>{task.requirementId}</strong>: {task.title} — {task.state} / {task.readinessImpact}</li>)}
+                  </ul>
+                ) : <p className="muted" style={{ margin: 0 }}>No discovery tasks have been generated yet.</p>}
+              </div>
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>Evidence boundary</strong>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {V1DiscoveryCurrentState.proofBoundary.map((line) => <li key={line} style={{ marginBottom: 8 }}>{line}</li>)}
+                </ul>
+              </div>
+            </div>
+            {V1DiscoveryCurrentState.findings.length ? (
+              <div className="panel" style={{ background: "rgba(255,255,255,0.02)", display: "grid", gap: 10 }}>
+                <strong>System findings</strong>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {V1DiscoveryCurrentState.findings.slice(0, 8).map((finding) => (
+                    <div key={finding.code} className="validation-card">
+                      <p style={{ margin: 0 }}><strong>{finding.severity}</strong> — {finding.title}</p>
+                      <p className="muted" style={{ margin: "4px 0 0" }}>{finding.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>Current-state evidence is not available yet. That is a blocker, not a browser excuse to fake current-state facts.</p>
+        )}
+      </div>
+
       <div data-discovery-section="extraction" className="panel" style={{ display: selectedSection && selectedSection !== "extraction" ? "none" : "grid", gap: 14 }}>
         <div>
           <h2 style={{ margin: 0 }}>Discovery-to-design extraction preview</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Discovery should not stay as pasted notes only. This preview shows what the current-state capture is already doing to strengthen the design engine, route/boundary truth, and recovery handoff decision.
+            Discovery should not stay as pasted notes only. This preview shows what the current-state capture is already doing to strengthen the design checks, route/boundary evidence, and recovery handoff decision.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -248,7 +338,7 @@ export function ProjectDiscoveryPage() {
 
       <div data-discovery-section="authority" className="panel" style={{ display: selectedSection && selectedSection !== "authority" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Discovery-backed authority lift</h2>
+          <h2 style={{ margin: 0 }}>Discovery-backed anchors</h2>
           <p className="muted" style={{ margin: 0 }}>
             Discovery is now allowed to strengthen the shared model instead of staying as passive notes only. These counts show where current-state evidence is already promoting route and boundary anchors ahead of later saved design detail.
           </p>
@@ -256,8 +346,8 @@ export function ProjectDiscoveryPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span className="badge-soft">Discovery route anchors {discoveryRouteAnchors.length}</span>
           <span className="badge-soft">Discovery boundary anchors {discoveryBoundaryAnchors.length}</span>
-          <span className="badge-soft">Planner route anchors {plannerRouteAnchors.length}</span>
-          <span className="badge-soft">Planner boundary anchors {plannerBoundaryAnchors.length}</span>
+          <span className="badge-soft">System-draft route anchors {backendUnconfirmedRouteAnchors.length}</span>
+          <span className="badge-soft">System-draft boundary anchors {backendUnconfirmedBoundaryAnchors.length}</span>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -272,7 +362,7 @@ export function ProjectDiscoveryPage() {
             )}
           </div>
           <div className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
-            <strong style={{ display: "block", marginBottom: 8 }}>Still held by planner-preview truth</strong>
+            <strong style={{ display: "block", marginBottom: 8 }}>Still held as system-draft anchors</strong>
             <p className="muted" style={{ margin: 0 }}>
               Planner-preview anchors are useful, but the stronger recovery direction is to replace as many of them as possible with discovery-backed or saved design records.
             </p>

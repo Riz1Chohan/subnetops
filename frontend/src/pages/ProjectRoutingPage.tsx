@@ -5,11 +5,12 @@ import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { LoadingState } from "../components/app/LoadingState";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { parseRequirementsProfile } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { buildRecoveryRoadmapStatus } from "../lib/recoveryRoadmap";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
 
 function summaryCard(label: string, value: number | string, detail?: string) {
   return (
@@ -38,10 +39,7 @@ export function ProjectRoutingPage() {
   const sites = sitesQuery.data ?? [];
   const vlans = vlansQuery.data ?? [];
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
 
   if (projectQuery.isLoading) {
     return <LoadingState title="Loading routing and switching design" message="Composing protocol intent, route policy, QoS, and switching controls." />;
@@ -104,6 +102,7 @@ export function ProjectRoutingPage() {
       ) : null}
 
       <WorkspaceIssueBanner notice={issueNotice} />
+      <DesignAuthorityBanner authority={authority} compact />
 
       <div className="panel" style={{ display: selectedSection && selectedSection !== "overview" ? "none" : "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -132,13 +131,13 @@ export function ProjectRoutingPage() {
             <span className="badge-soft">pending {recovery.pendingCount}</span>
           </div>
           <div style={{ display: "grid", gap: 10 }}>
-            {recovery.phases.filter((phase) => phase.key === "phase-e" || phase.key === "phase-c" || phase.key === "phase-d").map((phase) => (
-              <div key={phase.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
+            {recovery.stages.filter((stage) => stage.key === "stage-e" || stage.key === "stage-c" || stage.key === "stage-d").map((stage) => (
+              <div key={stage.key} className="panel" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                  <strong>{phase.label}</strong>
-                  <span className={phase.status === "ready" ? "badge badge-info" : phase.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{phase.status}</span>
+                  <strong>{stage.label}</strong>
+                  <span className={stage.status === "ready" ? "badge badge-info" : stage.status === "partial" ? "badge badge-warning" : "badge badge-error"}>{stage.status}</span>
                 </div>
-                <p className="muted" style={{ margin: 0 }}>{phase.detail}</p>
+                <p className="muted" style={{ margin: 0 }}>{stage.detail}</p>
               </div>
             ))}
           </div>

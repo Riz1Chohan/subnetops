@@ -1,6 +1,8 @@
 import { Link, useLocation, useParams } from "react-router-dom";
+// V1_ENGINE1_CIDR_ADDRESSING_TRUTH
 import { useMemo } from "react";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
 import { useValidationResults } from "../features/validation/hooks";
 import { useCurrentUser } from "../features/auth/hooks";
 import { UsageBanner } from "../components/app/UsageBanner";
@@ -9,13 +11,14 @@ import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
 import { parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "../lib/discoveryFoundation";
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { buildRecoveryFocusPlan } from "../lib/recoveryFocus";
 import { buildRecoveryCompletionPlan } from "../lib/recoveryCompletionPlan";
 import { WorkspaceIssueBanner } from "../components/app/WorkspaceIssueBanner";
 import { parseWorkspaceIssueNotice } from "../lib/workspaceIssue";
+import { userFacingStatusLabel } from "../lib/userFacingCopy";
+import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
 
 function summaryCard(label: string, value: number | string) {
   return (
@@ -59,10 +62,10 @@ export function ProjectOverviewPage() {
   const warningCount = validationItems.filter((item) => item.severity === "WARNING").length;
   const requirementsProfile = parseRequirementsProfile(project?.requirementsJson);
   const requirementsReadiness = planningReadinessSummary(requirementsProfile);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const V1AiDraftHelper = designCore?.V1AiDraftHelper;
+  const V1FinalProofPass = designCore?.V1FinalProofPass;
+  const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -171,6 +174,7 @@ export function ProjectOverviewPage() {
       ) : null}
 
       <WorkspaceIssueBanner notice={issueNotice} />
+      <BackendEvidenceTruthCards evidenceView={reportEvidenceView} compact />
 
       <div className={`${focusClass("traceability")} recovery-focus-panel`} style={{ display: selectedSection && selectedSection !== "summary" ? "none" : "grid", gap: 14 }}>
         <div>
@@ -202,7 +206,7 @@ export function ProjectOverviewPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
           <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
-          <span className="badge-soft">Validation {validationHealthLabel(errorCount, warningCount)}</span>
+          <span className="badge-soft">Validation {reportEvidenceView ? `${reportEvidenceView.validation.rootBlockerCount} root / ${reportEvidenceView.validation.reviewItemCount} review` : validationHealthLabel(errorCount, warningCount)}</span>
           <span className="badge-soft">Requirements {requirementsReadiness.completionLabel}</span>
           {synthesized.organizationBlockAssumed ? <span className="badge-soft">Working range assumed</span> : null}
         </div>
@@ -212,6 +216,51 @@ export function ProjectOverviewPage() {
           <p className="muted" style={{ marginTop: 8 }}>{project.description || "No description yet."}</p>
         </div>
       </div>
+
+      {V1AiDraftHelper && (!selectedSection || selectedSection === "summary") ? (
+        <div className="panel" style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI draft boundary</h2>
+              <p className="muted" style={{ margin: 0 }}>AI is draft-only. It can seed reviewed structured inputs, but it is not an approved source for addressing, routing, security, reports, diagrams, or implementation.</p>
+            </div>
+            <span className={V1AiDraftHelper.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1AiDraftHelper.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>{userFacingStatusLabel(V1AiDraftHelper.overallReadiness)}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge-soft">Source status {userFacingStatusLabel(V1AiDraftHelper.aiAuthority)}</span>
+            <span className="badge-soft">AI objects {V1AiDraftHelper.aiDerivedObjectCount}</span>
+            <span className="badge-soft">Review required {V1AiDraftHelper.reviewRequiredObjectCount}</span>
+            <span className="badge-soft">Gates {V1AiDraftHelper.enforcedGateCount}/{V1AiDraftHelper.gateCount}</span>
+          </div>
+          {V1AiDraftHelper.draftObjectRows.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {V1AiDraftHelper.draftObjectRows.slice(0, 5).map((item) => <li key={item.objectId}><strong>{item.objectLabel}</strong> — {userFacingStatusLabel(item.state)} / {userFacingStatusLabel(item.proofStatus)}</li>)}
+            </ul>
+          ) : <p className="muted" style={{ margin: 0 }}>No saved AI-derived object markers detected.</p>}
+        </div>
+      ) : null}
+
+      {V1FinalProofPass && (!selectedSection || selectedSection === "summary") ? (
+        <div className="panel" style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Final readiness review</h2>
+              <p className="muted" style={{ margin: 0 }}>This is the final readiness review. It checks scenarios, release gates, report/export evidence, and diagram/browser boundaries without pretending the design is complete when evidence is missing.</p>
+            </div>
+            <span className={V1FinalProofPass.overallReadiness === "BLOCKED" ? "badge badge-danger" : V1FinalProofPass.overallReadiness === "REVIEW_REQUIRED" ? "badge badge-warning" : "badge-soft"}>{userFacingStatusLabel(V1FinalProofPass.overallReadiness)}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge-soft">Target {userFacingStatusLabel(V1FinalProofPass.releaseTarget)}</span>
+            <span className="badge-soft">Scenarios {V1FinalProofPass.scenarioProofReadyCount}/{V1FinalProofPass.scenarioCount}</span>
+            <span className="badge-soft">Domain rows {V1FinalProofPass.engineProofReadyCount}/{V1FinalProofPass.engineProofCount}</span>
+            <span className="badge-soft">Gates {V1FinalProofPass.passedGateCount}/{V1FinalProofPass.gateCount}</span>
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {V1FinalProofPass.releaseGates.slice(0, 4).map((gate) => <li key={gate.gateKey}><strong>{gate.gate}</strong> — {userFacingStatusLabel(gate.state)}</li>)}
+          </ul>
+          <p className="muted" style={{ margin: 0 }}>Blocked scenarios: {V1FinalProofPass.scenarioBlockedCount}. Review-required scenarios: {V1FinalProofPass.scenarioReviewCount}. This panel is deliberately an evidence status, not a marketing badge.</p>
+        </div>
+      ) : null}
 
       {!isFocusedSectionView ? (
         <UsageBanner
@@ -258,7 +307,7 @@ export function ProjectOverviewPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Explicit topology model</h2>
           <p className="muted" style={{ margin: 0 }}>
-            v108 turns requirements into explicit placement, path, boundary, and addressing objects instead of generic report wording. This section shows how the current topology choice is being resolved inside the design engine foundation.
+            Requirements should become explicit placement, path, boundary, and addressing evidence instead of generic report wording. This section shows how the current topology choice is being resolved inside the design foundation.
           </p>
         </div>
         <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
@@ -296,7 +345,7 @@ export function ProjectOverviewPage() {
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Unified design truth layer</h2>
           <p className="muted" style={{ margin: 0 }}>
-            This recovery pass adds a shared model that links site topology, route domains, service placement, security boundaries, WAN adjacencies, and flow contracts so later workspaces can read from one connected engineering layer.
+            This workspace uses a shared model that links site topology, route domains, service placement, security boundaries, WAN adjacencies, and flow contracts so every review area reads from one connected engineering layer.
           </p>
         </div>
         <div className="grid-2" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
@@ -312,7 +361,7 @@ export function ProjectOverviewPage() {
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li style={{ marginBottom: 8 }}>Diagram, routing, security, and report work can now point to the same linked design objects.</li>
               <li style={{ marginBottom: 8 }}>Site, zone, and service drift become easier to detect before implementation details are written.</li>
-              <li style={{ marginBottom: 0 }}>The next roadmap step can focus on strengthening this model instead of stacking more disconnected review helpers.</li>
+              <li style={{ marginBottom: 0 }}>The next engineering step should strengthen this model instead of stacking more disconnected review helpers.</li>
             </ul>
           </div>
           <div>
@@ -740,6 +789,858 @@ export function ProjectOverviewPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Source ledger</h2>
+          {designCore?.V1TraceabilityControl ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Label coverage", `${designCore.V1TraceabilityControl.outputLabelCoverage.labelledOutputCount}/${designCore.V1TraceabilityControl.outputLabelCoverage.requiredOutputCount}`)}
+                {summaryCard("Review outputs", designCore.V1TraceabilityControl.outputLabelCoverage.reviewRequiredCount)}
+                {summaryCard("Captured lineage", designCore.V1TraceabilityControl.requirementLineageCoverage.capturedCount)}
+                {summaryCard("Full lineage", designCore.V1TraceabilityControl.requirementLineageCoverage.fullCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                The design model labels outputs by source, evidence status, requirement lineage, and consumer path. This prevents saved form data, inferred objects, and computed review evidence from pretending to be implementation-ready facts.
+              </p>
+              {designCore.V1TraceabilityControl.outputLabelCoverage.missingLabelCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Missing output labels</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.V1TraceabilityControl.outputLabelCoverage.missingLabels.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Major output groups have source/evidence labels.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Output</th>
+                      <th align="left">Source type</th>
+                      <th align="left">Evidence</th>
+                      <th align="left">Consumers</th>
+                      <th align="left">Review reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1TraceabilityControl.outputLabels.slice(0, 14).map((item) => (
+                      <tr key={item.outputKey}>
+                        <td>{item.outputLabel}<br /><span className="muted">{item.sourceEngine}</span></td>
+                        <td>{userFacingStatusLabel(item.sourceType)}</td>
+                        <td>{userFacingStatusLabel(item.proofStatus)}<br /><span className="muted">{userFacingStatusLabel(item.confidence)}</span></td>
+                        <td>{item.consumerPath.slice(0, 4).join(", ")}</td>
+                        <td>{item.reviewReason || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Source ledger is not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement application policy</h2>
+          {designCore?.V1RequirementsMaterialization ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Policy rows", designCore.V1RequirementsMaterialization.totalPolicyCount)}
+                {summaryCard("Active fields", designCore.V1RequirementsMaterialization.activeFieldCount)}
+                {summaryCard("Applied", designCore.V1RequirementsMaterialization.materializedObjectCount)}
+                {summaryCard("Review/blocker", designCore.V1RequirementsMaterialization.reviewItemCount + designCore.V1RequirementsMaterialization.validationBlockerCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Every saved requirement must resolve to an applied object, system input signal, validation blocker, review item, explicit not-applicable state, or unsupported state. The UI only shows system-declared outcomes.
+              </p>
+              {designCore.V1RequirementsMaterialization.silentDropCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Active requirements with no application path</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.V1RequirementsMaterialization.silentDropKeys.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>No active requirement is silently dropped by the policy ledger.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Policy</th>
+                      <th align="left">Status</th>
+                      <th align="left">Evidence / review</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1RequirementsMaterialization.fieldOutcomes.filter((item) => item.captured).slice(0, 16).map((item) => (
+                      <tr key={item.key}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.expectedDisposition}<br /><span className="muted">{item.confidence}</span></td>
+                        <td>{item.materializationStatus}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{item.actualEvidence.slice(0, 2).join(" ") || item.reviewReason || item.noOpReason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirement application policy is not available in the design model yet.</p>
+          )}
+        </div>
+
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirements closure matrix</h2>
+          {designCore?.V1RequirementsClosure ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Active requirements", designCore.V1RequirementsClosure.activeRequirementCount)}
+                {summaryCard("Full traceability", designCore.V1RequirementsClosure.fullPropagatedCount)}
+                {summaryCard("Review/blocking", designCore.V1RequirementsClosure.reviewRequiredCount + designCore.V1RequirementsClosure.blockedCount)}
+                {summaryCard("Missing consumers", designCore.V1RequirementsClosure.missingConsumerCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This is the nothing-got-lost checker. Each active requirement must show capture, normalization, application or explicit review, system consumption, readiness impact, browser visibility, report/export evidence, and diagram impact when relevant. Missing consumers stay visible instead of being hidden.
+              </p>
+              {designCore.V1RequirementsClosure.blockedCount > 0 || designCore.V1RequirementsClosure.reviewRequiredCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Some requirements are still blocked or review-required.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.V1RequirementsClosure.blockedCount} blocked, {designCore.V1RequirementsClosure.reviewRequiredCount} review-required, {designCore.V1RequirementsClosure.partialPropagatedCount} partially traced.
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>No blocked or review-required active requirement rows found.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Actual design areas</th>
+                      <th align="left">Missing consumers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1RequirementsClosure.closureMatrix.filter((item) => item.active || item.consumerCoverage.captured).slice(0, 18).map((item) => (
+                      <tr key={item.requirementId}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.lifecycleStatus}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{userFacingStatusLabel(item.readinessImpact)}</td>
+                        <td>{item.actualAffectedEngines.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{item.missingConsumers.slice(0, 5).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Golden scenario</th>
+                      <th align="left">Status</th>
+                      <th align="left">Required keys</th>
+                      <th align="left">Blocking / review keys</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1RequirementsClosure.goldenScenarioClosures.filter((item) => item.relevant).slice(0, 10).map((scenario) => (
+                      <tr key={scenario.id}>
+                        <td>{scenario.label}</td>
+                        <td>{scenario.lifecycleStatus}</td>
+                        <td>{scenario.requiredRequirementKeys.slice(0, 6).join(", ")}</td>
+                        <td>{[...scenario.blockingRequirementKeys, ...scenario.reviewRequirementKeys].slice(0, 8).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirements closure matrix is not available in the design model yet.</p>
+          )}
+        </div>
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>CIDR/addressing checks</h2>
+          {designCore?.V1CidrAddressingTruth ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Address rows", designCore.V1CidrAddressingTruth.totalAddressRowCount)}
+                {summaryCard("Undersized", designCore.V1CidrAddressingTruth.undersizedSubnetCount)}
+                {summaryCard("Gateway issues", designCore.V1CidrAddressingTruth.gatewayIssueCount)}
+                {summaryCard("Requirement gaps", designCore.V1CidrAddressingTruth.requirementAddressingGapCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Addressing checks cover CIDR canonicalization, invalid CIDR rejection, /0-/32 edge behavior, role-aware gateway safety, deterministic allocator evidence, and requirement-driven subnet sizing. Addressing planning does not pretend to be approved IPAM authority.
+              </p>
+              {designCore.V1CidrAddressingTruth.requirementAddressingGapCount > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Some active requirements still lack concrete addressing evidence.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.V1CidrAddressingTruth.requirementAddressingGapCount} addressing requirement row(s) are review-required or blocking.
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>No active requirement-to-addressing gaps found.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Affected roles</th>
+                      <th align="left">Evidence / missing data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1CidrAddressingTruth.requirementAddressingMatrix.filter((item) => item.active).slice(0, 16).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.sourceValue}</span></td>
+                        <td>{userFacingStatusLabel(item.readinessImpact)}</td>
+                        <td>{item.affectedRoles.slice(0, 6).join(", ")}</td>
+                        <td>{item.materializedAddressingEvidence[0] || item.missingAddressingEvidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">VLAN</th>
+                      <th align="left">CIDR</th>
+                      <th align="left">Capacity</th>
+                      <th align="left">Gateway / site block</th>
+                      <th align="left">Blockers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1CidrAddressingTruth.addressingTruthRows.slice(0, 18).map((row) => (
+                      <tr key={row.rowId}>
+                        <td>{row.siteName} VLAN {row.vlanId}<br /><span className="muted">{row.vlanName} / {row.role}</span></td>
+                        <td>{row.canonicalSubnetCidr || row.sourceSubnetCidr}<br /><span className="muted">proposal {row.proposedSubnetCidr || "—"}</span></td>
+                        <td>{row.capacityState}<br /><span className="muted">/{row.recommendedPrefix ?? "—"} for {row.requiredUsableHosts ?? "—"} usable</span></td>
+                        <td>{row.gatewayState}<br /><span className="muted">site block {String(row.inSiteBlock)}</span></td>
+                        <td>{row.blockers.slice(0, 4).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">CIDR evidence</th>
+                      <th align="left">Status</th>
+                      <th align="left">Selftest</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1CidrAddressingTruth.edgeCaseProofs.map((proof) => (
+                      <tr key={proof.id}>
+                        <td>{proof.label}</td>
+                        <td>{userFacingStatusLabel(proof.status)}</td>
+                        <td>{proof.selftest}</td>
+                        <td>{proof.evidence[0]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>CIDR/addressing checks are not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Enterprise IPAM durability</h2>
+          {designCore?.V1EnterpriseIpamTruth ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.V1EnterpriseIpamTruth.overallReadiness)}
+                {summaryCard("Proposal-only", designCore.V1EnterpriseIpamTruth.engine1ProposalOnlyCount)}
+                {summaryCard("Approved", reportEvidenceView ? reportEvidenceView.ipam.approvedAllocations : designCore.V1EnterpriseIpamTruth.approvedAllocationCount)}
+                {summaryCard("Block/review", designCore.V1EnterpriseIpamTruth.conflictBlockerCount + designCore.V1EnterpriseIpamTruth.reviewRequiredCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This reconciles planned addressing with Engine 2 IPAM records. Addressing remains the mathematical planner; IPAM owns route domains, pools, candidate allocations, approved allocations, DHCP scopes, reservations, brownfield conflicts, approvals, and the ledger. A subnet cannot look implementation-ready while IPAM says it is planned-only, candidate, stale, conflicted, or review-required.
+              </p>
+              {designCore.V1EnterpriseIpamTruth.overallReadiness === "BLOCKING" ? (
+                <div className="trust-note danger">
+                  <strong>IPAM has blocking durability issues.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Resolve pool/allocation/brownfield/DHCP/reservation/approval blockers before implementation readiness.</p>
+                </div>
+              ) : designCore.V1EnterpriseIpamTruth.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>IPAM still needs candidate/approved allocation review.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Proposal-only rows are not approved IPAM authority.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>No active IPAM source gaps found.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">VLAN / role</th>
+                      <th align="left">Addressing</th>
+                      <th align="left">IPAM</th>
+                      <th align="left">State</th>
+                      <th align="left">Review evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1EnterpriseIpamTruth.reconciliationRows.slice(0, 18).map((row) => (
+                      <tr key={row.rowId}>
+                        <td>{row.siteName} VLAN {row.vlanId}<br /><span className="muted">{row.vlanName} / {row.role}</span></td>
+                        <td>{row.engine1PlannedCidr}<br /><span className="muted">proposal {row.engine1ProposedCidr || "—"}</span></td>
+                        <td>{row.engine2AllocationCidr || "—"}<br /><span className="muted">{row.engine2PoolName || "no pool"} / {row.routeDomainKey}</span></td>
+                        <td>{userFacingStatusLabel(row.reconciliationState)}<br /><span className="muted">{userFacingStatusLabel(row.readinessImpact)}</span></td>
+                        <td>{row.blockers[0] || row.reviewReasons[0] || row.evidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Counts</th>
+                      <th align="left">Evidence / missing data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1EnterpriseIpamTruth.requirementIpamMatrix.filter((item) => item.active).slice(0, 16).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.label}</span></td>
+                        <td>{userFacingStatusLabel(item.readinessImpact)}</td>
+                        <td>{item.approvedAllocationCount} approved / {item.candidateAllocationCount ?? item.durableCandidateCount} candidate / {item.engine1ProposalOnlyCount} planned-only</td>
+                        <td>{item.materializedIpamEvidence[0] || item.missingIpamEvidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">IPAM finding</th>
+                      <th align="left">Severity</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1EnterpriseIpamTruth.conflictRows.slice(0, 18).map((finding) => (
+                      <tr key={finding.id}>
+                        <td>{finding.code}<br /><span className="muted">{finding.title}</span></td>
+                        <td>{finding.severity}</td>
+                        <td>{userFacingStatusLabel(finding.readinessImpact)}</td>
+                        <td>{finding.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Enterprise IPAM durability checks are not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Design model coordinator</h2>
+          {designCore?.V1DesignCoreOrchestrator ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Sections", `${designCore.V1DesignCoreOrchestrator.presentSnapshotSectionCount}/${designCore.V1DesignCoreOrchestrator.requiredSnapshotSectionCount}`)}
+                {summaryCard("Readiness", userFacingStatusLabel(designCore.V1DesignCoreOrchestrator.overallReadiness))}
+                {summaryCard("Boundary findings", designCore.V1DesignCoreOrchestrator.boundaryFindings.length)}
+                {summaryCard("Browser truth risks", designCore.V1DesignCoreOrchestrator.frontendIndependentTruthRiskCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                The design model coordinator keeps the snapshot organized into named system-owned sections: source inputs, applied objects, addressing, Engine 2 IPAM, object/graph model, routing, security, implementation, report, diagram, and readiness. The browser displays this ledger; it does not compute engineering truth independently.
+              </p>
+              {designCore.V1DesignCoreOrchestrator.overallReadiness === "BLOCKED" ? (
+                <div className="trust-note danger">
+                  <strong>Design model coordination has blocking boundary issues.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Missing snapshot sections or upstream blockers must stay visible; downstream pages must not paper over them.</p>
+                </div>
+              ) : designCore.V1DesignCoreOrchestrator.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Design model coordination is present but review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>The coordinator is working, but some sections carry review-required evidence from upstream design areas.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>No missing design-model sections found.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Snapshot section</th>
+                      <th align="left">Owner</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Consumers</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1DesignCoreOrchestrator.sectionRows.slice(0, 16).map((row) => (
+                      <tr key={row.sectionKey}>
+                        <td>{row.label}<br /><span className="muted">{row.snapshotPath}</span></td>
+                        <td>{row.ownerEngine}<br /><span className="muted">{row.sourceType}</span></td>
+                        <td>{userFacingStatusLabel(row.readiness)}<br /><span className="muted">{row.blockerCount} block / {row.reviewCount} review</span></td>
+                        <td>{row.downstreamConsumers.slice(0, 4).join(", ")}</td>
+                        <td>{row.proofGates.slice(0, 3).join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Dependency</th>
+                      <th align="left">Path</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1DesignCoreOrchestrator.dependencyEdges.slice(0, 12).map((edge) => (
+                      <tr key={edge.id}>
+                        <td>{edge.relationship}</td>
+                        <td>{edge.sourceSectionKey} → {edge.targetSectionKey}</td>
+                        <td>{edge.evidence.slice(0, 2).join(" ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.V1DesignCoreOrchestrator.boundaryFindings.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Severity</th>
+                        <th align="left">Path</th>
+                        <th align="left">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.V1DesignCoreOrchestrator.boundaryFindings.slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.code}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.severity}<br /><span className="muted">{finding.readinessImpact}</span></td>
+                          <td>{finding.affectedSnapshotPath}</td>
+                          <td>{finding.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Design model coordinator is not available in this backend snapshot yet.</p>
+          )}
+        </div>
+
+
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Standards rulebook checks</h2>
+          {designCore?.V1StandardsRulebookControl ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.V1StandardsRulebookControl.overallReadiness)}
+                {summaryCard("Applicable rules", `${designCore.V1StandardsRulebookControl.applicableRuleCount}/${designCore.V1StandardsRulebookControl.ruleCount}`)}
+                {summaryCard("Blockers", designCore.V1StandardsRulebookControl.blockingRuleCount)}
+                {summaryCard("Req-linked rules", designCore.V1StandardsRulebookControl.requirementActivatedRuleCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Standards are active: every standards row carries applicability, severity, affected design areas/objects, remediation, exception policy, and requirement relationships. This page displays system standards checks; it does not invent pass/fail status.
+              </p>
+              {designCore.V1StandardsRulebookControl.overallReadiness === "BLOCKED" ? (
+                <div className="trust-note danger">
+                  <strong>Standards blockers remain.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Required standards failures must block false implementation readiness until remediated or explicitly exception-reviewed.</p>
+                </div>
+              ) : designCore.V1StandardsRulebookControl.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Standards are active but review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>Some rules need engineering review or exception evidence before the design can be treated as clean.</p>
+                </div>
+              ) : (
+                <div className="trust-note success"><strong>No standards blockers or review-required rule gaps found.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Rule</th>
+                      <th align="left">State</th>
+                      <th align="left">Requirement relationship</th>
+                      <th align="left">Affected engines</th>
+                      <th align="left">Remediation / exception</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1StandardsRulebookControl.ruleRows.slice(0, 18).map((row) => (
+                      <tr key={row.ruleId}>
+                        <td>{row.ruleId}<br /><span className="muted">{row.title}</span></td>
+                        <td>{row.enforcementState}<br /><span className="muted">{row.severity} / {row.strength}</span></td>
+                        <td>{row.requirementRelationships.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{row.affectedEngines.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{row.remediationGuidance}<br /><span className="muted">Exception: {row.exceptionPolicy}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Activated rules</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1StandardsRulebookControl.requirementActivations.slice(0, 14).map((item) => (
+                      <tr key={item.requirementKey}>
+                        <td>{item.requirementKey}<br /><span className="muted">{item.requirementValue}</span></td>
+                        <td>{item.lifecycleStatus}</td>
+                        <td>{userFacingStatusLabel(item.readinessImpact)}</td>
+                        <td>{item.activatedRuleIds.slice(0, 6).join(", ") || "—"}</td>
+                        <td>{item.evidence[0] || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.V1StandardsRulebookControl.findings.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Severity</th>
+                        <th align="left">Affected engine</th>
+                        <th align="left">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.V1StandardsRulebookControl.findings.slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.ruleId}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.severity}<br /><span className="muted">{finding.code}</span></td>
+                          <td>{finding.affectedEngine}</td>
+                          <td>{finding.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Standards rulebook checks are not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Validation readiness</h2>
+          {designCore?.V1ValidationReadiness ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", reportEvidenceView ? reportEvidenceView.readiness.designReview : designCore.V1ValidationReadiness.overallReadiness)}
+                {summaryCard("Root blockers", reportEvidenceView ? reportEvidenceView.validation.rootBlockerCount : designCore.V1ValidationReadiness.rootBlockerCount ?? designCore.V1ValidationReadiness.blockingFindingCount)}
+                {summaryCard("Review required", reportEvidenceView ? reportEvidenceView.validation.reviewItemCount : designCore.V1ValidationReadiness.reviewItemCount ?? designCore.V1ValidationReadiness.reviewRequiredFindingCount)}
+                {summaryCard("Impl gate", designCore.V1ValidationReadiness.validationGateAllowsImplementation ? "allowed" : "blocked/review")}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                Validation checks requirements, addressing, Engine 2 IPAM, standards, routing, security, implementation, report evidence, and diagram evidence. It does not create new design facts; it exposes whether upstream evidence is clean enough to claim readiness.
+              </p>
+              {designCore.V1ValidationReadiness.overallReadiness === "BLOCKING" ? (
+                <div className="trust-note danger">
+                  <strong>Implementation readiness is blocked.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>At least one blocking finding exists. Do not ship the design as implementation-ready.</p>
+                </div>
+              ) : designCore.V1ValidationReadiness.overallReadiness === "REVIEW_REQUIRED" ? (
+                <div className="trust-note warning">
+                  <strong>Implementation readiness is review-gated.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>The design may have visible outputs, but at least one requirement or design chain still needs review.</p>
+                </div>
+              ) : designCore.V1ValidationReadiness.overallReadiness === "WARNING" ? (
+                <div className="trust-note warning"><strong>Non-blocking validation warnings remain.</strong></div>
+              ) : (
+                <div className="trust-note success"><strong>No blockers or review-required readiness gaps found.</strong></div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Domain</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Counts</th>
+                      <th align="left">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1ValidationReadiness.coverageRows.slice(0, 14).map((row) => (
+                      <tr key={row.domain}>
+                        <td>{row.domain}<br /><span className="muted">{row.sourceSnapshotPath}</span></td>
+                        <td>{row.readiness}</td>
+                        <td>{row.blockerCount} block / {row.reviewRequiredCount} review / {row.warningCount} warning</td>
+                        <td>{row.evidence.slice(0, 2).join(" ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Lifecycle</th>
+                      <th align="left">Readiness</th>
+                      <th align="left">Missing consumers</th>
+                      <th align="left">Validation rules</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.V1ValidationReadiness.requirementGateRows.slice(0, 14).map((row) => (
+                      <tr key={row.requirementId}>
+                        <td>{row.requirementKey}</td>
+                        <td>{row.lifecycleStatus}</td>
+                        <td>{row.readinessImpact}</td>
+                        <td>{row.missingConsumers.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{row.validationRuleCodes.slice(0, 4).join(", ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {designCore.V1ValidationReadiness.findings.filter((finding) => finding.category !== "PASSED").length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th align="left">Finding</th>
+                        <th align="left">Category</th>
+                        <th align="left">Source</th>
+                        <th align="left">Remediation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designCore.V1ValidationReadiness.findings.filter((finding) => finding.category !== "PASSED").slice(0, 12).map((finding) => (
+                        <tr key={finding.id}>
+                          <td>{finding.ruleCode}<br /><span className="muted">{finding.title}</span></td>
+                          <td>{finding.category}</td>
+                          <td>{finding.sourceEngine}<br /><span className="muted">{finding.sourceSnapshotPath}</span></td>
+                          <td>{finding.remediation}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Validation readiness is not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Network object model</h2>
+          {designCore?.V1NetworkObjectModel ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Readiness", designCore.V1NetworkObjectModel.overallReadiness)}
+                {summaryCard("Objects", designCore.V1NetworkObjectModel.objectCount)}
+                {summaryCard("Metadata gaps", designCore.V1NetworkObjectModel.metadataGapObjectCount)}
+                {summaryCard("Lineage gaps", designCore.V1NetworkObjectModel.requirementLineageGapCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>Every generated device, interface, link, zone, policy, NAT intent, DHCP pool, and IP reservation carries source, evidence strength, readiness, validation impact, report/export impact, and diagram-impact labels.</p>
+              <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Object</th><th align="left">Type / role</th><th align="left">Source state</th><th align="left">Readiness</th><th align="left">Requirements</th></tr></thead><tbody>{designCore.V1NetworkObjectModel.objectLineage.slice(0, 18).map((row) => (<tr key={row.objectId}><td>{row.displayName}<br /><span className="muted">{row.objectId}</span></td><td>{row.objectType}<br /><span className="muted">{row.objectRole}</span></td><td>{userFacingStatusLabel(row.truthState)}<br /><span className="muted">{userFacingStatusLabel(row.sourceType)} / {userFacingStatusLabel(row.confidence)}</span></td><td>{userFacingStatusLabel(row.implementationReadiness)}<br /><span className="muted">{userFacingStatusLabel(row.proofStatus)}</span></td><td>{row.sourceRequirementIds.slice(0, 4).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+              <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Lifecycle</th><th align="left">Readiness</th><th align="left">Actual objects</th><th align="left">Missing objects</th></tr></thead><tbody>{designCore.V1NetworkObjectModel.requirementObjectLineage.slice(0, 14).map((row) => (<tr key={row.requirementId}><td>{row.sourceKey}</td><td>{row.lifecycleStatus}</td><td>{row.readinessImpact}</td><td>{row.actualObjectTypes.join(", ") || "—"}</td><td>{row.missingObjectTypes.join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            </>
+          ) : (<p className="muted" style={{ margin: 0 }}>Network object model is not available in the design model yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Design graph dependency integrity</h2>
+          {designCore?.V1DesignGraph ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.V1DesignGraph.overallReadiness)}{summaryCard("Graph nodes", designCore.V1DesignGraph.graphNodeCount)}{summaryCard("Graph edges", designCore.V1DesignGraph.graphEdgeCount)}{summaryCard("Object gaps", designCore.V1DesignGraph.objectCoverageGapCount)}</div>
+            <p className="muted" style={{ margin: 0 }}>Dependency paths are checked from requirements to system objects, object relationships, validation impact, browser display, report/export sections, and diagram impact. Diagram-only topology or orphaned graph objects are treated as readiness gaps.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Lifecycle</th><th align="left">Readiness</th><th align="left">Graph nodes</th><th align="left">Missing</th></tr></thead><tbody>{designCore.V1DesignGraph.requirementDependencyPaths.slice(0, 14).map((row) => (<tr key={row.requirementId}><td>{row.sourceKey}<br /><span className="muted">{row.requirementId}</span></td><td>{row.lifecycleStatus}</td><td>{row.readinessImpact}</td><td>{row.actualGraphNodeIds.slice(0, 4).join(", ") || "—"}</td><td>{[...row.missingGraphNodeIds, ...row.missingRelationshipTypes, ...row.missingConsumerSurfaces].slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Object</th><th align="left">Type</th><th align="left">Dependency</th><th align="left">Relationships</th><th align="left">Consumers</th></tr></thead><tbody>{designCore.V1DesignGraph.objectCoverage.slice(0, 18).map((row) => (<tr key={row.objectId}><td>{row.displayName}<br /><span className="muted">{row.objectId}</span></td><td>{row.objectType}<br /><span className="muted">{row.truthState}</span></td><td>{row.dependencyState}</td><td>{row.relationshipTypes.slice(0, 4).join(", ") || "—"}</td><td>{row.consumerSurfaces.slice(0, 4).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Design graph dependency checks are not available in the design model yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Routing and segmentation planning</h2>
+          {designCore?.V1RoutingSegmentation ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.V1RoutingSegmentation.overallReadiness)}{summaryCard("Protocol rows", designCore.V1RoutingSegmentation.protocolIntentCount)}{summaryCard("Simulation unavailable", designCore.V1RoutingSegmentation.simulationUnavailableCount)}{summaryCard("Requirement gaps", designCore.V1RoutingSegmentation.activeRequirementRoutingGapCount)}</div>
+            <p className="muted" style={{ margin: 0 }}>Routing intent, routing review, routing blockers, and simulation-unavailable behavior are kept separate. Connected/default/static/summary routes are planning evidence; OSPF, BGP, ECMP, redistribution, route leaking, cloud route tables, and asymmetric routing stay review-gated unless system evidence exists.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual protocol rows</th><th align="left">Missing</th></tr></thead><tbody>{designCore.V1RoutingSegmentation.requirementRoutingMatrix.slice(0, 14).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualProtocolIntentIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingProtocolCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Protocol/review row</th><th align="left">Category</th><th align="left">State</th><th align="left">Readiness</th><th align="left">Review reason</th></tr></thead><tbody>{designCore.V1RoutingSegmentation.protocolIntents.slice(0, 18).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.id}</span></td><td>{row.category}</td><td>{row.controlState}</td><td>{row.readinessImpact}</td><td>{row.reviewReason || "—"}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Routing and segmentation planning is not available in the design model yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Security policy flow</h2>
+          {designCore?.V1SecurityPolicyFlow ? (<>
+            <div className="summary-grid">{summaryCard("Readiness", designCore.V1SecurityPolicyFlow.overallReadiness)}{summaryCard("Flow consequences", designCore.V1SecurityPolicyFlow.flowConsequenceCount)}{summaryCard("Requirement gaps", designCore.V1SecurityPolicyFlow.activeRequirementSecurityGapCount)}{summaryCard("NAT/logging gaps", `${designCore.V1SecurityPolicyFlow.missingNatCount}/${designCore.V1SecurityPolicyFlow.loggingGapCount}`)}</div>
+            <p className="muted" style={{ margin: 0 }}>Security policy flow evidence is displayed only from the design model. Zone-to-zone posture, business service dependencies, NAT, logging, broad permits, duplicate/shadowed intent, and policy consequence summaries are review-gated planning evidence, not firewall configuration.</p>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Requirement</th><th align="left">Active</th><th align="left">Readiness</th><th align="left">Actual flows</th><th align="left">Missing security categories</th></tr></thead><tbody>{designCore.V1SecurityPolicyFlow.requirementSecurityMatrix.slice(0, 14).map((row) => (<tr key={row.requirementKey}><td>{row.requirementLabel}<br /><span className="muted">{row.requirementKey}</span></td><td>{row.active ? "yes" : "no"}</td><td>{row.readinessImpact}</td><td>{row.actualFlowRequirementIds.slice(0, 4).join(", ") || "—"}</td><td>{row.missingSecurityCategories.slice(0, 5).join(", ") || "—"}</td></tr>))}</tbody></table></div>
+            <div style={{ overflowX: "auto" }}><table><thead><tr><th align="left">Flow consequence</th><th align="left">Source</th><th align="left">Destination</th><th align="left">Action</th><th align="left">State</th><th align="left">Review reason</th></tr></thead><tbody>{designCore.V1SecurityPolicyFlow.flowConsequences.slice(0, 18).map((row) => (<tr key={row.id}><td>{row.name}<br /><span className="muted">{row.flowRequirementId}</span></td><td>{row.sourceZoneName}</td><td>{row.destinationZoneName}</td><td>{row.expectedAction}</td><td>{row.V1PolicyState}</td><td>{row.reviewReason || row.consequenceSummary}</td></tr>))}</tbody></table></div>
+          </>) : (<p className="muted" style={{ margin: 0 }}>Security policy flow checks are not available in the design model yet.</p>)}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement impact closure</h2>
+          {designCore?.requirementsImpactClosure ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Status", designCore.requirementsImpactClosure.completionStatus)}
+                {summaryCard("Captured fields", `${designCore.requirementsImpactClosure.capturedFieldCount}/${designCore.requirementsImpactClosure.totalFieldCount}`)}
+                {summaryCard("Concrete outputs", designCore.requirementsImpactClosure.concreteFieldCount)}
+                {summaryCard("Policy consequences", designCore.requirementsImpactClosure.policyFieldCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This closes the gap between selected requirements and actual plan evidence. Direct requirements should appear as sites, VLANs, policy flows, object-model evidence, or explicit review evidence.
+              </p>
+              {designCore.requirementsImpactClosure.directCapturedTraceableOnlyKeys.length > 0 ? (
+                <div className="trust-note warning">
+                  <strong>Direct fields still needing deeper concrete output</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.requirementsImpactClosure.directCapturedTraceableOnlyKeys.join(", ")}
+                  </p>
+                </div>
+              ) : (
+                <div className="trust-note success">
+                  <strong>Captured direct requirements have concrete or policy evidence.</strong>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Requirement</th>
+                      <th align="left">Status</th>
+                      <th align="left">Concrete evidence</th>
+                      <th align="left">Visible in</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.requirementsImpactClosure.fieldOutcomes.slice(0, 16).map((item) => (
+                      <tr key={item.key}>
+                        <td>{item.label}<br /><span className="muted">{item.key}</span></td>
+                        <td>{item.reflectionStatus}</td>
+                        <td>{item.concreteOutputs.slice(0, 4).join(", ") || "—"}</td>
+                        <td>{item.visibleIn.slice(0, 4).join(", ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirement impact closure is not available in the design model yet.</p>
+          )}
+        </div>
+
+        <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Requirement scenario evidence</h2>
+          {designCore?.requirementsScenarioProof ? (
+            <>
+              <div className="summary-grid">
+                {summaryCard("Scenario", designCore.requirementsScenarioProof.scenarioName)}
+                {summaryCard("Status", designCore.requirementsScenarioProof.status)}
+                {summaryCard("Passed signals", `${designCore.requirementsScenarioProof.passedSignalCount}/${designCore.requirementsScenarioProof.expectedSignalCount}`)}
+                {summaryCard("Missing", designCore.requirementsScenarioProof.missingSignalCount)}
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                This proves selected high-impact requirements are reflected in the actual backend evidence model, not just stored in the requirements form.
+              </p>
+              {designCore.requirementsScenarioProof.status === "passed" ? (
+                <div className="trust-note success">
+                  <strong>Scenario drivers have backend-visible design evidence.</strong>
+                </div>
+              ) : (
+                <div className="trust-note warning">
+                  <strong>Scenario evidence still has gaps.</strong>
+                  <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                    {designCore.requirementsScenarioProof.blockerCount} blocker signal(s), {designCore.requirementsScenarioProof.reviewCount} review signal(s).
+                  </p>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th align="left">Signal</th>
+                      <th align="left">Result</th>
+                      <th align="left">Requirement keys</th>
+                      <th align="left">Evidence</th>
+                      <th align="left">Missing evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designCore.requirementsScenarioProof.signals.map((signal) => (
+                      <tr key={signal.id}>
+                        <td>{signal.label}</td>
+                        <td>{signal.passed ? "pass" : signal.severity}</td>
+                        <td>{signal.requirementKeys.join(", ")}</td>
+                        <td>{signal.evidence.slice(0, 5).join(", ") || "—"}</td>
+                        <td>{signal.missingEvidence.join("; ") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Requirement scenario evidence is not available in the design model yet.</p>
+          )}
         </div>
 
         <div className="panel" style={{ display: selectedSection && selectedSection !== "traceability" ? "none" : "grid", gap: 12 }}>

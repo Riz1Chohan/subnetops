@@ -1,15 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  canonicalizeCidr,
-  classifySegmentRole,
-  isValidCidr,
-  isValidIpv4,
-  planningHintForHosts,
-  subnetFacts,
-  subnetWithinBlock,
-  suggestSubnetWithinBlock,
-  utilizationForCidr,
-} from "../../../lib/networkValidators";
 import type { Site, Vlan } from "../../../lib/types";
 
 interface VlanFormProps {
@@ -23,6 +12,7 @@ interface VlanFormProps {
     vlanId: number;
     vlanName: string;
     purpose?: string;
+    segmentRole?: string;
     subnetCidr: string;
     gatewayIp: string;
     dhcpEnabled: boolean;
@@ -32,6 +22,21 @@ interface VlanFormProps {
   }) => void | Promise<void>;
   isSubmitting?: boolean;
 }
+
+const SEGMENT_ROLE_OPTIONS = [
+  { value: "USER", label: "Users" },
+  { value: "SERVER", label: "Servers" },
+  { value: "GUEST", label: "Guest" },
+  { value: "MANAGEMENT", label: "Management" },
+  { value: "DMZ", label: "DMZ" },
+  { value: "VOICE", label: "Voice" },
+  { value: "PRINTER", label: "Printers" },
+  { value: "IOT", label: "IoT / OT" },
+  { value: "CAMERA", label: "Cameras / CCTV" },
+  { value: "WAN_TRANSIT", label: "WAN Transit" },
+  { value: "LOOPBACK", label: "Loopback" },
+  { value: "OTHER", label: "Unknown / Other" },
+];
 
 const PURPOSE_OPTIONS = [
   { value: "User Access", label: "User Access" },
@@ -47,9 +52,15 @@ const PURPOSE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
+/**
+ * Input collection only.
+ *
+ * Subnet sizing, role classification, gateway convention checks, parent-block
+ * containment, and suggested allocations are backend design-core responsibilities.
+ * This form intentionally avoids browser-side planning helpers.
+ */
 export function VlanForm({
   sites,
-  existingVlans = [],
   initialValues,
   submitLabel = "Create VLAN",
   onCancel,
@@ -61,6 +72,7 @@ export function VlanForm({
   const [vlanId, setVlanId] = useState("10");
   const [vlanName, setVlanName] = useState("");
   const [purpose, setPurpose] = useState("User Access");
+  const [segmentRole, setSegmentRole] = useState("USER");
   const [subnetCidr, setSubnetCidr] = useState("");
   const [gatewayIp, setGatewayIp] = useState("");
   const [estimatedHosts, setEstimatedHosts] = useState("");
@@ -73,6 +85,7 @@ export function VlanForm({
     setVlanId(initialValues?.vlanId ? String(initialValues.vlanId) : "10");
     setVlanName(initialValues?.vlanName ?? "");
     setPurpose(initialValues?.purpose ?? "User Access");
+    setSegmentRole(initialValues?.segmentRole ?? "USER");
     setSubnetCidr(initialValues?.subnetCidr ?? "");
     setGatewayIp(initialValues?.gatewayIp ?? "");
     setEstimatedHosts(initialValues?.estimatedHosts !== undefined ? String(initialValues.estimatedHosts) : "");
@@ -81,29 +94,13 @@ export function VlanForm({
     setDhcpEnabled(initialValues?.dhcpEnabled ?? true);
   }, [initialValues, sites]);
 
-  const role = useMemo(() => classifySegmentRole(`${purpose} ${vlanName} ${department} ${notes}`), [purpose, vlanName, department, notes]);
-  const planningHint = useMemo(() => planningHintForHosts(estimatedHosts ? Number(estimatedHosts) : undefined, role), [estimatedHosts, role]);
-  const currentUtilization = useMemo(() => utilizationForCidr(subnetCidr, estimatedHosts ? Number(estimatedHosts) : undefined, role), [subnetCidr, estimatedHosts, role]);
-  const selectedSite = useMemo(() => sites.find((site) => site.id === siteId), [sites, siteId]);
-  const subnetSuggestion = useMemo(
-    () => suggestSubnetWithinBlock(
-      selectedSite?.defaultAddressBlock,
-      existingVlans.filter((vlan) => vlan.siteId === siteId && vlan.id !== initialValues?.id).map((vlan) => vlan.subnetCidr),
-      estimatedHosts ? Number(estimatedHosts) : undefined,
-      role,
-    ),
-    [selectedSite?.defaultAddressBlock, existingVlans, siteId, estimatedHosts, initialValues?.id, role],
-  );
-  const facts = useMemo(() => subnetFacts(subnetCidr, role), [subnetCidr, role]);
-  const insideParentBlock = useMemo(() => subnetWithinBlock(subnetCidr, selectedSite?.defaultAddressBlock), [subnetCidr, selectedSite?.defaultAddressBlock]);
-
   const error = useMemo(() => {
     const vlanNumber = Number(vlanId);
     if (!siteId) return "Select a site first.";
     if (!Number.isInteger(vlanNumber) || vlanNumber < 1 || vlanNumber > 4094) return "VLAN ID must be between 1 and 4094.";
     if (!vlanName.trim()) return "VLAN name is required.";
-    if (!isValidCidr(subnetCidr)) return "Subnet must be valid CIDR format.";
-    if (!isValidIpv4(gatewayIp)) return "Gateway must be a valid IPv4 address.";
+    if (!subnetCidr.trim()) return "Subnet CIDR is required.";
+    if (!gatewayIp.trim()) return "Gateway IP is required.";
     if (estimatedHosts && (!/^\d+$/.test(estimatedHosts) || Number(estimatedHosts) < 0)) return "Estimated hosts must be a non-negative number.";
     return "";
   }, [siteId, vlanId, vlanName, subnetCidr, gatewayIp, estimatedHosts]);
@@ -118,8 +115,9 @@ export function VlanForm({
           vlanId: Number(vlanId),
           vlanName: vlanName.trim(),
           purpose,
-          subnetCidr,
-          gatewayIp,
+          segmentRole,
+          subnetCidr: subnetCidr.trim(),
+          gatewayIp: gatewayIp.trim(),
           dhcpEnabled,
           estimatedHosts: estimatedHosts ? Number(estimatedHosts) : undefined,
           department,
@@ -139,11 +137,18 @@ export function VlanForm({
         <input placeholder="VLAN ID" value={vlanId} onChange={(e) => setVlanId(e.target.value)} required />
         <input placeholder="VLAN Name" value={vlanName} onChange={(e) => setVlanName(e.target.value)} required />
       </div>
-      <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
-        {PURPOSE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
+      <div className="grid-2">
+        <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
+          {PURPOSE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <select value={segmentRole} onChange={(e) => setSegmentRole(e.target.value)} aria-label="Authoritative segment role">
+          {SEGMENT_ROLE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
       <div className="grid-2">
         <input placeholder="Subnet CIDR" value={subnetCidr} onChange={(e) => setSubnetCidr(e.target.value)} required />
         <input placeholder="Gateway IP" value={gatewayIp} onChange={(e) => setGatewayIp(e.target.value)} required />
@@ -153,60 +158,13 @@ export function VlanForm({
         <input placeholder="Department / owner" value={department} onChange={(e) => setDepartment(e.target.value)} />
       </div>
 
-      {(planningHint || facts) ? (
-        <div className="validation-card">
-          <strong>Subnetting insight</strong>
-          <p className="muted" style={{ margin: "6px 0" }}>
-            Segment role: <strong>{role.replace(/_/g, " ")}</strong>
-            {planningHint ? <>
-              {" "}• recommended minimum size: <strong>/{planningHint.recommendedPrefix}</strong> with about <strong>{planningHint.usableHosts}</strong> usable addresses.
-            </> : null}
-          </p>
-
-          {facts ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <p className="muted" style={{ margin: 0 }}>
-                Canonical subnet: <strong>{facts.canonicalCidr}</strong>
-                {facts.canonicalCidr !== subnetCidr ? <> • entered value will be treated as <strong>{facts.canonicalCidr}</strong></> : null}
-              </p>
-              <p className="muted" style={{ margin: 0 }}>
-                Network: <strong>{facts.networkAddress}</strong> • Broadcast: <strong>{facts.broadcastAddress}</strong>
-              </p>
-              <p className="muted" style={{ margin: 0 }}>
-                First usable: <strong>{facts.firstUsableIp || "—"}</strong> • Last usable: <strong>{facts.lastUsableIp || "—"}</strong>
-              </p>
-              <p className="muted" style={{ margin: 0 }}>
-                Mask: <strong>{facts.dottedMask}</strong> • Wildcard: <strong>{facts.wildcardMask}</strong> • Total: <strong>{facts.totalAddresses}</strong> • Usable: <strong>{facts.usableAddresses}</strong>
-              </p>
-              {currentUtilization ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  Current headroom: <strong>{currentUtilization.headroom}</strong> • utilization: <strong>{Math.round(currentUtilization.utilization * 100)}%</strong>
-                </p>
-              ) : null}
-              {selectedSite?.defaultAddressBlock ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  Parent site block: <strong>{selectedSite.defaultAddressBlock}</strong> • placement: <strong>{insideParentBlock === null ? "review" : insideParentBlock ? "inside parent block" : "outside parent block"}</strong>
-                </p>
-              ) : null}
-              {role === "WAN_TRANSIT" ? <p className="muted" style={{ margin: 0 }}>WAN transit segments may legitimately use /31 addressing for two-point links.</p> : null}
-              {role === "LOOPBACK" ? <p className="muted" style={{ margin: 0 }}>Loopback-style addressing is usually a /32 host route rather than a normal user VLAN.</p> : null}
-            </div>
-          ) : null}
-
-          {selectedSite?.defaultAddressBlock ? (
-            subnetSuggestion ? (
-              <div style={{ marginTop: 8 }}>
-                <p className="muted" style={{ margin: "6px 0" }}>
-                  Suggested placement inside site block <strong>{selectedSite.defaultAddressBlock}</strong>: <strong>{subnetSuggestion.subnetCidr}</strong> with gateway <strong>{subnetSuggestion.gatewayIp}</strong>.
-                </p>
-                <button type="button" onClick={() => { setSubnetCidr(subnetSuggestion.subnetCidr); setGatewayIp(subnetSuggestion.gatewayIp); }}>
-                  Use Suggested Subnet
-                </button>
-              </div>
-            ) : <p className="muted" style={{ marginTop: 8 }}>No fitting subnet suggestion was found inside <strong>{selectedSite.defaultAddressBlock}</strong> for the current estimate and segment role.</p>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="validation-card">
+        <strong>Backend-owned subnet authority</strong>
+        <p className="muted" style={{ margin: "6px 0 0" }}>
+          The frontend stores your inputs only. CIDR canonicalization, usable-address counts, gateway validation,
+          parent-block containment, right-sizing, and allocation suggestions are produced by backend design-core after save.
+        </p>
+      </div>
 
       <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
       <label>

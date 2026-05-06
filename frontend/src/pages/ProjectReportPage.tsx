@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useProject, useProjectSites, useProjectVlans } from "../features/projects/hooks";
 import { useValidationResults } from "../features/validation/hooks";
@@ -9,7 +9,6 @@ import { UsageBanner } from "../components/app/UsageBanner";
 import { ProjectDiagram } from "../features/diagram/components/ProjectDiagram";
 import { ValidationList } from "../features/validation/components/ValidationList";
 import { buildNamingPreviewExamples, parseRequirementsProfile, planningReadinessSummary } from "../lib/requirementsProfile";
-import { synthesizeLogicalDesign } from "../lib/designSynthesis";
 import { LoadingState } from "../components/app/LoadingState";
 import { EmptyState } from "../components/app/EmptyState";
 import { ErrorState } from "../components/app/ErrorState";
@@ -17,6 +16,11 @@ import { analyzeDiscoveryWorkspaceState, resolveDiscoveryWorkspaceState } from "
 import { resolvePlatformProfileState, synthesizePlatformBomFoundation } from "../lib/platformBomFoundation";
 import { apiBlob } from "../lib/api";
 import { buildValidationFixPath, validationFixLabel } from "../lib/validationFixLink";
+import { useAuthoritativeDesign } from "../features/designCore/hooks";
+import { designCoreAuthorityDetail, designCoreAuthorityLabel } from "../lib/designCoreSnapshot";
+import { DesignAuthorityBanner } from "../lib/designAuthority";
+import { buildReportTruthModel, truthBadgeClass } from "../lib/reportDiagramTruth";
+import { BackendEvidenceTruthCards, getCanonicalReportEvidenceView } from "../lib/reportEvidenceView";
 
 function reportStatus(errors: number, warnings: number, approvalStatus?: string) {
   if (approvalStatus === "APPROVED") return { label: "Approved", className: "badge badge-info" };
@@ -36,6 +40,64 @@ function generatedSummary({ projectName, environmentType, siteCount, rowCount, e
 
   return `${projectName} is a ${environment.toLowerCase()} network plan covering ${siteCount} site${siteCount === 1 ? "" : "s"} and ${rowCount} addressing plan row${rowCount === 1 ? "" : "s"}. ${readiness}`;
 }
+
+type ExportKind = "pdf" | "docx" | "csv";
+
+type ExportRunState = {
+  kind: ExportKind;
+  startedAt: number;
+  elapsedSeconds: number;
+  stageIndex: number;
+} | null;
+
+const EXPORT_STAGES = [
+  "Preparing export request",
+  "Building addressing schedule",
+  "Building validation summary",
+  "Building diagram and backend evidence",
+  "Building implementation appendix",
+  "Finalizing downloadable file",
+];
+
+function exportKindLabel(kind: ExportKind) {
+  if (kind === "pdf") return "professional PDF report";
+  if (kind === "docx") return "professional DOCX report";
+  return "Excel-friendly CSV export";
+}
+
+function ExportProgressModal({ run, onCancelNote }: { run: ExportRunState; onCancelNote: () => void }) {
+  if (!run) return null;
+  const stage = EXPORT_STAGES[Math.min(run.stageIndex, EXPORT_STAGES.length - 1)] ?? EXPORT_STAGES[0];
+  const longRunning = run.elapsedSeconds >= 60;
+
+  return (
+    <div className="export-progress-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="export-progress-title">
+      <div className="export-progress-modal">
+        <div className="export-progress-spinner" aria-hidden="true" />
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <p className="workspace-detail-kicker" style={{ marginBottom: 4 }}>Report processing</p>
+            <h2 id="export-progress-title" style={{ margin: 0 }}>Generating {exportKindLabel(run.kind)}…</h2>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            {stage}. Large multi-site designs can take 1–4 minutes because SubnetOps is composing addressing, validation, diagram, and implementation evidence.
+          </p>
+          <div className="export-progress-track" aria-hidden="true">
+            <span style={{ width: `${Math.min(92, 14 + run.stageIndex * 16)}%` }} />
+          </div>
+          <div className="export-progress-meta">
+            <span>Elapsed: {run.elapsedSeconds}s</span>
+            <span>{longRunning ? "Still working — do not click export again." : "Request is active."}</span>
+          </div>
+          <button type="button" className="link-button" onClick={onCancelNote}>
+            Keep working note
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function saveBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
@@ -57,6 +119,24 @@ function summaryCard(label: string, value: string | number) {
   );
 }
 
+
+function reportTruthLabel(label: string) {
+  const labels: Record<string, string> = {
+    USER_PROVIDED: "User provided",
+    REQUIREMENT_MATERIALIZED: "Applied requirement",
+    BACKEND_COMPUTED: "System calculated",
+    DURABLE_IPAM: "IPAM evidence",
+    CANDIDATE_IPAM: "Candidate IPAM",
+    APPROVED_IPAM: "Approved IPAM",
+    INFERRED: "Inferred / needs review",
+    ESTIMATED: "Estimate",
+    REVIEW_REQUIRED: "Needs review",
+    BLOCKED: "Blocked",
+    UNSUPPORTED: "Not supported",
+  };
+  return labels[label] ?? label.replace(/_/g, " ").toLowerCase();
+}
+
 function sectionList(items: string[], empty: string) {
   if (items.length === 0) return <p className="muted" style={{ margin: 0 }}>{empty}</p>;
   return (
@@ -65,6 +145,29 @@ function sectionList(items: string[], empty: string) {
     </ul>
   );
 }
+
+const PLANNING_ASSUMPTIONS = [
+  "Inputs were provided by the user and are not live-discovered network facts.",
+  "Subnet allocations are based on declared host counts, saved site blocks, and planning growth buffers.",
+  "Security zones are planning recommendations unless verified against actual firewall, identity, and access-control policy.",
+  "Device placement is conceptual unless a confirmed hardware inventory and cabling model have been provided.",
+  "Routing, WAN, DHCP, monitoring, and redundancy choices must be reviewed against business policy and vendor-specific implementation requirements.",
+  "Engineer review is required before implementation or production deployment.",
+];
+
+const ENGINEER_REVIEW_STATEMENT =
+  "This design package is intended for planning and review. Validate against the live environment, business policy, and vendor-specific implementation requirements before production deployment.";
+
+const ENGINEER_REVIEW_CHECKLIST = [
+  "Confirm live inventory.",
+  "Confirm WAN/provider constraints.",
+  "Confirm firewall policy requirements.",
+  "Confirm DHCP/static reservation strategy.",
+  "Confirm routing protocol choice.",
+  "Confirm redundancy/HA requirements.",
+  "Confirm monitoring/SNMP/logging requirements.",
+  "Confirm implementation change window.",
+];
 
 export function ProjectReportPage() {
   const { projectId = "" } = useParams();
@@ -75,6 +178,25 @@ export function ProjectReportPage() {
   const vlansQuery = useProjectVlans(projectId);
   const validationQuery = useValidationResults(projectId);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [activeExport, setActiveExport] = useState<ExportRunState>(null);
+
+  useEffect(() => {
+    if (!activeExport) return;
+
+    const timer = window.setInterval(() => {
+      setActiveExport((current) => {
+        if (!current) return current;
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
+        return {
+          ...current,
+          elapsedSeconds,
+          stageIndex: Math.min(EXPORT_STAGES.length - 1, Math.floor(elapsedSeconds / 18)),
+        };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [activeExport?.startedAt]);
 
   const project = projectQuery.data;
   const sites = sitesQuery.data ?? [];
@@ -84,10 +206,10 @@ export function ProjectReportPage() {
   const selectedSection = new URLSearchParams(location.search).get("section");
   const isFocusedSectionView = Boolean(selectedSection);
   const issueNotice = parseWorkspaceIssueNotice(location.search);
-  const synthesized = useMemo(
-    () => synthesizeLogicalDesign(project, sites, vlans, requirementsProfile),
-    [project, sites, vlans, requirementsProfile],
-  );
+  const { synthesized, designCore, authority } = useAuthoritativeDesign(projectId, project, sites, vlans, requirementsProfile);
+  const reportTruth = useMemo(() => buildReportTruthModel(designCore), [designCore]);
+  const V1ReportExportTruth = designCore?.V1ReportExportTruth;
+  const reportEvidenceView = getCanonicalReportEvidenceView(designCore);
 
   const discoverySummary = useMemo(
     () => analyzeDiscoveryWorkspaceState({ project, sites, vlans, state: resolveDiscoveryWorkspaceState(projectId, project) }),
@@ -171,44 +293,19 @@ export function ProjectReportPage() {
     synthesized.siteSummaries.length === 0 ? "No site design has been defined yet" : null,
   ].filter(Boolean) as string[];
 
-  const exportSnapshot = useMemo(() => ({
-    generatedAt: new Date().toISOString(),
-    project: project
-      ? {
-          id: project.id,
-          name: project.name,
-          organizationName: project.organizationName,
-          environmentType: project.environmentType,
-          basePrivateRange: project.basePrivateRange,
-          reportHeader: project.reportHeader,
-          logoUrl: project.logoUrl,
-          approvalStatus: project.approvalStatus,
-          requirementsJson: project.requirementsJson,
-          discoveryJson: project.discoveryJson,
-          platformProfileJson: project.platformProfileJson,
-        }
-      : null,
-    requirementsProfile,
-    validations: validations.map((item) => ({
-      id: item.id,
-      ruleCode: item.ruleCode,
-      severity: item.severity,
-      entityType: item.entityType,
-      title: item.title,
-      message: item.message,
-      createdAt: item.createdAt,
-    })),
-    synthesized,
-    discoverySummary,
-    platformFoundation,
-  }), [project, requirementsProfile, validations, synthesized, discoverySummary, platformFoundation]);
+  const downloadExport = async (kind: ExportKind) => {
+    if (activeExport) {
+      setExportMessage(`Already generating ${exportKindLabel(activeExport.kind)}. Wait for it to finish before starting another export.`);
+      return;
+    }
 
-  const downloadExport = async (kind: "pdf" | "docx" | "csv") => {
+    const startedAt = Date.now();
+    setActiveExport({ kind, startedAt, elapsedSeconds: 0, stageIndex: 0 });
+    setExportMessage(`Generating ${exportKindLabel(kind)}. This may take 1–4 minutes for large designs.`);
+
     try {
-      setExportMessage(kind === "pdf" ? "Preparing professional PDF report..." : kind === "docx" ? "Preparing professional DOCX report..." : "Preparing Excel-friendly CSV export...");
       const blob = await apiBlob(`/export/projects/${projectId}/${kind}`, {
         method: "POST",
-        body: JSON.stringify({ exportSnapshot }),
       });
       saveBlob(
         blob,
@@ -218,11 +315,26 @@ export function ProjectReportPage() {
             ? `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-professional-report.docx`
             : `${project.name.replace(/[^a-z0-9-_]+/gi, "_").toLowerCase()}-addressing-export.csv`,
       );
-      setExportMessage(kind === "pdf" ? "Professional PDF report exported." : kind === "docx" ? "Professional DOCX report exported." : "Excel-friendly CSV exported.");
+      const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      setExportMessage(`${exportKindLabel(kind)} generated in ${elapsedSeconds}s.`);
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "Export failed.");
+      setExportMessage(error instanceof Error ? error.message : "Export failed. The backend did not return a downloadable file.");
+    } finally {
+      setActiveExport(null);
     }
   };
+
+
+  const reportSectionLinks = [
+    { key: "assumptions", label: "Assumptions & constraints", detail: "Start the written package from the design basis and open issues.", path: `/projects/${projectId}/report?section=assumptions` },
+    { key: "topology", label: "Topology & placement", detail: "Open the topology narrative and placement story.", path: `/projects/${projectId}/report?section=topology` },
+    { key: "addressing", label: "Addressing hierarchy", detail: "Review site blocks, VLANs, and subnet allocations.", path: `/projects/${projectId}/report?section=addressing` },
+    { key: "services-security", label: "Services & boundaries", detail: "Check service anchors, trust zones, and DMZ posture.", path: `/projects/${projectId}/report?section=services-security` },
+    { key: "routing-flows", label: "Routing & flows", detail: "Review routing posture and required traffic paths.", path: `/projects/${projectId}/report?section=routing-flows` },
+    { key: "site-lld", label: "Site low-level design", detail: "Jump into per-site engineering detail and implementation posture.", path: `/projects/${projectId}/report?section=site-lld` },
+    { key: "validation", label: "Validation findings", detail: "Review issue, impact, and recommendation for open findings.", path: `/projects/${projectId}/report?section=validation` },
+    { key: "implementation", label: "Engineer checklist", detail: "Confirm the review gates before implementation handoff.", path: `/projects/${projectId}/report?section=implementation` },
+  ];
 
   const topValidationItems = validations
     .filter((item) => item.severity !== "INFO")
@@ -232,10 +344,30 @@ export function ProjectReportPage() {
   if (!selectedSection) {
     return (
       <section style={{ display: "grid", gap: 18 }}>
-        <div className="panel workspace-selection-blank">
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
+        <div className="panel workspace-selection-blank report-landing-shell">
           <p className="workspace-detail-kicker">Deliver</p>
-          <h2 style={{ margin: "0 0 8px 0" }}>Select a card from the left pane</h2>
-          <p className="muted" style={{ margin: 0 }}>Choose a deliverable card from the left pane to open that report section only.</p>
+          <h2 style={{ margin: "0 0 8px 0" }}>Report workspace</h2>
+          <p className="muted" style={{ margin: 0 }}>Pick a section below or use the left pane. This page now opens as a usable report hub instead of a dead-end blank state.</p>
+          <div className="trust-note" style={{ marginTop: 12 }}>
+            <p className="muted" style={{ margin: 0 }}>
+              <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+            </p>
+          </div>
+          <div className="report-landing-metrics">
+            {summaryCard("Sites", designCore?.summary.siteCount ?? synthesized.siteSummaries.length)}
+            {summaryCard("Address rows", designCore?.summary.vlanCount ?? synthesized.addressingPlan.length)}
+            {summaryCard("Errors", errorCount)}
+            {summaryCard("Warnings", warningCount)}
+          </div>
+          <div className="report-section-grid">
+            {reportSectionLinks.map((item) => (
+              <Link key={item.key} to={item.path} className="report-section-card">
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -265,6 +397,7 @@ export function ProjectReportPage() {
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
+        <ExportProgressModal run={activeExport} onCancelNote={() => setExportMessage("Report generation is still running in the current request. Wait for the download prompt before clicking export again.")} />
       {isFocusedSectionView ? (
         <>
         <div className="panel workspace-detail-toolbar">
@@ -273,29 +406,35 @@ export function ProjectReportPage() {
             <strong>{focusedSectionTitle}</strong>
           </div>
           <div className="workspace-detail-actions">
-            <button type="button" onClick={() => void downloadExport("docx")}>Export DOCX</button>
+            <button type="button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("docx")}>{activeExport ? "Generating…" : "Export DOCX"}</button>
           </div>
         </div>
         <WorkspaceIssueBanner notice={issueNotice} />
+      <BackendEvidenceTruthCards evidenceView={reportEvidenceView} />
+        <DesignAuthorityBanner authority={authority} compact />
         </>
       ) : (
       <header className="panel report-hero">
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span className={status.className}>{status.label}</span>
+            <span className={truthBadgeClass(reportTruth.overallReadiness)}>System evidence {reportTruth.overallReadinessLabel}</span>
             <span className="badge-soft">Requirements {readinessSummary.completionLabel}</span>
             {project.environmentType ? <span className="badge-soft">{project.environmentType}</span> : null}
             <span className="badge-soft">Topology {synthesized.topology.topologyLabel}</span>
-            <span className="badge-soft">Organization block {synthesized.organizationBlock}</span>
+            <span className="badge-soft">Organization block {designCore?.organizationBlock?.canonicalCidr ?? synthesized.organizationBlock}</span>
           </div>
           <div>
             <h1 style={{ marginBottom: 8 }}>{project.reportHeader || `${project.name} — Design Package`}</h1>
             <p className="muted" style={{ margin: 0 }}>{summary}</p>
+            <p className="muted" style={{ margin: "8px 0 0 0" }}>
+              <strong>{designCoreAuthorityLabel(designCore)}:</strong> {designCoreAuthorityDetail(designCore)}
+            </p>
           </div>
           <div className="form-actions" style={{ flexWrap: "wrap" }}>
-            <button type="button" onClick={() => void downloadExport("pdf")}>Export Professional PDF</button>
-            <button type="button" className="link-button" onClick={() => void downloadExport("docx")}>Export Professional DOCX</button>
-            <button type="button" className="link-button" onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
+            <button type="button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("pdf")}>{activeExport ? "Generating…" : "Export Professional PDF"}</button>
+            <button type="button" className="link-button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("docx")}>Export Professional DOCX</button>
+            <button type="button" className="link-button" disabled={Boolean(activeExport)} onClick={() => void downloadExport("csv")}>Export Excel-friendly CSV</button>
             <button type="button" className="link-button" onClick={() => window.print()}>Print / Save current view</button>
             <Link to={`/projects/${projectId}/diagram`} className="link-button">Open Diagram</Link>
             <Link to={`/projects/${projectId}/validation`} className="link-button">Validation</Link>
@@ -305,7 +444,11 @@ export function ProjectReportPage() {
       </header>
       )}
 
-      {!isFocusedSectionView ? <WorkspaceIssueBanner notice={issueNotice} /> : null}
+      {!isFocusedSectionView ? <>
+        <WorkspaceIssueBanner notice={issueNotice} />
+      <BackendEvidenceTruthCards evidenceView={reportEvidenceView} />
+        <DesignAuthorityBanner authority={authority} compact />
+      </> : null}
 
       {!isFocusedSectionView ? <UsageBanner
         planTier={authQuery.data?.user.planTier}
@@ -315,13 +458,13 @@ export function ProjectReportPage() {
 
 
       {!isFocusedSectionView ? <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        {summaryCard("Sites", synthesized.siteSummaries.length)}
-        {summaryCard("Address rows", synthesized.addressingPlan.length)}
-        {summaryCard("Traffic flows", synthesized.trafficFlows.length)}
-        {summaryCard("Security boundaries", synthesized.securityBoundaries.length)}
-        {summaryCard("Service placements", synthesized.servicePlacements.length)}
-        {summaryCard("Validation blockers", errorCount)}
-        {summaryCard("Warnings", warningCount)}
+        {summaryCard("Sites", designCore?.summary.siteCount ?? synthesized.siteSummaries.length)}
+        {summaryCard("Address rows", designCore?.summary.vlanCount ?? synthesized.addressingPlan.length)}
+        {summaryCard("Route domains", reportTruth.summary.routeDomainCount)}
+        {summaryCard("Security flows", reportTruth.summary.securityFlowCount)}
+        {summaryCard("Implementation steps", reportTruth.summary.implementationStepCount)}
+        {summaryCard("Blocked steps", reportTruth.summary.blockedImplementationStepCount)}
+        {summaryCard("Verification blocked", reportTruth.summary.blockedVerificationCheckCount)}
         {summaryCard("BOM line items", platformFoundation.totals.lineItems)}
       </div> : null}
 
@@ -331,8 +474,9 @@ export function ProjectReportPage() {
           <div>
             <h2 style={{ margin: "0 0 8px 0" }}>1. Design assumptions and constraints</h2>
             <p className="muted" style={{ margin: 0 }}>
-              This report is now structured around explicit design facts first. It should answer what is placed where, which subnets belong to which domains, how traffic moves, and what still needs confirmation.
+              This report is structured around explicit design facts, clear assumptions, deterministic checks, and engineer review. It should answer what is placed where, which subnets belong to which domains, how traffic moves, and what still needs confirmation.
             </p>
+            <p className="muted" style={{ margin: "8px 0 0 0" }}>{ENGINEER_REVIEW_STATEMENT}</p>
           </div>
           <span className="badge-soft">{exportBlockers.length === 0 ? "Export ready" : `${exportBlockers.length} review item${exportBlockers.length === 1 ? "" : "s"}`}</span>
         </div>
@@ -340,7 +484,7 @@ export function ProjectReportPage() {
           <div>
             <h3 style={{ marginTop: 0, marginBottom: 8 }}>Assumptions</h3>
             {sectionList(
-              synthesized.designReview.filter((item) => item.kind === "assumption").map((item) => item.detail).slice(0, 6),
+              [...PLANNING_ASSUMPTIONS, ...synthesized.designReview.filter((item) => item.kind === "assumption").map((item) => item.detail)].slice(0, 10),
               "No explicit assumptions surfaced yet.",
             )}
           </div>
@@ -673,7 +817,7 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>7. Validation findings</h3>
           <p className="muted" style={{ margin: 0 }}>
-            Validation should remain actionable. Keep the list focused on what must be corrected before implementation or export.
+            Validation should remain actionable. Findings should explain the issue, why it matters, and what to fix before implementation or export.
           </p>
         </div>
         <ValidationList
@@ -689,36 +833,148 @@ export function ProjectReportPage() {
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>8. Implementation and cutover</h3>
           <p className="muted" style={{ margin: 0 }}>
-            This section keeps the execution picture visible: rollout model, validation approach, rollback posture, cutover checkpoints, and the interfaces and boundary attachments that matter during review.
+            This section now stays tied to backend truth instead of hand-wavy rollout language alone. It shows what is blocked, what still needs review, which verification gates are missing, and what rollback posture exists before handoff.
           </p>
         </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className={truthBadgeClass(reportTruth.overallReadiness)}>Overall {reportTruth.overallReadinessLabel}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.routing)}>Routing {reportTruth.readiness.routing}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.security)}>Security {reportTruth.readiness.security}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.nat)}>NAT {reportTruth.readiness.nat}</span>
+          <span className={truthBadgeClass(reportTruth.readiness.implementation)}>Implementation {reportTruth.readiness.implementation}</span>
+        </div>
+
+        <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+          {summaryCard("Devices", reportTruth.summary.deviceCount)}
+          {summaryCard("Links", reportTruth.summary.linkCount)}
+          {summaryCard("Route domains", reportTruth.summary.routeDomainCount)}
+          {summaryCard("Security zones", reportTruth.summary.securityZoneCount)}
+          {summaryCard("Route intents", reportTruth.summary.routeIntentCount)}
+          {summaryCard("Security flows", reportTruth.summary.securityFlowCount)}
+          {summaryCard("Implementation steps", reportTruth.summary.implementationStepCount)}
+          {summaryCard("Blocked verification", reportTruth.summary.blockedVerificationCheckCount)}
+        </div>
+
         <div className="grid-2" style={{ alignItems: "start" }}>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Implementation summary</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li style={{ marginBottom: 8 }}><strong>Rollout:</strong> {synthesized.implementationPlan.rolloutStrategy}</li>
-              <li style={{ marginBottom: 8 }}><strong>Migration:</strong> {synthesized.implementationPlan.migrationStrategy}</li>
-              <li style={{ marginBottom: 8 }}><strong>Validation:</strong> {synthesized.implementationPlan.validationApproach}</li>
-              <li style={{ marginBottom: 8 }}><strong>Rollback:</strong> {synthesized.implementationPlan.rollbackPosture}</li>
-              <li style={{ marginBottom: 0 }}><strong>Handoff:</strong> {synthesized.implementationPlan.handoffPackage}</li>
-            </ul>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Blocking findings</h3>
+            {reportTruth.blockedFindings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No backend blocking findings are currently open.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.blockedFindings.map((item, index) => <li key={`${item.source}-${index}`} style={{ marginBottom: 8 }}><strong>{item.source} — {item.title}:</strong> {item.detail}</li>)}</ul>
+            )}
           </div>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Cutover checkpoints</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {synthesized.cutoverChecklist.slice(0, 8).map((item) => (
-                <li key={`${item.stage}-${item.item}`} style={{ marginBottom: 8 }}><strong>{item.stage}:</strong> {item.item}</li>
-              ))}
-            </ul>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Review findings</h3>
+            {reportTruth.reviewFindings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No backend review findings are currently open.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.reviewFindings.map((item, index) => <li key={`${item.source}-${index}`} style={{ marginBottom: 8 }}><strong>{item.source} — {item.title}:</strong> {item.detail}</li>)}</ul>
+            )}
           </div>
         </div>
+
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Implementation review queue</h3>
+          {reportTruth.topImplementationSteps.length === 0 ? <p className="muted" style={{ margin: 0 }}>No implementation steps are currently available from backend truth.</p> : (
+            <div className="table-wrap"><table><thead><tr><th>Step</th><th>Category</th><th>Readiness</th><th>Evidence / blockers</th><th>Rollback</th></tr></thead><tbody>
+              {reportTruth.topImplementationSteps.map((step) => <tr key={step.id}><td><strong>{step.title}</strong><div className="muted">{step.expectedOutcome}</div></td><td>{step.category}</td><td><span className={truthBadgeClass(step.readiness)}>{step.readiness}</span></td><td>{step.blockers[0] ?? step.requiredEvidence[0] ?? step.readinessReasons[0] ?? "—"}</td><td>{step.rollbackIntent || "—"}</td></tr>)}
+            </tbody></table></div>
+          )}
+        </div>
+
+        <div className="grid-2" style={{ alignItems: "start" }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Verification coverage</h3>
+            {reportTruth.verificationChecksByType.length === 0 ? <p className="muted" style={{ margin: 0 }}>No verification checks are currently available.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.verificationChecksByType.map((item) => <li key={item.checkType} style={{ marginBottom: 8 }}><strong>{item.checkType}:</strong> {item.totalCount} total · {item.blockedCount} blocked · {item.reviewCount} review · {item.readyCount} ready</li>)}</ul>
+            )}
+            <div style={{ marginTop: 12 }}><h4 style={{ margin: "0 0 8px 0" }}>Priority verification checks</h4>{reportTruth.verificationChecks.length === 0 ? <p className="muted" style={{ margin: 0 }}>No verification checks available.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.verificationChecks.slice(0, 8).map((check) => <li key={check.id} style={{ marginBottom: 8 }}><strong>{check.name}:</strong> {check.expectedResult} ({check.readiness})</li>)}</ul>}</div>
+          </div>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Rollback and review checklist</h3>
+            {reportTruth.rollbackActions.length === 0 ? <p className="muted" style={{ margin: 0 }}>No explicit rollback actions are currently modeled.</p> : (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{reportTruth.rollbackActions.map((item) => <li key={item.id} style={{ marginBottom: 8 }}><strong>{item.name}:</strong> {item.triggerCondition}</li>)}</ul>
+            )}
+            <div style={{ marginTop: 12 }}><h4 style={{ margin: "0 0 8px 0" }}>Engineer review checklist</h4>{sectionList(ENGINEER_REVIEW_CHECKLIST, "No checklist items available.")}</div>
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence boundary and limitations</h3>
+          {sectionList(reportTruth.limitations, "No additional limitations were recorded.")}
+        </div>
+      </div>
+
+      <div data-report-section="report-export-truth" className="panel report-section" style={{ display: selectedSection && selectedSection !== "report-export-truth" ? "none" : "grid", gap: 14 }}>
+        <div>
+          <h3 style={{ margin: "0 0 8px 0" }}>9. Report/export truth</h3>
+          <p className="muted" style={{ margin: 0 }}>
+            Reports and exports must show system evidence, requirement traceability, diagram impact, assumptions, review items, and blocked evidence instead of hiding missing data behind polished wording.
+          </p>
+        </div>
+        {!V1ReportExportTruth ? <p className="muted" style={{ margin: 0 }}>Report/export readiness evidence is not available in this snapshot yet.</p> : (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span className={truthBadgeClass(V1ReportExportTruth.overallReadiness)}>Overall {V1ReportExportTruth.overallReadiness}</span>
+              <span className="badge badge-soft">Sections {V1ReportExportTruth.readySectionCount}/{V1ReportExportTruth.requiredSectionCount} ready</span>
+              <span className="badge badge-soft">Traceability rows {V1ReportExportTruth.traceabilityRowCount}</span>
+              <span className={truthBadgeClass(V1ReportExportTruth.pdfDocxCsvCovered ? "ready" : "review")}>PDF/DOCX/CSV {V1ReportExportTruth.pdfDocxCsvCovered ? "covered" : "review"}</span>
+            </div>
+
+            <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+              {summaryCard("Required sections", V1ReportExportTruth.requiredSectionCount)}
+              {summaryCard("Blocked sections", V1ReportExportTruth.blockedSectionCount)}
+              {summaryCard("Review sections", V1ReportExportTruth.reviewSectionCount)}
+              {summaryCard("Missing consumers", V1ReportExportTruth.missingTraceabilityConsumerCount)}
+            </div>
+
+            {reportEvidenceView ? (
+              <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", alignItems: "start" }}>
+                {summaryCard("Design readiness", reportEvidenceView.readiness.designReview)}
+                {summaryCard("Implementation readiness", reportEvidenceView.readiness.implementation)}
+                {summaryCard("Root blockers", reportEvidenceView.validation.rootBlockerCount)}
+                {summaryCard("Propagated blockers", reportEvidenceView.validation.propagatedBlockerCount)}
+                {summaryCard("Review items", reportEvidenceView.validation.reviewItemCount)}
+                {summaryCard("IPAM candidates", reportEvidenceView.ipam.candidateAllocations)}
+                {summaryCard("Approved IPAM", reportEvidenceView.ipam.approvedAllocations)}
+                {summaryCard("Execution-ready steps", reportEvidenceView.implementation.executableSteps)}
+                {summaryCard("Hidden blocker surfaces", reportEvidenceView.omittedEvidence.hiddenBlockerSurfaces)}
+                {summaryCard("Hidden review surfaces", reportEvidenceView.omittedEvidence.hiddenReviewSurfaces)}
+                {summaryCard("Omitted evidence", reportEvidenceView.omittedEvidence.omittedRows)}
+              </div>
+            ) : null}
+
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Required report sections</h3>
+              <div className="table-wrap"><table><thead><tr><th>Section</th><th>Report section</th><th>Frontend location</th><th>Readiness</th><th>Evidence labels</th></tr></thead><tbody>
+                {V1ReportExportTruth.sectionGates.slice(0, 14).map((row) => <tr key={row.sectionKey}><td><strong>{row.title}</strong><div className="muted">{row.evidence[0] ?? "Evidence not provided"}</div></td><td>{row.reportSection}</td><td>{row.frontendLocation}</td><td><span className={truthBadgeClass(row.readinessImpact)}>{row.readinessImpact}</span></td><td>{row.truthLabels.map(reportTruthLabel).join(", ") || "—"}</td></tr>)}
+              </tbody></table></div>
+            </div>
+
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Requirement traceability matrix</h3>
+              <div className="table-wrap"><table><thead><tr><th>Requirement</th><th>Design consequence</th><th>Design areas</th><th>Report</th><th>Diagram</th><th>Readiness</th></tr></thead><tbody>
+                {V1ReportExportTruth.traceabilityMatrix.slice(0, 12).map((row) => <tr key={row.requirementKey}><td><strong>{row.requirementLabel}</strong><div className="muted">{row.requirementKey}</div></td><td>{row.designConsequence}</td><td>{row.enginesAffected.join(", ") || "—"}</td><td>{row.reportSection}</td><td>{row.diagramImpact}</td><td><span className={truthBadgeClass(row.readinessStatus)}>{row.readinessStatus}</span></td></tr>)}
+              </tbody></table></div>
+            </div>
+
+            <div className="grid-2" style={{ alignItems: "start" }}>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Evidence labels</h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.truthLabelRows.map((row) => <li key={row.truthLabel} style={{ marginBottom: 8 }}><strong>{reportTruthLabel(row.truthLabel)}:</strong> {row.count} · {row.reportUsage}</li>)}</ul>
+              </div>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Findings</h3>
+                {V1ReportExportTruth.findings.length === 0 ? <p className="muted" style={{ margin: 0 }}>No report/export findings are currently emitted.</p> : <ul style={{ margin: 0, paddingLeft: 18 }}>{V1ReportExportTruth.findings.map((finding) => <li key={finding.code} style={{ marginBottom: 8 }}><strong>{finding.severity} — {finding.title}:</strong> {finding.detail}</li>)}</ul>}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
         <div>
-          <h3 style={{ margin: "0 0 8px 0" }}>9. Open issues and review items</h3>
+          <h3 style={{ margin: "0 0 8px 0" }}>10. Open issues and review items</h3>
           <p className="muted" style={{ margin: 0 }}>
-            The product should stay honest about unresolved assumptions and next actions. This is where the handoff package should clearly say what still needs confirmation.
+            The package should stay honest about unresolved assumptions, risks, and next actions. This is where the handoff should clearly say what still needs confirmation.
           </p>
         </div>
         <div className="grid-2" style={{ alignItems: "start" }}>
@@ -733,7 +989,7 @@ export function ProjectReportPage() {
         </div>
       </div>
 
-      <div data-report-section="issues" className="panel report-section" style={{ display: selectedSection && selectedSection !== "issues" ? "none" : "grid", gap: 14 }}>
+      <div data-report-section="diagram-cross-check" className="panel report-section" style={{ display: selectedSection && selectedSection !== "diagram-cross-check" ? "none" : "grid", gap: 14 }}>
         <div>
           <h3 style={{ margin: "0 0 8px 0" }}>10. Diagram preview and report cross-check</h3>
           <p className="muted" style={{ margin: 0 }}>
@@ -763,7 +1019,7 @@ export function ProjectReportPage() {
             )}
           </div>
         </div>
-        <ProjectDiagram project={enrichedProject} />
+        <ProjectDiagram project={enrichedProject} synthesizedDesign={synthesized} />
       </div>
     </section>
   );

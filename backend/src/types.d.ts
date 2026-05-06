@@ -4,6 +4,8 @@ declare namespace Express {
       id: string;
       email?: string;
       planTier?: "FREE" | "PAID";
+      sessionId?: string;
+      tokenVersion?: number;
     };
   }
 }

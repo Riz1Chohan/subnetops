@@ -6,6 +6,7 @@ export function createVlan(input: {
   vlanId: number;
   vlanName: string;
   purpose?: string;
+  segmentRole?: string;
   subnetCidr: string;
   gatewayIp: string;
   dhcpEnabled: boolean;
@@ -23,6 +24,7 @@ export function updateVlan(vlanId: string, input: {
   vlanId?: number;
   vlanName?: string;
   purpose?: string;
+  segmentRole?: string;
   subnetCidr?: string;
   gatewayIp?: string;
   dhcpEnabled?: boolean;
